@@ -66,7 +66,7 @@ export default function LeadTable({ initialData, onUpdate }: LeadTableProps) {
 
   // Memoized derived data
   const updatedLeads = useMemo(() => {
-    return initialData.leads.map((lead: Lead) => ({
+    return initialData.map((lead: Lead) => ({
       ...lead,
       isSelected: selectedLeads.has(lead.id)
     }))
