@@ -1,0 +1,356 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Enums
+enum UserRole {
+  homeowner
+  provider
+  admin
+}
+
+enum PropertyType {
+  single_family
+  condo
+  townhouse
+  multi_family
+}
+
+enum ServiceCategory {
+  landscaping
+  remodeling
+  roofing
+  fencing
+  hvac
+  plumbing
+  painting
+  flooring
+}
+
+enum LeadStatus {
+  new
+  contacted
+  replied
+  matched
+  converted
+  unqualified
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  active
+  paused
+  completed
+}
+
+enum SequenceType {
+  sms_sms_email
+  email_sms_email
+  sms_email
+  custom
+}
+
+enum MessageType {
+  sms
+  email
+}
+
+enum MessageStatus {
+  scheduled
+  sent
+  delivered
+  failed
+  bounced
+}
+
+enum ReplySentiment {
+  positive
+  neutral
+  negative
+  question
+}
+
+enum SubscriptionTier {
+  free
+  basic
+  pro
+  enterprise
+}
+
+enum PriceRange {
+  budget
+  mid_range
+  premium
+  luxury
+}
+
+enum CapacityStatus {
+  accepting
+  limited
+  full
+}
+
+enum MatchStatus {
+  pending
+  sent_to_provider
+  accepted
+  declined
+  contacted
+  closed_won
+  closed_lost
+}
+
+enum OptimizationType {
+  message_template
+  send_timing
+  lead_scoring
+  matching_criteria
+}
+
+// Models
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  passwordHash  String   @map("password_hash")
+  role          UserRole
+  firstName     String   @map("first_name")
+  lastName      String   @map("last_name")
+  phone         String?
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  campaigns        Campaign[]
+  serviceProvider  ServiceProvider?
+  messageTemplates MessageTemplate[]
+
+  @@map("users")
+}
+
+model Lead {
+  id               String          @id @default(uuid())
+  firstName        String          @map("first_name")
+  lastName         String          @map("last_name")
+  email            String
+  phone            String
+  address          String
+  city             String
+  state            String
+  zip              String
+  propertyType     PropertyType    @map("property_type")
+  propertyValue    Decimal?        @map("property_value")
+  squareFootage    Int?            @map("square_footage")
+  moveInDate       DateTime?       @map("move_in_date")
+  serviceInterest  ServiceCategory @map("service_interest")
+  leadSource       String          @map("lead_source")
+  leadScore        Int             @default(0) @map("lead_score")
+  status           LeadStatus      @default(new)
+  notes            String?
+  aiTool1Metadata  Json?           @map("ai_tool_1_metadata")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  messages          Message[]
+  engagementMetrics EngagementMetric[]
+  matches           Match[]
+
+  // Indexes for filtering and sorting
+  @@index([email])
+  @@index([zip])
+  @@index([status])
+  @@index([serviceInterest])
+  @@index([leadScore])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@map("leads")
+}
+
+model Campaign {
+  id               String         @id @default(uuid())
+  name             String
+  serviceType      ServiceCategory @map("service_type")
+  targetAudience   Json           @map("target_audience")
+  sequenceType     SequenceType   @map("sequence_type")
+  status           CampaignStatus @default(draft)
+  totalLeads       Int            @default(0) @map("total_leads")
+  messagesSent     Int            @default(0) @map("messages_sent")
+  deliveredCount   Int            @default(0) @map("delivered_count")
+  openedCount      Int            @default(0) @map("opened_count")
+  repliedCount     Int            @default(0) @map("replied_count")
+  convertedCount   Int            @default(0) @map("converted_count")
+  scheduledStart   DateTime?      @map("scheduled_start")
+  startedAt        DateTime?      @map("started_at")
+  completedAt      DateTime?      @map("completed_at")
+  createdBy        String         @map("created_by")
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  creator               User                   @relation(fields: [createdBy], references: [id])
+  messages              Message[]
+  engagementMetrics     EngagementMetric[]
+  matches               Match[]
+
+  @@index([status])
+  @@index([serviceType])
+  @@map("campaigns")
+}
+
+model Message {
+  id                String        @id @default(uuid())
+  campaignId        String        @map("campaign_id")
+  leadId            String        @map("lead_id")
+  messageType       MessageType   @map("message_type")
+  sequenceStep      Int           @map("sequence_step")
+  subject           String?
+  content           String        @db.Text
+  status            MessageStatus @default(scheduled)
+  sentAt            DateTime?     @map("sent_at")
+  deliveredAt       DateTime?     @map("delivered_at")
+  providerMessageId String?       @map("provider_message_id")
+  errorMessage      String?       @map("error_message") @db.Text
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  // Relations
+  campaign          Campaign             @relation(fields: [campaignId], references: [id])
+  lead              Lead                 @relation(fields: [leadId], references: [id])
+  engagementMetrics EngagementMetric[]
+
+  @@index([campaignId])
+  @@index([leadId])
+  @@index([status])
+  @@map("messages")
+}
+
+model EngagementMetric {
+  id              String          @id @default(uuid())
+  messageId       String          @map("message_id")
+  leadId          String          @map("lead_id")
+  campaignId      String          @map("campaign_id")
+  delivered       Boolean         @default(false)
+  opened          Boolean         @default(false)
+  clicked         Boolean         @default(false)
+  replied         Boolean         @default(false)
+  replyText       String?         @map("reply_text") @db.Text
+  replySentiment  ReplySentiment? @map("reply_sentiment")
+  openedAt        DateTime?       @map("opened_at")
+  clickedAt       DateTime?       @map("clicked_at")
+  repliedAt       DateTime?       @map("replied_at")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  message  Message  @relation(fields: [messageId], references: [id])
+  lead     Lead     @relation(fields: [leadId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+
+  @@index([messageId])
+  @@index([leadId])
+  @@index([campaignId])
+  @@map("engagement_metrics")
+}
+
+model ServiceProvider {
+  id                   String             @id @default(uuid())
+  userId               String             @unique @map("user_id")
+  businessName         String             @map("business_name")
+  serviceCategories    ServiceCategory[]  @map("service_categories")
+  coverageAreas        Json               @map("coverage_areas")
+  rating               Decimal            @default(0) @db.Decimal(3, 2)
+  totalReviews         Int                @default(0) @map("total_reviews")
+  subscriptionTier     SubscriptionTier   @default(free) @map("subscription_tier")
+  priceRange           PriceRange         @map("price_range")
+  specializations      String[]
+  capacityStatus       CapacityStatus     @default(accepting) @map("capacity_status")
+  leadsReceivedCount   Int                @default(0) @map("leads_received_count")
+  leadsConvertedCount  Int                @default(0) @map("leads_converted_count")
+  conversionRate       Decimal            @default(0) @db.Decimal(5, 2) @map("conversion_rate")
+  isVerified           Boolean            @default(false) @map("is_verified")
+  isActive             Boolean            @default(true) @map("is_active")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  user    User    @relation(fields: [userId], references: [id])
+  matches Match[]
+
+  @@index([subscriptionTier])
+  @@index([isActive])
+  @@map("service_providers")
+}
+
+model Match {
+  id                  String      @id @default(uuid())
+  leadId              String      @map("lead_id")
+  providerId          String      @map("provider_id")
+  campaignId          String      @map("campaign_id")
+  matchScore          Int         @map("match_score")
+  matchReason         Json        @map("match_reason")
+  status              MatchStatus @default(pending)
+  leadPrice           Decimal?    @map("lead_price")
+  dealValue           Decimal?    @map("deal_value")
+  commissionAmount    Decimal?    @map("commission_amount")
+  providerNotifiedAt  DateTime?   @map("provider_notified_at")
+  providerResponseAt  DateTime?   @map("provider_response_at")
+  dealClosedAt        DateTime?   @map("deal_closed_at")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  lead     Lead            @relation(fields: [leadId], references: [id])
+  provider ServiceProvider @relation(fields: [providerId], references: [id])
+  campaign Campaign        @relation(fields: [campaignId], references: [id])
+
+  @@index([leadId])
+  @@index([providerId])
+  @@index([status])
+  @@map("matches")
+}
+
+model MessageTemplate {
+  id                String          @id @default(uuid())
+  name              String
+  type              MessageType
+  serviceCategory   ServiceCategory? @map("service_category")
+  subject           String?
+  body              String          @db.Text
+  isActive          Boolean         @default(true) @map("is_active")
+  performanceScore  Decimal         @default(0) @db.Decimal(5, 2) @map("performance_score")
+  timesUsed         Int             @default(0) @map("times_used")
+  avgReplyRate      Decimal         @default(0) @db.Decimal(5, 2) @map("avg_reply_rate")
+  createdBy         String          @map("created_by")
+  createdAt         DateTime        @default(now()) @map("created_at")
+  updatedAt         DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  creator User @relation(fields: [createdBy], references: [id])
+
+  @@index([type])
+  @@index([isActive])
+  @@map("message_templates")
+}
+
+model AIOptimization {
+  id                     String           @id @default(uuid())
+  optimizationType       OptimizationType @map("optimization_type")
+  beforeMetric           Json             @map("before_metric")
+  afterMetric            Json             @map("after_metric")
+  improvementPercentage  Decimal          @map("improvement_percentage") @db.Decimal(5, 2)
+  appliedAt              DateTime         @map("applied_at")
+  details                Json
+  createdAt              DateTime         @default(now()) @map("created_at")
+
+  @@index([optimizationType])
+  @@map("ai_optimizations")
+}
+
