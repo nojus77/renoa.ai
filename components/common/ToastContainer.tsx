@@ -5,7 +5,7 @@ export default function ToastContainer() {
   const { toasts, removeToast } = useToastStore()
 
   useEffect(() => {
-    toasts.forEach(toast => {
+    toasts.forEach((toast: { id: number }) => {
       const timer = setTimeout(() => {
         removeToast(toast.id)
       }, 3000)
@@ -15,7 +15,7 @@ export default function ToastContainer() {
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2">
-      {toasts.map((toast) => (
+      {toasts.map((toast: { id: number; type: 'success' | 'error'; message: string }) => (
         <div
           key={toast.id}
           className={`
