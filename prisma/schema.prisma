@@ -153,6 +153,16 @@ model Lead {
   serviceInterest  ServiceCategory @map("service_interest")
   leadSource       String          @map("lead_source")
   leadScore        Int             @default(0) @map("lead_score")
+  // New fields
+  tier             Int
+  campaign         String?
+  contactCount     Int             @default(0) @map("contact_count")
+  urgencyScore     Int?
+  propertyScore    Int?
+  financialScore   Int?
+  demographicScore Int?
+  marketScore      Int?
+  urgencyReasons   String?         @db.Text @map("urgency_reasons")
   status           LeadStatus      @default(new)
   notes            String?
   aiTool1Metadata  Json?           @map("ai_tool_1_metadata")
@@ -170,6 +180,7 @@ model Lead {
   @@index([status])
   @@index([serviceInterest])
   @@index([leadScore])
+  @@index([tier])
   @@index([createdAt])
   @@index([updatedAt])
   @@map("leads")

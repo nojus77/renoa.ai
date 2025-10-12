@@ -17,6 +17,15 @@ interface LeadInput {
   serviceInterest: string
   leadSource?: string
   leadScore?: number
+  tier?: number
+  campaign?: string
+  contactCount?: number
+  urgencyScore?: number
+  propertyScore?: number
+  financialScore?: number
+  demographicScore?: number
+  marketScore?: number
+  urgencyReasons?: string
   status?: string
   notes?: string
 }
@@ -49,6 +58,12 @@ export async function POST(request: NextRequest) {
         continue
       }
 
+      const computedTier = typeof lead.tier === 'number'
+        ? lead.tier
+        : (typeof lead.leadScore === 'number'
+            ? (lead.leadScore >= 80 ? 1 : lead.leadScore >= 60 ? 2 : 3)
+            : 3)
+
       validLeads.push({
         firstName: lead.firstName,
         lastName: lead.lastName,
@@ -65,6 +80,15 @@ export async function POST(request: NextRequest) {
         serviceInterest: lead.serviceInterest,
         leadSource: lead.leadSource || 'ai_tool',
         leadScore: lead.leadScore || 50,
+        tier: computedTier,
+        campaign: lead.campaign || null,
+        contactCount: typeof lead.contactCount === 'number' ? lead.contactCount : 0,
+        urgencyScore: typeof lead.urgencyScore === 'number' ? lead.urgencyScore : null,
+        propertyScore: typeof lead.propertyScore === 'number' ? lead.propertyScore : null,
+        financialScore: typeof lead.financialScore === 'number' ? lead.financialScore : null,
+        demographicScore: typeof lead.demographicScore === 'number' ? lead.demographicScore : null,
+        marketScore: typeof lead.marketScore === 'number' ? lead.marketScore : null,
+        urgencyReasons: lead.urgencyReasons || null,
         status: lead.status || 'new',
         notes: lead.notes || null
       })

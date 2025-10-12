@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '../../../lib/prisma'
-import { LeadStatus, ServiceCategory } from '@prisma/client'
+import { LeadStatus, ServiceCategory, Prisma } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,8 +9,11 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
     const search = searchParams.get('search') || ''
-    const status = searchParams.get('status')?.split(',').filter(Boolean) as LeadStatus[] | undefined
+  const status = searchParams.get('status')?.split(',').filter(Boolean) as LeadStatus[] | undefined
     const serviceInterest = searchParams.get('serviceInterest')?.split(',').filter(Boolean) as ServiceCategory[] | undefined
+  const tier = searchParams.get('tier')?.split(',').map(t => parseInt(t)).filter(n => !Number.isNaN(n)) as number[] | undefined
+  const sortBy = (searchParams.get('sortBy') || 'createdAt') as 'leadScore' | 'propertyValue' | 'tier' | 'createdAt'
+  const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc'
     
     const where: any = {}
     
@@ -32,15 +35,31 @@ export async function GET(request: NextRequest) {
       where.serviceInterest = { in: serviceInterest }
     }
     
+    if (tier && tier.length > 0) {
+      where.tier = { in: tier }
+    }
+    
     const total = await prisma.lead.count({ where })
     
+    // Build orderBy dynamically
+    const orderBy: Prisma.LeadOrderByWithRelationInput = (() => {
+      switch (sortBy) {
+        case 'leadScore':
+          return { leadScore: sortOrder }
+        case 'propertyValue':
+          return { propertyValue: sortOrder }
+        case 'tier':
+          return { tier: sortOrder }
+        default:
+          return { createdAt: 'desc' }
+      }
+    })()
+
     const leads = await prisma.lead.findMany({
       where,
       skip: (page - 1) * limit,
       take: limit,
-      orderBy: {
-        createdAt: 'desc'
-      }
+      orderBy
     })
     
     return NextResponse.json({
@@ -76,7 +95,17 @@ export async function POST(request: NextRequest) {
       zip, 
       propertyType, 
       serviceInterest,
-      leadSource 
+      leadSource,
+      // New fields
+      tier,
+      campaign,
+      contactCount,
+      urgencyScore,
+      propertyScore,
+      financialScore,
+      demographicScore,
+      marketScore,
+      urgencyReasons
     } = body
     
     if (!firstName || !lastName || !email || !phone || !city || !state || !zip) {
@@ -86,26 +115,44 @@ export async function POST(request: NextRequest) {
       )
     }
     
+    // derive default tier if not provided
+    const derivedTier: number = typeof tier === 'number' && !Number.isNaN(tier)
+      ? tier
+      : (typeof body.leadScore === 'number'
+          ? (body.leadScore >= 80 ? 1 : body.leadScore >= 60 ? 2 : 3)
+          : 3)
+
+    const data: any = {
+      firstName,
+      lastName,
+      email,
+      phone,
+      address: address || '',
+      city,
+      state,
+      zip,
+      propertyType: propertyType || 'single_family',
+      propertyValue: body.propertyValue ? parseFloat(body.propertyValue) : null,
+      squareFootage: body.squareFootage ? parseInt(body.squareFootage) : null,
+      moveInDate: body.moveInDate ? new Date(body.moveInDate) : null,
+      serviceInterest: serviceInterest || 'landscaping',
+      leadSource: leadSource || 'website',
+      leadScore: body.leadScore || 50,
+      tier: derivedTier,
+      campaign: campaign || null,
+      contactCount: typeof contactCount === 'number' ? contactCount : 0,
+      urgencyScore: typeof urgencyScore === 'number' ? urgencyScore : null,
+      propertyScore: typeof propertyScore === 'number' ? propertyScore : null,
+      financialScore: typeof financialScore === 'number' ? financialScore : null,
+      demographicScore: typeof demographicScore === 'number' ? demographicScore : null,
+      marketScore: typeof marketScore === 'number' ? marketScore : null,
+      urgencyReasons: urgencyReasons || null,
+      status: 'new',
+      notes: body.notes || null,
+    }
+
     const lead = await prisma.lead.create({
-      data: {
-        firstName,
-        lastName,
-        email,
-        phone,
-        address: address || '',
-        city,
-        state,
-        zip,
-        propertyType: propertyType || 'single_family',
-        propertyValue: body.propertyValue ? parseFloat(body.propertyValue) : null,
-        squareFootage: body.squareFootage ? parseInt(body.squareFootage) : null,
-        moveInDate: body.moveInDate ? new Date(body.moveInDate) : null,
-        serviceInterest: serviceInterest || 'landscaping',
-        leadSource: leadSource || 'website',
-        leadScore: body.leadScore || 50,
-        status: 'new',
-        notes: body.notes || null,
-      }
+      data
     })
     
     return NextResponse.json({ lead }, { status: 201 })

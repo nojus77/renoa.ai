@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import LeadDetailModal from '../../../components/leads/LeadDetailModal'
 import { showToast } from '@/lib/toast'
 
 interface Lead {
@@ -14,6 +15,10 @@ interface Lead {
   serviceInterest: string
   status: string
   leadScore: number
+  tier: number
+  contactCount: number
+  campaign?: string | null
+  propertyValue?: number | null
   createdAt: string
 }
 
@@ -25,11 +30,15 @@ export default function LeadsPage() {
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage, setItemsPerPage] = useState(3)
   const [apiTotalPages, setApiTotalPages] = useState(1)
+  const [tierFilter, setTierFilter] = useState<number | 'all'>('all')
+  const [sortBy, setSortBy] = useState<'leadScore' | 'propertyValue' | 'tier'>('leadScore')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
 
   // Fetch leads from API
   useEffect(() => {
     fetchLeads()
-  }, [currentPage, itemsPerPage, searchQuery, statusFilter.join(',')])
+  }, [currentPage, itemsPerPage, searchQuery, statusFilter.join(','), tierFilter, sortBy, sortOrder])
 
   const fetchLeads = async () => {
     try {
@@ -38,7 +47,10 @@ export default function LeadsPage() {
         page: currentPage.toString(),
         limit: itemsPerPage.toString(),
         ...(searchQuery && { search: searchQuery }),
-        ...(statusFilter.length > 0 && { status: statusFilter.join(',') })
+        ...(statusFilter.length > 0 && { status: statusFilter.join(',') }),
+        ...(tierFilter !== 'all' && { tier: String(tierFilter) }),
+        sortBy,
+        sortOrder
       })
       
       const response = await fetch(`/api/leads?${params.toString()}`)
@@ -65,13 +77,14 @@ export default function LeadsPage() {
       return
     }
 
-    const headers = ['Score', 'Name', 'City', 'Service', 'Status']
+    const headers = ['Score', 'Tier', 'Name', 'Status', 'Campaign', 'Property Value']
     const rows = filteredLeads.map(lead => [
       lead.leadScore,
+      lead.tier,
       `${lead.firstName} ${lead.lastName}`,
-      lead.city,
-      lead.serviceInterest,
-      lead.status
+      `Contacted ${lead.contactCount || 0} times`,
+      lead.campaign || '-',
+      formatCurrency(lead.propertyValue)
     ])
 
     const csvContent = [
@@ -110,6 +123,10 @@ export default function LeadsPage() {
       )
     }
 
+    if (tierFilter !== 'all') {
+      filtered = filtered.filter(lead => lead.tier === tierFilter)
+    }
+
     return filtered
   }, [leads, searchQuery, statusFilter])
 
@@ -121,6 +138,12 @@ export default function LeadsPage() {
   }, [filteredLeads, currentPage, itemsPerPage])
 
   const totalPages = Math.ceil(filteredLeads.length / itemsPerPage)
+
+  function formatCurrency(value?: number | null) {
+    if (!value && value !== 0) return '-'
+    const formatter = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', notation: 'compact', compactDisplay: 'short' })
+    return formatter.format(value)
+  }
 
   if (loading) {
     return (
@@ -161,6 +184,25 @@ export default function LeadsPage() {
               </label>
             ))}
           </div>
+        </div>
+
+        {/* Tier Filter */}
+        <div className="mb-6">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Tier</h3>
+          <select
+            className="w-full border rounded-lg p-2 text-sm"
+            value={tierFilter}
+            onChange={(e) => {
+              const v = e.target.value
+              setTierFilter(v === 'all' ? 'all' : Number(v) as any)
+              setCurrentPage(1)
+            }}
+          >
+            <option value="all">All tiers</option>
+            <option value="1">Tier 1</option>
+            <option value="2">Tier 2</option>
+            <option value="3">Tier 3</option>
+          </select>
         </div>
 
         {/* Clear All Filters */}
@@ -231,6 +273,27 @@ export default function LeadsPage() {
               </button>
             )}
           </div>
+
+          {/* Sort Controls */}
+          <div className="flex items-center gap-3 mt-3">
+            <select
+              className="border rounded-lg text-sm p-2"
+              value={sortBy}
+              onChange={(e) => { setSortBy(e.target.value as any); setCurrentPage(1) }}
+            >
+              <option value="leadScore">Sort by: AI Score</option>
+              <option value="propertyValue">Sort by: Property Value</option>
+              <option value="tier">Sort by: Tier</option>
+            </select>
+            <select
+              className="border rounded-lg text-sm p-2"
+              value={sortOrder}
+              onChange={(e) => { setSortOrder(e.target.value as any); setCurrentPage(1) }}
+            >
+              <option value="desc">Desc</option>
+              <option value="asc">Asc</option>
+            </select>
+          </div>
         </div>
 
         {filteredLeads.length === 0 ? (
@@ -260,29 +323,27 @@ export default function LeadsPage() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Score</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">City</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Service</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">AI Score</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tier</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact Name</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status (contacts)</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Campaign</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Property Value</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {paginatedLeads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-gray-50">
+                    <tr key={lead.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => setSelectedLead(lead)}>
                       <td className="px-4 py-3">
                         <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-indigo-100 text-indigo-600 font-semibold">
                           {lead.leadScore}
                         </span>
                       </td>
+                      <td className="px-4 py-3 text-sm">T{lead.tier}</td>
                       <td className="px-4 py-3 text-sm font-medium">{lead.firstName} {lead.lastName}</td>
-                      <td className="px-4 py-3 text-sm">{lead.city}</td>
-                      <td className="px-4 py-3 text-sm capitalize">{lead.serviceInterest}</td>
-                      <td className="px-4 py-3">
-                        <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800 capitalize">
-                          {lead.status}
-                        </span>
-                      </td>
+                      <td className="px-4 py-3 text-sm">Contacted {lead.contactCount || 0} times</td>
+                      <td className="px-4 py-3 text-sm">{lead.campaign || '-'}</td>
+                      <td className="px-4 py-3 text-sm">{formatCurrency(lead.propertyValue ?? null)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -358,6 +419,31 @@ export default function LeadsPage() {
           </>
         )}
       </main>
+      {selectedLead && (
+        <LeadDetailModal
+          lead={{
+            id: selectedLead.id,
+            firstName: selectedLead.firstName,
+            lastName: selectedLead.lastName,
+            email: selectedLead.email,
+            phone: selectedLead.phone,
+            address: '-',
+            city: selectedLead.city,
+            state: selectedLead.state,
+            zip: '-',
+            leadScore: selectedLead.leadScore,
+            tier: selectedLead.tier,
+            urgencyScore: undefined,
+            propertyScore: undefined,
+            financialScore: undefined,
+            demographicScore: undefined,
+            marketScore: undefined,
+            urgencyReasons: undefined,
+            campaign: selectedLead.campaign || null,
+          }}
+          onClose={() => setSelectedLead(null)}
+        />
+      )}
     </div>
   )
 }

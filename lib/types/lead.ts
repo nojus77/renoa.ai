@@ -75,14 +75,15 @@ export type Lead = {
   predictedService?: ServiceCategory
   // Scoring and tier
   score: LeadScore
-  tier: LeadTier
+  tier: number | LeadTier
   // Lead source and status
   leadSource: string
   status: LeadStatus
   // Metadata
   aiTool1Metadata: Prisma.JsonValue
   // Campaign and activity tracking
-  campaign?: LeadCampaign
+  campaign?: LeadCampaign | string | null
+  contactCount?: number
   lastActivityAt?: Date
   messagesSent: number
   hasNotes: boolean
@@ -122,6 +123,9 @@ export type LeadUpdate = Partial<
     | 'notes'
     | 'aiTool1Metadata'
     | 'score'
+    | 'tier'
+    | 'campaign'
+    | 'contactCount'
   >
 >
 
