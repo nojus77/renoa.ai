@@ -116,17 +116,41 @@ enum OptimizationType {
   matching_criteria
 }
 
+enum EmailStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
+}
+
+enum EventType {
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  OPENED
+  CLICKED
+}
+
+enum CampaignType {
+  EMAIL
+  SMS
+  MULTI_CHANNEL
+}
+
 // Models
 model User {
-  id            String   @id @default(uuid())
-  email         String   @unique
-  passwordHash  String   @map("password_hash")
-  role          UserRole
-  firstName     String   @map("first_name")
-  lastName      String   @map("last_name")
-  phone         String?
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         UserRole
+  firstName    String   @map("first_name")
+  lastName     String   @map("last_name")
+  phone        String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
 
   // Relations
   campaigns        Campaign[]
@@ -162,7 +186,7 @@ model Lead {
   financialScore   Int?
   demographicScore Int?
   marketScore      Int?
-  urgencyReasons   String?         @db.Text @map("urgency_reasons")
+  urgencyReasons   String?         @map("urgency_reasons") @db.Text
   status           LeadStatus      @default(new)
   notes            String?
   aiTool1Metadata  Json?           @map("ai_tool_1_metadata")
@@ -171,6 +195,7 @@ model Lead {
 
   // Relations
   messages          Message[]
+  inboundMessages   InboundMessage[]
   engagementMetrics EngagementMetric[]
   matches           Match[]
 
@@ -186,79 +211,119 @@ model Lead {
   @@map("leads")
 }
 
-model Campaign {
-  id               String         @id @default(uuid())
-  name             String
-  serviceType      ServiceCategory @map("service_type")
-  targetAudience   Json           @map("target_audience")
-  sequenceType     SequenceType   @map("sequence_type")
-  status           CampaignStatus @default(draft)
-  totalLeads       Int            @default(0) @map("total_leads")
-  messagesSent     Int            @default(0) @map("messages_sent")
-  deliveredCount   Int            @default(0) @map("delivered_count")
-  openedCount      Int            @default(0) @map("opened_count")
-  repliedCount     Int            @default(0) @map("replied_count")
-  convertedCount   Int            @default(0) @map("converted_count")
-  scheduledStart   DateTime?      @map("scheduled_start")
-  startedAt        DateTime?      @map("started_at")
-  completedAt      DateTime?      @map("completed_at")
-  createdBy        String         @map("created_by")
-  createdAt        DateTime       @default(now()) @map("created_at")
-  updatedAt        DateTime       @updatedAt @map("updated_at")
+model InboundMessage {
+  id            String @id @default(cuid())
+  originalMsgId String // Links to Message via id
+  leadId        String
+
+  // Email headers
+  messageId  String  @unique
+  inReplyTo  String?
+  references String? @db.Text
+
+  // Content
+  fromEmail  String
+  subject    String
+  body       String   @db.Text
+  htmlBody   String?  @db.Text
+  receivedAt DateTime @default(now())
 
   // Relations
-  creator               User                   @relation(fields: [createdBy], references: [id])
-  messages              Message[]
-  engagementMetrics     EngagementMetric[]
-  matches               Match[]
+  originalMsg Message @relation(fields: [originalMsgId], references: [id], onDelete: Cascade)
+  lead        Lead    @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([originalMsgId])
+}
+
+model Campaign {
+  id             String          @id @default(uuid())
+  name           String
+  serviceType    ServiceCategory @map("service_type")
+  targetAudience Json            @map("target_audience")
+  sequenceType   SequenceType    @map("sequence_type")
+  status         CampaignStatus  @default(draft)
+  type           CampaignType    @default(EMAIL)
+  totalLeads     Int             @default(0) @map("total_leads")
+  messagesSent   Int             @default(0) @map("messages_sent")
+  deliveredCount Int             @default(0) @map("delivered_count")
+  openedCount    Int             @default(0) @map("opened_count")
+  repliedCount   Int             @default(0) @map("replied_count")
+  convertedCount Int             @default(0) @map("converted_count")
+  scheduledStart DateTime?       @map("scheduled_start")
+  startedAt      DateTime?       @map("started_at")
+  completedAt    DateTime?       @map("completed_at")
+  createdBy      String?         @map("created_by")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+
+  // Relations
+  creator           User?              @relation(fields: [createdBy], references: [id])
+  messages          Message[]
+  sequences         CampaignSequence[]
+  engagementMetrics EngagementMetric[]
+  matches           Match[]
 
   @@index([status])
   @@index([serviceType])
   @@map("campaigns")
 }
 
+// Enhanced Message model with tracking
 model Message {
-  id                String        @id @default(uuid())
-  campaignId        String        @map("campaign_id")
-  leadId            String        @map("lead_id")
-  messageType       MessageType   @map("message_type")
-  sequenceStep      Int           @map("sequence_step")
-  subject           String?
-  content           String        @db.Text
-  status            MessageStatus @default(scheduled)
-  sentAt            DateTime?     @map("sent_at")
-  deliveredAt       DateTime?     @map("delivered_at")
-  providerMessageId String?       @map("provider_message_id")
-  errorMessage      String?       @map("error_message") @db.Text
-  createdAt         DateTime      @default(now()) @map("created_at")
+  id             String  @id @default(cuid())
+  leadId         String
+  campaignId     String?
+  sequenceStepId String?
+
+  // Email metadata
+  messageId     String  @unique // RFC 2822 Message-ID
+  trackingToken String  @unique // For pixel/click tracking
+  inReplyTo     String? // For threading
+
+  // Content
+  subject   String
+  body      String @db.Text
+  fromEmail String
+  toEmail   String
+
+  // Status
+  status       EmailStatus @default(QUEUED)
+  sentAt       DateTime?
+  scheduledFor DateTime?
 
   // Relations
-  campaign          Campaign             @relation(fields: [campaignId], references: [id])
-  lead              Lead                 @relation(fields: [leadId], references: [id])
+  lead     Lead             @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  campaign Campaign?        @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  events   EmailEvent[]
+  replies  InboundMessage[]
+
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
   engagementMetrics EngagementMetric[]
 
-  @@index([campaignId])
   @@index([leadId])
+  @@index([campaignId])
   @@index([status])
-  @@map("messages")
+  @@index([scheduledFor])
 }
 
 model EngagementMetric {
-  id              String          @id @default(uuid())
-  messageId       String          @map("message_id")
-  leadId          String          @map("lead_id")
-  campaignId      String          @map("campaign_id")
-  delivered       Boolean         @default(false)
-  opened          Boolean         @default(false)
-  clicked         Boolean         @default(false)
-  replied         Boolean         @default(false)
-  replyText       String?         @map("reply_text") @db.Text
-  replySentiment  ReplySentiment? @map("reply_sentiment")
-  openedAt        DateTime?       @map("opened_at")
-  clickedAt       DateTime?       @map("clicked_at")
-  repliedAt       DateTime?       @map("replied_at")
-  createdAt       DateTime        @default(now()) @map("created_at")
-  updatedAt       DateTime        @updatedAt @map("updated_at")
+  id             String          @id @default(uuid())
+  messageId      String          @map("message_id")
+  leadId         String          @map("lead_id")
+  campaignId     String          @map("campaign_id")
+  delivered      Boolean         @default(false)
+  opened         Boolean         @default(false)
+  clicked        Boolean         @default(false)
+  replied        Boolean         @default(false)
+  replyText      String?         @map("reply_text") @db.Text
+  replySentiment ReplySentiment? @map("reply_sentiment")
+  openedAt       DateTime?       @map("opened_at")
+  clickedAt      DateTime?       @map("clicked_at")
+  repliedAt      DateTime?       @map("replied_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
 
   // Relations
   message  Message  @relation(fields: [messageId], references: [id])
@@ -271,25 +336,45 @@ model EngagementMetric {
   @@map("engagement_metrics")
 }
 
+model EmailEvent {
+  id        String    @id @default(cuid())
+  messageId String
+  eventType EventType
+
+  // Event details
+  timestamp  DateTime @default(now())
+  ipAddress  String?
+  userAgent  String?
+  clickUrl   String? // For click events
+  bounceType String? // Hard/Soft for bounces
+  metadata   Json? // Additional SES metadata
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([eventType])
+  @@index([timestamp])
+}
+
 model ServiceProvider {
-  id                   String             @id @default(uuid())
-  userId               String             @unique @map("user_id")
-  businessName         String             @map("business_name")
-  serviceCategories    ServiceCategory[]  @map("service_categories")
-  coverageAreas        Json               @map("coverage_areas")
-  rating               Decimal            @default(0) @db.Decimal(3, 2)
-  totalReviews         Int                @default(0) @map("total_reviews")
-  subscriptionTier     SubscriptionTier   @default(free) @map("subscription_tier")
-  priceRange           PriceRange         @map("price_range")
-  specializations      String[]
-  capacityStatus       CapacityStatus     @default(accepting) @map("capacity_status")
-  leadsReceivedCount   Int                @default(0) @map("leads_received_count")
-  leadsConvertedCount  Int                @default(0) @map("leads_converted_count")
-  conversionRate       Decimal            @default(0) @db.Decimal(5, 2) @map("conversion_rate")
-  isVerified           Boolean            @default(false) @map("is_verified")
-  isActive             Boolean            @default(true) @map("is_active")
-  createdAt            DateTime           @default(now()) @map("created_at")
-  updatedAt            DateTime           @updatedAt @map("updated_at")
+  id                  String            @id @default(uuid())
+  userId              String            @unique @map("user_id")
+  businessName        String            @map("business_name")
+  serviceCategories   ServiceCategory[] @map("service_categories")
+  coverageAreas       Json              @map("coverage_areas")
+  rating              Decimal           @default(0) @db.Decimal(3, 2)
+  totalReviews        Int               @default(0) @map("total_reviews")
+  subscriptionTier    SubscriptionTier  @default(free) @map("subscription_tier")
+  priceRange          PriceRange        @map("price_range")
+  specializations     String[]
+  capacityStatus      CapacityStatus    @default(accepting) @map("capacity_status")
+  leadsReceivedCount  Int               @default(0) @map("leads_received_count")
+  leadsConvertedCount Int               @default(0) @map("leads_converted_count")
+  conversionRate      Decimal           @default(0) @map("conversion_rate") @db.Decimal(5, 2)
+  isVerified          Boolean           @default(false) @map("is_verified")
+  isActive            Boolean           @default(true) @map("is_active")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
 
   // Relations
   user    User    @relation(fields: [userId], references: [id])
@@ -301,21 +386,21 @@ model ServiceProvider {
 }
 
 model Match {
-  id                  String      @id @default(uuid())
-  leadId              String      @map("lead_id")
-  providerId          String      @map("provider_id")
-  campaignId          String      @map("campaign_id")
-  matchScore          Int         @map("match_score")
-  matchReason         Json        @map("match_reason")
-  status              MatchStatus @default(pending)
-  leadPrice           Decimal?    @map("lead_price")
-  dealValue           Decimal?    @map("deal_value")
-  commissionAmount    Decimal?    @map("commission_amount")
-  providerNotifiedAt  DateTime?   @map("provider_notified_at")
-  providerResponseAt  DateTime?   @map("provider_response_at")
-  dealClosedAt        DateTime?   @map("deal_closed_at")
-  createdAt           DateTime    @default(now()) @map("created_at")
-  updatedAt           DateTime    @updatedAt @map("updated_at")
+  id                 String      @id @default(uuid())
+  leadId             String      @map("lead_id")
+  providerId         String      @map("provider_id")
+  campaignId         String      @map("campaign_id")
+  matchScore         Int         @map("match_score")
+  matchReason        Json        @map("match_reason")
+  status             MatchStatus @default(pending)
+  leadPrice          Decimal?    @map("lead_price")
+  dealValue          Decimal?    @map("deal_value")
+  commissionAmount   Decimal?    @map("commission_amount")
+  providerNotifiedAt DateTime?   @map("provider_notified_at")
+  providerResponseAt DateTime?   @map("provider_response_at")
+  dealClosedAt       DateTime?   @map("deal_closed_at")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
 
   // Relations
   lead     Lead            @relation(fields: [leadId], references: [id])
@@ -329,19 +414,19 @@ model Match {
 }
 
 model MessageTemplate {
-  id                String          @id @default(uuid())
-  name              String
-  type              MessageType
-  serviceCategory   ServiceCategory? @map("service_category")
-  subject           String?
-  body              String          @db.Text
-  isActive          Boolean         @default(true) @map("is_active")
-  performanceScore  Decimal         @default(0) @db.Decimal(5, 2) @map("performance_score")
-  timesUsed         Int             @default(0) @map("times_used")
-  avgReplyRate      Decimal         @default(0) @db.Decimal(5, 2) @map("avg_reply_rate")
-  createdBy         String          @map("created_by")
-  createdAt         DateTime        @default(now()) @map("created_at")
-  updatedAt         DateTime        @updatedAt @map("updated_at")
+  id               String           @id @default(uuid())
+  name             String
+  type             MessageType
+  serviceCategory  ServiceCategory? @map("service_category")
+  subject          String?
+  body             String           @db.Text
+  isActive         Boolean          @default(true) @map("is_active")
+  performanceScore Decimal          @default(0) @map("performance_score") @db.Decimal(5, 2)
+  timesUsed        Int              @default(0) @map("times_used")
+  avgReplyRate     Decimal          @default(0) @map("avg_reply_rate") @db.Decimal(5, 2)
+  createdBy        String           @map("created_by")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
 
   // Relations
   creator User @relation(fields: [createdBy], references: [id])
@@ -351,17 +436,46 @@ model MessageTemplate {
   @@map("message_templates")
 }
 
+model CampaignSequence {
+  id         String @id @default(cuid())
+  campaignId String
+  stepNumber Int
+  delayDays  Int    @default(0)
+  delayHours Int    @default(0)
+
+  templateId String
+
+  campaign Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  template EmailTemplate @relation(fields: [templateId], references: [id])
+
+  @@unique([campaignId, stepNumber])
+  @@index([campaignId])
+}
+
+model EmailTemplate {
+  id      String @id @default(cuid())
+  name    String
+  subject String
+  body    String @db.Text
+
+  // Personalization
+  variables Json? // e.g., ["firstName", "propertyValue"]
+
+  sequences CampaignSequence[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
 model AIOptimization {
-  id                     String           @id @default(uuid())
-  optimizationType       OptimizationType @map("optimization_type")
-  beforeMetric           Json             @map("before_metric")
-  afterMetric            Json             @map("after_metric")
-  improvementPercentage  Decimal          @map("improvement_percentage") @db.Decimal(5, 2)
-  appliedAt              DateTime         @map("applied_at")
-  details                Json
-  createdAt              DateTime         @default(now()) @map("created_at")
+  id                    String           @id @default(uuid())
+  optimizationType      OptimizationType @map("optimization_type")
+  beforeMetric          Json             @map("before_metric")
+  afterMetric           Json             @map("after_metric")
+  improvementPercentage Decimal          @map("improvement_percentage") @db.Decimal(5, 2)
+  appliedAt             DateTime         @map("applied_at")
+  details               Json
+  createdAt             DateTime         @default(now()) @map("created_at")
 
   @@index([optimizationType])
   @@map("ai_optimizations")
 }
-

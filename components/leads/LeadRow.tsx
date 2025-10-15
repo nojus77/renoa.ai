@@ -63,12 +63,18 @@ export default function LeadRow({ lead, isSelected, onSelect, onViewDetails }: L
 
       {/* Tier */}
       <td className="w-[50px] px-4 py-3">
-        <span
-          className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
-          style={{ backgroundColor: getTierColor(lead.tier).background, color: getTierColor(lead.tier).color }}
-        >
-          {lead.tier}
-        </span>
+        {(() => {
+          const displayTier = typeof lead.tier === 'number' ? `T${Math.min(Math.max(lead.tier, 1), 3)}` : lead.tier
+          const colors = getTierColor(displayTier)
+          return (
+            <span
+              className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+              style={{ backgroundColor: colors.background, color: colors.color }}
+            >
+              {displayTier}
+            </span>
+          )
+        })()}
       </td>
 
       {/* Name */}
@@ -135,10 +141,14 @@ export default function LeadRow({ lead, isSelected, onSelect, onViewDetails }: L
       <td className="w-[100px] px-4 py-3">
         {lead.campaign ? (
           <div>
-            <div className="text-sm font-medium text-gray-900">{lead.campaign.code}</div>
-            <div className="text-xs text-gray-500">
-              {(lead.campaign.replyRate * 100).toFixed(1)}% replies
+            <div className="text-sm font-medium text-gray-900">
+              {typeof lead.campaign === 'string' ? lead.campaign : lead.campaign.code}
             </div>
+            {typeof lead.campaign !== 'string' && (
+              <div className="text-xs text-gray-500">
+                {(lead.campaign.replyRate * 100).toFixed(1)}% replies
+              </div>
+            )}
           </div>
         ) : (
           <span className="text-sm text-gray-500">No campaign</span>

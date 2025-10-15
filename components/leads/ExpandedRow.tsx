@@ -101,14 +101,14 @@ export default function ExpandedRow({
           </div>
 
           {/* Latest Reply */}
-          {lead.messages?.find(m => m.status === 'delivered') && (
+          {lead.messages?.find(m => String((m as any).status) === 'DELIVERED') && (
             <div className="mt-6">
               <h4 className="text-sm font-medium text-gray-900 mb-2">
                 💬 Latest Reply
               </h4>
               <div className="bg-white p-4 rounded-lg border">
                 <p className="text-sm text-gray-600 italic">
-                  "Yes! I'm looking for landscaping help..."
+                  &quot;Yes! I&apos;m looking for landscaping help...&quot;
                 </p>
                 <p className="text-xs text-gray-500 mt-1">
                   Replied: {lead.lastActivityAt ? formatRelativeTime(lead.lastActivityAt) : 'Never'}

@@ -209,24 +209,19 @@ export default function DetailPanel({ lead: initialLead, onClose, onSave }: Deta
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium text-gray-900">
-                        {message.messageType === 'email' ? '📧' : '📱'} {message.subject || 'Message'}
+                        📧 {message.subject || 'Message'}
                       </span>
                       <span className="text-sm text-gray-500">
                         {message.sentAt ? formatRelativeTime(message.sentAt) : formatRelativeTime(message.createdAt)}
                       </span>
                     </div>
                     <p className="text-sm text-gray-600 whitespace-pre-wrap">
-                      {message.content}
+                      {(message as any).body ?? (message as any).content ?? ''}
                     </p>
-                    {message.status !== 'sent' && (
-                      <p className="mt-2 text-xs text-gray-500">
-                        Status: {message.status}
-                        {message.deliveredAt && ` • Delivered ${formatRelativeTime(message.deliveredAt)}`}
-                        {message.errorMessage && (
-                          <span className="block text-red-600">{message.errorMessage}</span>
-                        )}
-                      </p>
-                    )}
+                    <p className="mt-2 text-xs text-gray-500">
+                      Status: {String((message as any).status)}
+                      {(message as any).scheduledFor && ` • Scheduled ${formatRelativeTime((message as any).scheduledFor)}`}
+                    </p>
                   </div>
                 ))}
               </div>

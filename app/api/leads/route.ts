@@ -5,18 +5,43 @@ import { LeadStatus, ServiceCategory, Prisma } from '@prisma/client'
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    
+
+    // Dashboard metrics support
+    if (searchParams.get('countOnly') === 'true') {
+      // Optional scoreMin for high priority
+      const scoreMin = searchParams.get('scoreMin') ? parseInt(searchParams.get('scoreMin')!) : undefined
+      const where: any = {}
+      if (typeof scoreMin === 'number' && !Number.isNaN(scoreMin)) {
+        where.leadScore = { gte: scoreMin }
+      }
+      const total = await prisma.lead.count({ where })
+      return NextResponse.json({ total })
+    }
+
+    if (searchParams.get('groupByService') === 'true') {
+      // Group by serviceInterest and count
+      const breakdown = await prisma.lead.groupBy({
+        by: ['serviceInterest'],
+        _count: { serviceInterest: true },
+      })
+      // Map to [service, count]
+      return NextResponse.json({
+        breakdown: breakdown.map(b => [b.serviceInterest, b._count.serviceInterest])
+      })
+    }
+
+    // Paginated leads fetch
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
     const search = searchParams.get('search') || ''
-  const status = searchParams.get('status')?.split(',').filter(Boolean) as LeadStatus[] | undefined
+    const status = searchParams.get('status')?.split(',').filter(Boolean) as LeadStatus[] | undefined
     const serviceInterest = searchParams.get('serviceInterest')?.split(',').filter(Boolean) as ServiceCategory[] | undefined
-  const tier = searchParams.get('tier')?.split(',').map(t => parseInt(t)).filter(n => !Number.isNaN(n)) as number[] | undefined
-  const sortBy = (searchParams.get('sortBy') || 'createdAt') as 'leadScore' | 'propertyValue' | 'tier' | 'createdAt'
-  const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc'
-    
+    const tier = searchParams.get('tier')?.split(',').map(t => parseInt(t)).filter(n => !Number.isNaN(n)) as number[] | undefined
+    const sortBy = (searchParams.get('sortBy') || 'createdAt') as 'leadScore' | 'propertyValue' | 'tier' | 'createdAt'
+    const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc'
+
     const where: any = {}
-    
+
     if (search) {
       where.OR = [
         { firstName: { contains: search, mode: 'insensitive' } },
@@ -26,21 +51,21 @@ export async function GET(request: NextRequest) {
         { phone: { contains: search, mode: 'insensitive' } },
       ]
     }
-    
+
     if (status && status.length > 0) {
       where.status = { in: status }
     }
-    
+
     if (serviceInterest && serviceInterest.length > 0) {
       where.serviceInterest = { in: serviceInterest }
     }
-    
+
     if (tier && tier.length > 0) {
       where.tier = { in: tier }
     }
-    
+
     const total = await prisma.lead.count({ where })
-    
+
     // Build orderBy dynamically
     const orderBy: Prisma.LeadOrderByWithRelationInput = (() => {
       switch (sortBy) {
@@ -61,7 +86,7 @@ export async function GET(request: NextRequest) {
       take: limit,
       orderBy
     })
-    
+
     return NextResponse.json({
       leads,
       pagination: {
