@@ -1,35 +1,76 @@
-import { NextRequest } from 'next/server'
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id, name, status, serviceType, targetAudience, sequenceType } = body
+    if (!id) {
+      return NextResponse.json({ error: 'Campaign id is required' }, { status: 400 })
+    }
+    // Only update provided fields
+    const updateData: any = {}
+    if (name !== undefined) updateData.name = name
+    if (status !== undefined) updateData.status = status
+    if (serviceType !== undefined) updateData.serviceType = serviceType
+    if (targetAudience !== undefined) updateData.targetAudience = targetAudience
+    if (sequenceType !== undefined) updateData.sequenceType = sequenceType
+    const updated = await prisma.campaign.update({
+      where: { id },
+      data: updateData
+    })
+    return NextResponse.json(updated)
+  } catch (error) {
+    console.error('Error updating campaign:', error)
+    const errorMsg = typeof error === 'object' && error !== null && 'message' in error ? (error as any).message : String(error)
+    return NextResponse.json({ error: errorMsg || 'Failed to update campaign' }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { id } = body
+    if (!id) {
+      return NextResponse.json({ error: 'Campaign id is required' }, { status: 400 })
+    }
+    await prisma.campaign.delete({ where: { id } })
+    return NextResponse.json({ success: true })
+  } catch (error) {
+    console.error('Error deleting campaign:', error)
+    const errorMsg = typeof error === 'object' && error !== null && 'message' in error ? (error as any).message : String(error)
+    return NextResponse.json({ error: errorMsg || 'Failed to delete campaign' }, { status: 500 })
+  }
+}
+import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
+import { EventType } from '@prisma/client'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     console.log('Received campaign data:', body)
-    // Only use fields that exist in Campaign model
-    const { name, status, serviceType, targetAudience, sequenceType } = body
+  const { name, status, serviceType, targetAudience, sequenceType } = body
     if (!name) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 })
     }
     if (!serviceType) {
       return NextResponse.json({ error: 'serviceType is required' }, { status: 400 })
     }
+    // targetAudience is Json type in schema, so send as object
     const campaign = await prisma.campaign.create({
       data: {
         name,
         status: status || 'draft',
         serviceType,
-        targetAudience: targetAudience ?? 'all',
-        sequenceType: sequenceType ?? 'single'
+        targetAudience: targetAudience || {},
+        sequenceType: sequenceType || 'single'
       }
     })
     console.log('Campaign created:', campaign)
     return NextResponse.json(campaign, { status: 201 })
   } catch (error) {
     console.error('Error creating campaign:', error)
-    return NextResponse.json({ error: 'Failed to create campaign' }, { status: 500 })
+  const errorMsg = typeof error === 'object' && error !== null && 'message' in error ? (error as any).message : String(error)
+  return NextResponse.json({ error: errorMsg || 'Failed to create campaign' }, { status: 500 })
   }
 }
-import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
-import { EventType } from '@prisma/client'
 
 export async function GET() {
   try {
@@ -39,17 +80,23 @@ export async function GET() {
         id: true,
         name: true,
         status: true,
+        serviceType: true,
+        createdAt: true,
       },
       orderBy: { createdAt: 'desc' },
     })
 
     // Aggregate stats per campaign
     const withStats = await Promise.all(
-      campaigns.map(async (c) => {
-        // Sent count = messages with a sentAt timestamp for this campaign
-        const sentCount = await prisma.message.count({
-          where: { campaignId: c.id, sentAt: { not: null } },
-        })
+  campaigns.map(async (c) => {
+    // Add this line - count assigned leads
+    const assignedLeadsCount = await prisma.campaignLead.count({
+      where: { campaignId: c.id }
+    })
+
+    const sentCount = await prisma.message.count({
+      where: { campaignId: c.id, sentAt: { not: null } },
+    })
 
         // Distinct leads touched by this campaign (via messages)
         const distinctLeads = await prisma.message.findMany({
@@ -89,19 +136,35 @@ export async function GET() {
         const clickRate = sentCount > 0 ? Math.round((clickUnique / sentCount) * 100) : 0
         const replyRate = sentCount > 0 ? Math.round((repliedUnique.length / sentCount) * 100) : 0
 
-        return {
+        // Debugging output for metrics
+        console.log('Campaign metrics:', {
           id: c.id,
           name: c.name,
-          status: c.status,
-          leadCount,
           sentCount,
+          leadCount,
+          openUnique,
+          clickUnique,
+          replyCount,
           openRate,
           clickRate,
-          replyCount,
-          replyRate,
-        }
-      })
-    )
+          replyRate
+        })
+
+        return {
+  id: c.id,
+  name: c.name,
+  status: c.status,
+  serviceType: c.serviceType,
+  createdAt: c.createdAt,
+  leadCount: assignedLeadsCount,  // Use the renamed variable
+  sentCount,
+  openRate,
+  clickRate,
+  replyCount,
+  replyRate,
+}
+  })
+)
 
     return NextResponse.json(withStats)
   } catch (error) {

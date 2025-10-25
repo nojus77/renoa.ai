@@ -142,6 +142,9 @@ export default function Footer() {
         {/* Bottom Bar */}
         <div className="border-t border-gray-800 pt-8 text-center text-gray-400">
           <p>&copy; {currentYear} Renoa.ai. All rights reserved.</p>
+          <p className="mt-2 text-sm">
+            Contact: <a href="mailto:hello@renoa.ai" className="underline hover:text-white">hello@renoa.ai</a>
+          </p>
         </div>
       </div>
     </footer>

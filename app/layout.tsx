@@ -20,7 +20,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <Providers>
-          {children}
+          <div>
+            {children}
+          </div>
               <Toaster />
               <div id="portal-root" />
         </Providers>

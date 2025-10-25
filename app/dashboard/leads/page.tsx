@@ -1,425 +1,1012 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { ServiceCategory, LeadStatus } from '@prisma/client'
-import { showToast } from '@/lib/toast'
-import { Download, Plus, SlidersHorizontal } from 'lucide-react'
+import React, { useState, useEffect, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
+} from "@/components/ui/table";
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-  SheetTrigger,
-} from '@/components/ui/sheet'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+  SheetDescription
+} from "@/components/ui/sheet";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Search,
+  Filter,
+  Download,
+  Plus,
+  Mail,
+  Phone,
+  MapPin,
+  Building2,
+  Calendar,
+  DollarSign,
+  Star,
+  TrendingUp,
+  Clock,
+  CheckCircle2,
+  AlertCircle,
+  User,
+  X
+} from "lucide-react";
+import { toast } from "sonner";
 
 interface Lead {
-  id: string
-  firstName: string
-  lastName: string
-  email: string
-  phone?: string | null
-  city: string
-  state: string
-  address?: string | null
-  zip?: string | null
-  serviceInterest: ServiceCategory
-  status: LeadStatus
-  leadScore: number
-  tier: number
-  contactCount: number
-  campaign?: string | null
-  updatedAt: string
-  createdAt?: string
-  lastContactedAt?: string | null
-  urgencyScore?: number | null
-  propertyScore?: number | null
-  scoringReason?: string | null
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  address: string;
+  city: string;
+  state: string;
+  zip: string;
+  propertyType: string;
+  propertyValue: number | null;
+  squareFootage: number | null;
+  serviceInterest: string;
+  leadSource: string;
+  leadScore: number;
+  tier: number;
+  status: string;
+  campaign: string | null;
+  contactCount: number;
+  urgencyScore: number | null;
+  propertyScore: number | null;
+  financialScore: number | null;
+  demographicScore: number | null;
+  marketScore: number | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface Filters {
-  search: string
-  scoreMin: number
-  scoreMax: number
-  tiers: number[]
-  statuses: LeadStatus[]
-  service: ServiceCategory | 'all'
-  campaign: string | 'all'
-}
+const TierBadge = ({ tier }: { tier: number }) => {
+  const colors = {
+    1: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    2: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+    3: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
+  };
+  return (
+    <Badge className={`${colors[tier as keyof typeof colors]} border font-semibold`}>
+      T{tier}
+    </Badge>
+  );
+};
+
+const StatusBadge = ({ status }: { status: string }) => {
+  const colors: Record<string, string> = {
+    new: "bg-sky-500/20 text-sky-400 border-sky-500/30",
+    contacted: "bg-amber-500/20 text-amber-400 border-amber-500/30",
+    qualified: "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+    converted: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+    lost: "bg-rose-500/20 text-rose-400 border-rose-500/30",
+  };
+  return (
+    <Badge className={`${colors[status] || colors.new} border capitalize`}>
+      {status}
+    </Badge>
+  );
+};
+
+const MetricCard = ({
+  title,
+  value,
+  subtitle,
+  icon,
+  trend
+}: {
+  title: string;
+  value: string | number;
+  subtitle?: string;
+  icon: React.ReactNode;
+  trend?: string;
+}) => (
+  <Card className="bg-zinc-900/50 border-zinc-800">
+    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+      <CardTitle className="text-sm font-medium text-zinc-400">{title}</CardTitle>
+      {icon}
+    </CardHeader>
+    <CardContent>
+      <div className="text-2xl font-bold text-zinc-100">{value}</div>
+      {subtitle && <p className="text-xs text-zinc-500 mt-1">{subtitle}</p>}
+      {trend && (
+        <p className="text-xs text-emerald-400 mt-2 flex items-center gap-1">
+          <TrendingUp className="h-3 w-3" />
+          {trend}
+        </p>
+      )}
+    </CardContent>
+  </Card>
+);
 
 export default function LeadsPage() {
-  const [leads, setLeads] = useState<Lead[]>([])
-  const [loading, setLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState(1)
-  const [totalPages, setTotalPages] = useState(1)
-  const [totalCount, setTotalCount] = useState(0)
-  const [sortBy, setSortBy] = useState<'leadScore' | 'tier' | 'createdAt'>('leadScore')
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [filtersOpen, setFiltersOpen] = useState(false)
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null)
-  const pageSize = 50
-  
-  const [filters, setFilters] = useState<Filters>({
-    search: '',
-    scoreMin: 0,
-    scoreMax: 100,
-    tiers: [],
-    statuses: [],
-    service: 'all',
-    campaign: 'all',
-  })
-
-  useEffect(() => {
-    fetchLeads()
-  }, [currentPage, sortBy, sortOrder, filters])
+  const [leads, setLeads] = useState<Lead[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [tierFilters, setTierFilters] = useState<number[]>([]);
+  const [newLeadOpen, setNewLeadOpen] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [newLeadForm, setNewLeadForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: 'IL',
+    zip: '',
+    propertyValue: '',
+    serviceInterest: 'landscaping',
+    notes: '',
+  });
 
   const fetchLeads = async () => {
+    setLoading(true);
     try {
-      setLoading(true)
-      const params = new URLSearchParams({
-        page: currentPage.toString(),
-        limit: String(pageSize),
-        sortBy,
-        sortOrder,
-        ...(filters.search && { search: filters.search }),
-        ...(filters.statuses.length > 0 && { status: filters.statuses.join(',') }),
-        ...(filters.tiers.length > 0 && { tier: filters.tiers.join(',') }),
-        ...(filters.service !== 'all' && { serviceInterest: filters.service }),
-      })
-      
-      const response = await fetch(`/api/leads?${params.toString()}`)
-      const data = await response.json()
-      setLeads(data.leads || [])
-      setTotalPages(data.pagination?.totalPages || 1)
-      setTotalCount(data.pagination?.total || 0)
-    } catch (error) {
-      showToast.error('Failed to fetch leads')
+      const res = await fetch("/api/leads?limit=1000");
+      const data = await res.json();
+      if (data.leads && Array.isArray(data.leads)) {
+        setLeads(data.leads);
+      }
+    } catch (err) {
+      toast.error('Failed to fetch leads');
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
-  const getScoreColor = (score: number) => {
-    if (score >= 70) return 'bg-emerald-50 text-emerald-700 border-emerald-200'
-    if (score >= 50) return 'bg-amber-50 text-amber-700 border-amber-200'
-    return 'bg-rose-50 text-rose-700 border-rose-200'
-  }
+  useEffect(() => {
+    fetchLeads();
+  }, []);
 
-  const getTierBadge = (tier: number) => {
-    const styles = {
-      1: 'bg-slate-100 text-slate-600 border border-slate-200',
-      2: 'bg-slate-100 text-slate-600 border border-slate-200',
-      3: 'bg-slate-50 text-slate-600 border border-slate-200',
+  const handleCreateLead = async () => {
+    if (!newLeadForm.firstName || !newLeadForm.lastName || !newLeadForm.email || !newLeadForm.phone || !newLeadForm.city || !newLeadForm.zip) {
+      toast.error('Please fill in all required fields');
+      return;
     }
-    return styles[tier as 1 | 2 | 3] ?? styles[3]
-  }
 
-  const exportToCSV = () => {
-    if (!leads?.length) {
-      showToast?.error?.('No leads to export')
-      return
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newLeadForm,
+          propertyValue: newLeadForm.propertyValue ? parseFloat(newLeadForm.propertyValue) : null,
+          leadScore: 50,
+          tier: 2,
+          status: 'new',
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to create lead');
+
+      toast.success('Lead created successfully!');
+      setNewLeadOpen(false);
+      setNewLeadForm({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        address: '',
+        city: '',
+        state: 'IL',
+        zip: '',
+        propertyValue: '',
+        serviceInterest: 'landscaping',
+        notes: '',
+      });
+      fetchLeads();
+    } catch (error) {
+      toast.error('Failed to create lead');
+    } finally {
+      setSubmitting(false);
     }
-    const headers = ['Score','Tier','Name','Email','City','State','Service','Status','Campaign','Updated']
-    const rows = leads.map(l => [
-      l.leadScore,
-      `T${l.tier}`,
-      `${l.firstName} ${l.lastName}`,
-      l.email,
-      l.city,
-      l.state,
-      String(l.serviceInterest),
-      String(l.status),
-      l.campaign ?? '-',
-      new Date(l.updatedAt).toLocaleString()
-    ])
-    const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${String(v).replaceAll('"','""')}"`).join(','))].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `leads-${new Date().toISOString().slice(0,10)}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+  };
 
-  const stats = {
-    total: totalCount,
+  const totals = useMemo(() => ({
+    total: leads.length,
     highPriority: leads.filter(l => l.leadScore >= 70).length,
-    contacted: leads.filter(l => l.contactCount > 0).length,
-    replied: leads.filter(l => l.status === 'replied').length,
-  }
+    contacted: leads.filter(l => l.status === 'contacted').length,
+    converted: leads.filter(l => l.status === 'converted').length,
+    totalValue: leads.reduce((sum, l) => sum + (l.propertyValue || 0), 0),
+  }), [leads]);
+
+  const filteredLeads = useMemo(() => {
+    let result = leads;
+
+    const query = searchQuery.toLowerCase().trim();
+    if (query) {
+      result = result.filter(l =>
+        `${l.firstName} ${l.lastName}`.toLowerCase().includes(query) ||
+        l.email.toLowerCase().includes(query) ||
+        l.serviceInterest.toLowerCase().includes(query) ||
+        l.city.toLowerCase().includes(query) ||
+        l.phone.includes(query)
+      );
+    }
+
+    if (statusFilters.length > 0) {
+      result = result.filter(l => statusFilters.includes(l.status));
+    }
+
+    if (tierFilters.length > 0) {
+      result = result.filter(l => tierFilters.includes(l.tier));
+    }
+
+    return result;
+  }, [leads, searchQuery, statusFilters, tierFilters]);
+
+  const highPriorityLeads = useMemo(() =>
+    leads.filter(l => l.leadScore >= 70).sort((a, b) => b.leadScore - a.leadScore),
+    [leads]
+  );
+
+  const recentLeads = useMemo(() =>
+    [...leads].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 20),
+    [leads]
+  );
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+    }).format(amount);
+  };
+
+  const formatDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const LeadRow = ({ lead }: { lead: Lead }) => (
+    <TableRow
+      className="border-zinc-800 cursor-pointer hover:bg-zinc-800/50 transition-colors"
+      onClick={() => {
+        setSelectedLead(lead);
+        setDetailOpen(true);
+      }}
+    >
+      <TableCell>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center w-10 h-10 rounded-full bg-zinc-800">
+            <span className="text-sm font-semibold text-zinc-100">
+              {lead.leadScore}
+            </span>
+          </div>
+          <TierBadge tier={lead.tier} />
+        </div>
+      </TableCell>
+      <TableCell>
+        <div>
+          <div className="font-medium text-zinc-100">{lead.firstName} {lead.lastName}</div>
+          <div className="text-xs text-zinc-400 mt-1">{lead.email}</div>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1 text-zinc-300">
+          <Phone className="h-3 w-3" />
+          <span className="text-sm">{lead.phone}</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex items-center gap-1 text-zinc-300">
+          <MapPin className="h-3 w-3" />
+          <span className="text-sm">{lead.city}, {lead.state}</span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 capitalize">
+          {lead.serviceInterest.replace('_', ' ')}
+        </Badge>
+      </TableCell>
+      <TableCell>
+        <StatusBadge status={lead.status} />
+      </TableCell>
+      <TableCell className="text-zinc-300 text-sm">
+        {lead.campaign || 'N/A'}
+      </TableCell>
+      <TableCell className="text-zinc-100 font-medium">
+        {lead.propertyValue ? formatCurrency(lead.propertyValue) : 'N/A'}
+      </TableCell>
+      <TableCell className="text-zinc-400 text-sm">
+        {formatDate(lead.createdAt)}
+      </TableCell>
+    </TableRow>
+  );
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Sheet-style Filters */}
-      <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
-        <SheetTrigger asChild>
-          <button className="sr-only" aria-hidden />
-        </SheetTrigger>
-        <SheetContent side="left" className="p-3 w-60">
-          <SheetHeader className="mb-2">
-            <SheetTitle className="text-sm font-semibold flex items-center gap-2">
-              <SlidersHorizontal className="w-4 h-4 text-muted-foreground" />
-              Filters
-            </SheetTitle>
-          </SheetHeader>
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-zinc-100">Leads</h1>
+          <p className="text-sm text-zinc-400 mt-1">
+            Manage and track all your leads
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" className="border-zinc-700">
+            <Download className="h-4 w-4 mr-2" />
+            Export
+          </Button>
+          <Button 
+            className="bg-emerald-600 hover:bg-emerald-500"
+            onClick={() => setNewLeadOpen(true)}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            New Lead
+          </Button>
+        </div>
+      </div>
 
-          {/* Search */}
-          <div className="mb-3">
-            <input
-              type="text"
-              placeholder="Search..."
-              value={filters.search}
-              onChange={(e) => setFilters({ ...filters, search: e.target.value })}
-              className="w-full px-3 py-1.5 text-sm border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-          </div>
+      {/* Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <MetricCard
+          title="Total Leads"
+          value={totals.total}
+          subtitle="+16 this week"
+          trend="+8% from last week"
+          icon={<User className="h-4 w-4 text-zinc-400" />}
+        />
+        <MetricCard
+          title="High Priority"
+          value={totals.highPriority}
+          subtitle="Score 70+"
+          icon={<Star className="h-4 w-4 text-amber-400" />}
+        />
+        <MetricCard
+          title="Contacted"
+          value={totals.contacted}
+          subtitle="Awaiting response"
+          icon={<Mail className="h-4 w-4 text-sky-400" />}
+        />
+        <MetricCard
+          title="Converted"
+          value={totals.converted}
+          subtitle="Successful closes"
+          icon={<CheckCircle2 className="h-4 w-4 text-emerald-400" />}
+        />
+        <MetricCard
+          title="Est. Value"
+          value={formatCurrency(totals.totalValue)}
+          subtitle="Pipeline value"
+          icon={<DollarSign className="h-4 w-4 text-emerald-400" />}
+        />
+      </div>
 
-          {/* Score Range */}
-          <div className="mb-3">
-            <label className="text-xs font-medium text-muted-foreground mb-1 block">Score: {filters.scoreMin}-{filters.scoreMax}</label>
-            <div className="flex gap-2">
-              <input type="number" value={filters.scoreMin} onChange={(e) => setFilters({ ...filters, scoreMin: parseInt(e.target.value) })} className="w-16 px-2 py-1 text-xs border border-border rounded-md" />
-              <input type="number" value={filters.scoreMax} onChange={(e) => setFilters({ ...filters, scoreMax: parseInt(e.target.value) })} className="w-16 px-2 py-1 text-xs border border-border rounded-md" />
-            </div>
-          </div>
+      {/* Tabs */}
+      <Tabs defaultValue="all" className="space-y-4">
+        <TabsList className="bg-zinc-900/30 border border-zinc-800">
+          <TabsTrigger value="all">All Leads</TabsTrigger>
+          <TabsTrigger value="high-priority">High Priority</TabsTrigger>
+          <TabsTrigger value="recent">Recent</TabsTrigger>
+          <TabsTrigger value="converted">Converted</TabsTrigger>
+        </TabsList>
 
-          {/* Tier */}
-          <div className="mb-3">
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Tier</label>
-            {[1, 2, 3].map(tier => (
-              <label key={tier} className="flex items-center text-xs mb-1">
-                <input type="checkbox" checked={filters.tiers.includes(tier)} onChange={() => {
-                  setFilters({
-                    ...filters,
-                    tiers: filters.tiers.includes(tier)
-                      ? filters.tiers.filter(t => t !== tier)
-                      : [...filters.tiers, tier],
-                  })
-                }} className="mr-2 scale-90" />
-                Tier {tier}
-              </label>
-            ))}
-          </div>
+        {/* All Leads Tab */}
+        <TabsContent value="all" className="space-y-4">
+          <Card className="bg-zinc-900/50 border-zinc-800">
+            <CardHeader>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-zinc-100">All Leads ({filteredLeads.length})</CardTitle>
+                  <div className="relative w-64">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-zinc-500" />
+                    <Input
+                      placeholder="Search leads..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-9 bg-zinc-800 border-zinc-700 text-zinc-100"
+                    />
+                  </div>
+                </div>
 
-          {/* Status */}
-          <div className="mb-3">
-            <label className="text-xs font-medium text-muted-foreground mb-1.5 block">Status</label>
-            {['new', 'contacted', 'replied'].map(status => (
-              <label key={status} className="flex items-center text-xs mb-1 capitalize">
-                <input type="checkbox" className="mr-2 scale-90" />
-                {status}
-              </label>
-            ))}
-          </div>
+                {/* Quick Filters */}
+                <div className="flex flex-wrap gap-2">
+                  <div className="text-xs text-zinc-400 flex items-center mr-2">
+                    Status:
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant={statusFilters.includes('new') ? "default" : "outline"}
+                    className={statusFilters.includes('new') ? "bg-sky-600" : "border-zinc-700"}
+                    onClick={() => {
+                      if (statusFilters.includes('new')) {
+                        setStatusFilters(statusFilters.filter(s => s !== 'new'));
+                      } else {
+                        setStatusFilters([...statusFilters, 'new']);
+                      }
+                    }}
+                  >
+                    <Star className="h-3 w-3 mr-1" />
+                    New ({leads.filter(l => l.status === 'new').length})
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant={statusFilters.includes('contacted') ? "default" : "outline"}
+                    className={statusFilters.includes('contacted') ? "bg-amber-600" : "border-zinc-700"}
+                    onClick={() => {
+                      if (statusFilters.includes('contacted')) {
+                        setStatusFilters(statusFilters.filter(s => s !== 'contacted'));
+                      } else {
+                        setStatusFilters([...statusFilters, 'contacted']);
+                      }
+                    }}
+                  >
+                    <Mail className="h-3 w-3 mr-1" />
+                    Contacted ({leads.filter(l => l.status === 'contacted').length})
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant={statusFilters.includes('qualified') ? "default" : "outline"}
+                    className={statusFilters.includes('qualified') ? "bg-emerald-600" : "border-zinc-700"}
+                    onClick={() => {
+                      if (statusFilters.includes('qualified')) {
+                        setStatusFilters(statusFilters.filter(s => s !== 'qualified'));
+                      } else {
+                        setStatusFilters([...statusFilters, 'qualified']);
+                      }
+                    }}
+                  >
+                    <CheckCircle2 className="h-3 w-3 mr-1" />
+                    Qualified ({leads.filter(l => l.status === 'qualified').length})
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant={statusFilters.includes('converted') ? "default" : "outline"}
+                    className={statusFilters.includes('converted') ? "bg-purple-600" : "border-zinc-700"}
+                    onClick={() => {
+                      if (statusFilters.includes('converted')) {
+                        setStatusFilters(statusFilters.filter(s => s !== 'converted'));
+                      } else {
+                        setStatusFilters([...statusFilters, 'converted']);
+                      }
+                    }}
+                  >
+                    <DollarSign className="h-3 w-3 mr-1" />
+                    Converted ({leads.filter(l => l.status === 'converted').length})
+                  </Button>
+
+                  <div className="border-l border-zinc-700 h-8 mx-2" />
+
+                  <div className="text-xs text-zinc-400 flex items-center mr-2">
+                    Tier:
+                  </div>
+
+                  <Button
+                    size="sm"
+                    variant={tierFilters.includes(1) ? "default" : "outline"}
+                    className={tierFilters.includes(1) ? "bg-emerald-600" : "border-zinc-700"}
+                    onClick={() => {
+                      if (tierFilters.includes(1)) {
+                        setTierFilters(tierFilters.filter(t => t !== 1));
+                      } else {
+                        setTierFilters([...tierFilters, 1]);
+                      }
+                    }}
+                  >
+                    T1 ({leads.filter(l => l.tier === 1).length})
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant={tierFilters.includes(2) ? "default" : "outline"}
+                    className={tierFilters.includes(2) ? "bg-sky-600" : "border-zinc-700"}
+                    onClick={() => {
+                      if (tierFilters.includes(2)) {
+                        setTierFilters(tierFilters.filter(t => t !== 2));
+                      } else {
+                        setTierFilters([...tierFilters, 2]);
+                      }
+                    }}
+                  >
+                    T2 ({leads.filter(l => l.tier === 2).length})
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant={tierFilters.includes(3) ? "default" : "outline"}
+                    className={tierFilters.includes(3) ? "bg-zinc-600" : "border-zinc-700"}
+                    onClick={() => {
+                      if (tierFilters.includes(3)) {
+                        setTierFilters(tierFilters.filter(t => t !== 3));
+                      } else {
+                        setTierFilters([...tierFilters, 3]);
+                      }
+                    }}
+                  >
+                    T3 ({leads.filter(l => l.tier === 3).length})
+                  </Button>
+
+                  {(statusFilters.length > 0 || tierFilters.length > 0) && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="text-zinc-400"
+                      onClick={() => {
+                        setStatusFilters([]);
+                        setTierFilters([]);
+                      }}
+                    >
+                      <X className="h-3 w-3 mr-1" />
+                      Clear All ({statusFilters.length + tierFilters.length})
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-zinc-800">
+                    <TableHead className="text-zinc-400">Score</TableHead>
+                    <TableHead className="text-zinc-400">Name</TableHead>
+                    <TableHead className="text-zinc-400">Phone</TableHead>
+                    <TableHead className="text-zinc-400">Location</TableHead>
+                    <TableHead className="text-zinc-400">Service</TableHead>
+                    <TableHead className="text-zinc-400">Status</TableHead>
+                    <TableHead className="text-zinc-400">Campaign</TableHead>
+                    <TableHead className="text-zinc-400">Value</TableHead>
+                    <TableHead className="text-zinc-400">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-zinc-400">
+                        Loading leads...
+                      </TableCell>
+                    </TableRow>
+                  ) : filteredLeads.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={9} className="text-center py-8 text-zinc-400">
+                        No leads found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    filteredLeads.map((lead) => <LeadRow key={lead.id} lead={lead} />)
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* High Priority Tab */}
+        <TabsContent value="high-priority" className="space-y-4">
+          <Card className="bg-zinc-900/50 border-zinc-800">
+            <CardHeader>
+              <CardTitle className="text-zinc-100 flex items-center gap-2">
+                <Star className="h-5 w-5 text-amber-400" />
+                High Priority Leads ({highPriorityLeads.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-zinc-800">
+                    <TableHead className="text-zinc-400">Score</TableHead>
+                    <TableHead className="text-zinc-400">Name</TableHead>
+                    <TableHead className="text-zinc-400">Phone</TableHead>
+                    <TableHead className="text-zinc-400">Location</TableHead>
+                    <TableHead className="text-zinc-400">Service</TableHead>
+                    <TableHead className="text-zinc-400">Status</TableHead>
+                    <TableHead className="text-zinc-400">Campaign</TableHead>
+                    <TableHead className="text-zinc-400">Value</TableHead>
+                    <TableHead className="text-zinc-400">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {highPriorityLeads.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Recent Tab */}
+        <TabsContent value="recent" className="space-y-4">
+          <Card className="bg-zinc-900/50 border-zinc-800">
+            <CardHeader>
+              <CardTitle className="text-zinc-100 flex items-center gap-2">
+                <Clock className="h-5 w-5 text-sky-400" />
+                Recent Leads
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-zinc-800">
+                    <TableHead className="text-zinc-400">Score</TableHead>
+                    <TableHead className="text-zinc-400">Name</TableHead>
+                    <TableHead className="text-zinc-400">Phone</TableHead>
+                    <TableHead className="text-zinc-400">Location</TableHead>
+                    <TableHead className="text-zinc-400">Service</TableHead>
+                    <TableHead className="text-zinc-400">Status</TableHead>
+                    <TableHead className="text-zinc-400">Campaign</TableHead>
+                    <TableHead className="text-zinc-400">Value</TableHead>
+                    <TableHead className="text-zinc-400">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {recentLeads.map((lead) => <LeadRow key={lead.id} lead={lead} />)}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Converted Tab */}
+        <TabsContent value="converted" className="space-y-4">
+          <Card className="bg-zinc-900/50 border-zinc-800">
+            <CardHeader>
+              <CardTitle className="text-zinc-100 flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-emerald-400" />
+                Converted Leads ({leads.filter(l => l.status === 'converted').length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-zinc-800">
+                    <TableHead className="text-zinc-400">Score</TableHead>
+                    <TableHead className="text-zinc-400">Name</TableHead>
+                    <TableHead className="text-zinc-400">Phone</TableHead>
+                    <TableHead className="text-zinc-400">Location</TableHead>
+                    <TableHead className="text-zinc-400">Service</TableHead>
+                    <TableHead className="text-zinc-400">Status</TableHead>
+                    <TableHead className="text-zinc-400">Campaign</TableHead>
+                    <TableHead className="text-zinc-400">Value</TableHead>
+                    <TableHead className="text-zinc-400">Date</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {leads.filter(l => l.status === 'converted').map((lead) => <LeadRow key={lead.id} lead={lead} />)}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Lead Detail Slideout */}
+      <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl bg-zinc-950 text-zinc-200 border-l border-zinc-800 overflow-y-auto">
+          {selectedLead && (
+            <>
+              <SheetHeader className="sticky top-0 bg-zinc-950/95 backdrop-blur-sm z-10 pb-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <SheetTitle className="text-2xl font-bold text-zinc-100">
+                      {selectedLead.firstName} {selectedLead.lastName}
+                    </SheetTitle>
+                    <SheetDescription className="text-zinc-400 mt-1">
+                      {selectedLead.serviceInterest.replace('_', ' ')} • Score: {selectedLead.leadScore}
+                    </SheetDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <TierBadge tier={selectedLead.tier} />
+                    <StatusBadge status={selectedLead.status} />
+                  </div>
+                </div>
+
+                <div className="flex gap-2 mt-4">
+                  <a href={`mailto:${selectedLead.email}`}>
+                    <Button size="sm" variant="outline" className="border-zinc-700">
+                      <Mail className="h-4 w-4 mr-2" />Email
+                    </Button>
+                  </a>
+                  <a href={`tel:${selectedLead.phone}`}>
+                    <Button size="sm" variant="outline" className="border-zinc-700">
+                      <Phone className="h-4 w-4 mr-2" />Call
+                    </Button>
+                  </a>
+                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500">
+                    Assign to Provider
+                  </Button>
+                </div>
+              </SheetHeader>
+
+              <div className="space-y-6 py-6">
+                {/* Contact Info */}
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                  <CardHeader>
+                    <CardTitle className="text-sm text-zinc-200">Contact Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3 text-sm">
+                    <div className="flex items-start gap-3">
+                      <Mail className="h-4 w-4 text-zinc-500 mt-0.5" />
+                      <div>
+                        <p className="text-zinc-400">Email</p>
+                        <p className="text-zinc-200">{selectedLead.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Phone className="h-4 w-4 text-zinc-500 mt-0.5" />
+                      <div>
+                        <p className="text-zinc-400">Phone</p>
+                        <p className="text-zinc-200">{selectedLead.phone}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <MapPin className="h-4 w-4 text-zinc-500 mt-0.5" />
+                      <div>
+                        <p className="text-zinc-400">Location</p>
+                        <p className="text-zinc-200">{selectedLead.city}, {selectedLead.state} {selectedLead.zip}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Building2 className="h-4 w-4 text-zinc-500 mt-0.5" />
+                      <div>
+                        <p className="text-zinc-400">Service</p>
+                        <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 mt-1 capitalize">
+                          {selectedLead.serviceInterest.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Lead Details */}
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                  <CardHeader>
+                    <CardTitle className="text-sm text-zinc-200">Lead Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-400">Lead Score</span>
+                      <span className="text-zinc-100 font-semibold text-lg">{selectedLead.leadScore}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-400">Tier</span>
+                      <TierBadge tier={selectedLead.tier} />
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-400">Property Value</span>
+                      <span className="text-emerald-400 font-semibold">
+                        {selectedLead.propertyValue ? formatCurrency(selectedLead.propertyValue) : 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-400">Campaign</span>
+                      <span className="text-zinc-200">{selectedLead.campaign || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-zinc-400">Date Created</span>
+                      <span className="text-zinc-200">{formatDate(selectedLead.createdAt)}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Notes */}
+                {selectedLead.notes && (
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-sm text-zinc-200">Notes</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-zinc-300 text-sm">{selectedLead.notes}</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            </>
+          )}
         </SheetContent>
       </Sheet>
 
-      {/* Main Content */}
-      <main className="flex-1 overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="bg-card border-b border-border px-4 py-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => setFiltersOpen(true)}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-sm border border-border rounded-md hover:bg-muted/50 transition-colors"
-              >
-                <SlidersHorizontal className="w-4 h-4" />
-                <span className="text-xs">Filters</span>
-              </button>
-              <div>
-                <h1 className="text-lg font-semibold">Leads</h1>
-                <p className="text-xs text-muted-foreground">{totalCount} total leads</p>
+      {/* New Lead Dialog */}
+      <Dialog open={newLeadOpen} onOpenChange={setNewLeadOpen}>
+        <DialogContent className="bg-zinc-950 text-zinc-100 border-zinc-800 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Lead</DialogTitle>
+            <DialogDescription className="text-zinc-400">
+              Create a new lead for your sales pipeline
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName" className="text-zinc-200">First Name *</Label>
+                <Input
+                  id="firstName"
+                  value={newLeadForm.firstName}
+                  onChange={(e) => setNewLeadForm({ ...newLeadForm, firstName: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800"
+                  placeholder="John"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="lastName" className="text-zinc-200">Last Name *</Label>
+                <Input
+                  id="lastName"
+                  value={newLeadForm.lastName}
+                  onChange={(e) => setNewLeadForm({ ...newLeadForm, lastName: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800"
+                  placeholder="Smith"
+                />
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={exportToCSV}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted/50 transition-colors"
-              >
-                <Download className="w-4 h-4" />
-                Export
-              </button>
-              <button className="flex items-center gap-2 px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors">
-                <Plus className="w-4 h-4" />
-                New Lead
-              </button>
-            </div>
-          </div>
-        </div>
 
-        {/* Stats Cards - COMPACT */}
-        <div className="px-4 py-2.5 bg-card border-b border-border">
-          <div className="grid grid-cols-4 gap-3">
-            <div className="bg-card border border-border rounded-md p-2">
-              <p className="text-xs text-muted-foreground mb-0.5">Total Leads</p>
-              <p className="text-xl font-medium">{stats.total}</p>
-            </div>
-            <div className="bg-card border border-border rounded-md p-2">
-              <p className="text-xs text-muted-foreground mb-0.5">High Priority</p>
-              <p className="text-xl font-medium text-emerald-600">{stats.highPriority}</p>
-            </div>
-            <div className="bg-card border border-border rounded-md p-2">
-              <p className="text-xs text-muted-foreground mb-0.5">Contacted</p>
-              <p className="text-xl font-medium text-blue-600">{stats.contacted}</p>
-            </div>
-            <div className="bg-card border border-border rounded-md p-2">
-              <p className="text-xs text-muted-foreground mb-0.5">Replied</p>
-              <p className="text-xl font-medium text-violet-600">{stats.replied}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Table - COMPACT */}
-        <div className="flex-1 overflow-auto bg-background">
-          <table className="w-full text-sm">
-            <thead className="bg-muted/50 border-b border-border sticky top-0">
-              <tr>
-                <th className="px-4 py-1.5 text-left text-xs font-medium text-muted-foreground uppercase">Score</th>
-                <th className="px-4 py-1.5 text-left text-xs font-medium text-muted-foreground uppercase">Tier</th>
-                <th className="px-4 py-1.5 text-left text-xs font-medium text-muted-foreground uppercase">Name</th>
-                <th className="px-4 py-1.5 text-left text-xs font-medium text-muted-foreground uppercase">Email</th>
-                <th className="px-4 py-1.5 text-left text-xs font-medium text-muted-foreground uppercase">Location</th>
-                <th className="px-4 py-1.5 text-left text-xs font-medium text-muted-foreground uppercase">Service</th>
-                <th className="px-4 py-1.5 text-left text-xs font-medium text-muted-foreground uppercase">Campaign</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
-              {leads.map((lead) => (
-                <tr key={lead.id} onClick={() => setSelectedLead(lead)} className="hover:bg-muted/50 cursor-pointer transition-colors">
-                  <td className="px-4 py-1.5 text-sm">
-                    <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium border ${getScoreColor(lead.leadScore)}`}>
-                      {lead.leadScore}
-                    </span>
-                  </td>
-                  <td className="px-4 py-1.5 text-sm">
-                    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${getTierBadge(lead.tier)}`}>
-                      T{lead.tier}
-                    </span>
-                  </td>
-                  <td className="px-4 py-1.5 text-sm font-medium text-foreground">{lead.firstName} {lead.lastName}</td>
-                  <td className="px-4 py-1.5 text-sm text-muted-foreground">{lead.email}</td>
-                  <td className="px-4 py-1.5 text-sm text-muted-foreground">{lead.city}, {lead.state}</td>
-                  <td className="px-4 py-1.5 text-sm text-muted-foreground capitalize">{String(lead.serviceInterest)}</td>
-                  <td className="px-4 py-1.5 text-sm text-muted-foreground">{lead.campaign || '-'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Lead Detail Dialog */}
-        <Dialog open={!!selectedLead} onOpenChange={(open) => !open && setSelectedLead(null)}>
-          <DialogContent>
-            {selectedLead && (
-              <div className="space-y-4">
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-3">
-                    <span className="text-lg font-semibold">{selectedLead.firstName} {selectedLead.lastName}</span>
-                    <span className={`inline-flex items-center justify-center h-7 px-2 rounded-full text-xs font-medium border ${getTierBadge(selectedLead.tier)}`}>
-                      T{selectedLead.tier}
-                    </span>
-                  </DialogTitle>
-                </DialogHeader>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="sm:col-span-1">
-                    <label className="text-xs text-muted-foreground">Lead Score</label>
-                    <div className="mt-1">
-                      <span className={`inline-flex items-center justify-center w-9 h-9 rounded-full text-sm font-semibold border ${getScoreColor(selectedLead.leadScore)}`}>
-                        {selectedLead.leadScore}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="sm:col-span-2 grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="text-xs text-muted-foreground">Email</label>
-                      <p className="text-sm text-foreground mt-1">{selectedLead.email}</p>
-                    </div>
-                    <div>
-                      <label className="text-xs text-muted-foreground">Phone</label>
-                      <p className="text-sm text-foreground mt-1">{selectedLead.phone || '-'}</p>
-                    </div>
-                    <div className="col-span-2">
-                      <label className="text-xs text-muted-foreground">Address</label>
-                      <p className="text-sm text-foreground mt-1">
-                        {selectedLead.address || '-'}{selectedLead.address ? ', ' : ''}{selectedLead.city}, {selectedLead.state} {selectedLead.zip || ''}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs text-muted-foreground">Service</label>
-                    <p className="text-sm text-muted-foreground mt-1 capitalize">{String(selectedLead.serviceInterest)}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Status</label>
-                    <p className="text-sm text-muted-foreground mt-1 capitalize">{String(selectedLead.status)}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Campaign</label>
-                    <p className="text-sm text-muted-foreground mt-1">{selectedLead.campaign || '-'}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs text-muted-foreground">Urgency Score</label>
-                    <p className="text-sm text-foreground mt-1">{selectedLead.urgencyScore ?? '-'}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Property Score</label>
-                    <p className="text-sm text-foreground mt-1">{selectedLead.propertyScore ?? '-'}</p>
-                  </div>
-                  <div className="sm:col-span-3">
-                    <label className="text-xs text-muted-foreground">Scoring Reason</label>
-                    <p className="text-sm text-muted-foreground mt-1 whitespace-pre-line">{selectedLead.scoringReason || '-'}</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div>
-                    <label className="text-xs text-muted-foreground">Created</label>
-                    <p className="text-sm text-muted-foreground mt-1">{selectedLead.createdAt ? new Date(selectedLead.createdAt).toLocaleString() : '-'}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Last Updated</label>
-                    <p className="text-sm text-muted-foreground mt-1">{selectedLead.updatedAt ? new Date(selectedLead.updatedAt).toLocaleString() : '-'}</p>
-                  </div>
-                  <div>
-                    <label className="text-xs text-muted-foreground">Last Contacted</label>
-                    <p className="text-sm text-muted-foreground mt-1">{selectedLead.lastContactedAt ? new Date(selectedLead.lastContactedAt).toLocaleString() : '-'}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-end gap-2 pt-2">
-                  <button className="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted/50">Send Email</button>
-                  <button className="px-3 py-1.5 text-sm border border-border rounded-md hover:bg-muted/50">Mark Contacted</button>
-                  <button onClick={() => setSelectedLead(null)} className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-md hover:bg-primary/90">Close</button>
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-zinc-200">Email *</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={newLeadForm.email}
+                  onChange={(e) => setNewLeadForm({ ...newLeadForm, email: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800"
+                  placeholder="john@example.com"
+                />
               </div>
-            )}
-          </DialogContent>
-        </Dialog>
 
-        {/* Pagination - COMPACT */}
-        <div className="bg-card border-t border-border px-4 py-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground text-xs">Page {currentPage} of {totalPages}</span>
-            <div className="flex gap-1">
-              <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage === 1} className="px-3 py-1 text-xs border border-border rounded-md hover:bg-muted/50 disabled:opacity-50 transition-colors">
-                Previous
-              </button>
-              <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage === totalPages} className="px-3 py-1 text-xs border border-border rounded-md hover:bg-muted/50 disabled:opacity-50 transition-colors">
-                Next
-              </button>
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-zinc-200">Phone *</Label>
+                <Input
+                  id="phone"
+                  value={newLeadForm.phone}
+                  onChange={(e) => setNewLeadForm({ ...newLeadForm, phone: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800"
+                  placeholder="(312) 555-0100"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address" className="text-zinc-200">Address</Label>
+              <Input
+                id="address"
+                value={newLeadForm.address}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, address: e.target.value })}
+                className="bg-zinc-900 border-zinc-800"
+                placeholder="123 Main St"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="city" className="text-zinc-200">City *</Label>
+                <Input
+                  id="city"
+                  value={newLeadForm.city}
+                  onChange={(e) => setNewLeadForm({ ...newLeadForm, city: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800"
+                  placeholder="Chicago"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="state" className="text-zinc-200">State</Label>
+                <Input
+                  id="state"
+                  value={newLeadForm.state}
+                  onChange={(e) => setNewLeadForm({ ...newLeadForm, state: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800"
+                  placeholder="IL"
+                  maxLength={2}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="zip" className="text-zinc-200">ZIP *</Label>
+                <Input
+                  id="zip"
+                  value={newLeadForm.zip}
+                  onChange={(e) => setNewLeadForm({ ...newLeadForm, zip: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800"
+                  placeholder="60614"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="serviceInterest" className="text-zinc-200">Service Interest</Label>
+                <Select
+                  value={newLeadForm.serviceInterest}
+                  onValueChange={(value) => setNewLeadForm({ ...newLeadForm, serviceInterest: value })}
+                >
+                  <SelectTrigger className="bg-zinc-900 border-zinc-800">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-800">
+                    <SelectItem value="landscaping">Landscaping</SelectItem>
+                    <SelectItem value="roofing">Roofing</SelectItem>
+                    <SelectItem value="hvac">HVAC</SelectItem>
+                    <SelectItem value="plumbing">Plumbing</SelectItem>
+                    <SelectItem value="electrical">Electrical</SelectItem>
+                    <SelectItem value="painting">Painting</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="propertyValue" className="text-zinc-200">Property Value</Label>
+                <Input
+                  id="propertyValue"
+                  type="number"
+                  value={newLeadForm.propertyValue}
+                  onChange={(e) => setNewLeadForm({ ...newLeadForm, propertyValue: e.target.value })}
+                  className="bg-zinc-900 border-zinc-800"
+                  placeholder="450000"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes" className="text-zinc-200">Notes</Label>
+              <Textarea
+                id="notes"
+                value={newLeadForm.notes}
+                onChange={(e) => setNewLeadForm({ ...newLeadForm, notes: e.target.value })}
+                className="bg-zinc-900 border-zinc-800 min-h-[100px]"
+                placeholder="Additional information about the lead..."
+              />
             </div>
           </div>
-        </div>
-      </main>
+
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setNewLeadOpen(false)}
+              className="border-zinc-700"
+              disabled={submitting}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleCreateLead}
+              className="bg-emerald-600 hover:bg-emerald-500"
+              disabled={submitting}
+            >
+              {submitting ? 'Creating...' : 'Create Lead'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
-  )
+  );
 }

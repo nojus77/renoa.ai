@@ -1,6 +1,16 @@
+"use client"
+
 import Link from "next/link";
 
 export default function Hero() {
+  // Smooth scroll handler for Get Started button
+  const handleGetStartedClick = () => {
+    const el = document.getElementById('email-optin');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <section className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 text-white">
       {/* Navigation */}
@@ -41,12 +51,13 @@ export default function Hero() {
             contractors for every home improvement need.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-            <Link
-              href="/get-started"
-              className="w-full sm:w-auto px-8 py-4 bg-white text-primary-700 rounded-lg text-lg font-semibold hover:bg-white/90 transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-0.5"
+            <button
+              type="button"
+              onClick={handleGetStartedClick}
+              className="w-full sm:w-auto px-8 py-4 bg-white text-primary-700 rounded-lg text-lg font-semibold hover:bg-white/90 transition-all shadow-xl hover:shadow-2xl transform hover:-translate-y-0.5 cursor-pointer"
             >
               Get Started Free
-            </Link>
+            </button>
             <Link
               href="#how-it-works"
               className="w-full sm:w-auto px-8 py-4 bg-white/10 backdrop-blur-sm text-white rounded-lg text-lg font-semibold hover:bg-white/20 transition-all border-2 border-white/30"
@@ -54,6 +65,28 @@ export default function Hero() {
               How It Works
             </Link>
           </div>
+        </div>
+
+        {/* Email Opt-in Form */}
+        <div id="email-optin" className="mt-16 max-w-xl mx-auto bg-white/10 backdrop-blur-sm rounded-2xl p-8 shadow-lg">
+          <h2 className="text-2xl font-bold mb-2 text-white">Join the Waitlist</h2>
+          <form className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+            <input
+              type="email"
+              required
+              placeholder="Your email address"
+              className="w-full sm:w-2/3 px-4 py-3 rounded-lg bg-white/80 text-primary-900 placeholder:text-primary-400 focus:outline-none focus:ring-2 focus:ring-primary-400"
+            />
+            <button
+              type="submit"
+              className="w-full sm:w-auto px-6 py-3 rounded-lg bg-primary-700 text-white font-semibold hover:bg-primary-800 transition-all shadow"
+            >
+              Join Waitlist
+            </button>
+          </form>
+          <p className="mt-3 text-sm text-white/80 text-center">
+            Get notified when we launch in your area. We respect your privacy and you can unsubscribe anytime.
+          </p>
         </div>
 
         {/* Trust Indicators */}
@@ -94,4 +127,3 @@ export default function Hero() {
     </section>
   );
 }
-

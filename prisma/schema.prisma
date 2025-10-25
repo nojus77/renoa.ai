@@ -177,7 +177,6 @@ model Lead {
   serviceInterest  ServiceCategory @map("service_interest")
   leadSource       String          @map("lead_source")
   leadScore        Int             @default(0) @map("lead_score")
-  // New fields
   tier             Int
   campaign         String?
   contactCount     Int             @default(0) @map("contact_count")
@@ -192,14 +191,18 @@ model Lead {
   aiTool1Metadata  Json?           @map("ai_tool_1_metadata")
   createdAt        DateTime        @default(now()) @map("created_at")
   updatedAt        DateTime        @updatedAt @map("updated_at")
-
+  
   // Relations
+  providerId       String?
+  provider         Provider?       @relation("ProviderLeads", fields: [providerId], references: [id])
+  emailLogs        EmailLog[]
+  campaignLeads    CampaignLead[]
   messages          Message[]
   inboundMessages   InboundMessage[]
   engagementMetrics EngagementMetric[]
   matches           Match[]
 
-  // Indexes for filtering and sorting
+  // Indexes
   @@index([email])
   @@index([zip])
   @@index([status])
@@ -210,7 +213,26 @@ model Lead {
   @@index([updatedAt])
   @@map("leads")
 }
-
+model EmailLog {
+  id           String    @id @default(uuid())
+  messageId    String    @unique @map("message_id")
+  leadId       String    @map("lead_id")
+  campaignId   String?   @map("campaign_id")
+  fromEmail    String    @map("from_email")
+  toEmail      String    @map("to_email")
+  subject      String
+  body         String    @db.Text
+  sentAt       DateTime  @map("sent_at")
+  openedAt     DateTime? @map("opened_at")
+  clickedAt    DateTime? @map("clicked_at")
+  repliedAt    DateTime? @map("replied_at")
+  bouncedAt    DateTime? @map("bounced_at")
+  complainedAt DateTime? @map("complained_at")
+  
+  lead         Lead      @relation(fields: [leadId], references: [id])
+  
+  @@map("email_logs")
+}
 model InboundMessage {
   id            String @id @default(cuid())
   originalMsgId String // Links to Message via id
@@ -263,6 +285,7 @@ model Campaign {
   sequences         CampaignSequence[]
   engagementMetrics EngagementMetric[]
   matches           Match[]
+  campaignLeads     CampaignLead[]
 
   @@index([status])
   @@index([serviceType])
@@ -437,17 +460,17 @@ model MessageTemplate {
 }
 
 model CampaignSequence {
-  id         String @id @default(cuid())
-  campaignId String
-  stepNumber Int
-  delayDays  Int    @default(0)
-  delayHours Int    @default(0)
-
-  templateId String
-
+  id          String   @id @default(cuid())
+  campaignId  String
+  stepNumber  Int
+  templateId  String
+  delayDays   Int      @default(0)
+  status      String   @default("active")
+  createdAt   DateTime @default(now())
+  
   campaign Campaign      @relation(fields: [campaignId], references: [id], onDelete: Cascade)
   template EmailTemplate @relation(fields: [templateId], references: [id])
-
+  
   @@unique([campaignId, stepNumber])
   @@index([campaignId])
 }
@@ -478,4 +501,52 @@ model AIOptimization {
 
   @@index([optimizationType])
   @@map("ai_optimizations")
+}
+
+model CampaignLead {
+  id         String   @id @default(cuid())
+  campaignId String
+  leadId     String
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  
+  campaign Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  lead     Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  
+  @@unique([campaignId, leadId])
+  @@index([campaignId])
+  @@index([leadId])
+}
+
+model Provider {
+  id                String   @id @default(cuid())
+  businessName      String
+  ownerName         String
+  email             String   @unique
+  phone             String
+  serviceTypes      String[] // ["Landscaping", "Roofing"]
+  serviceAreas      String[] // ["Lincoln Park", "Lakeview"]
+  yearsInBusiness   Int
+  status            String   // "active", "paused", "suspended"
+  leadCapacity      Int      // Max leads per week
+  currentLeadCount  Int      @default(0)
+  rating            Float    @default(0)
+  
+  // Performance metrics
+  totalLeadsSent    Int      @default(0)
+  leadsAccepted     Int      @default(0)
+  leadsConverted    Int      @default(0)
+  
+  // Financial
+  totalRevenue      Float    @default(0)
+  commissionRate    Float    @default(0.15) // 15% default
+  averageJobValue   Float    @default(0)
+  
+  // Timestamps
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  lastActivityAt    DateTime @default(now())
+  
+  // Relations
+  leads             Lead[]   @relation("ProviderLeads")
 }
