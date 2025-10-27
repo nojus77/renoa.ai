@@ -419,21 +419,27 @@ export default function DashboardPage() {
     }
 
     // Unpaid commissions
-    const unpaidCommissions = data.providers.filter(p =>
-      p.unpaidCommission > 0
-    );
-    if (unpaidCommissions.length > 0) {
-      const totalUnpaid = unpaidCommissions.reduce((sum, p) => sum + p.unpaidCommission, 0);
-      insights.push({
-        type: 'action',
-        title: '💰 Outstanding Commissions',
-        description: `${unpaidCommissions.length} providers have unpaid commissions totaling $${totalUnpaid.toLocaleString()}. Process payments to maintain strong relationships.`,
-        action: {
-          label: 'Review Payments',
-          href: '/dashboard/providers',
-        },
-      });
-    }
+const unpaidCommissions = (data.providers || []).filter(p => {
+  const commission = (Number(p.totalRevenue) || 0) * (Number(p.commissionRate) || 0);
+  return commission > 0;
+});
+
+if (unpaidCommissions.length > 0) {
+  const totalUnpaid = unpaidCommissions.reduce((sum, p) => {
+    const commission = (Number(p.totalRevenue) || 0) * (Number(p.commissionRate) || 0);
+    return sum + commission;
+  }, 0);
+  
+  insights.push({
+    type: 'action',
+    title: '💰 Outstanding Commissions',
+    description: `${unpaidCommissions.length} providers have unpaid commissions totaling $${totalUnpaid.toLocaleString()}. Process payments to maintain strong relationships.`,
+    action: {
+      label: 'Review Payments',
+      href: '/dashboard/providers',
+    },
+  });
+}
 
     // Conversion rate insight
     const converted = data.leads.filter(l => l.status === 'converted').length;

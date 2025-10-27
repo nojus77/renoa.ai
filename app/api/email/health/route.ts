@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { checkSesHealth } from '@/lib/email/ses'
+import { checkSesHealth } from '@/lib/emails/ses'
 
 export const dynamic = 'force-dynamic'
 

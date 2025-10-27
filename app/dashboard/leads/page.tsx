@@ -54,7 +54,10 @@ import {
   CheckCircle2,
   AlertCircle,
   User,
-  X
+  X,
+  Edit,
+  Save,
+  Sparkles
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -84,9 +87,22 @@ interface Lead {
   demographicScore: number | null;
   marketScore: number | null;
   notes: string | null;
+  assignedProviderId: string | null;
   createdAt: string;
   updatedAt: string;
 }
+
+// VALID SERVICE OPTIONS FROM YOUR PRISMA SCHEMA
+const SERVICE_OPTIONS = [
+  { value: "landscaping", label: "Landscaping" },
+  { value: "remodeling", label: "Remodeling" },
+  { value: "roofing", label: "Roofing" },
+  { value: "fencing", label: "Fencing" },
+  { value: "hvac", label: "HVAC" },
+  { value: "plumbing", label: "Plumbing" },
+  { value: "painting", label: "Painting" },
+  { value: "flooring", label: "Flooring" },
+];
 
 const TierBadge = ({ tier }: { tier: number }) => {
   const colors = {
@@ -157,6 +173,10 @@ export default function LeadsPage() {
   const [tierFilters, setTierFilters] = useState<number[]>([]);
   const [newLeadOpen, setNewLeadOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<Lead>>({});
+  const [matching, setMatching] = useState(false);
+  
   const [newLeadForm, setNewLeadForm] = useState({
     firstName: '',
     lastName: '',
@@ -198,19 +218,25 @@ export default function LeadsPage() {
 
     setSubmitting(true);
     try {
+      const payload = {
+        ...newLeadForm,
+        propertyValue: newLeadForm.propertyValue ? parseFloat(newLeadForm.propertyValue) : null,
+        leadScore: 50,
+        tier: 2,
+        status: 'new',
+      };
+
       const res = await fetch('/api/leads', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newLeadForm,
-          propertyValue: newLeadForm.propertyValue ? parseFloat(newLeadForm.propertyValue) : null,
-          leadScore: 50,
-          tier: 2,
-          status: 'new',
-        }),
+        body: JSON.stringify(payload),
       });
 
-      if (!res.ok) throw new Error('Failed to create lead');
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to create lead');
+      }
 
       toast.success('Lead created successfully!');
       setNewLeadOpen(false);
@@ -228,10 +254,72 @@ export default function LeadsPage() {
         notes: '',
       });
       fetchLeads();
-    } catch (error) {
-      toast.error('Failed to create lead');
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to create lead');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleUpdateLead = async () => {
+    if (!selectedLead) return;
+
+    setSubmitting(true);
+    try {
+      const payload = {
+        ...editForm,
+        propertyValue: editForm.propertyValue ? parseFloat(String(editForm.propertyValue)) : null,
+      };
+
+      const res = await fetch(`/api/leads/${selectedLead.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to update lead');
+      }
+
+      toast.success('Lead updated successfully!');
+      setEditMode(false);
+      fetchLeads();
+      
+      const updatedLead = await res.json();
+      setSelectedLead(updatedLead);
+    } catch (error: any) {
+      toast.error(error.message || 'Failed to update lead');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleAIMatch = async () => {
+    if (!selectedLead) return;
+
+    setMatching(true);
+    try {
+      const res = await fetch(`/api/leads/${selectedLead.id}/match`, {
+        method: 'POST',
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to match lead');
+      }
+      
+      toast.success(`✨ Matched with ${data.provider.name}! Score: ${data.provider.matchScore}/100`);
+      fetchLeads();
+      
+      // Update selected lead
+      const updatedLead = { ...selectedLead, assignedProviderId: data.provider.id, status: 'contacted' };
+      setSelectedLead(updatedLead);
+    } catch (error: any) {
+      toast.error(error.message || 'No matching providers found');
+    } finally {
+      setMatching(false);
     }
   };
 
@@ -299,6 +387,8 @@ export default function LeadsPage() {
       className="border-zinc-800 cursor-pointer hover:bg-zinc-800/50 transition-colors"
       onClick={() => {
         setSelectedLead(lead);
+        setEditForm(lead);
+        setEditMode(false);
         setDetailOpen(true);
       }}
     >
@@ -342,7 +432,7 @@ export default function LeadsPage() {
         {lead.campaign || 'N/A'}
       </TableCell>
       <TableCell className="text-zinc-100 font-medium">
-        {lead.propertyValue ? formatCurrency(lead.propertyValue) : 'N/A'}
+        {lead.propertyValue ? formatCurrency(Number(lead.propertyValue)) : 'N/A'}
       </TableCell>
       <TableCell className="text-zinc-400 text-sm">
         {formatDate(lead.createdAt)}
@@ -404,7 +494,7 @@ export default function LeadsPage() {
         />
         <MetricCard
           title="Est. Value"
-          value={formatCurrency(totals.totalValue)}
+          value={formatCurrency(Number(totals.totalValue))}
           subtitle="Pipeline value"
           icon={<DollarSign className="h-4 w-4 text-emerald-400" />}
         />
@@ -419,7 +509,6 @@ export default function LeadsPage() {
           <TabsTrigger value="converted">Converted</TabsTrigger>
         </TabsList>
 
-        {/* All Leads Tab */}
         <TabsContent value="all" className="space-y-4">
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader>
@@ -437,7 +526,6 @@ export default function LeadsPage() {
                   </div>
                 </div>
 
-                {/* Quick Filters */}
                 <div className="flex flex-wrap gap-2">
                   <div className="text-xs text-zinc-400 flex items-center mr-2">
                     Status:
@@ -612,7 +700,6 @@ export default function LeadsPage() {
           </Card>
         </TabsContent>
 
-        {/* High Priority Tab */}
         <TabsContent value="high-priority" className="space-y-4">
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader>
@@ -644,7 +731,6 @@ export default function LeadsPage() {
           </Card>
         </TabsContent>
 
-        {/* Recent Tab */}
         <TabsContent value="recent" className="space-y-4">
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader>
@@ -676,7 +762,6 @@ export default function LeadsPage() {
           </Card>
         </TabsContent>
 
-        {/* Converted Tab */}
         <TabsContent value="converted" className="space-y-4">
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader>
@@ -709,7 +794,7 @@ export default function LeadsPage() {
         </TabsContent>
       </Tabs>
 
-      {/* Lead Detail Slideout */}
+      {/* Lead Detail Slideout with EDIT MODE */}
       <Sheet open={detailOpen} onOpenChange={setDetailOpen}>
         <SheetContent side="right" className="w-full sm:max-w-2xl bg-zinc-950 text-zinc-200 border-l border-zinc-800 overflow-y-auto">
           {selectedLead && (
@@ -718,7 +803,22 @@ export default function LeadsPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <SheetTitle className="text-2xl font-bold text-zinc-100">
-                      {selectedLead.firstName} {selectedLead.lastName}
+                      {editMode ? (
+                        <div className="flex gap-2">
+                          <Input
+                            value={editForm.firstName || ''}
+                            onChange={(e) => setEditForm({ ...editForm, firstName: e.target.value })}
+                            className="bg-zinc-900 border-zinc-800"
+                          />
+                          <Input
+                            value={editForm.lastName || ''}
+                            onChange={(e) => setEditForm({ ...editForm, lastName: e.target.value })}
+                            className="bg-zinc-900 border-zinc-800"
+                          />
+                        </div>
+                      ) : (
+                        `${selectedLead.firstName} ${selectedLead.lastName}`
+                      )}
                     </SheetTitle>
                     <SheetDescription className="text-zinc-400 mt-1">
                       {selectedLead.serviceInterest.replace('_', ' ')} • Score: {selectedLead.leadScore}
@@ -731,24 +831,73 @@ export default function LeadsPage() {
                 </div>
 
                 <div className="flex gap-2 mt-4">
-                  <a href={`mailto:${selectedLead.email}`}>
-                    <Button size="sm" variant="outline" className="border-zinc-700">
-                      <Mail className="h-4 w-4 mr-2" />Email
-                    </Button>
-                  </a>
-                  <a href={`tel:${selectedLead.phone}`}>
-                    <Button size="sm" variant="outline" className="border-zinc-700">
-                      <Phone className="h-4 w-4 mr-2" />Call
-                    </Button>
-                  </a>
-                  <Button size="sm" className="bg-emerald-600 hover:bg-emerald-500">
-                    Assign to Provider
-                  </Button>
+                  {!editMode ? (
+                    <>
+                      <a href={`mailto:${selectedLead.email}`}>
+                        <Button size="sm" variant="outline" className="border-zinc-700">
+                          <Mail className="h-4 w-4 mr-2" />Email
+                        </Button>
+                      </a>
+                      <a href={`tel:${selectedLead.phone}`}>
+                        <Button size="sm" variant="outline" className="border-zinc-700">
+                          <Phone className="h-4 w-4 mr-2" />Call
+                        </Button>
+                      </a>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="border-zinc-700"
+                        onClick={() => setEditMode(true)}
+                      >
+                        <Edit className="h-4 w-4 mr-2" />Edit
+                      </Button>
+                      
+                      {!selectedLead.assignedProviderId ? (
+                        <Button 
+                          size="sm" 
+                          className="bg-emerald-600 hover:bg-emerald-500"
+                          onClick={handleAIMatch}
+                          disabled={matching}
+                        >
+                          <Sparkles className="h-4 w-4 mr-2" />
+                          {matching ? 'Matching...' : 'AI Match Provider'}
+                        </Button>
+                      ) : (
+                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 border px-3 py-1">
+                          <CheckCircle2 className="h-3 w-3 mr-1" />
+                          Assigned to Provider
+                        </Badge>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="border-zinc-700"
+                        onClick={() => {
+                          setEditMode(false);
+                          setEditForm(selectedLead);
+                        }}
+                        disabled={submitting}
+                      >
+                        <X className="h-4 w-4 mr-2" />Cancel
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        className="bg-emerald-600 hover:bg-emerald-500"
+                        onClick={handleUpdateLead}
+                        disabled={submitting}
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {submitting ? 'Saving...' : 'Save Changes'}
+                      </Button>
+                    </>
+                  )}
                 </div>
               </SheetHeader>
 
               <div className="space-y-6 py-6">
-                {/* Contact Info */}
                 <Card className="bg-zinc-900/50 border-zinc-800">
                   <CardHeader>
                     <CardTitle className="text-sm text-zinc-200">Contact Information</CardTitle>
@@ -756,38 +905,111 @@ export default function LeadsPage() {
                   <CardContent className="space-y-3 text-sm">
                     <div className="flex items-start gap-3">
                       <Mail className="h-4 w-4 text-zinc-500 mt-0.5" />
-                      <div>
+                      <div className="flex-1">
                         <p className="text-zinc-400">Email</p>
-                        <p className="text-zinc-200">{selectedLead.email}</p>
+                        {editMode ? (
+                          <Input
+                            value={editForm.email || ''}
+                            onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                            className="bg-zinc-900 border-zinc-800 mt-1"
+                          />
+                        ) : (
+                          <p className="text-zinc-200">{selectedLead.email}</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
                       <Phone className="h-4 w-4 text-zinc-500 mt-0.5" />
-                      <div>
+                      <div className="flex-1">
                         <p className="text-zinc-400">Phone</p>
-                        <p className="text-zinc-200">{selectedLead.phone}</p>
+                        {editMode ? (
+                          <Input
+                            value={editForm.phone || ''}
+                            onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                            className="bg-zinc-900 border-zinc-800 mt-1"
+                          />
+                        ) : (
+                          <p className="text-zinc-200">{selectedLead.phone}</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
                       <MapPin className="h-4 w-4 text-zinc-500 mt-0.5" />
-                      <div>
+                      <div className="flex-1">
                         <p className="text-zinc-400">Location</p>
-                        <p className="text-zinc-200">{selectedLead.city}, {selectedLead.state} {selectedLead.zip}</p>
+                        {editMode ? (
+                          <div className="space-y-2 mt-1">
+                            <Input
+                              placeholder="Address"
+                              value={editForm.address || ''}
+                              onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                              className="bg-zinc-900 border-zinc-800"
+                            />
+                            <div className="grid grid-cols-3 gap-2">
+                              <Input
+                                placeholder="City"
+                                value={editForm.city || ''}
+                                onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                                className="bg-zinc-900 border-zinc-800"
+                              />
+                              <Input
+                                placeholder="State"
+                                value={editForm.state || ''}
+                                onChange={(e) => setEditForm({ ...editForm, state: e.target.value })}
+                                className="bg-zinc-900 border-zinc-800"
+                                maxLength={2}
+                              />
+                              <Input
+                                placeholder="ZIP"
+                                value={editForm.zip || ''}
+                                onChange={(e) => setEditForm({ ...editForm, zip: e.target.value })}
+                                className="bg-zinc-900 border-zinc-800"
+                              />
+                            </div>
+                          </div>
+                        ) : (
+                          <p className="text-zinc-200">{selectedLead.city}, {selectedLead.state} {selectedLead.zip}</p>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
                       <Building2 className="h-4 w-4 text-zinc-500 mt-0.5" />
-                      <div>
+                      <div className="flex-1">
                         <p className="text-zinc-400">Service</p>
-                        <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 mt-1 capitalize">
-                          {selectedLead.serviceInterest.replace('_', ' ')}
-                        </Badge>
+                        {editMode ? (
+                          <Select
+                            value={editForm.serviceInterest || selectedLead.serviceInterest}
+                            onValueChange={(value) => setEditForm({ ...editForm, serviceInterest: value })}
+                          >
+                            <SelectTrigger className="bg-zinc-900 border-zinc-800 mt-1">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent 
+                              className="bg-zinc-900 border-zinc-800 text-zinc-100 z-[9999]"
+                              position="popper"
+                              sideOffset={5}
+                            >
+                              {SERVICE_OPTIONS.map(option => (
+                                <SelectItem 
+                                  key={option.value} 
+                                  value={option.value}
+                                  className="text-zinc-100 focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer hover:bg-zinc-800"
+                                >
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <Badge variant="secondary" className="bg-zinc-800 text-zinc-300 mt-1 capitalize">
+                            {selectedLead.serviceInterest.replace('_', ' ')}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Lead Details */}
                 <Card className="bg-zinc-900/50 border-zinc-800">
                   <CardHeader>
                     <CardTitle className="text-sm text-zinc-200">Lead Details</CardTitle>
@@ -803,9 +1025,19 @@ export default function LeadsPage() {
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-zinc-400">Property Value</span>
-                      <span className="text-emerald-400 font-semibold">
-                        {selectedLead.propertyValue ? formatCurrency(selectedLead.propertyValue) : 'N/A'}
-                      </span>
+                      {editMode ? (
+                        <Input
+                          type="number"
+                          value={editForm.propertyValue?.toString() || ''}
+                          onChange={(e) => setEditForm({ ...editForm, propertyValue: e.target.value ? Number(e.target.value) : null })}
+                          className="bg-zinc-900 border-zinc-800 w-32"
+                          placeholder="450000"
+                        />
+                      ) : (
+                        <span className="text-emerald-400 font-semibold">
+                          {selectedLead.propertyValue ? formatCurrency(Number(selectedLead.propertyValue)) : 'N/A'}
+                        </span>
+                      )}
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-zinc-400">Campaign</span>
@@ -818,17 +1050,23 @@ export default function LeadsPage() {
                   </CardContent>
                 </Card>
 
-                {/* Notes */}
-                {selectedLead.notes && (
-                  <Card className="bg-zinc-900/50 border-zinc-800">
-                    <CardHeader>
-                      <CardTitle className="text-sm text-zinc-200">Notes</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-zinc-300 text-sm">{selectedLead.notes}</p>
-                    </CardContent>
-                  </Card>
-                )}
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                  <CardHeader>
+                    <CardTitle className="text-sm text-zinc-200">Notes</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {editMode ? (
+                      <Textarea
+                        value={editForm.notes || ''}
+                        onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                        className="bg-zinc-900 border-zinc-800 min-h-[100px]"
+                        placeholder="Additional information about the lead..."
+                      />
+                    ) : (
+                      <p className="text-zinc-300 text-sm">{selectedLead.notes || 'No notes'}</p>
+                    )}
+                  </CardContent>
+                </Card>
               </div>
             </>
           )}
@@ -944,21 +1182,28 @@ export default function LeadsPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="serviceInterest" className="text-zinc-200">Service Interest</Label>
+                <Label htmlFor="serviceInterest" className="text-zinc-200">Service Interest *</Label>
                 <Select
                   value={newLeadForm.serviceInterest}
                   onValueChange={(value) => setNewLeadForm({ ...newLeadForm, serviceInterest: value })}
                 >
-                  <SelectTrigger className="bg-zinc-900 border-zinc-800">
-                    <SelectValue />
+                  <SelectTrigger className="bg-zinc-900 border-zinc-800 text-zinc-100">
+                    <SelectValue placeholder="Select service..." />
                   </SelectTrigger>
-                  <SelectContent className="bg-zinc-900 border-zinc-800">
-                    <SelectItem value="landscaping">Landscaping</SelectItem>
-                    <SelectItem value="roofing">Roofing</SelectItem>
-                    <SelectItem value="hvac">HVAC</SelectItem>
-                    <SelectItem value="plumbing">Plumbing</SelectItem>
-                    <SelectItem value="electrical">Electrical</SelectItem>
-                    <SelectItem value="painting">Painting</SelectItem>
+                  <SelectContent 
+                    className="bg-zinc-900 border-zinc-800 text-zinc-100 z-[9999]"
+                    position="popper"
+                    sideOffset={5}
+                  >
+                    {SERVICE_OPTIONS.map(option => (
+                      <SelectItem 
+                        key={option.value} 
+                        value={option.value}
+                        className="text-zinc-100 focus:bg-zinc-800 focus:text-zinc-100 cursor-pointer hover:bg-zinc-800"
+                      >
+                        {option.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>

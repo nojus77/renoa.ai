@@ -68,3 +68,50 @@
   }
 }
 
+/* ===========================================
+   DROPDOWN FIX - Make Select Dropdowns Visible
+   =========================================== */
+
+/* Force SelectContent to render on top of everything */
+[data-radix-popper-content-wrapper] {
+  z-index: 9999 !important;
+}
+
+/* Ensure SelectContent itself has high z-index */
+[role="listbox"] {
+  z-index: 9999 !important;
+  background-color: #18181b !important; /* zinc-900 */
+  border: 1px solid #27272a !important; /* zinc-800 */
+  color: #fafafa !important; /* zinc-100 */
+}
+
+/* Make sure individual items are visible */
+[role="option"] {
+  color: #fafafa !important; /* zinc-100 */
+  cursor: pointer !important;
+}
+
+/* Hover state for dropdown items */
+[role="option"]:hover,
+[role="option"][data-highlighted] {
+  background-color: #27272a !important; /* zinc-800 */
+  color: #fafafa !important; /* zinc-100 */
+}
+
+/* Selected state */
+[role="option"][data-state="checked"] {
+  background-color: #10b981 !important; /* emerald-500 */
+  color: white !important;
+}
+
+/* Fix for Dialog/Sheet dropdowns specifically */
+[data-state="open"] [role="listbox"] {
+  z-index: 9999 !important;
+}
+
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}

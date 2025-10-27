@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '../../../lib/prisma'
-import { LeadStatus, ServiceCategory, Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
 
-    // Dashboard metrics support
     if (searchParams.get('countOnly') === 'true') {
-      // Optional scoreMin for high priority
       const scoreMin = searchParams.get('scoreMin') ? parseInt(searchParams.get('scoreMin')!) : undefined
       const where: any = {}
       if (typeof scoreMin === 'number' && !Number.isNaN(scoreMin)) {
@@ -19,24 +17,21 @@ export async function GET(request: NextRequest) {
     }
 
     if (searchParams.get('groupByService') === 'true') {
-      // Group by serviceInterest and count
       const breakdown = await prisma.lead.groupBy({
         by: ['serviceInterest'],
         _count: { serviceInterest: true },
       })
-      // Map to [service, count]
       return NextResponse.json({
         breakdown: breakdown.map(b => [b.serviceInterest, b._count.serviceInterest])
       })
     }
 
-    // Paginated leads fetch
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
     const search = searchParams.get('search') || ''
-    const status = searchParams.get('status')?.split(',').filter(Boolean) as LeadStatus[] | undefined
-    const serviceInterest = searchParams.get('serviceInterest')?.split(',').filter(Boolean) as ServiceCategory[] | undefined
-    const tier = searchParams.get('tier')?.split(',').map(t => parseInt(t)).filter(n => !Number.isNaN(n)) as number[] | undefined
+    const status = searchParams.get('status')?.split(',').filter(Boolean)
+    const serviceInterest = searchParams.get('serviceInterest')?.split(',').filter(Boolean)
+    const tier = searchParams.get('tier')?.split(',').map(t => parseInt(t)).filter(n => !Number.isNaN(n))
     const sortBy = (searchParams.get('sortBy') || 'createdAt') as 'leadScore' | 'propertyValue' | 'tier' | 'createdAt'
     const sortOrder = (searchParams.get('sortOrder') || 'desc') as 'asc' | 'desc'
 
@@ -66,8 +61,7 @@ export async function GET(request: NextRequest) {
 
     const total = await prisma.lead.count({ where })
 
-    // Build orderBy dynamically
-    const orderBy: Prisma.LeadOrderByWithRelationInput = (() => {
+    const orderBy: any = (() => {
       switch (sortBy) {
         case 'leadScore':
           return { leadScore: sortOrder }
@@ -109,82 +103,85 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     
-    const { 
-      firstName, 
-      lastName, 
-      email, 
-      phone, 
-      address, 
-      city, 
-      state, 
-      zip, 
-      propertyType, 
-      serviceInterest,
-      leadSource,
-      // New fields
-      tier,
-      campaign,
-      contactCount,
-      urgencyScore,
-      propertyScore,
-      financialScore,
-      demographicScore,
-      marketScore,
-      urgencyReasons
-    } = body
+    console.log('📥 Received lead data:', JSON.stringify(body, null, 2));
     
-    if (!firstName || !lastName || !email || !phone || !city || !state || !zip) {
+    // Validate required fields
+    const required = ['firstName', 'lastName', 'email', 'phone', 'city', 'state', 'zip'];
+    const missing = required.filter(field => !body[field]);
+    
+    if (missing.length > 0) {
+      console.log('❌ Missing required fields:', missing);
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: `Missing required fields: ${missing.join(', ')}` },
         { status: 400 }
       )
     }
     
-    // derive default tier if not provided
-    const derivedTier: number = typeof tier === 'number' && !Number.isNaN(tier)
-      ? tier
-      : (typeof body.leadScore === 'number'
-          ? (body.leadScore >= 80 ? 1 : body.leadScore >= 60 ? 2 : 3)
-          : 3)
-
-    const data: any = {
-      firstName,
-      lastName,
-      email,
-      phone,
-      address: address || '',
-      city,
-      state,
-      zip,
-      propertyType: propertyType || 'single_family',
-      propertyValue: body.propertyValue ? parseFloat(body.propertyValue) : null,
-      squareFootage: body.squareFootage ? parseInt(body.squareFootage) : null,
-      moveInDate: body.moveInDate ? new Date(body.moveInDate) : null,
-      serviceInterest: serviceInterest || 'landscaping',
-      leadSource: leadSource || 'website',
-      leadScore: body.leadScore || 50,
-      tier: derivedTier,
-      campaign: campaign || null,
-      contactCount: typeof contactCount === 'number' ? contactCount : 0,
-      urgencyScore: typeof urgencyScore === 'number' ? urgencyScore : null,
-      propertyScore: typeof propertyScore === 'number' ? propertyScore : null,
-      financialScore: typeof financialScore === 'number' ? financialScore : null,
-      demographicScore: typeof demographicScore === 'number' ? demographicScore : null,
-      marketScore: typeof marketScore === 'number' ? marketScore : null,
-      urgencyReasons: urgencyReasons || null,
-      status: 'new',
-      notes: body.notes || null,
+    // Validate service interest
+    const validServices = ['landscaping', 'remodeling', 'roofing', 'fencing', 'hvac', 'plumbing', 'painting', 'flooring'];
+    if (body.serviceInterest && !validServices.includes(body.serviceInterest)) {
+      console.log('❌ Invalid service interest:', body.serviceInterest);
+      return NextResponse.json(
+        { error: `Invalid service interest. Must be one of: ${validServices.join(', ')}` },
+        { status: 400 }
+      )
     }
 
+    // Calculate tier
+    const tier = body.tier || (body.leadScore >= 80 ? 1 : body.leadScore >= 60 ? 2 : 3);
+
+    // Build the data object with proper types
+    const leadData: Prisma.LeadCreateInput = {
+      firstName: body.firstName,
+      lastName: body.lastName,
+      email: body.email,
+      phone: body.phone,
+      address: body.address || '',
+      city: body.city,
+      state: body.state,
+      zip: body.zip,
+      propertyType: body.propertyType || 'single_family',
+      propertyValue: body.propertyValue ? new Prisma.Decimal(body.propertyValue) : null,
+      squareFootage: body.squareFootage ? parseInt(body.squareFootage) : null,
+      moveInDate: body.moveInDate ? new Date(body.moveInDate) : null,
+      serviceInterest: body.serviceInterest || 'landscaping',
+      leadSource: body.leadSource || 'website',
+      leadScore: body.leadScore || 50,
+      tier: tier,
+      campaign: body.campaign || null,
+      contactCount: body.contactCount || 0,
+      urgencyScore: body.urgencyScore || null,
+      propertyScore: body.propertyScore || null,
+      financialScore: body.financialScore || null,
+      demographicScore: body.demographicScore || null,
+      marketScore: body.marketScore || null,
+      urgencyReasons: body.urgencyReasons || null,
+      status: 'new',
+      notes: body.notes || null,
+    };
+
+    console.log('💾 Creating lead in database...');
+
     const lead = await prisma.lead.create({
-      data
-    })
+      data: leadData
+    });
+    
+    console.log('✅ Lead created successfully:', lead.id);
     
     return NextResponse.json({ lead }, { status: 201 })
-  } catch (error) {
-    console.error('Error creating lead:', error)
+    
+  } catch (error: any) {
+    console.error('💥 Error creating lead:', error);
+    console.error('💥 Error stack:', error.stack);
+    console.error('💥 Error message:', error.message);
+    
+    // Return detailed error for debugging
     return NextResponse.json(
-      { error: 'Failed to create lead' },
+      { 
+        error: 'Failed to create lead',
+        details: error.message,
+        code: error.code,
+      },
       { status: 500 }
     )
   }

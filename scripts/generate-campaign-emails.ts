@@ -1,6 +1,6 @@
 // This script simulates a background job for batch email generation
 import { prisma } from '../lib/prisma'
-import { generateMessageId, generateTrackingToken } from '../lib/email/id'
+import { generateMessageId, generateTrackingToken } from '../lib/emails/id'
 import OpenAI from 'openai'
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
