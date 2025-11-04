@@ -7,115 +7,144 @@ export async function POST(
 ) {
   try {
     const { id } = params;
+    
+    console.log('🔍 Finding matching providers for lead:', id);
 
-    console.log('🔍 Finding match for lead:', id);
-
-    // Get the lead
     const lead = await prisma.lead.findUnique({
       where: { id },
     });
 
     if (!lead) {
+      console.log('❌ Lead not found:', id);
       return NextResponse.json(
         { error: 'Lead not found' },
         { status: 404 }
       );
     }
 
-    console.log('📍 Lead location:', lead.city, '- Service:', lead.serviceInterest);
+    console.log('📍 Lead location:', lead.city, lead.state, '- Zip:', lead.zip);
+    console.log('🛠️  Service:', lead.serviceInterest);
 
-    // Find matching providers
-    const providers = await prisma.provider.findMany({
+    const allProviders = await prisma.provider.findMany({
       where: {
         status: 'active',
-        serviceTypes: {
-          has: lead.serviceInterest,
-        },
-        serviceAreas: {
-          has: lead.city,
-        },
       },
     });
 
-    console.log('📊 Found', providers.length, 'matching providers');
+    console.log('👥 Total active providers:', allProviders.length);
 
-    if (providers.length === 0) {
+    if (allProviders.length === 0) {
       return NextResponse.json(
-        { error: `No matching providers found in ${lead.city} for ${lead.serviceInterest}` },
+        { error: 'No active providers in the system' },
         { status: 404 }
       );
     }
 
-    // Calculate match scores
-    const scoredProviders = providers.map(provider => {
-      let score = 0;
+    const matchingProviders = allProviders.filter(provider => {
+      console.log(`\nChecking provider: ${provider.businessName}`);
+      console.log('  Service types:', provider.serviceTypes);
+      console.log('  Service areas:', provider.serviceAreas);
 
-      // Rating score (0-40 points)
-      score += (provider.rating / 5) * 40;
+      const serviceMatch = provider.serviceTypes && 
+        provider.serviceTypes.includes(lead.serviceInterest);
+      
+      console.log('  Service match:', serviceMatch);
 
-      // Conversion rate (0-30 points)
-      const conversionRate = provider.totalLeadsSent > 0 
-        ? (provider.leadsConverted / provider.totalLeadsSent) 
-        : 0;
-      score += conversionRate * 30;
+      let areaMatch = false;
+      
+      if (provider.serviceAreas && Array.isArray(provider.serviceAreas) && provider.serviceAreas.length > 0) {
+        areaMatch = provider.serviceAreas.some(area => {
+          if (typeof area === 'string') {
+            return area === lead.zip;  // ✅ Using lead.zip
+          } else if (typeof area === 'object' && area !== null) {
+            const areaObj = area as any;
+            return areaObj.zipCode === lead.zip ||  // ✅ Using lead.zip
+                   areaObj.city?.toLowerCase() === lead.city?.toLowerCase();
+          }
+          return false;
+        });
 
-      // Capacity score (0-20 points)
-      const capacityUsed = provider.currentLeadCount / provider.leadCapacity;
-      score += (1 - capacityUsed) * 20;
+        if (!areaMatch && lead.city) {
+          areaMatch = provider.serviceAreas.some(area => {
+            if (typeof area === 'object' && area !== null) {
+              const areaObj = area as any;
+              return areaObj.city?.toLowerCase() === lead.city?.toLowerCase();
+            }
+            return false;
+          });
+        }
+      }
 
-      // Years in business (0-10 points)
-      score += Math.min(provider.yearsInBusiness / 10, 1) * 10;
+      console.log('  Area match:', areaMatch);
 
-      return {
-        ...provider,
-        matchScore: Math.round(score),
-      };
+      return serviceMatch && areaMatch;
     });
 
-    // Get the best match
-    const bestMatch = scoredProviders.sort((a, b) => b.matchScore - a.matchScore)[0];
+    console.log('\n✅ Found matching providers:', matchingProviders.length);
 
-    console.log('✨ Best match:', bestMatch.businessName, '- Score:', bestMatch.matchScore);
+    if (matchingProviders.length === 0) {
+      return NextResponse.json(
+        { 
+          error: `No providers available in ${lead.city} for ${lead.serviceInterest}`,
+          details: {
+            city: lead.city,
+            state: lead.state,
+            zipCode: lead.zip,  // ✅ Using lead.zip
+            service: lead.serviceInterest,
+            totalProviders: allProviders.length,
+          }
+        },
+        { status: 404 }
+      );
+    }
 
-    // Assign the lead to the best provider
-    await prisma.lead.update({
+    const sortedProviders = matchingProviders.sort((a, b) => {
+      const aCapacity = a.leadCapacity - a.currentLeadCount;
+      const bCapacity = b.leadCapacity - b.currentLeadCount;
+      return bCapacity - aCapacity;
+    });
+
+    const selectedProvider = sortedProviders[0];
+
+    console.log('🎯 Selected provider:', selectedProvider.businessName);
+
+    const updatedLead = await prisma.lead.update({
       where: { id },
       data: {
-        assignedProviderId: bestMatch.id,
-        status: 'contacted',
+        status: 'matched',
+        assignedProviderId: selectedProvider.id,
+      },
+      include: {
+        assignedProvider: true,
       },
     });
 
-    // Update provider stats
     await prisma.provider.update({
-      where: { id: bestMatch.id },
+      where: { id: selectedProvider.id },
       data: {
-        currentLeadCount: { increment: 1 },
-        totalLeadsSent: { increment: 1 },
+        currentLeadCount: {
+          increment: 1,
+        },
+        totalLeadsSent: {
+          increment: 1,
+        },
+        lastActivityAt: new Date(),
       },
     });
+
+    console.log('✅ Lead matched successfully');
 
     return NextResponse.json({
-      success: true,
-      provider: {
-        id: bestMatch.id,
-        name: bestMatch.businessName,
-        email: bestMatch.email,
-        rating: bestMatch.rating,
-        matchScore: bestMatch.matchScore,
-      },
-      allMatches: scoredProviders.map(p => ({
-        id: p.id,
-        name: p.businessName,
-        matchScore: p.matchScore,
-        rating: p.rating,
-      })),
-    });
+  success: true,
+  lead: updatedLead,
+  provider: selectedProvider,  // ✅ Add this!
+  message: `Matched with ${selectedProvider.businessName}`,
+});
 
-  } catch (error: any) {
-    console.error('💥 Error matching lead:', error);
+  } catch (error) {
+    console.error('❌ Error matching lead:', error);
     return NextResponse.json(
-      { error: 'Failed to match lead', details: error.message },
+      { error: 'Failed to match lead with provider' },
       { status: 500 }
     );
   }

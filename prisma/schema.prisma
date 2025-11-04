@@ -25,46 +25,55 @@ model User {
 }
 
 model Lead {
-  id                 String             @id @default(uuid())
-  firstName          String             @map("first_name")
-  lastName           String             @map("last_name")
-  email              String
-  phone              String
-  address            String
-  city               String
-  state              String
-  zip                String
-  propertyType       PropertyType       @map("property_type")
-  propertyValue      Decimal?           @map("property_value")  // Value of their home
-  contractValue      Decimal?           @map("contract_value")  // ← ADD THIS - Value of the service deal
-  squareFootage      Int?               @map("square_footage")
-  moveInDate         DateTime?          @map("move_in_date")
-  serviceInterest    ServiceCategory    @map("service_interest")
-  leadSource         String             @map("lead_source")
-  leadScore          Int                @default(0) @map("lead_score")
-  tier               Int
-  campaign           String?
-  contactCount       Int                @default(0) @map("contact_count")
-  urgencyScore       Int?
-  propertyScore      Int?
-  financialScore     Int?
-  demographicScore   Int?
-  marketScore        Int?
-  urgencyReasons     String?            @map("urgency_reasons")
-  status             LeadStatus         @default(new)
-  notes              String?
-  aiTool1Metadata    Json?              @map("ai_tool_1_metadata")
-  createdAt          DateTime           @default(now()) @map("created_at")
-  updatedAt          DateTime           @updatedAt @map("updated_at")
-  assignedProviderId String?            @map("assigned_provider_id")
-  campaignLeads      CampaignLead[]     @relation("CampaignLeadRelation")
-  inboundMessages    InboundMessage[]   @relation("LeadInboundMessages")
-  messages           Message[]          @relation("LeadMessages")
-  emailLogs          EmailLog[]         @relation("LeadEmailLogs")
-  engagementMetrics  EngagementMetric[] @relation("LeadEngagementMetrics")
-  assignedProvider   Provider?          @relation("AssignedProviderLeads", fields: [assignedProviderId], references: [id])
-  matches            Match[]            @relation("LeadMatches")
-  providerNotes      LeadNote[]         @relation("LeadNotes")
+  id                    String             @id @default(uuid())
+  firstName             String             @map("first_name")
+  lastName              String             @map("last_name")
+  email                 String
+  phone                 String
+  address               String
+  city                  String
+  state                 String
+  zip                   String             // ✅ Just this one, no zipCode!
+  propertyType          PropertyType       @map("property_type")
+  propertyValue         Decimal?           @map("property_value")
+  contractValue         Decimal?           @map("contract_value")
+  squareFootage         Int?               @map("square_footage")
+  moveInDate            DateTime?          @map("move_in_date")
+  serviceInterest       ServiceCategory    @map("service_interest")
+  leadSource            String             @map("lead_source")
+  leadScore             Int                @default(0) @map("lead_score")
+  tier                  Int
+  campaign              String?
+  contactCount          Int                @default(0) @map("contact_count")
+  urgencyScore          Int?
+  propertyScore         Int?
+  financialScore        Int?
+  demographicScore      Int?
+  marketScore           Int?
+  urgencyReasons        String?            @map("urgency_reasons")
+  status                LeadStatus         @default(new)
+  notes                 String?
+  aiTool1Metadata       Json?              @map("ai_tool_1_metadata")
+  
+  // Scheduling fields
+  customerPreferredDate DateTime?          @map("customer_preferred_date")
+  providerProposedDate  DateTime?          @map("provider_proposed_date")
+  schedulingStatus      String?            @map("scheduling_status")
+  schedulingNotes       String?            @map("scheduling_notes")
+  
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  assignedProviderId    String?            @map("assigned_provider_id")
+  
+  // Relations
+  campaignLeads         CampaignLead[]     @relation("CampaignLeadRelation")
+  inboundMessages       InboundMessage[]   @relation("LeadInboundMessages")
+  messages              Message[]          @relation("LeadMessages")
+  emailLogs             EmailLog[]         @relation("LeadEmailLogs")
+  engagementMetrics     EngagementMetric[] @relation("LeadEngagementMetrics")
+  assignedProvider      Provider?          @relation("AssignedProviderLeads", fields: [assignedProviderId], references: [id])
+  matches               Match[]            @relation("LeadMatches")
+  providerNotes         LeadNote[]         @relation("LeadNotes")
 
   @@index([email])
   @@index([zip])
@@ -366,22 +375,30 @@ model Provider {
   ownerName        String
   email            String     @unique
   phone            String
-  serviceTypes     String[]
-  serviceAreas     String[]
-  yearsInBusiness  Int
-  status           String
-  leadCapacity     Int
+  serviceTypes     String[]   @default([])           // ✅ Default empty array
+  serviceAreas     String[]   @default([])           // ✅ Default empty array
+  yearsInBusiness  Int        @default(0)            // ✅ Default 0
+  status           String     @default("active")     // ✅ Default "active"
+  leadCapacity     Int        @default(10)           // ✅ Default 10
   currentLeadCount Int        @default(0)
-  rating           Float      @default(0)
+  rating           Float      @default(4.5)          // ✅ Better default
   totalLeadsSent   Int        @default(0)
   leadsAccepted    Int        @default(0)
   leadsConverted   Int        @default(0)
   totalRevenue     Float      @default(0)
   commissionRate   Float      @default(0.15)
-  averageJobValue  Float      @default(0)
+  averageJobValue  Float      @default(5000)         // ✅ Better default
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   lastActivityAt   DateTime   @default(now())
+  
+  // Availability fields
+  workingHours     Json?
+  timeZone         String     @default("America/Chicago")
+  bufferTime       Int        @default(30)
+  advanceBooking   Int        @default(14)
+  availabilityNotes String?
+  
   leads            Lead[]     @relation("AssignedProviderLeads")
   leadNotes        LeadNote[] @relation("ProviderNotes")
 }
@@ -408,6 +425,9 @@ enum ServiceCategory {
   plumbing
   painting
   flooring
+  lawn_care
+  tree_service
+  hardscaping
 }
 
 enum LeadStatus {

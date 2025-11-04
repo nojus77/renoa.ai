@@ -3,13 +3,14 @@
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { 
+import {
   LayoutDashboard,
   TrendingUp,
   Users,
   Settings,
   LogOut,
-  ChevronRight
+  ChevronRight,
+  Calendar
 } from 'lucide-react';
 
 interface ProviderLayoutProps {
@@ -34,6 +35,11 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       icon: LayoutDashboard,
     },
     {
+      name: 'Calendar',
+      href: '/provider/calendar',
+      icon: Calendar,
+    },
+    {
       name: 'Analytics',
       href: '/provider/analytics',
       icon: TrendingUp,
@@ -48,7 +54,6 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       name: 'Settings',
       href: '/provider/settings',
       icon: Settings,
-      disabled: true, // For future
     },
   ];
 
@@ -78,8 +83,8 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                 href={item.disabled ? '#' : item.href}
                 className={`
                   flex items-center gap-3 px-4 py-3 rounded-lg transition-all
-                  ${active 
-                    ? 'bg-blue-600 text-white' 
+                  ${active
+                    ? 'bg-blue-600 text-white'
                     : item.disabled
                     ? 'text-zinc-600 cursor-not-allowed'
                     : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'

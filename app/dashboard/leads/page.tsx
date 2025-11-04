@@ -310,7 +310,7 @@ export default function LeadsPage() {
         throw new Error(data.error || 'Failed to match lead');
       }
       
-      toast.success(`✨ Matched with ${data.provider.name}! Score: ${data.provider.matchScore}/100`);
+      toast.success(data.message || 'Provider matched successfully!');
       fetchLeads();
       
       // Update selected lead

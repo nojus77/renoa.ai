@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
 
+    // Quick count endpoint
     if (searchParams.get('countOnly') === 'true') {
       const scoreMin = searchParams.get('scoreMin') ? parseInt(searchParams.get('scoreMin')!) : undefined
       const where: any = {}
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ total })
     }
 
+    // Group by service endpoint
     if (searchParams.get('groupByService') === 'true') {
       const breakdown = await prisma.lead.groupBy({
         by: ['serviceInterest'],
@@ -26,6 +28,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // Main query with filters
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
     const search = searchParams.get('search') || ''
@@ -70,16 +73,20 @@ export async function GET(request: NextRequest) {
         case 'tier':
           return { tier: sortOrder }
         default:
-          return { createdAt: 'desc' }
+          return { createdAt: sortOrder }  // ✅ Use sortOrder, not hardcoded 'desc'
       }
     })()
 
+    // ✅ FIX: Actually USE the where, orderBy, and pagination!
     const leads = await prisma.lead.findMany({
       where,
       skip: (page - 1) * limit,
       take: limit,
-      orderBy
-    })
+      orderBy,
+      include: {
+        assignedProvider: true,  // ✅ Include provider info
+      },
+    });
 
     return NextResponse.json({
       leads,
@@ -118,7 +125,7 @@ export async function POST(request: NextRequest) {
     }
     
     // Validate service interest
-    const validServices = ['landscaping', 'remodeling', 'roofing', 'fencing', 'hvac', 'plumbing', 'painting', 'flooring'];
+    const validServices = ['landscaping', 'lawn_care', 'hardscaping', 'remodeling', 'roofing', 'fencing', 'hvac', 'plumbing', 'painting', 'flooring'];
     if (body.serviceInterest && !validServices.includes(body.serviceInterest)) {
       console.log('❌ Invalid service interest:', body.serviceInterest);
       return NextResponse.json(
@@ -163,7 +170,10 @@ export async function POST(request: NextRequest) {
     console.log('💾 Creating lead in database...');
 
     const lead = await prisma.lead.create({
-      data: leadData
+      data: leadData,
+      include: {
+        assignedProvider: true,  // ✅ Include provider in response
+      },
     });
     
     console.log('✅ Lead created successfully:', lead.id);
