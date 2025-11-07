@@ -8,7 +8,7 @@
             font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6;
             color: #1a1a1a;
-            background: #A3BE8C;
+            background: #d4e4d0;
             -webkit-font-smoothing: antialiased;
             zoom: 0.75;
         }
@@ -23,9 +23,9 @@
         /* Navigation with gradient fade */
         nav {
             background: linear-gradient(to bottom,
-                rgba(201, 203, 174, 0.95) 0%,
-                rgba(201, 203, 174, 0.90) 70%,
-                rgba(201, 203, 174, 0.0) 100%);
+                rgba(212, 228, 208, 0.95) 0%,
+                rgba(212, 228, 208, 0.85) 60%,
+                rgba(212, 228, 208, 0.0) 100%);
             backdrop-filter: blur(10px);
             border-bottom: none;
             padding: 12px 0 24px 0;
@@ -329,10 +329,11 @@
             overflow: hidden;
             background: linear-gradient(180deg,
                 #d4e4d0 0%,      /* top - light sandy green */
-                #a3be8c 30%,     /* upper green */
-                #b5c49d 50%,     /* middle soft green */
-                #c9cbae 70%,     /* lower beige */
-                #ddd9c8 100%     /* bottom sand */
+                #cde4ca 15%,     /* soft transition */
+                #c0dbb8 30%,     /* lighter soft green */
+                #b5d0a8 50%,     /* middle soft green */
+                #bdd3ae 70%,     /* transitioning to sage */
+                #c5cbb1 100%     /* bottom - matches first section */
             );
         }
 
@@ -802,9 +803,9 @@
         /* Stats Section */
         .stats {
             background: linear-gradient(to bottom,
-                #c5cbb1 0%,      /* fade from hero-bottom */
-                #c2ccb8 50%,     /* softer mid-tone */
-                #c8cdb6 100%     /* fade to next section */
+                #dce0d2 0%,      /* continues from section 4 */
+                #dfe3d6 50%,     /* softer mid-tone */
+                #e2e6da 100%     /* fade to CTA section */
             );
             padding: 80px 40px;
             border-top: none;
@@ -1042,9 +1043,12 @@
             z-index: 2;
         }
         
-        /* Services section - sage background */
+        /* Services section - soft gradient continuation */
         .services-section {
-            background: transparent;
+            background: linear-gradient(to bottom,
+                #c5cbb1 0%,      /* matches hero bottom */
+                #c5cbb1 100%     /* consistent soft sage */
+            );
             padding-top: 0 !important;
         }
         
@@ -1052,31 +1056,35 @@
         .section:nth-of-type(1) {
             background: linear-gradient(to bottom,
                 #c5cbb1 0%,
-                #c8cdb6 100%
+                #c7cdb4 50%,
+                #c9cfb8 100%
             );
         }
 
         /* Second section (Why Choose Us) - softer gradient */
         .section:nth-of-type(2) {
             background: linear-gradient(to bottom,
-                #c8cdb6 0%,
-                #cbd0bb 100%
+                #c9cfb8 0%,
+                #ccd2bc 50%,
+                #cfd5c0 100%
             );
         }
 
         /* Third section (Providers) - softer gradient */
         .section:nth-of-type(3) {
             background: linear-gradient(to bottom,
-                #cbd0bb 0%,
-                #cdd2be 100%
+                #cfd5c0 0%,
+                #d2d8c4 50%,
+                #d5dac8 100%
             );
         }
 
-        /* Fourth section (Testimonials) - softer gradient */
+        /* Fourth section (Testimonials) - softer gradient to sandy bottom */
         .section:nth-of-type(4) {
             background: linear-gradient(to bottom,
-                #cdd2be 0%,
-                #d0d5c1 100%
+                #d5dac8 0%,
+                #d8ddcc 50%,
+                #dce0d2 100%
             );
         }
 
@@ -1583,15 +1591,15 @@
         /* CTA Section */
         .cta-section {
             background: linear-gradient(to bottom,
-                #cdd2be 0%,      /* fade from testimonials */
-                #b5c4a4 30%,     /* softer green tone */
-                #9eb58c 60%,     /* mid green */
-                #88a77a 85%,     /* darker green */
-                #4f7055 100%     /* deep green base */
+                #e2e6da 0%,      /* continues from stats */
+                #dde3d4 25%,     /* subtle sandy tone */
+                #d8dfce 50%,     /* soft sandy middle */
+                #d3dbc8 75%,     /* light sandy */
+                #ced7c2 100%     /* sandy bottom */
             );
             padding: 100px 40px;
             text-align: center;
-            color: #F5EDE1;
+            color: #06402B;
             position: relative;
             overflow: hidden;
         }
