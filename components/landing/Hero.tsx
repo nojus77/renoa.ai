@@ -21,6 +21,20 @@ export default function Hero() {
   });
   const dotsContainerRef = useRef<HTMLDivElement>(null);
 
+  // Service images mapping
+  const serviceImages: Record<string, string> = {
+    landscaping: 'https://images.unsplash.com/photo-1558904541-efa843a96f01?w=800&q=80',
+    lawn_care: 'https://images.unsplash.com/photo-1599629954294-8f4e8c8b6e3d?w=800&q=80',
+    hardscaping: 'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?w=800&q=80',
+    remodeling: 'https://images.unsplash.com/photo-1581858726788-75bc0f6a952d?w=800&q=80',
+    roofing: 'https://images.unsplash.com/photo-1632778149955-e80f8ceca2e8?w=800&q=80',
+    fencing: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80',
+    hvac: 'https://images.unsplash.com/photo-1581092918056-0c4c3acd3789?w=800&q=80',
+    plumbing: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=800&q=80',
+    painting: 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?w=800&q=80',
+    flooring: 'https://images.unsplash.com/photo-1615971677499-5467cbab01c0?w=800&q=80',
+  };
+
   // Floating dots animation
   useEffect(() => {
     const dotsContainer = dotsContainerRef.current;
@@ -186,20 +200,27 @@ export default function Hero() {
     }
   };
 
+  // Get current service image
+  const currentImage = selectedService
+    ? serviceImages[selectedService]
+    : serviceImages.landscaping;
+
   return (
     <section className="hero">
-      <div id="dotsContainer" ref={dotsContainerRef}></div>
+      <div className="hero-top-section">
+        <div className="hero-dots-container" ref={dotsContainerRef}></div>
 
-      <div className="hero-content">
-        <h1>
-          Find trusted local pros for
-          <br />
-          <span className="rotating-word" id="rotatingWord">
-            {rotatingWord}
-            <div className="sparkle-container" id="sparkleContainer"></div>
-          </span>
-        </h1>
-        <p className="hero-subtitle">Stop wasting time on quotes - let AI match you instantly!</p>
+        <div className="hero-split-container">
+          {/* LEFT SIDE - Form */}
+          <div className="hero-left-content">
+            <h1>
+              Find trusted local pros for
+              <br />
+              <span className="rotating-word">
+                {rotatingWord}
+              </span>
+            </h1>
+            <p className="hero-subtitle">Stop wasting time on quotes - let AI match you instantly!</p>
 
         <div className="hero-form-progressive">
           {/* Step 1 - Service & Location (always visible) */}
@@ -358,30 +379,58 @@ export default function Hero() {
           )}
         </div>
 
-        <div className="trust-bar">
-          <div className="trust-item">
-            <div className="trust-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
-              </svg>
+            <div className="trust-bar">
+              <div className="trust-item">
+                <div className="trust-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+                  </svg>
+                </div>
+                <span>Verified Professionals</span>
+              </div>
+              <div className="trust-item">
+                <div className="trust-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                  </svg>
+                </div>
+                <span>Instant AI Matching</span>
+              </div>
+              <div className="trust-item">
+                <div className="trust-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                  </svg>
+                </div>
+                <span>100% Secure</span>
+              </div>
             </div>
-            <span>Verified Professionals</span>
           </div>
-          <div className="trust-item">
-            <div className="trust-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
-              </svg>
+
+          {/* RIGHT SIDE - Browser Mockup */}
+          <div className="hero-right-mockup">
+            <div className="browser-mockup">
+              <div className="browser-chrome">
+                <div className="browser-dots">
+                  <span className="dot red"></span>
+                  <span className="dot yellow"></span>
+                  <span className="dot green"></span>
+                </div>
+                <div className="browser-address">renoa.ai</div>
+              </div>
+              <div className="browser-content">
+                <img
+                  src={currentImage}
+                  alt={selectedService || 'Service'}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    transition: 'opacity 0.3s ease'
+                  }}
+                />
+              </div>
             </div>
-            <span>Instant AI Matching</span>
-          </div>
-          <div className="trust-item">
-            <div className="trust-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
-              </svg>
-            </div>
-            <span>100% Secure</span>
           </div>
         </div>
       </div>
