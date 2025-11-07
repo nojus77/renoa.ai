@@ -12,7 +12,7 @@ export default function Navbar() {
             <li><a href="#how">How it works</a></li>
             <li><a href="#providers">Providers</a></li>
             <li><a href="#about">About</a></li>
-            <li><Link href="/provider/login">For Professionals</Link></li>
+            <li><Link href="/provider/login" className="providers-link">For Professionals</Link></li>
           </ul>
           <button className="btn btn-primary">Get Started</button>
         </div>
