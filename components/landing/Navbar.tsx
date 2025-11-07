@@ -1,4 +1,12 @@
+'use client';
+
 export default function Navbar() {
+  const handleProviderClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    window.location.href = '/provider/login';
+  };
+
   return (
     <nav>
       <div className="nav-container">
@@ -10,7 +18,7 @@ export default function Navbar() {
             <li><a href="#how">How it works</a></li>
             <li><a href="#providers">Providers</a></li>
             <li><a href="#about">About</a></li>
-            <li><a href="/provider/login" className="providers-link">For Professionals</a></li>
+            <li><a href="/provider/login" className="providers-link" onClick={handleProviderClick}>For Professionals</a></li>
           </ul>
           <button className="btn btn-primary">Get Started</button>
         </div>
