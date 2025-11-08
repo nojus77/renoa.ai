@@ -25,11 +25,11 @@ export async function POST(
       },
     });
 
-    // Increment provider's leads received
+    // Increment provider's leads sent
     await prisma.provider.update({
       where: { id: providerId },
       data: {
-        leadsReceived: {
+        totalLeadsSent: {
           increment: 1,
         },
       },

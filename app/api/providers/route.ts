@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     if (Array.isArray(body.serviceTypes)) {
       serviceTypes = body.serviceTypes;
     } else if (typeof body.serviceTypes === 'string') {
-      serviceTypes = body.serviceTypes.split(',').map(s => s.trim()).filter(Boolean);
+      serviceTypes = body.serviceTypes.split(',').map((s: string) => s.trim()).filter(Boolean);
     }
 
     // Parse service areas
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     if (Array.isArray(body.serviceAreas)) {
       serviceAreas = body.serviceAreas;
     } else if (typeof body.serviceAreas === 'string') {
-      serviceAreas = body.serviceAreas.split(',').map(s => s.trim()).filter(Boolean);
+      serviceAreas = body.serviceAreas.split(',').map((s: string) => s.trim()).filter(Boolean);
     } else if (body.city) {
       // If no serviceAreas but city is provided, use city
       serviceAreas = [body.city];

@@ -54,7 +54,7 @@ export async function POST(
     await prisma.provider.update({
       where: { id: providerId },
       data: {
-        leadsReceived: {
+        totalLeadsSent: {
           increment: 1,
         },
       },
@@ -73,7 +73,7 @@ export async function POST(
         leadState: lead.state,
         service: lead.serviceInterest,
         leadScore: lead.leadScore,
-        propertyValue: lead.propertyValue,
+        propertyValue: lead.propertyValue ? Number(lead.propertyValue) : null,
         notes: lead.notes,
       });
       console.log('Email sent to provider:', provider.email);

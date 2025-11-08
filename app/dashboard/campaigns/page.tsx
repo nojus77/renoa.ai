@@ -211,6 +211,49 @@ export default function CampaignsPage() {
   }
 };
 
+  const handleUpdateStatus = async (campaignId: string, newStatus: string) => {
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to update campaign status');
+      }
+
+      toast.success(`Campaign ${newStatus === 'active' ? 'activated' : 'paused'} successfully`);
+      fetchCampaigns();
+    } catch (error: any) {
+      console.error('Update status error:', error);
+      toast.error(error.message || 'Failed to update campaign status');
+    }
+  };
+
+  const handleDeleteCampaign = async (campaignId: string) => {
+    if (!confirm('Are you sure you want to delete this campaign? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/campaigns/${campaignId}`, {
+        method: 'DELETE',
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to delete campaign');
+      }
+
+      toast.success('Campaign deleted successfully');
+      setSelectedCampaign(null);
+      fetchCampaigns();
+    } catch (error: any) {
+      console.error('Delete campaign error:', error);
+      toast.error(error.message || 'Failed to delete campaign');
+    }
+  };
+
   const filteredCampaigns = campaigns.filter(c => {
     const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status === statusFilter;

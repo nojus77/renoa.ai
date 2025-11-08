@@ -34,14 +34,12 @@ export async function PATCH(
         });
 
         if (provider) {
-          const leadsConverted = (provider.leadsConverted || 0) + 1;
-          const conversionRate = leadsConverted / (provider.leadsReceived || 1);
-
           await prisma.provider.update({
             where: { id: lead.assignedProviderId },
             data: {
-              leadsConverted,
-              conversionRate,
+              leadsConverted: {
+                increment: 1,
+              },
             },
           });
         }

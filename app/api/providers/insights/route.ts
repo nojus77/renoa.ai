@@ -17,11 +17,17 @@ export async function GET() {
     }
 
     const totalRevenue = providers.reduce((sum, p) => sum + p.totalRevenue, 0);
-    const totalUnpaid = providers.reduce((sum, p) => sum + p.unpaidCommission, 0);
     const activeProviders = providers.filter(p => p.status === 'active').length;
-    const avgConversion = providers.reduce((sum, p) => sum + (p.conversionRate || 0), 0) / providers.length;
+    const avgConversion = providers.reduce((sum, p) => {
+      const conversionRate = p.totalLeadsSent > 0 ? p.leadsConverted / p.totalLeadsSent : 0;
+      return sum + conversionRate;
+    }, 0) / providers.length;
     const topProvider = providers.sort((a, b) => b.totalRevenue - a.totalRevenue)[0];
-    const lowPerformer = providers.sort((a, b) => (a.conversionRate || 0) - (b.conversionRate || 0))[0];
+    const lowPerformer = providers.sort((a, b) => {
+      const aRate = a.totalLeadsSent > 0 ? a.leadsConverted / a.totalLeadsSent : 0;
+      const bRate = b.totalLeadsSent > 0 ? b.leadsConverted / b.totalLeadsSent : 0;
+      return aRate - bRate;
+    })[0];
 
     const prompt = `You are a business analyst reviewing a home improvement service provider network. Analyze this data and provide actionable insights:
 
@@ -29,15 +35,17 @@ export async function GET() {
 - Total Providers: ${providers.length}
 - Active: ${activeProviders}
 - Total Revenue Generated: $${totalRevenue.toLocaleString()}
-- Unpaid Commission: $${totalUnpaid.toLocaleString()}
 - Average Conversion Rate: ${(avgConversion * 100).toFixed(1)}%
 
-**Top Performer:** ${topProvider.businessName} ($${topProvider.totalRevenue.toLocaleString()} revenue, ${((topProvider.conversionRate || 0) * 100).toFixed(1)}% conversion)
+**Top Performer:** ${topProvider.businessName} ($${topProvider.totalRevenue.toLocaleString()} revenue)
 
-**Needs Attention:** ${lowPerformer.businessName} (${((lowPerformer.conversionRate || 0) * 100).toFixed(1)}% conversion rate)
+**Needs Attention:** ${lowPerformer.businessName} (low conversion rate)
 
 **Provider Details:**
-${providers.map(p => `- ${p.businessName}: $${p.totalRevenue.toLocaleString()} revenue, ${p.leadsReceived} leads, ${p.leadsConverted} converted (${((p.conversionRate || 0) * 100).toFixed(1)}%), $${p.unpaidCommission.toLocaleString()} unpaid`).join('\n')}
+${providers.map(p => {
+  const conversionRate = p.totalLeadsSent > 0 ? (p.leadsConverted / p.totalLeadsSent) : 0;
+  return `- ${p.businessName}: $${p.totalRevenue.toLocaleString()} revenue, ${p.totalLeadsSent} leads sent, ${p.leadsConverted} converted (${(conversionRate * 100).toFixed(1)}%)`;
+}).join('\n')}
 
 Provide a concise analysis (3-4 paragraphs) covering:
 1. Overall network health and performance trends
