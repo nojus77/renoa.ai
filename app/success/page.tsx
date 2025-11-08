@@ -144,7 +144,7 @@ export default function SuccessPage() {
         </h1>
 
         <p className="text-xl text-gray-700 mb-8">
-          We're finding the perfect match for your <span className="font-semibold text-green-600">{(lead.serviceInterest || 'service').replace('_', ' ')}</span> project
+          We&apos;re finding the perfect match for your <span className="font-semibold text-green-600">{(lead.serviceInterest || 'service').replace('_', ' ')}</span> project
         </p>
 
         {/* Project Details */}
@@ -180,7 +180,7 @@ export default function SuccessPage() {
           <div className="space-y-3 text-left text-green-800">
             <div className="flex items-start">
               <span className="text-green-600 mr-3 text-xl font-bold">✓</span>
-              <span>Check your email - we've sent confirmation details to <strong>{lead.email}</strong></span>
+              <span>Check your email - we&apos;ve sent confirmation details to <strong>{lead.email}</strong></span>
             </div>
             <div className="flex items-start">
               <span className="text-green-600 mr-3 text-xl font-bold">✓</span>

@@ -178,7 +178,7 @@ export default function ProviderSettings() {
           <div className="mb-12">
             <div className="mb-6">
               <h2 className="text-lg font-semibold text-zinc-100 mb-2">Weekly Schedule</h2>
-              <p className="text-sm text-zinc-500">Set the hours you're available to take appointments</p>
+              <p className="text-sm text-zinc-500">Set the hours you&apos;re available to take appointments</p>
             </div>
 
             <div className="space-y-2">

@@ -300,7 +300,7 @@ export default function WhyTrust() {
                       </div>
                       <div className="faq-mini-item">
                         <p className="faq-q">Can I get multiple quotes?</p>
-                        <p className="faq-a">Yes—get 2–3 curated matches, compare details, chat, and book when you're ready.</p>
+                        <p className="faq-a">Yes—get 2–3 curated matches, compare details, chat, and book when you&apos;re ready.</p>
                       </div>
                     </div>
 

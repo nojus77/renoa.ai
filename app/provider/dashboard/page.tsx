@@ -623,7 +623,7 @@ export default function ProviderDashboard() {
       <>
         {lead.customerPreferredDate ? (
           <div className="bg-blue-500/10 border border-blue-500/30 rounded-lg p-3 mb-3">
-            <p className="text-sm text-zinc-400 mb-1">Customer's preferred date:</p>
+            <p className="text-sm text-zinc-400 mb-1">Customer&apos;s preferred date:</p>
             <p className="font-medium text-zinc-100">
               {formatLongDate(lead.customerPreferredDate)}
             </p>

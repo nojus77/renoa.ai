@@ -31,7 +31,7 @@ export default function FlowSelector({ onSelectGuided, onSelectSmart }: FlowSele
             Answer Quick Questions
           </h3>
           <p className="text-gray-600 mb-6 leading-relaxed">
-            We'll guide you through a few simple questions about your project. Quick, easy, and precise!
+            We&apos;ll guide you through a few simple questions about your project. Quick, easy, and precise!
           </p>
 
           <div className="space-y-2 mb-6">

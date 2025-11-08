@@ -88,7 +88,7 @@ export default function ProviderLoginPage() {
             </Button>
 
             <p className="text-xs text-zinc-500 text-center mt-4">
-              For security, we'll verify your email is registered in our system
+              For security, we&apos;ll verify your email is registered in our system
             </p>
           </form>
         </CardContent>

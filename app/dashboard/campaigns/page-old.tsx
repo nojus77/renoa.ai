@@ -564,7 +564,7 @@ export default function CampaignsPage() {
           <DialogTitle>Delete {deleteType === 'campaign' ? 'Campaign' : 'Template'}</DialogTitle>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              Are you sure you want to delete "{deleteItem?.name}"? This action cannot be undone.
+              Are you sure you want to delete &quot;{deleteItem?.name}&quot;? This action cannot be undone.
             </p>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>

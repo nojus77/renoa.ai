@@ -49,7 +49,7 @@ export default function EstimateConfirmation({
         </div>
 
         <h2 className="text-2xl font-bold text-center text-gray-900 mb-6">
-          Got it! Here's your project summary
+          Got it! Here&apos;s your project summary
         </h2>
 
         {/* Project Details */}
