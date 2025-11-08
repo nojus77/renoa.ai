@@ -183,7 +183,6 @@ export default function AdminLeads() {
     );
   }
 
-
   return (
     <div className="min-h-screen bg-zinc-950 p-8">
       <div className="max-w-7xl mx-auto">
@@ -653,41 +652,49 @@ export default function AdminLeads() {
               </div>
 
               {/* Assigned Provider */}
-{selectedLead.assignedProvider && (
-  <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-    <p className="text-sm text-green-400 font-medium mb-3">Assigned Provider</p>
-    <div className="space-y-2">
-      <p className="text-lg font-bold text-zinc-100">
-        {selectedLead.assignedProvider.businessName}
-      </p>
-      <p className="text-sm text-zinc-300">
-        {selectedLead.assignedProvider.ownerName}
-      </p>
-      <div className="flex gap-4 mt-3">
-        
-          href={`mailto:${selectedLead.assignedProvider.email}`}
-          className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
-        >
-          <Mail className="h-3 w-3" />
-          Email
-        </a>
-        
-          href={`tel:${selectedLead.assignedProvider.phone}`}
-          className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
-        >
-          <Phone className="h-3 w-3" />
-          Call
-        </a>
-      </div>
+              {selectedLead.assignedProvider && (
+                <div className="p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
+                  <p className="text-sm text-green-400 font-medium mb-3">Assigned Provider</p>
+                  <div className="space-y-2">
+                    <p className="text-lg font-bold text-zinc-100">
+                      {selectedLead.assignedProvider.businessName}
+                    </p>
+                    <p className="text-sm text-zinc-300">
+                      {selectedLead.assignedProvider.ownerName}
+                    </p>
+                    <div className="flex gap-4 mt-3">
+                      
+                        href={`mailto:${selectedLead.assignedProvider.email}`}
+                        className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                      >
+                        <Mail className="h-3 w-3" />
+                        Email
+                      </a>
+                      
+                        href={`tel:${selectedLead.assignedProvider.phone}`}
+                        className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                      >
+                        <Phone className="h-3 w-3" />
+                        Call
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Notes */}
+              {selectedLead.notes && (
+                <div>
+                  <p className="text-sm text-zinc-500 mb-2 font-medium">Notes</p>
+                  <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                    <p className="text-zinc-100 text-sm">{selectedLead.notes}</p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  </div>
-)}
-{/* Notes */}
-{selectedLead.notes && (
-  <div>
-    <p className="text-sm text-zinc-500 mb-2 font-medium">Notes</p>
-    <div className="p-4 bg-zinc-800/50 rounded-lg border border-zinc-700">
-      <p className="text-zinc-100 text-sm">{selectedLead.notes}</p>
-    </div>
-  </div>
-)}
+  );
+}
