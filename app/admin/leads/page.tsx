@@ -663,14 +663,14 @@ export default function AdminLeads() {
                       {selectedLead.assignedProvider.ownerName}
                     </p>
                     <div className="flex gap-4 mt-3">
-                      
+                      <a
                         href={`mailto:${selectedLead.assignedProvider.email}`}
                         className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
                       >
                         <Mail className="h-3 w-3" />
                         Email
                       </a>
-                      
+                      <a
                         href={`tel:${selectedLead.assignedProvider.phone}`}
                         className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
                       >
