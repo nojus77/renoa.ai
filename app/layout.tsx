@@ -4,6 +4,8 @@ import './globals.css'
 import { Toaster } from 'sonner'
 import { Providers } from './providers'
 
+export const dynamic = 'force-dynamic';
+
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
