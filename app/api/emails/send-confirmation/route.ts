@@ -203,11 +203,11 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Confirmation email sent successfully:', data);
 
-    return NextResponse.json({
-      success: true,
-      messageId: data.id,
-      message: 'Confirmation email sent successfully'
-    });
+return NextResponse.json({
+  success: true,
+  messageId: data.data?.id,  // Changed this line
+  message: 'Confirmation email sent successfully'
+});
 
   } catch (error: any) {
     console.error('❌ Error sending confirmation email:', error);
