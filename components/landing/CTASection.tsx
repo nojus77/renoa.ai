@@ -11,6 +11,7 @@ export default function CTASection() {
 
     const maxDots = 30;
     function createDot() {
+      if (!dotsContainer) return;
       const dot = document.createElement('div');
       dot.className = 'dot';
       const size = Math.random() * 60 + 20;

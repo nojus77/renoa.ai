@@ -43,6 +43,7 @@ export default function Hero() {
     const maxDots = 40;
 
     function createDot() {
+      if (!dotsContainer) return;
       const dot = document.createElement('div');
       dot.className = 'dot';
 

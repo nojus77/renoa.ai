@@ -87,22 +87,27 @@ export async function POST(
       }
 
       // Conversion rate score (0-25 points)
-      if (provider.conversionRate) {
-        const conversionScore = provider.conversionRate * 25;
+      const conversionRate = provider.totalLeadsSent > 0
+        ? provider.leadsConverted / provider.totalLeadsSent
+        : 0;
+      if (conversionRate > 0) {
+        const conversionScore = conversionRate * 25;
         score += conversionScore;
-        reasons.push(`${(provider.conversionRate * 100).toFixed(1)}% conversion rate`);
+        reasons.push(`${(conversionRate * 100).toFixed(1)}% conversion rate`);
       }
 
       // Geographic proximity (0-20 points)
+      // TODO: Add city field to Provider model
+      /*
       const leadCoords = getCoordinates(lead.city);
       const providerCoords = getCoordinates(provider.city);
-      
+
       if (leadCoords && providerCoords) {
         const distance = calculateDistance(
           leadCoords.lat, leadCoords.lon,
           providerCoords.lat, providerCoords.lon
         );
-        
+
         if (distance < 10) {
           score += 20;
           reasons.push(`Only ${distance.toFixed(1)} miles away`);
@@ -117,8 +122,11 @@ export async function POST(
           reasons.push(`${distance.toFixed(1)} miles away`);
         }
       }
+      */
 
       // Response time score (0-10 points)
+      // TODO: Add responseTime field to Provider model
+      /*
       if (provider.responseTime) {
         if (provider.responseTime < 2) {
           score += 10;
@@ -128,6 +136,7 @@ export async function POST(
           reasons.push('Good response time');
         }
       }
+      */
 
       return {
         provider,
@@ -156,8 +165,7 @@ ${topMatches.map((m, i) => `
 ${i + 1}. ${m.provider.businessName}
    - Match Score: ${m.score}/100
    - Rating: ${m.provider.rating?.toFixed(1) || 'N/A'} stars
-   - Conversion Rate: ${m.provider.conversionRate ? (m.provider.conversionRate * 100).toFixed(1) : 'N/A'}%
-   - Location: ${m.provider.city}, ${m.provider.state}
+   - Years in Business: ${m.provider.yearsInBusiness}
    - Reasons: ${m.reasons.join(', ')}
 `).join('\n')}
 

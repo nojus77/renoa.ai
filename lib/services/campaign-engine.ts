@@ -239,7 +239,6 @@ export class CampaignEngine {
           campaignId: campaign.id,
           stepNumber: seq.stepNumber,
           delayDays: seq.delayDays,
-          delayHours: seq.delayHours,
           templateId: template.id,
         },
       });

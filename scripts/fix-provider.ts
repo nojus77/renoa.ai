@@ -14,7 +14,7 @@ async function fixProvider() {
       data: {
         serviceTypes: ['landscaping', 'lawn care', 'tree service', 'hardscaping'],
         serviceAreas: ['60601', '60602', '60603', '60604', '60605', '60606', '60607', '60610', '60611', '60612'],
-        isActive: true,
+        status: 'active',
       }
     });
     console.log('✅ Provider updated!');

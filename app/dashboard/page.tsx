@@ -4,7 +4,6 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Calendar,
   TrendingUp,
@@ -482,9 +481,10 @@ if (unpaidCommissions.length > 0) {
       }).length,
       highPriorityLeads: data.leads.filter(l => l.leadScore >= 70 && l.status === 'new').length,
       activeCampaigns: data.campaigns.filter(c => c.status === 'active').length,
-      providersNeedingAttention: data.providers.filter(p =>
-        p.status === 'active' && (p.unpaidCommission > 0 || (p.rating && p.rating < 4.0))
-      ).length,
+      providersNeedingAttention: data.providers.filter(p => {
+        const unpaidCommission = (Number(p.totalRevenue) || 0) * (Number(p.commissionRate) || 0);
+        return p.status === 'active' && (unpaidCommission > 0 || (p.rating && p.rating < 4.0));
+      }).length,
     };
   }, [data]);
 

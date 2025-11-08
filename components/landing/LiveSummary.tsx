@@ -23,41 +23,41 @@ export default function LiveSummary({ service, zip, projectDetails, city, state 
 
     // Property/project size
     if (projectDetails.property_size) {
-      const sizeLabel = {
+      const sizeLabel = ({
         small: 'Small property',
         medium: 'Medium property',
         large: 'Large property',
         xlarge: 'Very large property',
         not_sure: 'Size TBD'
-      }[projectDetails.property_size] || projectDetails.property_size
+      } as any)[projectDetails.property_size] || projectDetails.property_size
       details.push(sizeLabel)
     }
 
     if (projectDetails.square_footage) {
-      const sqftLabel = {
+      const sqftLabel = ({
         small: 'Small area',
         medium: 'Medium area',
         large: 'Large area',
         xlarge: 'Very large area',
         not_sure: 'Size TBD'
-      }[projectDetails.square_footage] || projectDetails.square_footage
+      } as any)[projectDetails.square_footage] || projectDetails.square_footage
       details.push(sqftLabel)
     }
 
     if (projectDetails.linear_feet) {
-      const linearLabel = {
+      const linearLabel = ({
         small: '<100 ft',
         medium: '100-200 ft',
         large: '200-300 ft',
         xlarge: '300+ ft',
         not_sure: 'Length TBD'
-      }[projectDetails.linear_feet] || projectDetails.linear_feet
+      } as any)[projectDetails.linear_feet] || projectDetails.linear_feet
       details.push(linearLabel)
     }
 
     // Timeline
     if (projectDetails.timeline) {
-      const timelineLabel = {
+      const timelineLabel = ({
         asap: 'ASAP',
         '1_month': 'Within 1 month',
         '3_months': 'Within 3 months',
@@ -66,7 +66,7 @@ export default function LiveSummary({ service, zip, projectDetails, city, state 
         flexible: 'Flexible timing',
         planning: 'Planning stage',
         not_sure: 'Timeline TBD'
-      }[projectDetails.timeline] || 'Timeline set'
+      } as any)[projectDetails.timeline] || 'Timeline set'
       details.push(timelineLabel)
     }
 
@@ -77,7 +77,7 @@ export default function LiveSummary({ service, zip, projectDetails, city, state 
 
     // Project type specifics
     if (projectDetails.project_type) {
-      const typeLabel = {
+      const typeLabel = ({
         new_lawn: 'New lawn',
         lawn_maintenance: 'Maintenance',
         kitchen: 'Kitchen',
@@ -87,7 +87,7 @@ export default function LiveSummary({ service, zip, projectDetails, city, state 
         replacement: 'Replacement',
         installation: 'Installation',
         not_sure: 'Type TBD'
-      }[projectDetails.project_type] || projectDetails.project_type
+      } as any)[projectDetails.project_type] || projectDetails.project_type
       if (typeLabel !== 'Type TBD') {
         details.push(typeLabel)
       }
@@ -100,13 +100,13 @@ export default function LiveSummary({ service, zip, projectDetails, city, state 
 
     // Frequency for recurring services
     if (projectDetails.frequency) {
-      const freqLabel = {
+      const freqLabel = ({
         weekly: 'Weekly',
         biweekly: 'Bi-weekly',
         monthly: 'Monthly',
         one_time: 'One-time',
         not_sure: 'Frequency TBD'
-      }[projectDetails.frequency] || projectDetails.frequency
+      } as any)[projectDetails.frequency] || projectDetails.frequency
       details.push(freqLabel)
     }
 

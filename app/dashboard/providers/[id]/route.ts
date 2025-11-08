@@ -13,18 +13,15 @@ export async function PATCH(
       where: { id },
       data: {
         businessName: body.businessName,
-        contactName: body.contactName,
+        ownerName: body.ownerName || body.contactName, // Use ownerName field
         email: body.email,
         phone: body.phone,
         serviceTypes: body.serviceTypes,
-        address: body.address,
-        city: body.city,
-        state: body.state,
-        zip: body.zip,
-        website: body.website || null,
+        serviceAreas: body.serviceAreas || body.serviceTypes, // Use serviceAreas field
         commissionRate: body.commissionRate,
-        notes: body.notes || null,
         status: body.status,
+        yearsInBusiness: body.yearsInBusiness,
+        rating: body.rating,
       },
     });
 
