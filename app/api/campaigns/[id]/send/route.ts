@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 // import { sendEmailViaSES } from '@/lib/email/ses' // Implement this for real SES sending
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(
   req: Request,
   { params }: { params: { id: string } }

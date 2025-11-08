@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 
+export const dynamic = 'force-dynamic';
+
 // This is a stub for background job logic
 // In production, use a real job queue (e.g. Bull, Sidekiq, Temporal, etc)
 
