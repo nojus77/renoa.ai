@@ -213,16 +213,15 @@ export default function Hero() {
         <div className="hero-split-container">
           {/* LEFT SIDE - Form */}
           <div className="hero-left-content">
-            <h1>
-              Find trusted local pros for
-              <br />
-              <span className="rotating-word">
-                {rotatingWord}
-              </span>
-            </h1>
-            <p className="hero-subtitle">Stop wasting time on quotes - let AI match you instantly!</p>
+            <div className="hero-text-form-wrapper">
+              <h1>
+                Find trusted local pros for <br />
+                <span className="rotating-word">
+                  {rotatingWord}
+                </span>
+              </h1>
 
-        <div className="hero-form-progressive">
+              <div className="hero-form-progressive">
           {/* Step 1 - Service & Location (always visible) */}
           <div className={`step1-container ${step1Complete ? 'completed' : 'active'}`}>
             <div className="form-row-inline">
@@ -377,9 +376,44 @@ export default function Hero() {
               </button>
             </div>
           )}
-        </div>
+              </div>
 
-            <div className="trust-bar">
+              <p className="hero-subtitle">Stop wasting time on quotes - let AI match you instantly!</p>
+            </div>
+          </div>
+
+          {/* RIGHT SIDE - Browser Mockup */}
+          <div className="hero-right-mockup">
+            <div className="browser-mockup">
+              <div className="browser-chrome">
+                <div className="browser-dots">
+                  <span className="dot red"></span>
+                  <span className="dot yellow"></span>
+                  <span className="dot green"></span>
+                </div>
+                <div className="browser-address">renoa.ai</div>
+              </div>
+              <div className="browser-content">
+                <div className="browser-main-content">
+                  <img
+                    src={currentImage}
+                    alt={selectedService || 'Service'}
+                    style={{
+                      width: '100%',
+                      height: '100%',
+                      objectFit: 'cover',
+                      transition: 'opacity 0.3s ease'
+                    }}
+                  />
+                </div>
+                <div className="browser-sidebar">
+                  {/* Placeholder for future content */}
+                </div>
+              </div>
+            </div>
+
+            {/* Trust badges below mockup */}
+            <div className="trust-bar trust-bar-below-mockup">
               <div className="trust-item">
                 <div className="trust-icon">
                   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
@@ -403,32 +437,6 @@ export default function Hero() {
                   </svg>
                 </div>
                 <span>100% Secure</span>
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT SIDE - Browser Mockup */}
-          <div className="hero-right-mockup">
-            <div className="browser-mockup">
-              <div className="browser-chrome">
-                <div className="browser-dots">
-                  <span className="dot red"></span>
-                  <span className="dot yellow"></span>
-                  <span className="dot green"></span>
-                </div>
-                <div className="browser-address">renoa.ai</div>
-              </div>
-              <div className="browser-content">
-                <img
-                  src={currentImage}
-                  alt={selectedService || 'Service'}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    transition: 'opacity 0.3s ease'
-                  }}
-                />
               </div>
             </div>
           </div>

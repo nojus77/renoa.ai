@@ -1,6 +1,36 @@
+'use client';
+
+import { useEffect, useRef } from 'react';
+
 export default function Testimonials() {
+  const dotsContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const dotsContainer = dotsContainerRef.current;
+    if (!dotsContainer) return;
+
+    const maxDots = 30;
+    function createDot() {
+      const dot = document.createElement('div');
+      dot.className = 'dot';
+      const size = Math.random() * 60 + 20;
+      dot.style.width = `${size}px`;
+      dot.style.height = `${size}px`;
+      dot.style.left = `${Math.random() * 100}%`;
+      dot.style.top = `${Math.random() * 100}%`;
+      dot.style.animationDelay = `${Math.random() * 15}s`;
+      dot.style.opacity = String(Math.random() * 0.3 + 0.1);
+      dotsContainer.appendChild(dot);
+    }
+
+    for (let i = 0; i < maxDots; i++) {
+      createDot();
+    }
+  }, []);
+
   return (
     <section className="section bg-white">
+      <div className="section-dots-container" ref={dotsContainerRef}></div>
       <div className="container">
         <div className="section-header">
           <h2 className="section-title">What homeowners are saying</h2>
