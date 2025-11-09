@@ -43,9 +43,9 @@ export default function Footer() {
       <div className="footer-bottom">
         <p>© 2025 Renoa. All rights reserved.</p>
         <div className="footer-links">
-          <a href="#">Privacy Policy</a>
-          <a href="#">Terms of Service</a>
-          <a href="#">Cookie Policy</a>
+          <a href="/privacy-policy">Privacy Policy</a>
+          <a href="/terms">Terms of Service</a>
+          <a href="/cookie-policy">Cookie Policy</a>
         </div>
       </div>
     </footer>
