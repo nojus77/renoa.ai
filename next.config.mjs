@@ -1,17 +1,15 @@
-/** @type {import('next').NextConfig} */
+** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
   swcMinify: true,
-  async redirects() {
+  async rewrites() {
     return [
       {
         source: '/blog/:path*',
-        destination: 'https://slategrey-weasel-593990.hostingersite.com/blog/:path*',
-        permanent: false,
+        destination: 'http://195.179.239.120/blog/:path*',
       },
     ];
   },
 };
 
 export default nextConfig;
-
