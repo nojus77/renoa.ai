@@ -105,8 +105,8 @@ export default function SettingsPage() {
   };
 
   const handleAddAdmin = async () => {
-    if (!newAdmin.email || !newAdmin.name || !newAdmin.password) {
-      toast.error('Please fill in all fields');
+    if (!newAdmin.email || !newAdmin.name) {
+      toast.error('Please fill in email and name');
       return;
     }
 
@@ -118,7 +118,11 @@ export default function SettingsPage() {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(newAdmin),
+        body: JSON.stringify({
+          email: newAdmin.email,
+          name: newAdmin.name,
+          role: newAdmin.role,
+        }),
       });
 
       const data = await response.json();
@@ -128,7 +132,18 @@ export default function SettingsPage() {
         return;
       }
 
-      toast.success('Admin added successfully');
+      // Show success message
+      if (data.emailSent) {
+        toast.success('Admin added successfully! Welcome email sent with temporary password.');
+      } else {
+        toast.success('Admin added successfully');
+      }
+
+      // Show warning if email failed to send
+      if (data.emailError) {
+        toast.warning(data.emailError, { duration: 5000 });
+      }
+
       setShowAddAdmin(false);
       setNewAdmin({ email: '', name: '', password: '', role: 'admin' });
       fetchAdmins();
@@ -206,6 +221,9 @@ export default function SettingsPage() {
       toast.success('Password changed successfully');
       setShowChangePassword(false);
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+
+      // Clear the mustChangePassword flag in localStorage
+      localStorage.setItem('adminMustChangePassword', 'false');
     } catch (error) {
       toast.error('Failed to change password');
     } finally {
@@ -228,6 +246,30 @@ export default function SettingsPage() {
 
   return (
     <div className="p-6 space-y-4">
+      {/* Password Change Warning */}
+      {typeof window !== 'undefined' && localStorage.getItem('adminMustChangePassword') === 'true' && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Key className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="text-sm font-semibold text-amber-400 mb-1">Password Change Required</h3>
+              <p className="text-xs text-amber-300/80 mb-3">
+                For security reasons, you must change your password before accessing other features of the admin dashboard.
+                Please use the &quot;Change Password&quot; option below.
+              </p>
+              <Button
+                size="sm"
+                onClick={() => setShowChangePassword(true)}
+                className="bg-amber-600 hover:bg-amber-500 text-white"
+              >
+                <Key className="h-3 w-3 mr-2" />
+                Change Password Now
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -531,7 +573,13 @@ export default function SettingsPage() {
           <CardContent>
             {showAddAdmin && (
               <div className="mb-4 p-3 bg-muted/30 rounded-lg border border-border space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="mb-2 p-2 bg-sky-500/10 border border-sky-500/30 rounded-md">
+                  <p className="text-xs text-sky-400">
+                    A temporary password will be automatically generated and emailed to the new admin.
+                    They will be required to change it on first login.
+                  </p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div>
                     <label className="text-xs font-medium text-foreground block mb-1">
                       Name
@@ -554,18 +602,6 @@ export default function SettingsPage() {
                       onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
                       className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       placeholder="admin@example.com"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-foreground block mb-1">
-                      Password (Temporary)
-                    </label>
-                    <input
-                      type="password"
-                      value={newAdmin.password}
-                      onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
-                      className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                      placeholder="Temporary password"
                     />
                   </div>
                   <div>

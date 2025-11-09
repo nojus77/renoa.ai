@@ -65,10 +65,18 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           const name = localStorage.getItem('adminName') || ''
           const email = localStorage.getItem('adminEmail') || ''
           const role = localStorage.getItem('adminRole') || ''
+          const mustChangePassword = localStorage.getItem('adminMustChangePassword') === 'true'
 
           setAdminName(name)
           setAdminEmail(email)
           setAdminRole(role)
+
+          // Check if user must change password and is not already on settings page
+          if (mustChangePassword && pathname !== '/dashboard/settings') {
+            router.push('/dashboard/settings')
+            return
+          }
+
           setIsAuthorized(true)
         } else {
           // Token is invalid or expired
@@ -76,6 +84,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           localStorage.removeItem('adminEmail')
           localStorage.removeItem('adminName')
           localStorage.removeItem('adminRole')
+          localStorage.removeItem('adminMustChangePassword')
           router.push('/admin/login')
         }
       } catch (error) {
@@ -85,7 +94,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     }
 
     verifyToken()
-  }, [router])
+  }, [router, pathname])
 
   // Show nothing while checking auth
   if (!isAuthorized) {

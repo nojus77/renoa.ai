@@ -41,9 +41,16 @@ export default function AdminLoginPage() {
       localStorage.setItem('adminEmail', data.admin.email);
       localStorage.setItem('adminName', data.admin.name);
       localStorage.setItem('adminRole', data.admin.role);
+      localStorage.setItem('adminMustChangePassword', data.admin.mustChangePassword.toString());
 
       toast.success(`Welcome back, ${data.admin.name}!`);
-      router.push('/dashboard');
+
+      // Redirect to settings if password change is required, otherwise to dashboard
+      if (data.admin.mustChangePassword) {
+        router.push('/dashboard/settings');
+      } else {
+        router.push('/dashboard');
+      }
     } catch (err) {
       setError('An error occurred. Please try again.');
       toast.error('Login failed');
