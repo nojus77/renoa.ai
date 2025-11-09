@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
+import InputMask from 'react-input-mask';
+import AddressAutocomplete from '@/components/ui/AddressAutocomplete';
 
 export default function Hero() {
   const [rotatingWord, setRotatingWord] = useState('landscaping');
@@ -16,9 +18,18 @@ export default function Hero() {
     lastName: '',
     email: '',
     phone: '',
+    address: '',
     city: '',
-    state: ''
+    state: '',
+    zip: ''
   });
+  const [formErrors, setFormErrors] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: ''
+  });
+  const [submitError, setSubmitError] = useState('');
   const dotsContainerRef = useRef<HTMLDivElement>(null);
 
   // Service images mapping
@@ -146,15 +157,64 @@ export default function Hero() {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  // Validate form fields
+  const validateForm = (): boolean => {
+    const errors = {
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: ''
+    };
+
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    // First Name validation
+    if (!formData.firstName.trim()) {
+      errors.firstName = 'First name is required';
+    } else if (formData.firstName.trim().length < 2) {
+      errors.firstName = 'First name must be at least 2 characters';
+    } else if (!nameRegex.test(formData.firstName)) {
+      errors.firstName = 'First name can only contain letters';
+    }
+
+    // Last Name validation
+    if (!formData.lastName.trim()) {
+      errors.lastName = 'Last name is required';
+    } else if (formData.lastName.trim().length < 2) {
+      errors.lastName = 'Last name must be at least 2 characters';
+    } else if (!nameRegex.test(formData.lastName)) {
+      errors.lastName = 'Last name can only contain letters';
+    }
+
+    // Email validation
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required';
+    } else if (!emailRegex.test(formData.email)) {
+      errors.email = 'Please enter a valid email address';
+    }
+
+    // Phone validation
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    if (!formData.phone.trim()) {
+      errors.phone = 'Phone number is required';
+    } else if (phoneDigits.length !== 10) {
+      errors.phone = 'Phone number must be exactly 10 digits';
+    }
+
+    setFormErrors(errors);
+    return !errors.firstName && !errors.lastName && !errors.email && !errors.phone;
+  };
+
   // Handle final form submission
   const handleGetMatched = async () => {
-    // Validate required fields
-    if (!formData.firstName || !formData.lastName || !formData.email || !formData.phone) {
-      alert('Please fill in all required fields (First Name, Last Name, Email, Phone)');
+    // Validate form
+    if (!validateForm()) {
       return;
     }
 
     setIsSubmitting(true);
+    setSubmitError('');
     try {
       const response = await fetch('/api/leads', {
         method: 'POST',
@@ -165,37 +225,27 @@ export default function Hero() {
           firstName: formData.firstName,
           lastName: formData.lastName,
           email: formData.email,
-          phone: formData.phone,
+          phone: formData.phone.replace(/\D/g, ''),
+          address: formData.address || '',
           city: formData.city || 'Unknown',
           state: formData.state || 'Unknown',
-          zip: zipCode,
+          zip: formData.zip || zipCode,
           serviceInterest: selectedService,
           leadSource: 'landing_page_hero'
         }),
       });
 
       if (response.ok) {
-        alert('Success! We are finding the best match for you.');
-        // Reset form
-        setSelectedService('');
-        setZipCode('');
-        setFormData({
-          firstName: '',
-          lastName: '',
-          email: '',
-          phone: '',
-          city: '',
-          state: ''
-        });
-        setStep(1);
-        setStep1Complete(false);
+        const data = await response.json();
+        // Redirect to success page
+        window.location.href = `/success?leadId=${data.lead.id}`;
       } else {
         const error = await response.json();
-        alert(error.error || 'Something went wrong. Please try again.');
+        setSubmitError(error.error || 'Something went wrong. Please try again.');
       }
     } catch (error) {
       console.error('Form submission error:', error);
-      alert('Failed to submit. Please try again.');
+      setSubmitError('Network error. Please check your connection and try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -275,40 +325,106 @@ export default function Hero() {
             <div className="step2-container slide-in">
               <p className="step2-intro">Great! Now just a few more details...</p>
 
+              {submitError && (
+                <div className="error-banner">
+                  {submitError}
+                </div>
+              )}
+
               <div className="step2-grid">
-                <input
-                  type="text"
-                  value={formData.firstName}
-                  onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  placeholder="First Name"
-                  required
-                />
-                <input
-                  type="text"
-                  value={formData.lastName}
-                  onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  placeholder="Last Name"
-                  required
-                />
-                <input
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  placeholder="Email"
-                  required
-                />
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="Phone"
-                  required
-                />
-                <input
-                  type="text"
-                  value={formData.city}
-                  onChange={(e) => handleInputChange('city', e.target.value)}
-                  placeholder="City (optional)"
+                <div>
+                  <input
+                    type="text"
+                    value={formData.firstName}
+                    onChange={(e) => {
+                      handleInputChange('firstName', e.target.value);
+                      if (formErrors.firstName) {
+                        setFormErrors({ ...formErrors, firstName: '' });
+                      }
+                    }}
+                    placeholder="First Name"
+                    className={formErrors.firstName ? 'error' : ''}
+                    required
+                  />
+                  {formErrors.firstName && (
+                    <p className="field-error">{formErrors.firstName}</p>
+                  )}
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    value={formData.lastName}
+                    onChange={(e) => {
+                      handleInputChange('lastName', e.target.value);
+                      if (formErrors.lastName) {
+                        setFormErrors({ ...formErrors, lastName: '' });
+                      }
+                    }}
+                    placeholder="Last Name"
+                    className={formErrors.lastName ? 'error' : ''}
+                    required
+                  />
+                  {formErrors.lastName && (
+                    <p className="field-error">{formErrors.lastName}</p>
+                  )}
+                </div>
+                <div>
+                  <input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => {
+                      handleInputChange('email', e.target.value);
+                      if (formErrors.email) {
+                        setFormErrors({ ...formErrors, email: '' });
+                      }
+                    }}
+                    placeholder="Email"
+                    className={formErrors.email ? 'error' : ''}
+                    required
+                  />
+                  {formErrors.email && (
+                    <p className="field-error">{formErrors.email}</p>
+                  )}
+                </div>
+                <div>
+                  <InputMask
+                    mask="(999) 999-9999"
+                    value={formData.phone}
+                    onChange={(e) => {
+                      handleInputChange('phone', e.target.value);
+                      if (formErrors.phone) {
+                        setFormErrors({ ...formErrors, phone: '' });
+                      }
+                    }}
+                  >
+                    {(inputProps: any) => (
+                      <input
+                        {...inputProps}
+                        type="tel"
+                        placeholder="(555) 123-4567"
+                        className={formErrors.phone ? 'error' : ''}
+                        required
+                      />
+                    )}
+                  </InputMask>
+                  {formErrors.phone && (
+                    <p className="field-error">{formErrors.phone}</p>
+                  )}
+                </div>
+                <AddressAutocomplete
+                  value={formData.address}
+                  onChange={(value) => handleInputChange('address', value)}
+                  onAddressSelect={(components) => {
+                    setFormData(prev => ({
+                      ...prev,
+                      address: components.street,
+                      city: components.city,
+                      state: components.state,
+                      zip: components.zip,
+                    }));
+                  }}
+                  placeholder="Your address (optional)"
+                  className="address-autocomplete-input"
                 />
                 <select
                   value={formData.state}

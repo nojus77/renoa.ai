@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import InputMask from 'react-input-mask'
+import AddressAutocomplete from '@/components/ui/AddressAutocomplete'
 
 interface Message {
   role: 'ai' | 'user'
@@ -19,6 +21,13 @@ interface QuestionConfig {
   errorMessage?: string
 }
 
+interface FieldError {
+  firstName?: string
+  lastName?: string
+  email?: string
+  phone?: string
+}
+
 export default function ConversationalForm() {
   const router = useRouter()
   const [step, setStep] = useState(0)
@@ -30,8 +39,14 @@ export default function ConversationalForm() {
     firstName: '',
     lastName: '',
     email: '',
-    phone: ''
+    phone: '',
+    address: '',
+    city: '',
+    state: '',
+    zip: ''
   })
+  const [fieldErrors, setFieldErrors] = useState<FieldError>({})
+  const [submitError, setSubmitError] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const questions: QuestionConfig[] = [
@@ -118,7 +133,12 @@ export default function ConversationalForm() {
 
     // Validate input
     if (question.validation && !question.validation(value)) {
-      alert(question.errorMessage || 'Invalid input')
+      // Show validation error in the conversation
+      setConversation([...conversation, {
+        role: 'ai',
+        text: question.errorMessage || 'Invalid input. Please try again.',
+        timestamp: new Date()
+      }])
       return
     }
 
@@ -172,15 +192,51 @@ export default function ConversationalForm() {
     handleTextSubmit(choice)
   }
 
-  const handleContactSubmit = async () => {
-    // Validate contact form
-    if (!contactForm.firstName || !contactForm.lastName || !contactForm.email || !contactForm.phone) {
-      alert('Please fill in all contact fields')
-      return
+  const validateContactForm = (): boolean => {
+    const errors: FieldError = {}
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]+$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    // First Name validation
+    if (!contactForm.firstName.trim()) {
+      errors.firstName = 'First name is required'
+    } else if (contactForm.firstName.trim().length < 2) {
+      errors.firstName = 'First name must be at least 2 characters'
+    } else if (!nameRegex.test(contactForm.firstName)) {
+      errors.firstName = 'First name can only contain letters'
     }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(contactForm.email)) {
-      alert('Please enter a valid email address')
+    // Last Name validation
+    if (!contactForm.lastName.trim()) {
+      errors.lastName = 'Last name is required'
+    } else if (contactForm.lastName.trim().length < 2) {
+      errors.lastName = 'Last name must be at least 2 characters'
+    } else if (!nameRegex.test(contactForm.lastName)) {
+      errors.lastName = 'Last name can only contain letters'
+    }
+
+    // Email validation
+    if (!contactForm.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!emailRegex.test(contactForm.email)) {
+      errors.email = 'Please enter a valid email address'
+    }
+
+    // Phone validation - must be exactly 10 digits
+    const phoneDigits = contactForm.phone.replace(/\D/g, '')
+    if (!contactForm.phone.trim()) {
+      errors.phone = 'Phone number is required'
+    } else if (phoneDigits.length !== 10) {
+      errors.phone = 'Phone number must be exactly 10 digits'
+    }
+
+    setFieldErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleContactSubmit = async () => {
+    // Validate contact form
+    if (!validateContactForm()) {
       return
     }
 
@@ -192,10 +248,11 @@ export default function ConversationalForm() {
         firstName: contactForm.firstName,
         lastName: contactForm.lastName,
         email: contactForm.email,
-        phone: contactForm.phone,
-        city: 'Unknown', // Will be filled from ZIP
-        state: 'Unknown',
-        zip: answers.location || '',
+        phone: contactForm.phone.replace(/\D/g, ''), // Strip formatting
+        address: contactForm.address || '',
+        city: contactForm.city || 'Unknown',
+        state: contactForm.state || 'Unknown',
+        zip: contactForm.zip || answers.location || '',
         serviceInterest: 'general',
         leadSource: 'conversational_form',
         projectDetails: {
@@ -220,24 +277,30 @@ export default function ConversationalForm() {
         window.location.href = `/success?leadId=${data.lead.id}`
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-        alert(`Failed to submit: ${errorData.error || 'Server error'}. Please try again.`)
+        setSubmitError(`Failed to submit: ${errorData.error || 'Server error'}. Please try again.`)
       }
     } catch (error) {
       console.error('Submission failed:', error)
-      alert('Network error. Please check your connection and try again.')
+      setSubmitError('Network error. Please check your connection and try again.')
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  const formatPhoneNumber = (value: string) => {
-    const phoneNumber = value.replace(/\D/g, '')
-    if (phoneNumber.length === 0) return ''
-    if (phoneNumber.length <= 3) return phoneNumber
-    if (phoneNumber.length <= 6) {
-      return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3)}`
-    }
-    return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6, 10)}`
+  // Check if form is valid for submit button state
+  const isContactFormValid = (): boolean => {
+    const nameRegex = /^[a-zA-ZÀ-ÿ\s'-]+$/
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    const phoneDigits = contactForm.phone.replace(/\D/g, '')
+
+    return (
+      contactForm.firstName.trim().length >= 2 &&
+      nameRegex.test(contactForm.firstName) &&
+      contactForm.lastName.trim().length >= 2 &&
+      nameRegex.test(contactForm.lastName) &&
+      emailRegex.test(contactForm.email) &&
+      phoneDigits.length === 10
+    )
   }
 
   return (
@@ -354,43 +417,131 @@ export default function ConversationalForm() {
 
             {currentQuestion?.type === 'contact' && (
               <div className="space-y-3">
+                {submitError && (
+                  <div className="p-4 bg-red-50 border-2 border-red-200 rounded-xl text-red-700 text-sm">
+                    {submitError}
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <input
+                      type="text"
+                      value={contactForm.firstName}
+                      onChange={(e) => {
+                        setContactForm({ ...contactForm, firstName: e.target.value })
+                        if (fieldErrors.firstName) {
+                          setFieldErrors({ ...fieldErrors, firstName: undefined })
+                        }
+                      }}
+                      placeholder="First Name"
+                      className={`px-4 py-3 border-2 rounded-xl focus:outline-none transition-colors w-full ${
+                        fieldErrors.firstName
+                          ? 'border-red-500 focus:border-red-500'
+                          : 'border-gray-200 focus:border-green-500'
+                      }`}
+                      disabled={isSubmitting}
+                    />
+                    {fieldErrors.firstName && (
+                      <p className="text-red-500 text-xs mt-1 ml-1">{fieldErrors.firstName}</p>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      type="text"
+                      value={contactForm.lastName}
+                      onChange={(e) => {
+                        setContactForm({ ...contactForm, lastName: e.target.value })
+                        if (fieldErrors.lastName) {
+                          setFieldErrors({ ...fieldErrors, lastName: undefined })
+                        }
+                      }}
+                      placeholder="Last Name"
+                      className={`px-4 py-3 border-2 rounded-xl focus:outline-none transition-colors w-full ${
+                        fieldErrors.lastName
+                          ? 'border-red-500 focus:border-red-500'
+                          : 'border-gray-200 focus:border-green-500'
+                      }`}
+                      disabled={isSubmitting}
+                    />
+                    {fieldErrors.lastName && (
+                      <p className="text-red-500 text-xs mt-1 ml-1">{fieldErrors.lastName}</p>
+                    )}
+                  </div>
+                </div>
+                <div>
                   <input
-                    type="text"
-                    value={contactForm.firstName}
-                    onChange={(e) => setContactForm({ ...contactForm, firstName: e.target.value })}
-                    placeholder="First Name"
-                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                    type="email"
+                    value={contactForm.email}
+                    onChange={(e) => {
+                      setContactForm({ ...contactForm, email: e.target.value })
+                      if (fieldErrors.email) {
+                        setFieldErrors({ ...fieldErrors, email: undefined })
+                      }
+                    }}
+                    placeholder="Email Address"
+                    className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-colors ${
+                      fieldErrors.email
+                        ? 'border-red-500 focus:border-red-500'
+                        : 'border-gray-200 focus:border-green-500'
+                    }`}
                     disabled={isSubmitting}
                   />
-                  <input
-                    type="text"
-                    value={contactForm.lastName}
-                    onChange={(e) => setContactForm({ ...contactForm, lastName: e.target.value })}
-                    placeholder="Last Name"
-                    className="px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
+                  {fieldErrors.email && (
+                    <p className="text-red-500 text-xs mt-1 ml-1">{fieldErrors.email}</p>
+                  )}
+                </div>
+                <div>
+                  <InputMask
+                    mask="(999) 999-9999"
+                    value={contactForm.phone}
+                    onChange={(e) => {
+                      setContactForm({ ...contactForm, phone: e.target.value })
+                      if (fieldErrors.phone) {
+                        setFieldErrors({ ...fieldErrors, phone: undefined })
+                      }
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    {(inputProps: any) => (
+                      <input
+                        {...inputProps}
+                        type="tel"
+                        placeholder="(555) 123-4567"
+                        className={`w-full px-4 py-3 border-2 rounded-xl focus:outline-none transition-colors ${
+                          fieldErrors.phone
+                            ? 'border-red-500 focus:border-red-500'
+                            : 'border-gray-200 focus:border-green-500'
+                        }`}
+                      />
+                    )}
+                  </InputMask>
+                  {fieldErrors.phone && (
+                    <p className="text-red-500 text-xs mt-1 ml-1">{fieldErrors.phone}</p>
+                  )}
+                </div>
+                <div>
+                  <AddressAutocomplete
+                    value={contactForm.address}
+                    onChange={(value) => {
+                      setContactForm({ ...contactForm, address: value })
+                    }}
+                    onAddressSelect={(components) => {
+                      setContactForm({
+                        ...contactForm,
+                        address: components.street,
+                        city: components.city,
+                        state: components.state,
+                        zip: components.zip,
+                      })
+                    }}
+                    placeholder="Your address (optional)"
+                    className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-green-500 transition-colors"
                     disabled={isSubmitting}
                   />
                 </div>
-                <input
-                  type="email"
-                  value={contactForm.email}
-                  onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                  placeholder="Email Address"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
-                  disabled={isSubmitting}
-                />
-                <input
-                  type="tel"
-                  value={contactForm.phone}
-                  onChange={(e) => setContactForm({ ...contactForm, phone: formatPhoneNumber(e.target.value) })}
-                  placeholder="Phone Number"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-green-500 focus:outline-none transition-colors"
-                  disabled={isSubmitting}
-                />
                 <button
                   onClick={handleContactSubmit}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || !isContactFormValid()}
                   className="w-full px-6 py-4 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl hover:from-green-600 hover:to-green-700 font-semibold text-lg transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isSubmitting ? 'Finding Your Match...' : 'Get Matched with Top Providers →'}

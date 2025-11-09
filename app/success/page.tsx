@@ -25,6 +25,7 @@ export default function SuccessPage() {
   const searchParams = useSearchParams()
   const [lead, setLead] = useState<Lead | null>(null)
   const [loading, setLoading] = useState(true)
+  const [countdown, setCountdown] = useState(5)
   const leadId = searchParams.get('leadId')
 
   useEffect(() => {
@@ -43,6 +44,24 @@ export default function SuccessPage() {
       setLoading(false)
     }
   }, [leadId])
+
+  // Auto-redirect countdown
+  useEffect(() => {
+    if (!loading) {
+      const timer = setInterval(() => {
+        setCountdown((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer)
+            window.location.href = '/'
+            return 0
+          }
+          return prev - 1
+        })
+      }, 1000)
+
+      return () => clearInterval(timer)
+    }
+  }, [loading])
 
   if (loading) {
     return (
@@ -66,11 +85,11 @@ export default function SuccessPage() {
           </div>
 
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Success! 🎉
+            Thank You!
           </h1>
 
-          <p className="text-xl text-gray-700 mb-8">
-            Your service request has been submitted successfully!
+          <p className="text-xl text-gray-700 mb-8 leading-relaxed">
+            We&apos;re finding the perfect match for your project. We&apos;ll contact you within 24 hours.
           </p>
 
           <div className="bg-green-50 border-2 border-green-200 rounded-xl p-6 mb-8">
@@ -103,7 +122,7 @@ export default function SuccessPage() {
           </button>
 
           <p className="mt-6 text-gray-500 text-sm">
-            Questions? Reply to the confirmation email we sent you.
+            Redirecting to home in {countdown} seconds... | Questions? Reply to the confirmation email.
           </p>
         </div>
 
@@ -140,11 +159,11 @@ export default function SuccessPage() {
         </div>
 
         <h1 className="text-4xl font-bold text-gray-900 mb-4">
-          Success! 🎉
+          Thank You!
         </h1>
 
-        <p className="text-xl text-gray-700 mb-8">
-          We&apos;re finding the perfect match for your <span className="font-semibold text-green-600">{(lead.serviceInterest || 'service').replace('_', ' ')}</span> project
+        <p className="text-xl text-gray-700 mb-8 leading-relaxed">
+          We&apos;re finding the perfect match for your <span className="font-semibold text-green-600">{(lead.serviceInterest || 'service').replace('_', ' ')}</span> project. We&apos;ll contact you within 24 hours.
         </p>
 
         {/* Project Details */}
@@ -205,7 +224,7 @@ export default function SuccessPage() {
         </button>
 
         <p className="mt-6 text-gray-500 text-sm">
-          Questions? Reply to the confirmation email we sent you.
+          Redirecting to home in {countdown} seconds... | Questions? Reply to the confirmation email.
         </p>
       </div>
 

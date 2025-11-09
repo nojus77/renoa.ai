@@ -179,7 +179,79 @@ export async function POST(request: NextRequest) {
     });
     
     console.log('✅ Lead created successfully:', lead.id);
-    
+
+    // Send Slack notification (non-blocking)
+    if (process.env.SLACK_WEBHOOK_URL) {
+      try {
+        const slackMessage = {
+          text: `🎯 New Lead Captured!`,
+          blocks: [
+            {
+              type: 'header',
+              text: {
+                type: 'plain_text',
+                text: '🎯 New Lead Captured!',
+                emoji: true
+              }
+            },
+            {
+              type: 'section',
+              fields: [
+                {
+                  type: 'mrkdwn',
+                  text: `*Name:*\n${lead.firstName} ${lead.lastName}`
+                },
+                {
+                  type: 'mrkdwn',
+                  text: `*Service:*\n${lead.serviceInterest}`
+                },
+                {
+                  type: 'mrkdwn',
+                  text: `*Phone:*\n${lead.phone}`
+                },
+                {
+                  type: 'mrkdwn',
+                  text: `*Email:*\n${lead.email}`
+                },
+                {
+                  type: 'mrkdwn',
+                  text: `*Location:*\n${lead.city}, ${lead.state} ${lead.zip}`
+                },
+                {
+                  type: 'mrkdwn',
+                  text: `*Lead Source:*\n${lead.leadSource}`
+                }
+              ]
+            },
+            {
+              type: 'context',
+              elements: [
+                {
+                  type: 'mrkdwn',
+                  text: `Lead ID: ${lead.id} | Tier: ${lead.tier} | Score: ${lead.leadScore}`
+                }
+              ]
+            }
+          ]
+        };
+
+        await fetch(process.env.SLACK_WEBHOOK_URL, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(slackMessage),
+        });
+
+        console.log('✅ Slack notification sent successfully');
+      } catch (slackError) {
+        // Don't fail the request if Slack notification fails
+        console.error('⚠️ Failed to send Slack notification:', slackError);
+      }
+    } else {
+      console.log('⚠️ SLACK_WEBHOOK_URL not configured, skipping notification');
+    }
+
     return NextResponse.json({ lead }, { status: 201 })
     
   } catch (error: any) {
