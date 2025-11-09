@@ -12,9 +12,9 @@ export default function LogoutPage() {
     localStorage.clear();
     sessionStorage.clear();
 
-    // Redirect to home page after a short delay
+    // Redirect to admin login page after a short delay
     const timeout = setTimeout(() => {
-      router.push('/');
+      router.push('/admin/login');
     }, 1500);
 
     return () => clearTimeout(timeout);

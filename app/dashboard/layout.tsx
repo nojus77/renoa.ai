@@ -1,7 +1,7 @@
 'use client'
-import { ReactNode, useState } from 'react'
+import { ReactNode, useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 // Simple navigation items - we'll use text for now, add icons later
@@ -24,7 +24,33 @@ interface DashboardLayoutProps {
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [isAuthorized, setIsAuthorized] = useState(false)
   const pathname = usePathname()
+  const router = useRouter()
+
+  useEffect(() => {
+    // Check if user is authenticated
+    const adminAuth = localStorage.getItem('adminAuth')
+
+    if (!adminAuth || adminAuth !== 'true') {
+      // Redirect to login if not authenticated
+      router.push('/admin/login')
+    } else {
+      setIsAuthorized(true)
+    }
+  }, [router])
+
+  // Show nothing while checking auth
+  if (!isAuthorized) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500 mx-auto mb-4" />
+          <div className="text-muted-foreground">Verifying access...</div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground">

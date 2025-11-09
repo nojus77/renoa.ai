@@ -371,9 +371,9 @@ export default function DashboardPage() {
       const providers = await providersRes.json();
 
       setData({
-        leads: leadsData.leads || [],
-        campaigns: campaigns || [],
-        providers: providers || [],
+        leads: Array.isArray(leadsData.leads) ? leadsData.leads : [],
+        campaigns: Array.isArray(campaigns) ? campaigns : [],
+        providers: Array.isArray(providers) ? providers : [],
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
