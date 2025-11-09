@@ -508,12 +508,12 @@ if (unpaidCommissions.length > 0) {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 space-y-4 max-w-[1400px] mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-zinc-100">Dashboard</h1>
-          <p className="text-sm text-zinc-400 mt-1">
+          <h1 className="text-2xl font-bold text-zinc-100">Dashboard</h1>
+          <p className="text-xs text-zinc-400 mt-0.5">
             {new Date().toLocaleDateString('en-US', {
               weekday: 'long',
               year: 'numeric',
@@ -534,8 +534,8 @@ if (unpaidCommissions.length > 0) {
 
       {/* Quick Actions */}
       <div>
-        <h2 className="text-lg font-semibold text-zinc-100 mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <h2 className="text-base font-semibold text-zinc-100 mb-2">Quick Actions</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
           <QuickAction
             icon={<Plus className="h-5 w-5 text-white" />}
             label="Add Lead"
@@ -565,8 +565,8 @@ if (unpaidCommissions.length > 0) {
 
       {/* Alerts Row */}
       <div>
-        <h2 className="text-lg font-semibold text-zinc-100 mb-3">Priority Alerts</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <h2 className="text-base font-semibold text-zinc-100 mb-2">Priority Alerts</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <AlertCard
             title="New Leads Today"
             count={metrics.newLeadsToday}
@@ -599,7 +599,7 @@ if (unpaidCommissions.length > 0) {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* AI Insights - Takes 2 columns */}
         <div className="lg:col-span-2 space-y-4">
           <div className="flex items-center gap-2 mb-3">

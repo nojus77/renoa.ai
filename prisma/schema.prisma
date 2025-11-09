@@ -391,16 +391,31 @@ model Provider {
   createdAt        DateTime   @default(now())
   updatedAt        DateTime   @updatedAt
   lastActivityAt   DateTime   @default(now())
-  
+
   // Availability fields
   workingHours     Json?
   timeZone         String     @default("America/Chicago")
   bufferTime       Int        @default(30)
   advanceBooking   Int        @default(14)
   availabilityNotes String?
-  
+
   leads            Lead[]     @relation("AssignedProviderLeads")
   leadNotes        LeadNote[] @relation("ProviderNotes")
+}
+
+model Admin {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  hashedPassword    String    @map("hashed_password")
+  name              String
+  role              AdminRole @default(admin)
+  mustChangePassword Boolean  @default(false) @map("must_change_password")
+  lastLoginAt       DateTime? @map("last_login_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@map("admins")
 }
 
 enum UserRole {
@@ -534,4 +549,10 @@ enum CampaignType {
   EMAIL
   SMS
   MULTI_CHANNEL
+}
+
+enum AdminRole {
+  super_admin
+  admin
+  viewer
 }

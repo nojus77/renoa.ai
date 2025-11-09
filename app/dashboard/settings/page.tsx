@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,11 +15,20 @@ import {
   Palette,
   Save,
   Check,
+  UserPlus,
+  Trash2,
+  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
+  const [adminRole, setAdminRole] = useState<string>('');
+  const [admins, setAdmins] = useState<any[]>([]);
+  const [loadingAdmins, setLoadingAdmins] = useState(false);
+  const [showAddAdmin, setShowAddAdmin] = useState(false);
+  const [newAdmin, setNewAdmin] = useState({ email: '', name: '', password: '', role: 'admin' });
+
   const [settings, setSettings] = useState({
     // Profile Settings
     companyName: 'Renoa.ai',
@@ -46,6 +55,97 @@ export default function SettingsPage() {
     dateFormat: 'MM/DD/YYYY',
     currency: 'USD',
   });
+
+  useEffect(() => {
+    // Get admin role from localStorage
+    const role = localStorage.getItem('adminRole');
+    setAdminRole(role || '');
+
+    // Load admins if super_admin
+    if (role === 'super_admin') {
+      fetchAdmins();
+    }
+  }, []);
+
+  const fetchAdmins = async () => {
+    setLoadingAdmins(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/users', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      const data = await response.json();
+      if (data.admins) {
+        setAdmins(data.admins);
+      }
+    } catch (error) {
+      toast.error('Failed to load admins');
+    } finally {
+      setLoadingAdmins(false);
+    }
+  };
+
+  const handleAddAdmin = async () => {
+    if (!newAdmin.email || !newAdmin.name || !newAdmin.password) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newAdmin),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to add admin');
+        return;
+      }
+
+      toast.success('Admin added successfully');
+      setShowAddAdmin(false);
+      setNewAdmin({ email: '', name: '', password: '', role: 'admin' });
+      fetchAdmins();
+    } catch (error) {
+      toast.error('Failed to add admin');
+    }
+  };
+
+  const handleDeleteAdmin = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this admin?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch(`/api/admin/users?id=${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        toast.error(data.error || 'Failed to delete admin');
+        return;
+      }
+
+      toast.success('Admin deleted successfully');
+      fetchAdmins();
+    } catch (error) {
+      toast.error('Failed to delete admin');
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -337,6 +437,151 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Admin Management - Only show to super_admin */}
+      {adminRole === 'super_admin' && (
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm font-medium text-foreground flex items-center gap-2">
+                <Users className="h-4 w-4 text-emerald-400" />
+                Admin Management
+              </CardTitle>
+              <Button
+                size="sm"
+                onClick={() => setShowAddAdmin(!showAddAdmin)}
+                className="bg-emerald-600 hover:bg-emerald-500"
+              >
+                <UserPlus className="h-3 w-3 mr-2" />
+                Add Admin
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {showAddAdmin && (
+              <div className="mb-4 p-3 bg-muted/30 rounded-lg border border-border space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newAdmin.name}
+                      onChange={(e) => setNewAdmin({ ...newAdmin, name: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="John Doe"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={newAdmin.email}
+                      onChange={(e) => setNewAdmin({ ...newAdmin, email: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="admin@example.com"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">
+                      Password (Temporary)
+                    </label>
+                    <input
+                      type="password"
+                      value={newAdmin.password}
+                      onChange={(e) => setNewAdmin({ ...newAdmin, password: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      placeholder="Temporary password"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-foreground block mb-1">
+                      Role
+                    </label>
+                    <select
+                      value={newAdmin.role}
+                      onChange={(e) => setNewAdmin({ ...newAdmin, role: e.target.value })}
+                      className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    >
+                      <option value="viewer">Viewer</option>
+                      <option value="admin">Admin</option>
+                      <option value="super_admin">Super Admin</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleAddAdmin}
+                    className="bg-emerald-600 hover:bg-emerald-500"
+                  >
+                    Create Admin
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setShowAddAdmin(false)}
+                    className="border-border"
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              {loadingAdmins ? (
+                <div className="text-center py-4 text-muted-foreground text-xs">
+                  Loading admins...
+                </div>
+              ) : admins.length === 0 ? (
+                <div className="text-center py-4 text-muted-foreground text-xs">
+                  No admins found
+                </div>
+              ) : (
+                admins.map((admin) => (
+                  <div
+                    key={admin.id}
+                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
+                  >
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-medium text-foreground">{admin.name}</h4>
+                        <Badge className={`text-[10px] ${
+                          admin.role === 'super_admin'
+                            ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
+                            : admin.role === 'admin'
+                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                            : 'bg-sky-500/20 text-sky-400 border-sky-500/30'
+                        }`}>
+                          {admin.role.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <p className="text-[10px] text-muted-foreground">{admin.email}</p>
+                      {admin.lastLoginAt && (
+                        <p className="text-[10px] text-muted-foreground">
+                          Last login: {new Date(admin.lastLoginAt).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="destructive"
+                      onClick={() => handleDeleteAdmin(admin.id)}
+                      className="ml-2"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ))
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Danger Zone */}
       <Card className="bg-card border-rose-500/30">

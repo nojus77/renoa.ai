@@ -20,22 +20,30 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      // For now, we'll use a simple hardcoded check
-      // In production, this should call an API endpoint
-      const ADMIN_EMAIL = 'admin@renoa.ai';
-      const ADMIN_PASSWORD = 'admin123'; // This should be properly hashed in production
+      const response = await fetch('/api/admin/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-      if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-        // Store auth token in localStorage
-        localStorage.setItem('adminAuth', 'true');
-        localStorage.setItem('adminEmail', email);
+      const data = await response.json();
 
-        toast.success('Welcome back!');
-        router.push('/dashboard');
-      } else {
-        setError('Invalid email or password');
-        toast.error('Invalid credentials');
+      if (!response.ok) {
+        setError(data.error || 'Invalid credentials');
+        toast.error(data.error || 'Login failed');
+        return;
       }
+
+      // Store JWT token and admin info in localStorage
+      localStorage.setItem('adminToken', data.token);
+      localStorage.setItem('adminEmail', data.admin.email);
+      localStorage.setItem('adminName', data.admin.name);
+      localStorage.setItem('adminRole', data.admin.role);
+
+      toast.success(`Welcome back, ${data.admin.name}!`);
+      router.push('/dashboard');
     } catch (err) {
       setError('An error occurred. Please try again.');
       toast.error('Login failed');
@@ -128,12 +136,14 @@ export default function AdminLoginPage() {
               </Button>
             </form>
 
-            {/* Development Note */}
-            <div className="mt-4 p-3 bg-sky-500/10 border border-sky-500/30 rounded-lg">
-              <p className="text-xs text-sky-400 text-center">
-                Development credentials: admin@renoa.ai / admin123
-              </p>
-            </div>
+            {/* Development Note - Only show in development */}
+            {process.env.NODE_ENV !== 'production' && (
+              <div className="mt-4 p-3 bg-sky-500/10 border border-sky-500/30 rounded-lg">
+                <p className="text-xs text-sky-400 text-center">
+                  Development: Default password is &quot;changeme123&quot;
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 

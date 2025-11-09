@@ -29,15 +29,42 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter()
 
   useEffect(() => {
-    // Check if user is authenticated
-    const adminAuth = localStorage.getItem('adminAuth')
+    const verifyToken = async () => {
+      const token = localStorage.getItem('adminToken')
 
-    if (!adminAuth || adminAuth !== 'true') {
-      // Redirect to login if not authenticated
-      router.push('/admin/login')
-    } else {
-      setIsAuthorized(true)
+      if (!token) {
+        router.push('/admin/login')
+        return
+      }
+
+      try {
+        const response = await fetch('/api/admin/verify', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token }),
+        })
+
+        const data = await response.json()
+
+        if (data.valid) {
+          setIsAuthorized(true)
+        } else {
+          // Token is invalid or expired
+          localStorage.removeItem('adminToken')
+          localStorage.removeItem('adminEmail')
+          localStorage.removeItem('adminName')
+          localStorage.removeItem('adminRole')
+          router.push('/admin/login')
+        }
+      } catch (error) {
+        console.error('Token verification failed:', error)
+        router.push('/admin/login')
+      }
     }
+
+    verifyToken()
   }, [router])
 
   // Show nothing while checking auth
