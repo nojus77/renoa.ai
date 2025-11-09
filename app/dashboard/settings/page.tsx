@@ -842,7 +842,7 @@ export default function SettingsPage() {
                 </div>
               ) : admins.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  No team members found. Click "Add Admin" to invite your first team member.
+                  No team members found. Click &quot;Add Admin&quot; to invite your first team member.
                 </div>
               ) : (
                 <div className="overflow-x-auto">
