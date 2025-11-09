@@ -140,6 +140,21 @@ export function setConsent(
     storeGPCPreference(gpcEnabled);
 
     console.log('✅ Cookie consent saved:', level, fullPreferences);
+
+    // Dispatch custom event so GoogleAnalytics can react immediately
+    window.dispatchEvent(
+      new CustomEvent('cookieConsentChanged', {
+        detail: fullPreferences,
+      })
+    );
+
+    // Load scripts based on consent
+    if (fullPreferences.analytics) {
+      loadAnalytics();
+    }
+    if (fullPreferences.marketing) {
+      loadMarketing();
+    }
   } catch (error) {
     console.error('Failed to save cookie consent:', error);
   }
@@ -186,42 +201,12 @@ export function hasConsent(): boolean {
 
 /**
  * Loads Google Analytics if consent is given
+ * Note: Analytics loading is handled by GoogleAnalytics component
  */
 export function loadAnalytics(): void {
-  if (typeof window === 'undefined') return;
-
-  if (!hasAnalyticsConsent()) {
-    console.log('⚠️ Analytics blocked: No consent');
-    return;
-  }
-
-  const GA_MEASUREMENT_ID = process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID;
-  if (!GA_MEASUREMENT_ID) {
-    console.warn('⚠️ GA_MEASUREMENT_ID not configured');
-    return;
-  }
-
-  // Check if already loaded
-  if (document.querySelector(`script[src*="googletagmanager.com/gtag/js"]`)) {
-    console.log('✅ Google Analytics already loaded');
-    return;
-  }
-
-  // Load Google Analytics
-  const script = document.createElement('script');
-  script.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
-  script.async = true;
-  document.head.appendChild(script);
-
-  script.onload = () => {
-    (window as any).dataLayer = (window as any).dataLayer || [];
-    function gtag(...args: any[]) {
-      (window as any).dataLayer.push(args);
-    }
-    gtag('js', new Date());
-    gtag('config', GA_MEASUREMENT_ID);
-    console.log('✅ Google Analytics loaded');
-  };
+  // Analytics loading is handled by GoogleAnalytics component
+  // which properly respects cookie consent
+  console.log('Analytics consent granted - handled by GoogleAnalytics component');
 }
 
 /**

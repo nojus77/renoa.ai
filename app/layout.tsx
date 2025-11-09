@@ -4,6 +4,7 @@ import './globals.css'
 import { Toaster } from 'sonner'
 import { Providers } from './providers'
 import CookieBanner from '@/components/CookieBanner'
+import GoogleAnalytics from '@/components/GoogleAnalytics'
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,7 @@ export default function RootLayout({
           </div>
               <Toaster />
               <div id="portal-root" />
+              <GoogleAnalytics />
               <CookieBanner />
         </Providers>
       </body>
