@@ -172,135 +172,145 @@ export default function ProviderSettings() {
           </div>
         </div>
 
-        {/* Main Content - Centered, Cleaner */}
-        <div className="max-w-5xl mx-auto px-8 py-12">
-          {/* Weekly Schedule */}
-          <div className="mb-12">
-            <div className="mb-6">
-              <h2 className="text-lg font-semibold text-zinc-100 mb-2">Weekly Schedule</h2>
-              <p className="text-sm text-zinc-500">Set the hours you&apos;re available to take appointments</p>
-            </div>
+        {/* Main Content - Two Column Layout */}
+        <div className="max-w-7xl mx-auto px-8 py-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Left Column: Weekly Schedule */}
+            <div>
+              <div className="mb-4">
+                <h2 className="text-base font-semibold text-zinc-100 mb-1">Weekly Schedule</h2>
+                <p className="text-xs text-zinc-500">Set your available hours</p>
+              </div>
 
-            <div className="space-y-2">
-              {days.map(({ key, label }) => {
-                const isAvailable = workingHours[key].length > 0;
-                return (
-                  <div 
-                    key={key} 
-                    className="flex items-center justify-between p-4 bg-zinc-900/50 rounded-xl border border-zinc-800/50 hover:border-zinc-700/50 transition-colors"
-                  >
-                    <div className="flex items-center gap-4 flex-1">
+              <div className="space-y-2">
+                {days.map(({ key, label }) => {
+                  const isAvailable = workingHours[key].length > 0;
+                  return (
+                    <div
+                      key={key}
+                      className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-lg border border-zinc-800/50 hover:border-zinc-700/50 transition-colors"
+                    >
                       {/* Toggle Switch */}
                       <button
                         onClick={() => toggleDayAvailability(key)}
                         className={`
-                          relative inline-flex h-6 w-11 items-center rounded-full transition-colors
+                          relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0
                           ${isAvailable ? 'bg-blue-600' : 'bg-zinc-800'}
                         `}
                       >
                         <span
                           className={`
-                            inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-                            ${isAvailable ? 'translate-x-6' : 'translate-x-1'}
+                            inline-block h-3 w-3 transform rounded-full bg-white transition-transform
+                            ${isAvailable ? 'translate-x-5' : 'translate-x-1'}
                           `}
                         />
                       </button>
 
                       {/* Day Label */}
-                      <span className={`text-sm font-medium w-28 ${isAvailable ? 'text-zinc-100' : 'text-zinc-500'}`}>
+                      <span className={`text-xs font-medium w-16 ${isAvailable ? 'text-zinc-100' : 'text-zinc-500'}`}>
                         {label}
                       </span>
 
                       {/* Time Inputs */}
                       {isAvailable ? (
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 flex-1">
                           {workingHours[key].map((slot, index) => (
-                            <div key={index} className="flex items-center gap-2">
+                            <div key={index} className="flex items-center gap-1.5">
                               <input
                                 type="time"
                                 value={slot.start}
                                 onChange={(e) => updateDayTime(key, index, 'start', e.target.value)}
-                                className="px-3 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
+                                className="px-2 py-1.5 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-100 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-transparent"
                               />
-                              <span className="text-zinc-600">→</span>
+                              <span className="text-zinc-600 text-xs">→</span>
                               <input
                                 type="time"
                                 value={slot.end}
                                 onChange={(e) => updateDayTime(key, index, 'end', e.target.value)}
-                                className="px-3 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
+                                className="px-2 py-1.5 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-100 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-transparent"
                               />
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <span className="text-sm text-zinc-600 italic">Unavailable</span>
+                        <span className="text-xs text-zinc-600 italic">Unavailable</span>
                       )}
                     </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right Column: Other Settings */}
+            <div className="space-y-4">
+              {/* Booking Preferences */}
+              <div>
+                <div className="mb-4">
+                  <h2 className="text-base font-semibold text-zinc-100 mb-1">Booking Preferences</h2>
+                  <p className="text-xs text-zinc-500">Configure appointment settings</p>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="bg-zinc-900/50 rounded-lg border border-zinc-800/50 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="p-1.5 bg-blue-500/10 rounded">
+                        <Clock className="h-4 w-4 text-blue-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-semibold text-zinc-100">Buffer Time</h3>
+                        <p className="text-xs text-zinc-500">Between appointments</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={bufferTime}
+                        onChange={(e) => setBufferTime(parseInt(e.target.value))}
+                        className="flex-1 px-3 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-100 text-base font-medium focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-transparent"
+                        min="0"
+                        step="15"
+                      />
+                      <span className="text-xs text-zinc-500">minutes</span>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
 
-          {/* Booking Preferences */}
-          <div className="grid grid-cols-2 gap-6 mb-12">
-            <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-blue-500/10 rounded-lg">
-                  <Clock className="h-5 w-5 text-blue-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-zinc-100">Buffer Time</h3>
-                  <p className="text-xs text-zinc-500">Between appointments</p>
+                  <div className="bg-zinc-900/50 rounded-lg border border-zinc-800/50 p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="p-1.5 bg-purple-500/10 rounded">
+                        <Calendar className="h-4 w-4 text-purple-400" />
+                      </div>
+                      <div>
+                        <h3 className="text-xs font-semibold text-zinc-100">Advance Booking</h3>
+                        <p className="text-xs text-zinc-500">Maximum days ahead</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        value={advanceBooking}
+                        onChange={(e) => setAdvanceBooking(parseInt(e.target.value))}
+                        className="flex-1 px-3 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-100 text-base font-medium focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-transparent"
+                        min="1"
+                        max="90"
+                      />
+                      <span className="text-xs text-zinc-500">days</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  value={bufferTime}
-                  onChange={(e) => setBufferTime(parseInt(e.target.value))}
-                  className="flex-1 px-4 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-zinc-100 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
-                  min="0"
-                  step="15"
+
+              {/* Notes */}
+              <div className="bg-zinc-900/50 rounded-lg border border-zinc-800/50 p-4">
+                <h3 className="text-xs font-semibold text-zinc-100 mb-3">Special Instructions</h3>
+                <textarea
+                  value={availabilityNotes}
+                  onChange={(e) => setAvailabilityNotes(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-transparent resize-none"
+                  rows={4}
+                  placeholder="e.g., Closed on holidays, Emergency calls available 24/7..."
                 />
-                <span className="text-sm text-zinc-500">minutes</span>
               </div>
             </div>
-
-            <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-purple-500/10 rounded-lg">
-                  <Calendar className="h-5 w-5 text-purple-400" />
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-zinc-100">Advance Booking</h3>
-                  <p className="text-xs text-zinc-500">Maximum days ahead</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  value={advanceBooking}
-                  onChange={(e) => setAdvanceBooking(parseInt(e.target.value))}
-                  className="flex-1 px-4 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-zinc-100 text-lg font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent"
-                  min="1"
-                  max="90"
-                />
-                <span className="text-sm text-zinc-500">days</span>
-              </div>
-            </div>
-          </div>
-
-          {/* Notes */}
-          <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 p-6">
-            <h3 className="text-sm font-semibold text-zinc-100 mb-3">Special Instructions</h3>
-            <textarea
-              value={availabilityNotes}
-              onChange={(e) => setAvailabilityNotes(e.target.value)}
-              className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700/50 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-transparent resize-none"
-              rows={3}
-              placeholder="e.g., Closed on holidays, Emergency calls available 24/7..."
-            />
           </div>
         </div>
       </div>

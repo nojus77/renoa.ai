@@ -119,18 +119,22 @@ export default function ProviderCalendar() {
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
     const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-    
+
+    // Get day of week (0 = Sunday, 1 = Monday, etc.)
+    let startingDayOfWeek = firstDay.getDay();
+    // Convert to Monday-based (0 = Monday, 6 = Sunday)
+    startingDayOfWeek = startingDayOfWeek === 0 ? 6 : startingDayOfWeek - 1;
+
     const days: (Date | null)[] = [];
-    
+
     for (let i = 0; i < startingDayOfWeek; i++) {
       days.push(null);
     }
-    
+
     for (let day = 1; day <= daysInMonth; day++) {
       days.push(new Date(year, month, day));
     }
-    
+
     return days;
   };
 
@@ -300,7 +304,7 @@ export default function ProviderCalendar() {
           <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 overflow-hidden">
             {/* Day Headers */}
             <div className="grid grid-cols-7 bg-zinc-900/80 border-b border-zinc-800/50">
-              {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
+              {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map(day => (
                 <div key={day} className="text-center py-2 text-xs font-semibold text-zinc-400">
                   {day}
                 </div>

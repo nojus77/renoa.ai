@@ -46,7 +46,7 @@ export default function ProviderAnalytics() {
   const [providerName, setProviderName] = useState('');
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
-  const [timeRange, setTimeRange] = useState<30 | 60 | 90>(30);
+  const [timeRange, setTimeRange] = useState<30 | 90 | 'ytd'>(30);
 
   useEffect(() => {
     const id = localStorage.getItem('providerId');
@@ -60,10 +60,18 @@ export default function ProviderAnalytics() {
     fetchAnalytics(id, timeRange);
   }, [router, timeRange]);
 
-  const fetchAnalytics = async (id: string, days: number) => {
+  const fetchAnalytics = async (id: string, days: number | 'ytd') => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/provider/analytics?providerId=${id}&days=${days}`);
+      // Calculate days for YTD
+      let actualDays = days;
+      if (days === 'ytd') {
+        const now = new Date();
+        const startOfYear = new Date(now.getFullYear(), 0, 1);
+        actualDays = Math.floor((now.getTime() - startOfYear.getTime()) / (1000 * 60 * 60 * 24));
+      }
+
+      const res = await fetch(`/api/provider/analytics?providerId=${id}&days=${actualDays}`);
       const data = await res.json();
       if (data.analytics) {
         setAnalytics(data.analytics);
@@ -108,16 +116,27 @@ export default function ProviderAnalytics() {
         <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Time Range Selector */}
         <div className="flex gap-2 mb-6">
-          {[30, 60, 90].map((days) => (
-            <Button
-              key={days}
-              variant={timeRange === days ? "default" : "outline"}
-              onClick={() => setTimeRange(days as 30 | 60 | 90)}
-              className={timeRange === days ? "bg-blue-600" : "border-zinc-700"}
-            >
-              Last {days} Days
-            </Button>
-          ))}
+          <Button
+            variant={timeRange === 30 ? "default" : "outline"}
+            onClick={() => setTimeRange(30)}
+            className={timeRange === 30 ? "bg-blue-600" : "border-zinc-700"}
+          >
+            30 Days
+          </Button>
+          <Button
+            variant={timeRange === 90 ? "default" : "outline"}
+            onClick={() => setTimeRange(90)}
+            className={timeRange === 90 ? "bg-blue-600" : "border-zinc-700"}
+          >
+            90 Days
+          </Button>
+          <Button
+            variant={timeRange === 'ytd' ? "default" : "outline"}
+            onClick={() => setTimeRange('ytd')}
+            className={timeRange === 'ytd' ? "bg-blue-600" : "border-zinc-700"}
+          >
+            YTD
+          </Button>
         </div>
 
         {/* Key Metrics */}
