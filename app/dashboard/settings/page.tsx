@@ -36,6 +36,7 @@ export default function SettingsPage() {
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [showAddAdmin, setShowAddAdmin] = useState(false);
   const [newAdmin, setNewAdmin] = useState({ email: '', name: '', password: '', role: 'admin' });
+  const [timezonePreview, setTimezonePreview] = useState('');
 
   // Change Password state
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -68,7 +69,7 @@ export default function SettingsPage() {
     sessionTimeout: '30',
 
     // System Settings
-    timezone: 'America/New_York',
+    timezone: 'America/Chicago',
     dateFormat: 'MM/DD/YYYY',
     currency: 'USD',
   });
@@ -83,6 +84,28 @@ export default function SettingsPage() {
       fetchAdmins();
     }
   }, []);
+
+  // Real-time timezone preview clock that updates every second
+  useEffect(() => {
+    const updateTimezonePreview = () => {
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: settings.timezone,
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      const formattedTime = formatter.format(now);
+      setTimezonePreview(formattedTime);
+    };
+
+    // Update immediately and then every second
+    updateTimezonePreview();
+    const interval = setInterval(updateTimezonePreview, 1000);
+
+    return () => clearInterval(interval);
+  }, [settings.timezone]);
 
   const fetchAdmins = async () => {
     setLoadingAdmins(true);
@@ -327,6 +350,7 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings({ ...settings, companyName: e.target.value })}
                 className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">Your organization name (appears on emails and reports)</p>
             </div>
             <div>
               <label className="text-xs font-medium text-foreground block mb-1">
@@ -338,6 +362,7 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings({ ...settings, email: e.target.value })}
                 className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">Primary admin contact email address</p>
             </div>
             <div>
               <label className="text-xs font-medium text-foreground block mb-1">
@@ -349,6 +374,7 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings({ ...settings, phone: e.target.value })}
                 className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">Support contact number for urgent matters</p>
             </div>
           </CardContent>
         </Card>
@@ -432,6 +458,7 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings({ ...settings, senderName: e.target.value })}
                 className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">Display name for automated emails (e.g., &apos;Renoa Team&apos;)</p>
             </div>
             <div>
               <label className="text-xs font-medium text-foreground block mb-1">
@@ -443,6 +470,7 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings({ ...settings, senderEmail: e.target.value })}
                 className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">Email address used to send notifications to customers</p>
             </div>
             <div>
               <label className="text-xs font-medium text-foreground block mb-1">
@@ -454,6 +482,7 @@ export default function SettingsPage() {
                 onChange={(e) => setSettings({ ...settings, replyToEmail: e.target.value })}
                 className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-sky-500"
               />
+              <p className="text-[10px] text-muted-foreground mt-1">Where customer replies will be sent (e.g., &apos;support@renoa.ai&apos;)</p>
             </div>
           </CardContent>
         </Card>
@@ -521,11 +550,14 @@ export default function SettingsPage() {
                   onChange={(e) => setSettings({ ...settings, timezone: e.target.value })}
                   className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-purple-500"
                 >
-                  <option value="America/New_York">Eastern Time (ET)</option>
                   <option value="America/Chicago">Central Time (CT)</option>
+                  <option value="America/New_York">Eastern Time (ET)</option>
                   <option value="America/Denver">Mountain Time (MT)</option>
                   <option value="America/Los_Angeles">Pacific Time (PT)</option>
                 </select>
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  Current time: {timezonePreview}
+                </p>
               </div>
               <div>
                 <label className="text-xs font-medium text-foreground block mb-1">

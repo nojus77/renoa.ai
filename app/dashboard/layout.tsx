@@ -37,6 +37,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [adminName, setAdminName] = useState('')
   const [adminEmail, setAdminEmail] = useState('')
   const [adminRole, setAdminRole] = useState('')
+  const [currentTime, setCurrentTime] = useState('')
   const pathname = usePathname()
   const router = useRouter()
 
@@ -95,6 +96,31 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
     verifyToken()
   }, [router, pathname])
+
+  // Real-time clock that updates every second
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date()
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Chicago',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+
+      const formattedTime = formatter.format(now).replace(',', ' •')
+      setCurrentTime(`${formattedTime} CT`)
+    }
+
+    // Update immediately and then every second
+    updateClock()
+    const interval = setInterval(updateClock, 1000)
+
+    return () => clearInterval(interval)
+  }, [])
 
   // Show nothing while checking auth
   if (!isAuthorized) {
@@ -174,8 +200,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <div className={`p-4 ${sidebarOpen ? 'ml-64' : ''} transition-all duration-200`}>
-        {/* Header bar with User Menu and Theme Toggle */}
+        {/* Header bar with Clock, User Menu and Theme Toggle */}
         <div className="flex items-center justify-end gap-3 mb-4">
+          {/* Real-time Clock */}
+          <div className="text-sm text-muted-foreground font-medium">
+            {currentTime}
+          </div>
+
           {/* User Dropdown Menu */}
           <DropdownMenu>
             <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500">
