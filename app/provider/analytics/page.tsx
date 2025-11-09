@@ -4,29 +4,28 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { 
+import ProviderLayout from '@/components/provider/ProviderLayout';
+import {
   TrendingUp,
   Target,
   Clock,
   DollarSign,
   Award,
-  Calendar,
-  ArrowLeft
+  Calendar
 } from 'lucide-react';
-import { 
-  LineChart, 
-  Line, 
-  PieChart, 
-  Pie, 
+import {
+  LineChart,
+  Line,
+  PieChart,
+  Pie,
   Cell,
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
   Legend,
-  ResponsiveContainer 
+  ResponsiveContainer
 } from 'recharts';
-import Link from 'next/link';
 
 interface Analytics {
   totalLeads: number;
@@ -44,17 +43,20 @@ interface Analytics {
 export default function ProviderAnalytics() {
   const router = useRouter();
   const [providerId, setProviderId] = useState('');
+  const [providerName, setProviderName] = useState('');
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
   const [timeRange, setTimeRange] = useState<30 | 60 | 90>(30);
 
   useEffect(() => {
     const id = localStorage.getItem('providerId');
+    const name = localStorage.getItem('providerName');
     if (!id) {
       router.push('/provider/login');
       return;
     }
     setProviderId(id);
+    setProviderName(name || '');
     fetchAnalytics(id, timeRange);
   }, [router, timeRange]);
 
@@ -75,36 +77,35 @@ export default function ProviderAnalytics() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-zinc-400">Loading analytics...</div>
-      </div>
+      <ProviderLayout providerName={providerName}>
+        <div className="h-full flex items-center justify-center">
+          <div className="text-zinc-400">Loading analytics...</div>
+        </div>
+      </ProviderLayout>
     );
   }
 
   if (!analytics) {
     return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-zinc-400">No analytics data available</div>
-      </div>
+      <ProviderLayout providerName={providerName}>
+        <div className="h-full flex items-center justify-center">
+          <div className="text-zinc-400">No analytics data available</div>
+        </div>
+      </ProviderLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-zinc-100">
-      <div className="border-b border-zinc-800 bg-zinc-900/50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <Link href="/provider/dashboard">
-            <Button variant="ghost" className="mb-2">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </Link>
-          <h1 className="text-2xl font-bold text-zinc-100">Performance Analytics</h1>
-          <p className="text-sm text-zinc-400 mt-1">Track your lead conversion performance</p>
+    <ProviderLayout providerName={providerName}>
+      <div className="h-full bg-zinc-950 text-zinc-100 overflow-auto">
+        <div className="border-b border-zinc-800 bg-zinc-900/50">
+          <div className="max-w-6xl mx-auto px-4 py-3">
+            <h1 className="text-xl font-bold text-zinc-100">Performance Analytics</h1>
+            <p className="text-xs text-zinc-400 mt-1">Track your lead conversion performance</p>
+          </div>
         </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="max-w-6xl mx-auto px-4 py-6">
         {/* Time Range Selector */}
         <div className="flex gap-2 mb-6">
           {[30, 60, 90].map((days) => (
@@ -120,7 +121,7 @@ export default function ProviderAnalytics() {
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm text-zinc-400 flex items-center gap-2">
@@ -129,7 +130,7 @@ export default function ProviderAnalytics() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-blue-400">
+              <div className="text-2xl font-bold text-blue-400">
                 {analytics.acceptanceRate}%
               </div>
               <p className="text-xs text-zinc-500 mt-1">
@@ -146,7 +147,7 @@ export default function ProviderAnalytics() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-emerald-400">
+              <div className="text-2xl font-bold text-emerald-400">
                 {analytics.conversionRate}%
               </div>
               <p className="text-xs text-zinc-500 mt-1">
@@ -163,7 +164,7 @@ export default function ProviderAnalytics() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-purple-400">
+              <div className="text-2xl font-bold text-purple-400">
                 {analytics.avgDaysToConvert}
               </div>
               <p className="text-xs text-zinc-500 mt-1">days to convert</p>
@@ -178,7 +179,7 @@ export default function ProviderAnalytics() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-3xl font-bold text-amber-400">
+              <div className="text-2xl font-bold text-amber-400">
                 ${analytics.totalRevenue.toLocaleString()}
               </div>
               <p className="text-xs text-zinc-500 mt-1">from conversions</p>
@@ -187,7 +188,7 @@ export default function ProviderAnalytics() {
         </div>
 
         {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {/* Conversion Trend */}
           <Card className="bg-zinc-900/50 border-zinc-800">
             <CardHeader>
@@ -197,7 +198,7 @@ export default function ProviderAnalytics() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={240}>
                 <LineChart data={analytics.conversionTrend}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                   <XAxis 
@@ -238,7 +239,7 @@ export default function ProviderAnalytics() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={240}>
                 <PieChart>
                   <Pie
                     data={analytics.statusBreakdown}
@@ -268,14 +269,14 @@ export default function ProviderAnalytics() {
         </div>
 
         {/* Performance Insights */}
-        <Card className="bg-zinc-900/50 border-zinc-800 mt-6">
-          <CardHeader>
-            <CardTitle className="text-zinc-100">Performance Insights</CardTitle>
+        <Card className="bg-zinc-900/50 border-zinc-800 mt-4">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base text-zinc-100">Performance Insights</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {analytics.conversionRate > 50 && (
-                <div className="flex items-start gap-3 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                <div className="flex items-start gap-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
                   <TrendingUp className="h-5 w-5 text-emerald-400 mt-0.5" />
                   <div>
                     <p className="text-emerald-400 font-semibold">Excellent Performance!</p>
@@ -285,9 +286,9 @@ export default function ProviderAnalytics() {
                   </div>
                 </div>
               )}
-              
+
               {analytics.acceptanceRate < 70 && (
-                <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                <div className="flex items-start gap-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
                   <Target className="h-5 w-5 text-amber-400 mt-0.5" />
                   <div>
                     <p className="text-amber-400 font-semibold">Opportunity to Improve</p>
@@ -299,7 +300,7 @@ export default function ProviderAnalytics() {
               )}
 
               {analytics.avgDaysToConvert > 14 && (
-                <div className="flex items-start gap-3 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                <div className="flex items-start gap-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                   <Clock className="h-5 w-5 text-blue-400 mt-0.5" />
                   <div>
                     <p className="text-blue-400 font-semibold">Speed Up Your Process</p>
@@ -315,5 +316,6 @@ export default function ProviderAnalytics() {
         </Card>
       </div>
     </div>
+    </ProviderLayout>
   );
 }

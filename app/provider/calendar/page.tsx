@@ -222,11 +222,11 @@ export default function ProviderCalendar() {
       <div className="min-h-screen bg-zinc-950">
         {/* Header with Stats */}
         <div className="border-b border-zinc-800/50 bg-zinc-900/30 backdrop-blur-sm">
-          <div className="max-w-7xl mx-auto px-8 py-8">
-            <div className="flex items-center justify-between mb-8">
+          <div className="max-w-6xl mx-auto px-4 py-4">
+            <div className="flex items-center justify-between mb-4">
               <div>
-                <h1 className="text-3xl font-bold text-zinc-100">Calendar</h1>
-                <p className="text-sm text-zinc-500 mt-2">Manage your appointments and schedule</p>
+                <h1 className="text-xl font-bold text-zinc-100">Calendar</h1>
+                <p className="text-xs text-zinc-400 mt-1">Manage your appointments and schedule</p>
               </div>
               <div className="flex items-center gap-3">
                 <Button
@@ -252,43 +252,43 @@ export default function ProviderCalendar() {
             </div>
 
             {/* Compact Stats */}
-            <div className="grid grid-cols-3 gap-4">
-              <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-xl border border-blue-500/20 p-4">
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 rounded-xl border border-blue-500/20 p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-blue-400 font-medium mb-1">NEXT UP</p>
                     {nextAppointment ? (
                       <>
-                        <p className="text-xl font-bold text-zinc-100">{nextAppointment.customerName}</p>
+                        <p className="text-base font-bold text-zinc-100">{nextAppointment.customerName}</p>
                         <p className="text-xs text-zinc-400 mt-1">{formatTime(nextAppointment.scheduledDate)}</p>
                       </>
                     ) : (
                       <p className="text-sm text-zinc-500">No upcoming</p>
                     )}
                   </div>
-                  <Clock className="h-8 w-8 text-blue-400/30" />
+                  <Clock className="h-6 w-6 text-blue-400/30" />
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-xl border border-green-500/20 p-4">
+              <div className="bg-gradient-to-br from-green-500/10 to-green-600/5 rounded-xl border border-green-500/20 p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-green-400 font-medium mb-1">THIS MONTH</p>
-                    <p className="text-3xl font-bold text-zinc-100">{monthAppointments.length}</p>
+                    <p className="text-2xl font-bold text-zinc-100">{monthAppointments.length}</p>
                     <p className="text-xs text-zinc-400 mt-1">appointments</p>
                   </div>
-                  <TrendingUp className="h-8 w-8 text-green-400/30" />
+                  <TrendingUp className="h-6 w-6 text-green-400/30" />
                 </div>
               </div>
 
-              <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 rounded-xl border border-purple-500/20 p-4">
+              <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 rounded-xl border border-purple-500/20 p-3">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-purple-400 font-medium mb-1">TOTAL</p>
-                    <p className="text-3xl font-bold text-zinc-100">{appointments.length}</p>
+                    <p className="text-2xl font-bold text-zinc-100">{appointments.length}</p>
                     <p className="text-xs text-zinc-400 mt-1">all time</p>
                   </div>
-                  <CalendarIcon className="h-8 w-8 text-purple-400/30" />
+                  <CalendarIcon className="h-6 w-6 text-purple-400/30" />
                 </div>
               </div>
             </div>
@@ -296,12 +296,12 @@ export default function ProviderCalendar() {
         </div>
 
         {/* Calendar Grid */}
-        <div className="max-w-7xl mx-auto px-8 py-8">
-          <div className="bg-zinc-900/50 rounded-2xl border border-zinc-800/50 overflow-hidden">
+        <div className="max-w-6xl mx-auto px-4 py-4">
+          <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 overflow-hidden">
             {/* Day Headers */}
             <div className="grid grid-cols-7 bg-zinc-900/80 border-b border-zinc-800/50">
               {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(day => (
-                <div key={day} className="text-center py-4 text-sm font-semibold text-zinc-400">
+                <div key={day} className="text-center py-2 text-xs font-semibold text-zinc-400">
                   {day}
                 </div>
               ))}
@@ -311,7 +311,7 @@ export default function ProviderCalendar() {
             <div className="grid grid-cols-7">
               {days.map((date, index) => {
                 if (!date) {
-                  return <div key={`empty-${index}`} className="min-h-[140px] border-r border-b border-zinc-800/30" />;
+                  return <div key={`empty-${index}`} className="min-h-[100px] border-r border-b border-zinc-800/30" />;
                 }
 
                 const dayAppointments = getAppointmentsForDate(date);
@@ -323,7 +323,7 @@ export default function ProviderCalendar() {
                   <div
                     key={index}
                     className={`
-                      min-h-[140px] p-3 border-r border-b border-zinc-800/30 transition-colors
+                      min-h-[100px] p-2 border-r border-b border-zinc-800/30 transition-colors
                       ${!isAvailable ? 'bg-red-500/5' : 'hover:bg-zinc-800/30'}
                     `}
                   >
@@ -375,14 +375,14 @@ export default function ProviderCalendar() {
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-zinc-900 rounded-2xl border border-zinc-800 max-w-3xl w-full max-h-[90vh] overflow-hidden shadow-2xl">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-lg">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-500 flex items-center justify-center text-white font-bold text-base">
                   {selectedLead.firstName[0]}{selectedLead.lastName[0]}
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-zinc-100">{selectedLead.customerName}</h2>
-                  <p className="text-sm text-zinc-400 capitalize">{selectedLead.serviceType}</p>
+                  <h2 className="text-lg font-bold text-zinc-100">{selectedLead.customerName}</h2>
+                  <p className="text-xs text-zinc-400 capitalize">{selectedLead.serviceType}</p>
                 </div>
               </div>
               <Button
@@ -396,15 +396,15 @@ export default function ProviderCalendar() {
             </div>
 
             {/* Modal Content */}
-            <div className="overflow-y-auto max-h-[calc(90vh-200px)] p-6">
+            <div className="overflow-y-auto max-h-[calc(90vh-200px)] p-4">
               {/* Lead Score */}
-              <div className="mb-6 p-4 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl border border-blue-500/20">
+              <div className="mb-4 p-3 bg-gradient-to-br from-blue-500/10 to-purple-500/10 rounded-xl border border-blue-500/20">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <Star className="h-8 w-8 text-yellow-400 fill-yellow-400" />
+                    <Star className="h-6 w-6 text-yellow-400 fill-yellow-400" />
                     <div>
-                      <p className="text-sm text-zinc-400">Lead Score</p>
-                      <p className="text-3xl font-bold text-zinc-100">{selectedLead.leadScore}</p>
+                      <p className="text-xs text-zinc-400">Lead Score</p>
+                      <p className="text-2xl font-bold text-zinc-100">{selectedLead.leadScore}</p>
                     </div>
                   </div>
                   <div className={`px-4 py-2 rounded-lg ${
@@ -420,8 +420,8 @@ export default function ProviderCalendar() {
               </div>
 
               {/* Quick Info Grid */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700/50">
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/50">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-blue-500/10 rounded-lg">
                       <Clock className="h-5 w-5 text-blue-400" />
@@ -434,14 +434,14 @@ export default function ProviderCalendar() {
                   </div>
                 </div>
 
-                <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700/50">
+                <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/50">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-green-500/10 rounded-lg">
                       <DollarSign className="h-5 w-5 text-green-400" />
                     </div>
                     <div>
                       <p className="text-xs text-zinc-500">Property Value</p>
-                      <p className="text-lg font-bold text-zinc-100">
+                      <p className="text-base font-bold text-zinc-100">
                         ${selectedLead.propertyValue.toLocaleString()}
                       </p>
                     </div>
@@ -450,7 +450,7 @@ export default function ProviderCalendar() {
               </div>
 
               {/* Contact Info */}
-              <div className="bg-zinc-800/50 rounded-xl p-5 border border-zinc-700/50 mb-6">
+              <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/50 mb-4">
                 <h3 className="text-sm font-semibold text-zinc-100 mb-4 flex items-center gap-2">
                   <User className="h-4 w-4" />
                   Contact Information
@@ -474,7 +474,7 @@ export default function ProviderCalendar() {
               </div>
 
               {/* Property Info */}
-              <div className="bg-zinc-800/50 rounded-xl p-5 border border-zinc-700/50 mb-6">
+              <div className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700/50 mb-4">
                 <h3 className="text-sm font-semibold text-zinc-100 mb-4 flex items-center gap-2">
                   <Home className="h-4 w-4" />
                   Property Details

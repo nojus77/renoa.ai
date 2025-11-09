@@ -60,23 +60,23 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
   const isActive = (href: string) => pathname === href;
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
-      {/* Sidebar */}
-      <div className="w-64 border-r border-zinc-800 bg-zinc-900/50 flex flex-col">
+    <div className="flex h-screen bg-zinc-950 overflow-hidden">
+      {/* Sidebar - Fixed and Sticky */}
+      <div className="w-64 border-r border-zinc-800 bg-zinc-900/50 flex flex-col fixed left-0 top-0 h-screen z-50">
         {/* Logo/Header */}
-        <div className="p-6 border-b border-zinc-800">
+        <div className="p-6 border-b border-zinc-800 flex-shrink-0">
           <h1 className="text-xl font-bold text-zinc-100">Provider Portal</h1>
           {providerName && (
             <p className="text-sm text-zinc-400 mt-1">{providerName}</p>
           )}
         </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4 space-y-1">
+        {/* Navigation - Scrollable middle section */}
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.href);
-            
+
             return (
               <Link
                 key={item.name}
@@ -105,8 +105,8 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
           })}
         </nav>
 
-        {/* Logout */}
-        <div className="p-4 border-t border-zinc-800">
+        {/* Logout - Fixed at bottom */}
+        <div className="p-4 border-t border-zinc-800 flex-shrink-0 bg-zinc-900/50">
           <Button
             variant="outline"
             className="w-full border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
@@ -118,8 +118,8 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex-1 overflow-auto">
+      {/* Main Content - With left margin to account for fixed sidebar */}
+      <div className="flex-1 ml-64 overflow-auto h-screen">
         {children}
       </div>
     </div>
