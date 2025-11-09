@@ -3,6 +3,15 @@ import { ReactNode, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { ThemeToggle } from '@/components/theme-toggle'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { User, LogOut, Shield } from 'lucide-react'
 
 // Simple navigation items - we'll use text for now, add icons later
 const navItems = [
@@ -25,6 +34,9 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
+  const [adminName, setAdminName] = useState('')
+  const [adminEmail, setAdminEmail] = useState('')
+  const [adminRole, setAdminRole] = useState('')
   const pathname = usePathname()
   const router = useRouter()
 
@@ -49,6 +61,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         const data = await response.json()
 
         if (data.valid) {
+          // Load admin info from localStorage
+          const name = localStorage.getItem('adminName') || ''
+          const email = localStorage.getItem('adminEmail') || ''
+          const role = localStorage.getItem('adminRole') || ''
+
+          setAdminName(name)
+          setAdminEmail(email)
+          setAdminRole(role)
           setIsAuthorized(true)
         } else {
           // Token is invalid or expired
@@ -145,8 +165,43 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main Content */}
       <div className={`p-4 ${sidebarOpen ? 'ml-64' : ''} transition-all duration-200`}>
-        {/* Header bar with Theme Toggle */}
-        <div className="flex items-center justify-end mb-4">
+        {/* Header bar with User Menu and Theme Toggle */}
+        <div className="flex items-center justify-end gap-3 mb-4">
+          {/* User Dropdown Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-muted transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500">
+              <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center">
+                <User className="h-4 w-4 text-white" />
+              </div>
+              <div className="flex flex-col items-start text-left">
+                <span className="text-sm font-medium text-foreground">{adminName}</span>
+                <span className="text-xs text-muted-foreground capitalize">{adminRole.replace('_', ' ')}</span>
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuLabel className="font-normal">
+                <div className="flex flex-col space-y-1">
+                  <p className="text-sm font-medium leading-none">{adminName}</p>
+                  <p className="text-xs leading-none text-muted-foreground">{adminEmail}</p>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/dashboard/settings" className="flex items-center cursor-pointer">
+                  <Shield className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem asChild>
+                <Link href="/logout" className="flex items-center cursor-pointer text-rose-600">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <ThemeToggle />
         </div>
         {/* Toggle Button for mobile */}
