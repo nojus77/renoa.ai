@@ -72,38 +72,30 @@ export default function AddressAutocomplete({
   };
 
   useEffect(() => {
-    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-
-    if (!apiKey) {
-      console.warn('NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is not defined');
-      // Still set loaded to true so the input works without autocomplete
-      setIsLoaded(true);
-      return;
-    }
-
-    // Check if Google Maps is already loaded
+    // Check if Google Maps is already loaded (loaded globally in layout.tsx)
     if (window.google && window.google.maps && window.google.maps.places) {
       setIsLoaded(true);
       return;
     }
 
-    // Load Google Maps script
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-    script.async = true;
-    script.defer = true;
-    script.onload = () => setIsLoaded(true);
-    script.onerror = () => {
-      console.error('Error loading Google Maps');
-      setIsLoaded(true); // Still set loaded so input works
-    };
-    document.head.appendChild(script);
+    // Poll for Google Maps to be loaded (since it's loaded globally)
+    const checkInterval = setInterval(() => {
+      if (window.google && window.google.maps && window.google.maps.places) {
+        setIsLoaded(true);
+        clearInterval(checkInterval);
+      }
+    }, 100);
+
+    // Stop polling after 10 seconds
+    const timeout = setTimeout(() => {
+      clearInterval(checkInterval);
+      console.warn('[AddressAutocomplete] Google Maps API not loaded after 10 seconds');
+      setIsLoaded(true); // Still set loaded so input works without autocomplete
+    }, 10000);
 
     return () => {
-      // Cleanup script if component unmounts
-      if (script.parentNode) {
-        script.parentNode.removeChild(script);
-      }
+      clearInterval(checkInterval);
+      clearTimeout(timeout);
     };
   }, []);
 

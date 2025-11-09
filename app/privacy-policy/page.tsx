@@ -19,178 +19,104 @@ export default function PrivacyPolicyPage() {
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <article className="bg-white rounded-2xl shadow-sm p-8 sm:p-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Privacy Policy</h1>
-          <p className="text-gray-600 mb-8">Last Updated: January 9, 2025</p>
+          <p className="text-gray-600 mb-8">Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
 
           <div className="prose prose-green max-w-none">
+            {/* Content will go here */}
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Introduction</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">1. Introduction</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                Welcome to Renoa.ai (&quot;we,&quot; &quot;our,&quot; or &quot;us&quot;). We respect your privacy and are committed to protecting your personal information. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our website and services.
+                Welcome to Renoa AI. We respect your privacy and are committed to protecting your personal data. This privacy policy will inform you about how we handle your personal data when you visit our website and tell you about your privacy rights.
               </p>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Information We Collect</h2>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">Information You Provide to Us</h3>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">2. Information We Collect</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                When you use Renoa.ai, we collect the following information:
+                We may collect, use, store and transfer different kinds of personal data about you:
               </p>
               <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
-                <li><strong>Contact Information</strong>: First name, last name, email address, phone number</li>
-                <li><strong>Project Information</strong>: Service type requested, project description, preferred timeline</li>
-                <li><strong>Location Information</strong>: Street address, city, state, ZIP code</li>
-                <li><strong>Communication Preferences</strong>: How you prefer to be contacted</li>
-              </ul>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">Information Collected Automatically</h3>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                When you visit our website, we automatically collect:
-              </p>
-              <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
-                <li><strong>Device Information</strong>: IP address, browser type, operating system</li>
-                <li><strong>Usage Data</strong>: Pages visited, time spent on pages, links clicked</li>
-                <li><strong>Cookies and Tracking Technologies</strong>: See our Cookie Policy below</li>
+                <li><strong>Identity Data:</strong> First name, last name</li>
+                <li><strong>Contact Data:</strong> Email address, telephone number, physical address</li>
+                <li><strong>Technical Data:</strong> IP address, browser type and version, device information</li>
+                <li><strong>Usage Data:</strong> Information about how you use our website and services</li>
+                <li><strong>Marketing Data:</strong> Your preferences in receiving marketing from us</li>
               </ul>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">How We Use Your Information</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">3. How We Use Your Information</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                We use your information to:
-              </p>
-              <ol className="list-decimal pl-6 text-gray-700 space-y-2 mb-4">
-                <li><strong>Match You with Service Providers</strong>: Connect you with qualified contractors in your area</li>
-                <li><strong>Communicate with You</strong>: Send project updates, provider matches, and service confirmations</li>
-                <li><strong>Improve Our Services</strong>: Analyze usage patterns and optimize our AI matching algorithm</li>
-                <li><strong>Send Marketing Communications</strong>: Share tips, promotions, and updates (you can opt-out anytime)</li>
-                <li><strong>Comply with Legal Obligations</strong>: Respond to legal requests and prevent fraud</li>
-              </ol>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">How We Share Your Information</h2>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">With Service Providers</h3>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                When you submit a request, we share your contact information and project details with matched service providers so they can contact you with quotes.
-              </p>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">With Third-Party Service Providers</h3>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                We share information with trusted partners who help us operate our platform:
+                We will only use your personal data when the law allows us to. Most commonly, we will use your personal data:
               </p>
               <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
-                <li><strong>Email Service Providers</strong> (AWS SES, Resend): To send transactional and marketing emails</li>
-                <li><strong>Analytics Providers</strong> (Google Analytics): To understand how users interact with our site</li>
-                <li><strong>Cloud Hosting</strong> (Vercel, Supabase): To store data securely</li>
-              </ul>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">Legal Requirements</h3>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                We may disclose your information if required by law, court order, or government request.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Your Email Communications Rights</h2>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">Marketing Emails</h3>
-              <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
-                <li>You can unsubscribe from marketing emails anytime by clicking &quot;Unsubscribe&quot; at the bottom of any email</li>
-                <li>You can also email us at hello@renoa.ai to opt-out</li>
-                <li>Unsubscribe requests are processed within 48 hours</li>
-              </ul>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">Transactional Emails</h3>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                We may still send you service-related emails (like provider matches and confirmations) even if you opt-out of marketing.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Your Privacy Rights</h2>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">Access and Correction</h3>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                You have the right to access and update your personal information. Contact us at privacy@renoa.ai.
-              </p>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">Data Deletion</h3>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                You can request deletion of your personal information. We&apos;ll delete your data within 30 days unless we&apos;re legally required to keep it.
-              </p>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">Do Not Sell My Information (California Residents)</h3>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                We do not sell your personal information to third parties.
-              </p>
-
-              <h3 className="text-xl font-semibold text-gray-900 mb-3 mt-6">GDPR Rights (EU Residents)</h3>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                If you&apos;re in the EU, you have additional rights:
-              </p>
-              <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
-                <li>Right to data portability</li>
-                <li>Right to restrict processing</li>
-                <li>Right to object to processing</li>
-                <li>Right to lodge a complaint with a supervisory authority</li>
+                <li>To provide and maintain our service</li>
+                <li>To notify you about changes to our service</li>
+                <li>To provide customer support</li>
+                <li>To match you with service providers in your area</li>
+                <li>To send you marketing communications (with your consent)</li>
+                <li>To improve our website and services</li>
               </ul>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Data Security</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">4. Data Security</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                We implement industry-standard security measures including:
-              </p>
-              <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
-                <li>SSL/TLS encryption for data transmission</li>
-                <li>Secure cloud storage with access controls</li>
-                <li>Regular security audits and updates</li>
-              </ul>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                However, no method of transmission over the internet is 100% secure. We cannot guarantee absolute security.
+                We have implemented appropriate security measures to prevent your personal data from being accidentally lost, used, or accessed in an unauthorized way. We limit access to your personal data to those employees, agents, contractors, and other third parties who have a business need to know.
               </p>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Data Retention</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">5. Data Retention</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                We retain your information for as long as:
-              </p>
-              <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
-                <li>Your account is active</li>
-                <li>Needed to provide services</li>
-                <li>Required by law (typically 7 years for business records)</li>
-              </ul>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                After this period, we securely delete or anonymize your data.
+                We will only retain your personal data for as long as reasonably necessary to fulfill the purposes we collected it for, including for the purposes of satisfying any legal, regulatory, tax, accounting, or reporting requirements.
               </p>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Children&apos;s Privacy</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">6. Your Legal Rights</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                Renoa.ai is not intended for users under 18. We do not knowingly collect information from children. If you believe we&apos;ve collected information from a child, contact us immediately at privacy@renoa.ai.
-              </p>
-            </section>
-
-            <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Changes to This Privacy Policy</h2>
-              <p className="text-gray-700 leading-relaxed mb-4">
-                We may update this Privacy Policy periodically. We&apos;ll notify you of significant changes by:
+                Under certain circumstances, you have rights under data protection laws in relation to your personal data:
               </p>
               <ul className="list-disc pl-6 text-gray-700 space-y-2 mb-4">
-                <li>Posting the new policy on this page</li>
-                <li>Updating the &quot;Last Updated&quot; date</li>
-                <li>Sending you an email notification (for material changes)</li>
+                <li>Request access to your personal data</li>
+                <li>Request correction of your personal data</li>
+                <li>Request erasure of your personal data</li>
+                <li>Object to processing of your personal data</li>
+                <li>Request restriction of processing your personal data</li>
+                <li>Request transfer of your personal data</li>
+                <li>Right to withdraw consent</li>
               </ul>
             </section>
 
             <section className="mb-8">
-              <h2 className="text-2xl font-semibold text-gray-900 mb-4">Contact Us</h2>
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">7. Third-Party Links</h2>
               <p className="text-gray-700 leading-relaxed mb-4">
-                If you have questions about this Privacy Policy, contact us:
+                Our website may include links to third-party websites, plug-ins, and applications. Clicking on those links may allow third parties to collect or share data about you. We do not control these third-party websites and are not responsible for their privacy statements.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">8. Cookies</h2>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                We use cookies and similar tracking technologies to track activity on our website and store certain information. For more details, please see our{' '}
+                <Link href="/cookie-policy" className="text-green-600 hover:text-green-700 font-semibold underline">
+                  Cookie Policy
+                </Link>.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">9. Changes to This Privacy Policy</h2>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page and updating the "Last updated" date.
+              </p>
+            </section>
+
+            <section className="mb-8">
+              <h2 className="text-2xl font-semibold text-gray-900 mb-4">10. Contact Us</h2>
+              <p className="text-gray-700 leading-relaxed mb-4">
+                If you have any questions about this Privacy Policy, please contact us at:
               </p>
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                 <p className="text-gray-700 mb-2">
@@ -199,13 +125,10 @@ export default function PrivacyPolicyPage() {
                     privacy@renoa.ai
                   </a>
                 </p>
-                <p className="text-gray-700 mb-2">
-                  <strong>Address:</strong> Renoa.ai, Chicago, IL
-                </p>
                 <p className="text-gray-700">
                   <strong>Website:</strong>{' '}
-                  <a href="https://renoa.ai/contact" className="text-green-600 hover:text-green-700 underline">
-                    renoa.ai/contact
+                  <a href="https://renoa.ai" className="text-green-600 hover:text-green-700 underline">
+                    https://renoa.ai
                   </a>
                 </p>
               </div>

@@ -272,6 +272,8 @@ export default function Hero() {
                 </span>
               </h1>
 
+              <p className="hero-subtitle">Stop wasting time on quotes - let AI match you instantly!</p>
+
               <div className="hero-form-progressive">
           {/* Step 1 - Service & Location (always visible) */}
           <div className={`step1-container ${step1Complete ? 'completed' : 'active'}`}>
@@ -494,8 +496,6 @@ export default function Hero() {
             </div>
           )}
               </div>
-
-              <p className="hero-subtitle">Stop wasting time on quotes - let AI match you instantly!</p>
             </div>
           </div>
 
