@@ -94,10 +94,19 @@ export default function SettingsPage() {
         },
       });
       const data = await response.json();
+
+      console.log('Admins API response:', data);
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to load admins');
+        return;
+      }
+
       if (data.admins) {
         setAdmins(data.admins);
       }
     } catch (error) {
+      console.error('Error fetching admins:', error);
       toast.error('Failed to load admins');
     } finally {
       setLoadingAdmins(false);

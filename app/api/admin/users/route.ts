@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    console.log('Fetching admins from database...');
     const admins = await prisma.admin.findMany({
       select: {
         id: true,
@@ -53,11 +54,15 @@ export async function GET(request: NextRequest) {
       orderBy: { createdAt: 'desc' },
     });
 
+    console.log(`Found ${admins.length} admins`);
     return NextResponse.json({ admins });
   } catch (error) {
     console.error('Error fetching admins:', error);
+    // Return more detailed error info in development
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    console.error('Error details:', errorMessage);
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: process.env.NODE_ENV === 'development' ? errorMessage : undefined },
       { status: 500 }
     );
   }
