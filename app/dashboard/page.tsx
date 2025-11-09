@@ -200,9 +200,11 @@ const ActivityFeed = () => {
     try {
       const res = await fetch('/api/activity');
       const data = await res.json();
-      setActivities(data);
+      // Ensure data is always an array
+      setActivities(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching activities:', error);
+      setActivities([]); // Set to empty array on error
     } finally {
       setLoading(false);
       setIsRefreshing(false);

@@ -89,6 +89,7 @@ export async function GET() {
     return NextResponse.json(activities.slice(0, 20));
   } catch (error) {
     console.error('Error fetching activities:', error);
-    return NextResponse.json({ error: 'Failed to fetch activities' }, { status: 500 });
+    // Return empty array instead of error object to prevent frontend crashes
+    return NextResponse.json([]);
   }
 }
