@@ -26,8 +26,13 @@ import {
   UserPlus,
   Trash2,
   Users,
+  ChevronDown,
+  ChevronUp,
+  CheckCircle2,
+  XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { ROLE_DEFINITIONS, PERMISSION_GROUPS, getRoleDefinition, hasPermission, type AdminRole as AdminRoleType } from '@/lib/permissions';
 
 export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
@@ -35,8 +40,9 @@ export default function SettingsPage() {
   const [admins, setAdmins] = useState<any[]>([]);
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [showAddAdmin, setShowAddAdmin] = useState(false);
-  const [newAdmin, setNewAdmin] = useState({ email: '', name: '', password: '', role: 'admin' });
+  const [newAdmin, setNewAdmin] = useState({ email: '', name: '', password: '', role: 'sales_rep' });
   const [timezonePreview, setTimezonePreview] = useState('');
+  const [showPermissions, setShowPermissions] = useState(false);
 
   // Change Password state
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -654,11 +660,73 @@ export default function SettingsPage() {
                       onChange={(e) => setNewAdmin({ ...newAdmin, role: e.target.value })}
                       className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
                     >
-                      <option value="viewer">Viewer</option>
-                      <option value="admin">Admin</option>
+                      <option value="sales_rep">Sales Representative</option>
+                      <option value="customer_support">Customer Support</option>
+                      <option value="developer">Developer</option>
                       <option value="super_admin">Super Admin</option>
                     </select>
                   </div>
+                </div>
+
+                {/* Role Permissions Info Panel */}
+                <div className="mt-3 border border-border rounded-lg overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setShowPermissions(!showPermissions)}
+                    className="w-full px-3 py-2 bg-muted/20 flex items-center justify-between hover:bg-muted/30 transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-3 w-3 text-muted-foreground" />
+                      <span className="text-xs font-medium text-foreground">
+                        {getRoleDefinition(newAdmin.role as AdminRoleType)?.name} Permissions
+                      </span>
+                    </div>
+                    {showPermissions ? (
+                      <ChevronUp className="h-3 w-3 text-muted-foreground" />
+                    ) : (
+                      <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                    )}
+                  </button>
+
+                  {showPermissions && (
+                    <div className="p-3 bg-background space-y-3 max-h-64 overflow-y-auto">
+                      <p className="text-[10px] text-muted-foreground mb-2">
+                        {getRoleDefinition(newAdmin.role as AdminRoleType)?.description}
+                      </p>
+                      {Object.entries(PERMISSION_GROUPS).map(([groupName, permissions]) => {
+                        const hasAnyInGroup = permissions.some(p =>
+                          hasPermission(newAdmin.role as AdminRoleType, p.permission)
+                        );
+
+                        if (!hasAnyInGroup) return null;
+
+                        return (
+                          <div key={groupName}>
+                            <h4 className="text-[10px] font-semibold text-foreground mb-1.5">{groupName}</h4>
+                            <div className="space-y-1">
+                              {permissions.map(({ permission, label }) => {
+                                const hasAccess = hasPermission(newAdmin.role as AdminRoleType, permission);
+                                return (
+                                  <div key={permission} className="flex items-center gap-1.5">
+                                    {hasAccess ? (
+                                      <CheckCircle2 className="h-3 w-3 text-emerald-400 flex-shrink-0" />
+                                    ) : (
+                                      <XCircle className="h-3 w-3 text-muted-foreground/30 flex-shrink-0" />
+                                    )}
+                                    <span className={`text-[10px] ${
+                                      hasAccess ? 'text-foreground' : 'text-muted-foreground/50'
+                                    }`}>
+                                      {label}
+                                    </span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
                 <div className="flex gap-2">
                   <Button
@@ -690,41 +758,39 @@ export default function SettingsPage() {
                   No admins found
                 </div>
               ) : (
-                admins.map((admin) => (
-                  <div
-                    key={admin.id}
-                    className="flex items-center justify-between p-3 bg-muted/30 rounded-lg"
-                  >
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-medium text-foreground">{admin.name}</h4>
-                        <Badge className={`text-[10px] ${
-                          admin.role === 'super_admin'
-                            ? 'bg-purple-500/20 text-purple-400 border-purple-500/30'
-                            : admin.role === 'admin'
-                            ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                            : 'bg-sky-500/20 text-sky-400 border-sky-500/30'
-                        }`}>
-                          {admin.role.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground">{admin.email}</p>
-                      {admin.lastLoginAt && (
-                        <p className="text-[10px] text-muted-foreground">
-                          Last login: {new Date(admin.lastLoginAt).toLocaleDateString()}
-                        </p>
-                      )}
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => handleDeleteAdmin(admin.id)}
-                      className="ml-2"
+                admins.map((admin) => {
+                  const roleDefinition = getRoleDefinition(admin.role as AdminRoleType);
+
+                  return (
+                    <div
+                      key={admin.id}
+                      className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors"
                     >
-                      <Trash2 className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ))
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <h4 className="text-xs font-medium text-foreground">{admin.name}</h4>
+                          <Badge className={`text-[10px] ${roleDefinition?.badgeClass || 'bg-gray-500/20 text-gray-400 border-gray-500/30'}`}>
+                            {roleDefinition?.name || admin.role.replace('_', ' ')}
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground">{admin.email}</p>
+                        {admin.lastLoginAt && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            Last login: {new Date(admin.lastLoginAt).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => handleDeleteAdmin(admin.id)}
+                        className="ml-2"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  );
+                })
               )}
             </div>
           </CardContent>

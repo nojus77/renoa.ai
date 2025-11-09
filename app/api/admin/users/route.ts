@@ -1,42 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { Resend } from 'resend';
 import { customAlphabet } from 'nanoid';
+import { requireAuth, requirePermission } from '@/lib/auth';
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Generate random password (12 characters, alphanumeric + special chars)
 const generatePassword = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*', 12);
 
-// Verify admin token and extract user info
-function verifyAdminToken(request: NextRequest) {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.substring(7);
-  try {
-    const decoded = jwt.verify(token, JWT_SECRET) as {
-      id: string;
-      email: string;
-      role: string;
-    };
-    return decoded;
-  } catch {
-    return null;
-  }
-}
-
 // GET - List all admins
 export async function GET(request: NextRequest) {
-  const admin = verifyAdminToken(request);
-  if (!admin) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const authResult = requirePermission(request, 'view_admins');
+  if (!authResult.authorized) {
+    return NextResponse.json(
+      { error: authResult.error.message },
+      { status: authResult.error.status }
+    );
   }
 
   try {
@@ -70,14 +52,12 @@ export async function GET(request: NextRequest) {
 
 // POST - Create new admin
 export async function POST(request: NextRequest) {
-  const admin = verifyAdminToken(request);
-  if (!admin) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Only super_admin can create new admins
-  if (admin.role !== 'super_admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const authResult = requirePermission(request, 'create_admins');
+  if (!authResult.authorized) {
+    return NextResponse.json(
+      { error: authResult.error.message },
+      { status: authResult.error.status }
+    );
   }
 
   try {
@@ -304,14 +284,12 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Remove admin
 export async function DELETE(request: NextRequest) {
-  const admin = verifyAdminToken(request);
-  if (!admin) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-
-  // Only super_admin can delete admins
-  if (admin.role !== 'super_admin') {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  const authResult = requirePermission(request, 'delete_admins');
+  if (!authResult.authorized) {
+    return NextResponse.json(
+      { error: authResult.error.message },
+      { status: authResult.error.status }
+    );
   }
 
   try {
@@ -326,7 +304,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     // Don't allow deleting yourself
-    if (id === admin.id) {
+    if (id === authResult.admin.id) {
       return NextResponse.json(
         { error: 'Cannot delete your own account' },
         { status: 400 }

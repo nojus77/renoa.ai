@@ -12,17 +12,26 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { User, LogOut, Shield } from 'lucide-react'
+import { hasPermission, type AdminRole, type Permission } from '@/lib/permissions'
 
-// Simple navigation items - we'll use text for now, add icons later
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard' },
-  { href: '/dashboard/leads', label: 'Leads' },
-  { href: '/dashboard/campaigns', label: 'Campaigns' },
-  { href: '/dashboard/providers', label: 'Providers' },
-  { href: '/dashboard/analytics', label: 'Analytics' },
+// Navigation items with permission requirements
+const navItems: Array<{
+  href: string;
+  label: string;
+  permission?: Permission;
+}> = [
+  { href: '/dashboard', label: 'Dashboard', permission: 'view_dashboard' },
+  { href: '/dashboard/leads', label: 'Leads', permission: 'view_leads' },
+  { href: '/dashboard/campaigns', label: 'Campaigns', permission: 'view_campaigns' },
+  { href: '/dashboard/providers', label: 'Providers', permission: 'view_providers' },
+  { href: '/dashboard/analytics', label: 'Analytics', permission: 'view_analytics' },
 ]
 
-const bottomNavItems = [
+const bottomNavItems: Array<{
+  href: string;
+  label: string;
+  permission?: Permission;
+}> = [
   { href: '/dashboard/settings', label: 'Settings' },
   { href: '/logout', label: 'Logout' },
 ]
@@ -158,42 +167,46 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
           {/* Navigation Items */}
           <nav className="flex-1 space-y-1">
-            {navItems.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted/50'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              )
-            })}
+            {navItems
+              .filter((item) => !item.permission || hasPermission(adminRole as AdminRole, item.permission))
+              .map((item) => {
+                const isActive = pathname === item.href
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-muted text-foreground'
+                        : 'text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                )
+              })}
           </nav>
 
           {/* Bottom Navigation */}
           <nav className="mt-auto space-y-1 pt-4 border-t border-border">
-            {bottomNavItems.map((item) => {
-              const isActive = pathname === item.href
-              return (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-muted text-foreground'
-                      : 'text-muted-foreground hover:bg-muted/50'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              )
-            })}
+            {bottomNavItems
+              .filter((item) => !item.permission || hasPermission(adminRole as AdminRole, item.permission))
+              .map((item) => {
+                const isActive = pathname === item.href
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    className={`flex items-center px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
+                      isActive
+                        ? 'bg-muted text-foreground'
+                        : 'text-muted-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    {item.label}
+                  </Link>
+                )
+              })}
           </nav>
         </div>
       </aside>
