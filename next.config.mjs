@@ -6,7 +6,7 @@ const nextConfig = {
     return [
       {
         source: '/blog/:path*',
-        destination: 'https://slategrey-weasel-593990.hostingersite.com/blog/:path*',
+        destination: 'https://blog.renoa.ai/blog/:path*',
       },
     ];
   },
