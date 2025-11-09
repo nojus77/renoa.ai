@@ -30,6 +30,11 @@ import {
   ChevronUp,
   CheckCircle2,
   XCircle,
+  Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ROLE_DEFINITIONS, PERMISSION_GROUPS, getRoleDefinition, hasPermission, type AdminRole as AdminRoleType } from '@/lib/permissions';
@@ -43,6 +48,9 @@ export default function SettingsPage() {
   const [newAdmin, setNewAdmin] = useState({ email: '', name: '', password: '', role: 'sales_rep' });
   const [timezonePreview, setTimezonePreview] = useState('');
   const [showPermissions, setShowPermissions] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortField, setSortField] = useState<'name' | 'role' | 'email' | 'lastLoginAt'>('name');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // Change Password state
   const [showChangePassword, setShowChangePassword] = useState(false);
@@ -279,6 +287,67 @@ export default function SettingsPage() {
       toast.error('Failed to save settings');
     } finally {
       setSaving(false);
+    }
+  };
+
+  // Helper function to format relative time
+  const formatRelativeTime = (date: string | null) => {
+    if (!date) return 'Never';
+
+    const now = new Date();
+    const loginDate = new Date(date);
+    const diffMs = now.getTime() - loginDate.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return loginDate.toLocaleDateString();
+  };
+
+  // Sort and filter admins
+  const getSortedAndFilteredAdmins = () => {
+    let filtered = admins.filter(admin =>
+      admin.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      admin.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      admin.role.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    filtered.sort((a, b) => {
+      let aVal = a[sortField];
+      let bVal = b[sortField];
+
+      // Handle null values for lastLoginAt
+      if (sortField === 'lastLoginAt') {
+        if (!aVal) return 1;
+        if (!bVal) return -1;
+        aVal = new Date(aVal).getTime();
+        bVal = new Date(bVal).getTime();
+      }
+
+      if (typeof aVal === 'string') {
+        aVal = aVal.toLowerCase();
+        bVal = bVal.toLowerCase();
+      }
+
+      if (sortDirection === 'asc') {
+        return aVal > bVal ? 1 : -1;
+      } else {
+        return aVal < bVal ? 1 : -1;
+      }
+    });
+
+    return filtered;
+  };
+
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
     }
   };
 
@@ -748,49 +817,160 @@ export default function SettingsPage() {
               </div>
             )}
 
+            {/* Search Bar */}
+            {!showAddAdmin && admins.length > 0 && (
+              <div className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search by name, email, or role..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-10 pr-4 py-2 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Team Overview Table */}
             <div className="space-y-2">
               {loadingAdmins ? (
-                <div className="text-center py-4 text-muted-foreground text-xs">
-                  Loading admins...
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto mb-2" />
+                  Loading team members...
                 </div>
               ) : admins.length === 0 ? (
-                <div className="text-center py-4 text-muted-foreground text-xs">
-                  No admins found
+                <div className="text-center py-8 text-muted-foreground text-sm">
+                  No team members found. Click "Add Admin" to invite your first team member.
                 </div>
               ) : (
-                admins.map((admin) => {
-                  const roleDefinition = getRoleDefinition(admin.role as AdminRoleType);
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-3 px-4">
+                          <button
+                            onClick={() => handleSort('name')}
+                            className="flex items-center gap-1 text-xs font-semibold text-foreground hover:text-emerald-400 transition-colors"
+                          >
+                            Name
+                            {sortField === 'name' && (
+                              sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                            )}
+                            {sortField !== 'name' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                          </button>
+                        </th>
+                        <th className="text-left py-3 px-4">
+                          <button
+                            onClick={() => handleSort('role')}
+                            className="flex items-center gap-1 text-xs font-semibold text-foreground hover:text-emerald-400 transition-colors"
+                          >
+                            Role
+                            {sortField === 'role' && (
+                              sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                            )}
+                            {sortField !== 'role' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                          </button>
+                        </th>
+                        <th className="text-left py-3 px-4">
+                          <button
+                            onClick={() => handleSort('email')}
+                            className="flex items-center gap-1 text-xs font-semibold text-foreground hover:text-emerald-400 transition-colors"
+                          >
+                            Email
+                            {sortField === 'email' && (
+                              sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                            )}
+                            {sortField !== 'email' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                          </button>
+                        </th>
+                        <th className="text-left py-3 px-4">
+                          <button
+                            onClick={() => handleSort('lastLoginAt')}
+                            className="flex items-center gap-1 text-xs font-semibold text-foreground hover:text-emerald-400 transition-colors"
+                          >
+                            Last Login
+                            {sortField === 'lastLoginAt' && (
+                              sortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                            )}
+                            {sortField !== 'lastLoginAt' && <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                          </button>
+                        </th>
+                        <th className="text-center py-3 px-4">
+                          <div className="flex items-center justify-center gap-1 text-xs font-semibold text-foreground">
+                            <Clock className="h-3 w-3" />
+                            Active Time
+                          </div>
+                        </th>
+                        <th className="text-center py-3 px-4">
+                          <div className="text-xs font-semibold text-foreground">
+                            Status
+                          </div>
+                        </th>
+                        <th className="text-center py-3 px-4">
+                          <div className="text-xs font-semibold text-foreground">
+                            Actions
+                          </div>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {getSortedAndFilteredAdmins().map((admin) => {
+                        const roleDefinition = getRoleDefinition(admin.role as AdminRoleType);
+                        const isActive = admin.lastLoginAt &&
+                          (new Date().getTime() - new Date(admin.lastLoginAt).getTime()) < 86400000; // Active if logged in within 24h
 
-                  return (
-                    <div
-                      key={admin.id}
-                      className="flex items-center justify-between p-3 bg-muted/30 rounded-lg hover:bg-muted/40 transition-colors"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="text-xs font-medium text-foreground">{admin.name}</h4>
-                          <Badge className={`text-[10px] ${roleDefinition?.badgeClass || 'bg-gray-500/20 text-gray-400 border-gray-500/30'}`}>
-                            {roleDefinition?.name || admin.role.replace('_', ' ')}
-                          </Badge>
-                        </div>
-                        <p className="text-[10px] text-muted-foreground">{admin.email}</p>
-                        {admin.lastLoginAt && (
-                          <p className="text-[10px] text-muted-foreground mt-0.5">
-                            Last login: {new Date(admin.lastLoginAt).toLocaleDateString()}
-                          </p>
-                        )}
-                      </div>
-                      <Button
-                        size="sm"
-                        variant="destructive"
-                        onClick={() => handleDeleteAdmin(admin.id)}
-                        className="ml-2"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
+                        return (
+                          <tr key={admin.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+                            <td className="py-3 px-4">
+                              <div className="text-xs font-medium text-foreground">{admin.name}</div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <Badge className={`text-[10px] ${roleDefinition?.badgeClass || 'bg-gray-500/20 text-gray-400 border-gray-500/30'}`}>
+                                {roleDefinition?.name || admin.role.replace('_', ' ')}
+                              </Badge>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="text-xs text-muted-foreground">{admin.email}</div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="text-xs text-muted-foreground">{formatRelativeTime(admin.lastLoginAt)}</div>
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <div className="text-xs text-muted-foreground/50">—</div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center justify-center gap-1.5">
+                                <div className={`h-2 w-2 rounded-full ${isActive ? 'bg-emerald-400' : 'bg-gray-400/50'}`} />
+                                <span className="text-xs text-muted-foreground">{isActive ? 'Active' : 'Inactive'}</span>
+                              </div>
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex items-center justify-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => handleDeleteAdmin(admin.id)}
+                                  className="h-7 px-2"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+
+                  {/* No results message */}
+                  {getSortedAndFilteredAdmins().length === 0 && (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      No team members found matching &quot;{searchQuery}&quot;
                     </div>
-                  );
-                })
+                  )}
+                </div>
               )}
             </div>
           </CardContent>

@@ -112,15 +112,12 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       const now = new Date()
       const formatter = new Intl.DateTimeFormat('en-US', {
         timeZone: 'America/Chicago',
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
         hour: 'numeric',
         minute: '2-digit',
         hour12: true,
       })
 
-      const formattedTime = formatter.format(now).replace(',', ' •')
+      const formattedTime = formatter.format(now)
       setCurrentTime(`${formattedTime} CT`)
     }
 
@@ -214,9 +211,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
       {/* Main Content */}
       <div className={`p-4 ${sidebarOpen ? 'ml-64' : ''} transition-all duration-200`}>
         {/* Header bar with Clock, User Menu and Theme Toggle */}
-        <div className="flex items-center justify-end gap-3 mb-4">
+        <div className="flex items-center justify-end gap-4 mb-4">
           {/* Real-time Clock */}
-          <div className="text-sm text-muted-foreground font-medium">
+          <div className="text-base text-foreground font-semibold tracking-wide">
             {currentTime}
           </div>
 
