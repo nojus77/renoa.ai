@@ -6,7 +6,7 @@ const nextConfig = {
     return [
       {
         source: '/blog/:path*',
-        destination: 'http://195.179.239.120/blog/:path*',
+        destination: 'https://slategrey-weasel-593990.hostingersite.com/blog/:path*',
       },
     ];
   },
