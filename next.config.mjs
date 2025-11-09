@@ -6,7 +6,7 @@ const nextConfig = {
     return [
       {
         source: '/blog/:path*',
-        destination: 'https://195.179.239.120/blog/:path*',
+        destination: 'http://195.179.239.120/blog/:path*',
       },
     ];
   },
