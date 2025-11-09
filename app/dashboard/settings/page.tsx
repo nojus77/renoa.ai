@@ -5,6 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
   Settings,
   User,
   Bell,
@@ -28,6 +36,15 @@ export default function SettingsPage() {
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [showAddAdmin, setShowAddAdmin] = useState(false);
   const [newAdmin, setNewAdmin] = useState({ email: '', name: '', password: '', role: 'admin' });
+
+  // Change Password state
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
 
   const [settings, setSettings] = useState({
     // Profile Settings
@@ -144,6 +161,55 @@ export default function SettingsPage() {
       fetchAdmins();
     } catch (error) {
       toast.error('Failed to delete admin');
+    }
+  };
+
+  const handleChangePassword = async () => {
+    // Validate passwords
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      toast.error('Please fill in all password fields');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      toast.error('New password must be at least 8 characters long');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const token = localStorage.getItem('adminToken');
+      const response = await fetch('/api/admin/change-password', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        toast.error(data.error || 'Failed to change password');
+        return;
+      }
+
+      toast.success('Password changed successfully');
+      setShowChangePassword(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      toast.error('Failed to change password');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -373,7 +439,12 @@ export default function SettingsPage() {
                 className="w-full px-2 py-1.5 text-sm bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-rose-500"
               />
             </div>
-            <Button variant="outline" size="sm" className="w-full border-border">
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full border-border"
+              onClick={() => setShowChangePassword(true)}
+            >
               <Key className="h-3 w-3 mr-2" />
               Change Password
             </Button>
@@ -612,6 +683,88 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Change Password Dialog */}
+      <Dialog open={showChangePassword} onOpenChange={setShowChangePassword}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground flex items-center gap-2">
+              <Key className="h-5 w-5 text-emerald-400" />
+              Change Password
+            </DialogTitle>
+            <DialogDescription className="text-muted-foreground">
+              Enter your current password and choose a new password.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">
+                Current Password
+              </label>
+              <input
+                type="password"
+                value={passwordData.currentPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Enter current password"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">
+                New Password
+              </label>
+              <input
+                type="password"
+                value={passwordData.newPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Enter new password (min 8 characters)"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-2">
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                value={passwordData.confirmPassword}
+                onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                className="w-full px-3 py-2 bg-background border border-border rounded-lg text-foreground focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                placeholder="Confirm new password"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowChangePassword(false);
+                setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+              }}
+              className="border-border"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={changingPassword}
+              className="bg-emerald-600 hover:bg-emerald-500"
+            >
+              {changingPassword ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2" />
+                  Changing...
+                </>
+              ) : (
+                <>
+                  <Key className="h-4 w-4 mr-2" />
+                  Change Password
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
