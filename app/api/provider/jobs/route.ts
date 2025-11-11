@@ -8,48 +8,71 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       providerId,
+      customerId,
       customerName,
       customerEmail,
       customerPhone,
       customerAddress,
       serviceType,
       startTime,
-      endTime,
+      duration = 2, // Duration in hours, default 2
       estimatedValue,
       internalNotes,
       customerNotes,
-      status,
+      status = 'scheduled',
     } = body;
 
-    if (!providerId || !customerName || !customerEmail || !customerPhone || !serviceType || !startTime) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!providerId || !serviceType || !startTime) {
+      return NextResponse.json({ error: 'Missing required fields: providerId, serviceType, startTime' }, { status: 400 });
     }
 
-    // Create new lead for "own client" job
-    const lead = await prisma.lead.create({
+    let finalCustomerId = customerId;
+
+    // If no customerId provided, create a new customer
+    if (!customerId) {
+      if (!customerName || !customerPhone) {
+        return NextResponse.json({ error: 'customerName and customerPhone required for new customer' }, { status: 400 });
+      }
+
+      const newCustomer = await prisma.customer.create({
+        data: {
+          providerId,
+          name: customerName,
+          email: customerEmail || null,
+          phone: customerPhone,
+          address: customerAddress || '',
+          source: 'own', // Provider manually added this customer
+        },
+      });
+
+      finalCustomerId = newCustomer.id;
+    }
+
+    // Calculate endTime from startTime + duration
+    const startDate = new Date(startTime);
+    const endDate = new Date(startDate.getTime() + duration * 60 * 60 * 1000);
+
+    // Create the job
+    const job = await prisma.job.create({
       data: {
-        assignedProviderId: providerId,
-        firstName: customerName.split(' ')[0],
-        lastName: customerName.split(' ').slice(1).join(' ') || customerName.split(' ')[0],
-        email: customerEmail,
-        phone: customerPhone,
+        providerId,
+        customerId: finalCustomerId,
+        serviceType,
         address: customerAddress || '',
-        city: '',
-        state: '',
-        zip: '',
-        propertyType: 'single_family',
-        serviceInterest: serviceType.toUpperCase().replace(/ /g, '_'),
-        providerProposedDate: startTime,
-        status: status || 'scheduled',
-        schedulingStatus: 'confirmed',
-        leadSource: 'provider_manual',
-        tier: 1,
-        contractValue: estimatedValue ? parseFloat(estimatedValue) : null,
-        notes: internalNotes || null,
+        startTime: startDate,
+        endTime: endDate,
+        status,
+        source: 'own', // Provider manually created this job
+        estimatedValue: estimatedValue ? parseFloat(estimatedValue) : null,
+        internalNotes: internalNotes || null,
+        customerNotes: customerNotes || null,
+      },
+      include: {
+        customer: true, // Include customer data in response
       },
     });
 
-    return NextResponse.json({ success: true, job: lead });
+    return NextResponse.json({ success: true, job });
   } catch (error) {
     console.error('Error creating job:', error);
     return NextResponse.json(
@@ -68,58 +91,44 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Provider ID required' }, { status: 400 });
     }
 
-    // Fetch all jobs for this provider (confirmed appointments + own clients)
-    const leads = await prisma.lead.findMany({
+    // Fetch all jobs for this provider using the Job model
+    const jobs = await prisma.job.findMany({
       where: {
-        assignedProviderId: providerId,
-        schedulingStatus: 'confirmed',
-        providerProposedDate: { not: null }
+        providerId,
       },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        address: true,
-        city: true,
-        state: true,
-        zip: true,
-        serviceInterest: true,
-        providerProposedDate: true,
-        status: true,
-        leadSource: true,
-        createdAt: true,
-        contractValue: true,
-        notes: true,
+      include: {
+        customer: true, // Include customer details
+        photos: true,   // Include job photos
       },
       orderBy: {
-        providerProposedDate: 'asc'
-      }
+        startTime: 'asc',
+      },
     });
 
-    // Transform to job format
-    const jobs = leads.map(lead => ({
-      id: lead.id,
-      customerName: `${lead.firstName} ${lead.lastName}`,
-      serviceType: lead.serviceInterest,
-      startTime: lead.providerProposedDate,
-      // Default 2-hour duration
-      endTime: lead.providerProposedDate
-        ? new Date(new Date(lead.providerProposedDate).getTime() + 2 * 60 * 60 * 1000).toISOString()
-        : null,
-      status: lead.status || 'scheduled', // scheduled, in_progress, completed, cancelled
-      isRenoaLead: lead.leadSource === 'landing_page_hero' || lead.leadSource?.includes('renoa'),
-      phone: lead.phone,
-      email: lead.email,
-      address: `${lead.address}, ${lead.city}, ${lead.state} ${lead.zip}`,
-      createdAt: lead.createdAt,
-      estimatedValue: lead.contractValue,
-      actualValue: lead.contractValue, // Can be updated later
-      notes: lead.notes,
+    // Transform to include customer name and other fields for frontend
+    const transformedJobs = jobs.map(job => ({
+      id: job.id,
+      customerName: job.customer.name,
+      customerEmail: job.customer.email,
+      customerPhone: job.customer.phone,
+      serviceType: job.serviceType,
+      address: job.address,
+      startTime: job.startTime,
+      endTime: job.endTime,
+      status: job.status,
+      source: job.source,
+      isRenoaLead: job.source === 'renoa',
+      estimatedValue: job.estimatedValue,
+      actualValue: job.actualValue,
+      internalNotes: job.internalNotes,
+      customerNotes: job.customerNotes,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      customer: job.customer,
+      photos: job.photos,
     }));
 
-    return NextResponse.json({ jobs });
+    return NextResponse.json({ jobs: transformedJobs });
   } catch (error) {
     console.error('Error fetching provider jobs:', error);
     return NextResponse.json(

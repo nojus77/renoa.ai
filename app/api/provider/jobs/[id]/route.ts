@@ -9,17 +9,16 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const job = await prisma.lead.findUnique({
+    const job = await prisma.job.findUnique({
       where: { id: params.id },
       include: {
-        invoices: {
+        customer: true,
+        photos: true,
+        provider: {
           select: {
-            id: true,
-            invoiceNumber: true,
-            status: true,
-            total: true,
-            amountPaid: true,
-            dueDate: true,
+            businessName: true,
+            phone: true,
+            email: true,
           },
         },
       },
@@ -29,24 +28,31 @@ export async function GET(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    return NextResponse.json({
-      success: true,
-      job: {
-        id: job.id,
-        customerName: `${job.firstName} ${job.lastName}`,
-        customerEmail: job.email,
-        customerPhone: job.phone,
-        address: `${job.address}, ${job.city}, ${job.state} ${job.zip}`,
-        serviceType: job.serviceInterest,
-        startTime: job.providerProposedDate,
-        status: job.status,
-        contractValue: job.contractValue,
-        notes: job.notes,
-        leadSource: job.leadSource,
-        createdAt: job.createdAt,
-        invoices: job.invoices,
-      },
-    });
+    // Transform to include customer details
+    const transformedJob = {
+      id: job.id,
+      customerName: job.customer.name,
+      customerEmail: job.customer.email,
+      customerPhone: job.customer.phone,
+      customerAddress: job.address,
+      serviceType: job.serviceType,
+      startTime: job.startTime,
+      endTime: job.endTime,
+      status: job.status,
+      source: job.source,
+      isRenoaLead: job.source === 'renoa',
+      estimatedValue: job.estimatedValue,
+      actualValue: job.actualValue,
+      internalNotes: job.internalNotes,
+      customerNotes: job.customerNotes,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      customer: job.customer,
+      photos: job.photos,
+      provider: job.provider,
+    };
+
+    return NextResponse.json({ success: true, job: transformedJob });
   } catch (error) {
     console.error('Error fetching job:', error);
     return NextResponse.json(
@@ -63,34 +69,40 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { status, actualValue, notes, customerNotes } = body;
+    const {
+      serviceType,
+      address,
+      startTime,
+      endTime,
+      status,
+      estimatedValue,
+      actualValue,
+      internalNotes,
+      customerNotes,
+    } = body;
 
-    // Build update data object
     const updateData: any = {};
 
-    if (status !== undefined) {
-      updateData.status = status;
-    }
+    if (serviceType !== undefined) updateData.serviceType = serviceType;
+    if (address !== undefined) updateData.address = address;
+    if (startTime !== undefined) updateData.startTime = new Date(startTime);
+    if (endTime !== undefined) updateData.endTime = new Date(endTime);
+    if (status !== undefined) updateData.status = status;
+    if (estimatedValue !== undefined) updateData.estimatedValue = estimatedValue ? parseFloat(estimatedValue) : null;
+    if (actualValue !== undefined) updateData.actualValue = actualValue ? parseFloat(actualValue) : null;
+    if (internalNotes !== undefined) updateData.internalNotes = internalNotes;
+    if (customerNotes !== undefined) updateData.customerNotes = customerNotes;
 
-    if (actualValue !== undefined) {
-      updateData.contractValue = actualValue;
-    }
-
-    if (notes !== undefined) {
-      updateData.notes = notes;
-    }
-
-    if (customerNotes !== undefined) {
-      updateData.customerNotes = customerNotes;
-    }
-
-    // Update the lead
-    const updatedLead = await prisma.lead.update({
+    const job = await prisma.job.update({
       where: { id: params.id },
       data: updateData,
+      include: {
+        customer: true,
+        photos: true,
+      },
     });
 
-    return NextResponse.json({ success: true, job: updatedLead });
+    return NextResponse.json({ success: true, job });
   } catch (error) {
     console.error('Error updating job:', error);
     return NextResponse.json(
@@ -106,11 +118,11 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    await prisma.lead.delete({
+    await prisma.job.delete({
       where: { id: params.id },
     });
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, message: 'Job deleted successfully' });
   } catch (error) {
     console.error('Error deleting job:', error);
     return NextResponse.json(

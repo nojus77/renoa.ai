@@ -35,6 +35,8 @@ export default function AddJobModal({
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   // New customer fields
   const [newCustomer, setNewCustomer] = useState({
@@ -99,12 +101,31 @@ export default function AddJobModal({
 
   // Load customers when searching
   useEffect(() => {
-    if (searchQuery.length >= 2) {
-      // TODO: Fetch customers from API
-      // For now, empty array
-      setCustomers([]);
-    }
-  }, [searchQuery]);
+    const fetchCustomers = async () => {
+      if (searchQuery.length >= 2) {
+        setSearching(true);
+        try {
+          const response = await fetch(`/api/provider/customers/search?q=${encodeURIComponent(searchQuery)}&providerId=${providerId}`);
+          const data = await response.json();
+          if (response.ok) {
+            setCustomers(data.customers || []);
+            setShowDropdown(true);
+          }
+        } catch (error) {
+          console.error('Error searching customers:', error);
+          setCustomers([]);
+        } finally {
+          setSearching(false);
+        }
+      } else {
+        setCustomers([]);
+        setShowDropdown(false);
+      }
+    };
+
+    const timeoutId = setTimeout(fetchCustomers, 300); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery, providerId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,8 +137,8 @@ export default function AddJobModal({
     }
 
     if (showNewCustomerForm) {
-      if (!newCustomer.name || !newCustomer.phone || !newCustomer.email || !newCustomer.address) {
-        toast.error('Please fill in all required customer fields');
+      if (!newCustomer.name || !newCustomer.phone) {
+        toast.error('Please fill in customer name and phone number');
         return;
       }
     }
@@ -238,21 +259,81 @@ export default function AddJobModal({
                     <input
                       type="text"
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      placeholder="Search for existing customer..."
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        if (!selectedCustomer) setShowDropdown(true);
+                      }}
+                      onFocus={() => {
+                        if (searchQuery.length >= 2 && customers.length > 0) {
+                          setShowDropdown(true);
+                        }
+                      }}
+                      placeholder="Search for existing customer by name, phone, or email..."
                       className="w-full pl-10 pr-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      disabled={!!selectedCustomer}
                     />
+
+                    {/* Dropdown with search results */}
+                    {showDropdown && !selectedCustomer && searchQuery.length >= 2 && (
+                      <div className="absolute z-10 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                        {searching ? (
+                          <div className="p-4 text-center text-sm text-zinc-400">
+                            Searching...
+                          </div>
+                        ) : customers.length > 0 ? (
+                          <>
+                            {customers.map((customer) => (
+                              <button
+                                key={customer.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedCustomer(customer);
+                                  setSearchQuery(customer.name);
+                                  setShowDropdown(false);
+                                }}
+                                className="w-full text-left px-4 py-3 hover:bg-zinc-700 border-b border-zinc-700/50 last:border-b-0 transition-colors"
+                              >
+                                <p className="text-sm font-medium text-zinc-100">{customer.name}</p>
+                                <p className="text-xs text-zinc-400 mt-0.5">
+                                  {customer.phone} {customer.email && `• ${customer.email}`}
+                                </p>
+                              </button>
+                            ))}
+                          </>
+                        ) : (
+                          <div className="p-4 text-center">
+                            <p className="text-sm text-zinc-400 mb-2">No customers found</p>
+                            <Button
+                              type="button"
+                              onClick={() => {
+                                setShowNewCustomerForm(true);
+                                setShowDropdown(false);
+                              }}
+                              variant="outline"
+                              size="sm"
+                              className="border-zinc-700"
+                            >
+                              <Plus className="h-3 w-3 mr-1" />
+                              Add New Customer
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {selectedCustomer && (
                     <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg flex items-center justify-between">
                       <div>
                         <p className="text-sm font-medium text-emerald-400">{selectedCustomer.name}</p>
-                        <p className="text-xs text-zinc-400">{selectedCustomer.email} • {selectedCustomer.phone}</p>
+                        <p className="text-xs text-zinc-400">{selectedCustomer.phone} {selectedCustomer.email && `• ${selectedCustomer.email}`}</p>
                       </div>
                       <Button
                         type="button"
-                        onClick={() => setSelectedCustomer(null)}
+                        onClick={() => {
+                          setSelectedCustomer(null);
+                          setSearchQuery('');
+                        }}
                         variant="ghost"
                         size="sm"
                         className="text-zinc-400 hover:text-zinc-100"

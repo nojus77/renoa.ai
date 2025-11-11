@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
@@ -26,56 +26,56 @@ model User {
 }
 
 model Lead {
-  id                    String             @id @default(uuid())
-  firstName             String             @map("first_name")
-  lastName              String             @map("last_name")
-  email                 String
-  phone                 String
-  address               String
-  city                  String
-  state                 String
-  zip                   String             // ✅ Just this one, no zipCode!
-  propertyType          PropertyType       @map("property_type")
-  propertyValue         Decimal?           @map("property_value")
-  contractValue         Decimal?           @map("contract_value")
-  squareFootage         Int?               @map("square_footage")
-  moveInDate            DateTime?          @map("move_in_date")
-  serviceInterest       ServiceCategory    @map("service_interest")
-  leadSource            String             @map("lead_source")
-  leadScore             Int                @default(0) @map("lead_score")
-  tier                  Int
-  campaign              String?
-  contactCount          Int                @default(0) @map("contact_count")
-  urgencyScore          Int?
-  propertyScore         Int?
-  financialScore        Int?
-  demographicScore      Int?
-  marketScore           Int?
-  urgencyReasons        String?            @map("urgency_reasons")
-  status                LeadStatus         @default(new)
-  notes                 String?
-  aiTool1Metadata       Json?              @map("ai_tool_1_metadata")
-  
+  id               String          @id @default(uuid())
+  firstName        String          @map("first_name")
+  lastName         String          @map("last_name")
+  email            String
+  phone            String
+  address          String
+  city             String
+  state            String
+  zip              String // ✅ Just this one, no zipCode!
+  propertyType     PropertyType    @map("property_type")
+  propertyValue    Decimal?        @map("property_value")
+  contractValue    Decimal?        @map("contract_value")
+  squareFootage    Int?            @map("square_footage")
+  moveInDate       DateTime?       @map("move_in_date")
+  serviceInterest  ServiceCategory @map("service_interest")
+  leadSource       String          @map("lead_source")
+  leadScore        Int             @default(0) @map("lead_score")
+  tier             Int
+  campaign         String?
+  contactCount     Int             @default(0) @map("contact_count")
+  urgencyScore     Int?
+  propertyScore    Int?
+  financialScore   Int?
+  demographicScore Int?
+  marketScore      Int?
+  urgencyReasons   String?         @map("urgency_reasons")
+  status           LeadStatus      @default(new)
+  notes            String?
+  aiTool1Metadata  Json?           @map("ai_tool_1_metadata")
+
   // Scheduling fields
-  customerPreferredDate DateTime?          @map("customer_preferred_date")
-  providerProposedDate  DateTime?          @map("provider_proposed_date")
-  schedulingStatus      String?            @map("scheduling_status")
-  schedulingNotes       String?            @map("scheduling_notes")
-  
-  createdAt             DateTime           @default(now()) @map("created_at")
-  updatedAt             DateTime           @updatedAt @map("updated_at")
-  assignedProviderId    String?            @map("assigned_provider_id")
-  
+  customerPreferredDate DateTime? @map("customer_preferred_date")
+  providerProposedDate  DateTime? @map("provider_proposed_date")
+  schedulingStatus      String?   @map("scheduling_status")
+  schedulingNotes       String?   @map("scheduling_notes")
+
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  assignedProviderId String?  @map("assigned_provider_id")
+
   // Relations
-  campaignLeads         CampaignLead[]     @relation("CampaignLeadRelation")
-  inboundMessages       InboundMessage[]   @relation("LeadInboundMessages")
-  messages              Message[]          @relation("LeadMessages")
-  emailLogs             EmailLog[]         @relation("LeadEmailLogs")
-  engagementMetrics     EngagementMetric[] @relation("LeadEngagementMetrics")
-  assignedProvider      Provider?          @relation("AssignedProviderLeads", fields: [assignedProviderId], references: [id])
-  matches               Match[]            @relation("LeadMatches")
-  providerNotes         LeadNote[]         @relation("LeadNotes")
-  invoices              Invoice[]          @relation("CustomerInvoices")
+  campaignLeads     CampaignLead[]     @relation("CampaignLeadRelation")
+  inboundMessages   InboundMessage[]   @relation("LeadInboundMessages")
+  messages          Message[]          @relation("LeadMessages")
+  emailLogs         EmailLog[]         @relation("LeadEmailLogs")
+  engagementMetrics EngagementMetric[] @relation("LeadEngagementMetrics")
+  assignedProvider  Provider?          @relation("AssignedProviderLeads", fields: [assignedProviderId], references: [id])
+  matches           Match[]            @relation("LeadMatches")
+  providerNotes     LeadNote[]         @relation("LeadNotes")
+  invoices          Invoice[]          @relation("CustomerInvoices")
 
   @@index([email])
   @@index([zip])
@@ -372,58 +372,124 @@ model CampaignLead {
 }
 
 model Provider {
-  id               String     @id @default(uuid())
+  id               String   @id @default(uuid())
   businessName     String
   ownerName        String
-  email            String     @unique
+  email            String   @unique
   phone            String
-  serviceTypes     String[]   @default([])           // ✅ Default empty array
-  serviceAreas     String[]   @default([])           // ✅ Default empty array
-  yearsInBusiness  Int        @default(0)            // ✅ Default 0
-  status           String     @default("active")     // ✅ Default "active"
-  leadCapacity     Int        @default(10)           // ✅ Default 10
-  currentLeadCount Int        @default(0)
-  rating           Float      @default(4.5)          // ✅ Better default
-  totalLeadsSent   Int        @default(0)
-  leadsAccepted    Int        @default(0)
-  leadsConverted   Int        @default(0)
-  totalRevenue     Float      @default(0)
-  commissionRate   Float      @default(0.15)
-  averageJobValue  Float      @default(5000)         // ✅ Better default
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
-  lastActivityAt   DateTime   @default(now())
+  serviceTypes     String[] @default([]) // ✅ Default empty array
+  serviceAreas     String[] @default([]) // ✅ Default empty array
+  yearsInBusiness  Int      @default(0) // ✅ Default 0
+  status           String   @default("active") // ✅ Default "active"
+  leadCapacity     Int      @default(10) // ✅ Default 10
+  currentLeadCount Int      @default(0)
+  rating           Float    @default(4.5) // ✅ Better default
+  totalLeadsSent   Int      @default(0)
+  leadsAccepted    Int      @default(0)
+  leadsConverted   Int      @default(0)
+  totalRevenue     Float    @default(0)
+  commissionRate   Float    @default(0.15)
+  averageJobValue  Float    @default(5000) // ✅ Better default
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastActivityAt   DateTime @default(now())
 
   // Availability fields
-  workingHours     Json?
-  timeZone         String     @default("America/Chicago")
-  bufferTime       Int        @default(30)
-  advanceBooking   Int        @default(14)
+  workingHours      Json?
+  timeZone          String  @default("America/Chicago")
+  bufferTime        Int     @default(30)
+  advanceBooking    Int     @default(14)
   availabilityNotes String?
 
-  leads            Lead[]        @relation("AssignedProviderLeads")
-  leadNotes        LeadNote[]    @relation("ProviderNotes")
-  blockedTimes     BlockedTime[] @relation("ProviderBlockedTimes")
-  invoices         Invoice[]     @relation("ProviderInvoices")
+  leads        Lead[]        @relation("AssignedProviderLeads")
+  leadNotes    LeadNote[]    @relation("ProviderNotes")
+  blockedTimes BlockedTime[] @relation("ProviderBlockedTimes")
+  invoices     Invoice[]     @relation("ProviderInvoices")
+  jobs         Job[]         @relation("ProviderJobs")
+  customers    Customer[]    @relation("ProviderCustomers")
+}
+
+model Customer {
+  id         String   @id @default(cuid())
+  providerId String   @map("provider_id")
+  name       String
+  email      String?
+  phone      String
+  address    String
+  source     String   @default("own") // "renoa" or "own"
+  tags       String[] @default([]) // ["Premium", "HOA", "Recurring", etc]
+  notes      String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  provider Provider @relation("ProviderCustomers", fields: [providerId], references: [id], onDelete: Cascade)
+  jobs     Job[]    @relation("CustomerJobs")
+
+  @@index([providerId])
+  @@index([phone])
+  @@map("customers")
+}
+
+model Job {
+  id             String   @id @default(cuid())
+  providerId     String   @map("provider_id")
+  customerId     String   @map("customer_id")
+  serviceType    String   @map("service_type") // "Lawn Mowing", "Landscaping", etc
+  address        String
+  startTime      DateTime @map("start_time")
+  endTime        DateTime @map("end_time")
+  status         String   @default("scheduled") // "scheduled", "in_progress", "completed", "cancelled"
+  source         String   @default("own") // "renoa" or "own"
+  estimatedValue Float?   @map("estimated_value")
+  actualValue    Float?   @map("actual_value")
+  internalNotes  String?  @map("internal_notes") @db.Text
+  customerNotes  String?  @map("customer_notes") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  provider Provider   @relation("ProviderJobs", fields: [providerId], references: [id], onDelete: Cascade)
+  customer Customer   @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
+  photos   JobPhoto[] @relation("JobPhotos")
+
+  @@index([providerId])
+  @@index([customerId])
+  @@index([startTime])
+  @@map("jobs")
+}
+
+model JobPhoto {
+  id        String   @id @default(cuid())
+  jobId     String   @map("job_id")
+  type      String // "before", "during", "after"
+  url       String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  job Job @relation("JobPhotos", fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("job_photos")
 }
 
 model BlockedTime {
-  id                    String    @id @default(uuid())
-  providerId            String    @map("provider_id")
-  fromDate              DateTime  @map("from_date")
-  toDate                DateTime  @map("to_date")
-  startTime             String?   @map("start_time")
-  endTime               String?   @map("end_time")
-  reason                String
-  notes                 String?   @db.Text
-  isRecurring           Boolean   @default(false) @map("is_recurring")
-  recurringType         String?   @map("recurring_type")         // 'weekly' or 'monthly'
-  recurringDaysOfWeek   Int[]     @default([]) @map("recurring_days_of_week") // [0-6] Sunday-Saturday
-  recurringEndsType     String?   @map("recurring_ends_type")    // 'never', 'after', 'on'
-  recurringOccurrences  Int?      @map("recurring_occurrences")
-  recurringEndsOnDate   DateTime? @map("recurring_ends_on_date")
-  createdAt             DateTime  @default(now()) @map("created_at")
-  updatedAt             DateTime  @updatedAt @map("updated_at")
+  id                   String    @id @default(uuid())
+  providerId           String    @map("provider_id")
+  fromDate             DateTime  @map("from_date")
+  toDate               DateTime  @map("to_date")
+  startTime            String?   @map("start_time")
+  endTime              String?   @map("end_time")
+  reason               String
+  notes                String?   @db.Text
+  isRecurring          Boolean   @default(false) @map("is_recurring")
+  recurringType        String?   @map("recurring_type") // 'weekly' or 'monthly'
+  recurringDaysOfWeek  Int[]     @default([]) @map("recurring_days_of_week") // [0-6] Sunday-Saturday
+  recurringEndsType    String?   @map("recurring_ends_type") // 'never', 'after', 'on'
+  recurringOccurrences Int?      @map("recurring_occurrences")
+  recurringEndsOnDate  DateTime? @map("recurring_ends_on_date")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
 
   provider Provider @relation("ProviderBlockedTimes", fields: [providerId], references: [id], onDelete: Cascade)
 
@@ -434,15 +500,15 @@ model BlockedTime {
 }
 
 model Admin {
-  id                String    @id @default(uuid())
-  email             String    @unique
-  hashedPassword    String    @map("hashed_password")
-  name              String
-  role              AdminRole @default(sales_rep)
-  mustChangePassword Boolean  @default(false) @map("must_change_password")
-  lastLoginAt       DateTime? @map("last_login_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  hashedPassword     String    @map("hashed_password")
+  name               String
+  role               AdminRole @default(sales_rep)
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
 
   @@index([email])
   @@map("admins")
@@ -589,46 +655,46 @@ enum AdminRole {
 }
 
 model Invoice {
-  id                String            @id @default(uuid())
-  invoiceNumber     String            @unique @map("invoice_number")
-  providerId        String            @map("provider_id")
-  customerId        String            @map("customer_id")
-  jobId             String?           @map("job_id")
-  status            InvoiceStatus     @default(draft)
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique @map("invoice_number")
+  providerId    String        @map("provider_id")
+  customerId    String        @map("customer_id")
+  jobId         String?       @map("job_id")
+  status        InvoiceStatus @default(draft)
 
   // Dates
-  invoiceDate       DateTime          @map("invoice_date")
-  dueDate           DateTime          @map("due_date")
-  paidDate          DateTime?         @map("paid_date")
+  invoiceDate DateTime  @map("invoice_date")
+  dueDate     DateTime  @map("due_date")
+  paidDate    DateTime? @map("paid_date")
 
   // Amounts
-  subtotal          Decimal           @db.Decimal(10, 2)
-  taxRate           Decimal?          @default(0) @map("tax_rate") @db.Decimal(5, 2)
-  taxAmount         Decimal           @default(0) @map("tax_amount") @db.Decimal(10, 2)
-  discountType      DiscountType?     @map("discount_type")
-  discountValue     Decimal?          @default(0) @map("discount_value") @db.Decimal(10, 2)
-  discountAmount    Decimal           @default(0) @map("discount_amount") @db.Decimal(10, 2)
-  total             Decimal           @db.Decimal(10, 2)
-  amountPaid        Decimal           @default(0) @map("amount_paid") @db.Decimal(10, 2)
+  subtotal       Decimal       @db.Decimal(10, 2)
+  taxRate        Decimal?      @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount      Decimal       @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  discountType   DiscountType? @map("discount_type")
+  discountValue  Decimal?      @default(0) @map("discount_value") @db.Decimal(10, 2)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  total          Decimal       @db.Decimal(10, 2)
+  amountPaid     Decimal       @default(0) @map("amount_paid") @db.Decimal(10, 2)
 
   // Customer-visible fields
-  notes             String?           @db.Text
-  terms             String?           @db.Text
-  paymentInstructions String?         @map("payment_instructions") @db.Text
+  notes               String? @db.Text
+  terms               String? @db.Text
+  paymentInstructions String? @map("payment_instructions") @db.Text
 
   // Email tracking
-  sentAt            DateTime?         @map("sent_at")
-  sentTo            String?           @map("sent_to")
-  viewedAt          DateTime?         @map("viewed_at")
+  sentAt   DateTime? @map("sent_at")
+  sentTo   String?   @map("sent_to")
+  viewedAt DateTime? @map("viewed_at")
 
-  createdAt         DateTime          @default(now()) @map("created_at")
-  updatedAt         DateTime          @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  provider          Provider          @relation("ProviderInvoices", fields: [providerId], references: [id], onDelete: Cascade)
-  customer          Lead              @relation("CustomerInvoices", fields: [customerId], references: [id], onDelete: Cascade)
-  lineItems         InvoiceLineItem[] @relation("InvoiceLineItems")
-  payments          Payment[]         @relation("InvoicePayments")
+  provider  Provider          @relation("ProviderInvoices", fields: [providerId], references: [id], onDelete: Cascade)
+  customer  Lead              @relation("CustomerInvoices", fields: [customerId], references: [id], onDelete: Cascade)
+  lineItems InvoiceLineItem[] @relation("InvoiceLineItems")
+  payments  Payment[]         @relation("InvoicePayments")
 
   @@index([providerId])
   @@index([customerId])
@@ -649,25 +715,25 @@ model InvoiceLineItem {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
-  invoice     Invoice  @relation("InvoiceLineItems", fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation("InvoiceLineItems", fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
   @@map("invoice_line_items")
 }
 
 model Payment {
-  id              String        @id @default(uuid())
-  invoiceId       String        @map("invoice_id")
-  amount          Decimal       @db.Decimal(10, 2)
-  paymentDate     DateTime      @map("payment_date")
-  paymentMethod   PaymentMethod @map("payment_method")
-  transactionId   String?       @map("transaction_id")
-  notes           String?       @db.Text
-  recordedBy      String?       @map("recorded_by")
-  createdAt       DateTime      @default(now()) @map("created_at")
-  updatedAt       DateTime      @updatedAt @map("updated_at")
+  id            String        @id @default(uuid())
+  invoiceId     String        @map("invoice_id")
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentDate   DateTime      @map("payment_date")
+  paymentMethod PaymentMethod @map("payment_method")
+  transactionId String?       @map("transaction_id")
+  notes         String?       @db.Text
+  recordedBy    String?       @map("recorded_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
 
-  invoice         Invoice       @relation("InvoicePayments", fields: [invoiceId], references: [id], onDelete: Cascade)
+  invoice Invoice @relation("InvoicePayments", fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
   @@index([paymentDate])
