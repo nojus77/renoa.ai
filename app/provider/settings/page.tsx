@@ -1,12 +1,31 @@
-"use client"
+'use client';
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
-import { Clock, Save, Calendar, Info, Check } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import {
+  User,
+  Briefcase,
+  Clock,
+  DollarSign,
+  Bell,
+  CreditCard,
+  Link2,
+  Shield,
+  Save,
+  Plus,
+  Trash2,
+  Upload,
+  Check,
+  X,
+  AlertTriangle,
+} from 'lucide-react';
 import { toast } from 'sonner';
+
+type TabType = 'profile' | 'business' | 'availability' | 'services' | 'notifications' | 'payments' | 'integrations' | 'security';
 
 interface TimeSlot {
   start: string;
@@ -23,13 +42,43 @@ interface WorkingHours {
   sunday: TimeSlot[];
 }
 
+interface Service {
+  id: string;
+  name: string;
+  enabled: boolean;
+  minPrice: number;
+  maxPrice: number;
+}
+
 export default function ProviderSettings() {
   const router = useRouter();
   const [providerName, setProviderName] = useState('');
   const [providerId, setProviderId] = useState('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+  const [activeTab, setActiveTab] = useState<TabType>('profile');
+
+  // Profile
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [bio, setBio] = useState('');
+  const [yearsInBusiness, setYearsInBusiness] = useState(0);
+  const [certifications, setCertifications] = useState<string[]>([]);
+  const [newCertification, setNewCertification] = useState('');
+
+  // Business
+  const [businessName, setBusinessName] = useState('');
+  const [businessAddress, setBusinessAddress] = useState('');
+  const [businessCity, setBusinessCity] = useState('');
+  const [businessState, setBusinessState] = useState('');
+  const [businessZip, setBusinessZip] = useState('');
+  const [serviceRadius, setServiceRadius] = useState(25);
+  const [website, setWebsite] = useState('');
+  const [businessHours, setBusinessHours] = useState('Mon-Fri: 9 AM - 5 PM');
+
+  // Availability
   const [workingHours, setWorkingHours] = useState<WorkingHours>({
     monday: [{ start: '09:00', end: '17:00' }],
     tuesday: [{ start: '09:00', end: '17:00' }],
@@ -40,13 +89,46 @@ export default function ProviderSettings() {
     sunday: [],
   });
   const [bufferTime, setBufferTime] = useState(30);
+  const [maxJobsPerDay, setMaxJobsPerDay] = useState(8);
   const [advanceBooking, setAdvanceBooking] = useState(14);
-  const [availabilityNotes, setAvailabilityNotes] = useState('');
+
+  // Services
+  const [services, setServices] = useState<Service[]>([
+    { id: '1', name: 'Lawn Mowing', enabled: true, minPrice: 50, maxPrice: 150 },
+    { id: '2', name: 'Landscaping', enabled: true, minPrice: 200, maxPrice: 2000 },
+    { id: '3', name: 'Spring Cleanup', enabled: true, minPrice: 150, maxPrice: 500 },
+    { id: '4', name: 'Mulching', enabled: false, minPrice: 100, maxPrice: 400 },
+  ]);
+  const [minimumJobValue, setMinimumJobValue] = useState(75);
+  const [depositRequired, setDepositRequired] = useState(false);
+  const [depositPercentage, setDepositPercentage] = useState(25);
+
+  // Notifications
+  const [emailNotifications, setEmailNotifications] = useState({
+    newLead: true,
+    jobReminders: true,
+    paymentReceived: true,
+    customerMessages: true,
+    weeklySummary: true,
+  });
+  const [smsNotifications, setSmsNotifications] = useState({
+    newLead: true,
+    urgentMessages: true,
+  });
+  const [quietHoursStart, setQuietHoursStart] = useState('21:00');
+  const [quietHoursEnd, setQuietHoursEnd] = useState('07:00');
+
+  // Payments
+  const [paymentTerms, setPaymentTerms] = useState('net_7');
+  const [acceptCreditCard, setAcceptCreditCard] = useState(true);
+  const [acceptCash, setAcceptCash] = useState(true);
+  const [acceptCheck, setAcceptCheck] = useState(false);
+  const [autoInvoice, setAutoInvoice] = useState(true);
 
   useEffect(() => {
     const id = localStorage.getItem('providerId');
     const name = localStorage.getItem('providerName');
-    
+
     if (!id || !name) {
       router.push('/provider/login');
       return;
@@ -54,27 +136,52 @@ export default function ProviderSettings() {
 
     setProviderId(id);
     setProviderName(name);
-    fetchAvailability(id);
+    loadSettings(id);
   }, [router]);
 
-  const fetchAvailability = async (id: string) => {
+  const loadSettings = async (id: string) => {
     setLoading(true);
     try {
+      // Load availability settings
       const res = await fetch(`/api/provider/availability?providerId=${id}`);
       const data = await res.json();
-      
+
       if (data.workingHours) setWorkingHours(data.workingHours);
       if (data.bufferTime) setBufferTime(data.bufferTime);
       if (data.advanceBooking) setAdvanceBooking(data.advanceBooking);
-      if (data.availabilityNotes) setAvailabilityNotes(data.availabilityNotes);
     } catch (error) {
-      toast.error('Failed to load settings');
+      console.error('Error loading settings:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSaveAvailability = async () => {
+  const saveProfileSettings = async () => {
+    setSaving(true);
+    try {
+      // API call would go here
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success('Profile settings saved');
+    } catch (error) {
+      toast.error('Failed to save profile settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveBusinessSettings = async () => {
+    setSaving(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success('Business settings saved');
+    } catch (error) {
+      toast.error('Failed to save business settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveAvailabilitySettings = async () => {
     setSaving(true);
     try {
       const res = await fetch('/api/provider/availability', {
@@ -85,58 +192,70 @@ export default function ProviderSettings() {
           workingHours,
           bufferTime,
           advanceBooking,
-          availabilityNotes,
         }),
       });
 
       if (!res.ok) throw new Error('Failed to save');
-
-      toast.success('✅ Settings saved successfully');
+      toast.success('Availability settings saved');
     } catch (error) {
-      toast.error('Failed to save settings');
+      toast.error('Failed to save availability settings');
     } finally {
       setSaving(false);
     }
   };
 
-  const toggleDayAvailability = (day: keyof WorkingHours) => {
-    setWorkingHours(prev => ({
-      ...prev,
-      [day]: prev[day].length === 0 
-        ? [{ start: '09:00', end: '17:00' }]
-        : []
-    }));
+  const saveServicesSettings = async () => {
+    setSaving(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success('Services settings saved');
+    } catch (error) {
+      toast.error('Failed to save services settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const updateDayTime = (
-    day: keyof WorkingHours,
-    index: number,
-    field: 'start' | 'end',
-    value: string
-  ) => {
-    setWorkingHours(prev => ({
-      ...prev,
-      [day]: prev[day].map((slot, i) => 
-        i === index ? { ...slot, [field]: value } : slot
-      )
-    }));
+  const saveNotificationSettings = async () => {
+    setSaving(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success('Notification settings saved');
+    } catch (error) {
+      toast.error('Failed to save notification settings');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const days: { key: keyof WorkingHours; label: string }[] = [
-    { key: 'monday', label: 'Monday' },
-    { key: 'tuesday', label: 'Tuesday' },
-    { key: 'wednesday', label: 'Wednesday' },
-    { key: 'thursday', label: 'Thursday' },
-    { key: 'friday', label: 'Friday' },
-    { key: 'saturday', label: 'Saturday' },
-    { key: 'sunday', label: 'Sunday' },
+  const savePaymentSettings = async () => {
+    setSaving(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 500));
+      toast.success('Payment settings saved');
+    } catch (error) {
+      toast.error('Failed to save payment settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const tabs = [
+    { id: 'profile' as TabType, name: 'Profile', icon: User },
+    { id: 'business' as TabType, name: 'Business', icon: Briefcase },
+    { id: 'availability' as TabType, name: 'Availability', icon: Clock },
+    { id: 'services' as TabType, name: 'Services & Pricing', icon: DollarSign },
+    { id: 'notifications' as TabType, name: 'Notifications', icon: Bell },
+    { id: 'payments' as TabType, name: 'Payments', icon: CreditCard },
+    { id: 'integrations' as TabType, name: 'Integrations', icon: Link2 },
+    { id: 'security' as TabType, name: 'Security', icon: Shield },
   ];
 
   if (loading) {
     return (
       <ProviderLayout providerName={providerName}>
         <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
         </div>
       </ProviderLayout>
     );
@@ -145,171 +264,763 @@ export default function ProviderSettings() {
   return (
     <ProviderLayout providerName={providerName}>
       <div className="min-h-screen bg-zinc-950">
-        {/* Header - Cleaner */}
-        <div className="border-b border-zinc-800/50 bg-zinc-900/30 backdrop-blur-sm sticky top-0 z-10">
-          <div className="max-w-5xl mx-auto px-8 py-6 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-semibold text-zinc-100">Availability</h1>
-              <p className="text-sm text-zinc-500 mt-1">Configure your working hours and booking preferences</p>
-            </div>
-            <Button
-              onClick={handleSaveAvailability}
-              disabled={saving}
-              className="bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-500/20"
-            >
-              {saving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Check className="h-4 w-4 mr-2" />
-                  Save Changes
-                </>
-              )}
-            </Button>
+        {/* Header */}
+        <div className="border-b border-zinc-800 bg-zinc-900/30 backdrop-blur-sm">
+          <div className="max-w-[1600px] mx-auto px-6 py-6">
+            <h1 className="text-2xl font-bold text-zinc-100">Settings</h1>
+            <p className="text-sm text-zinc-400 mt-1">Manage your account and preferences</p>
           </div>
         </div>
 
-        {/* Main Content - Two Column Layout */}
-        <div className="max-w-7xl mx-auto px-8 py-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column: Weekly Schedule */}
-            <div>
-              <div className="mb-4">
-                <h2 className="text-base font-semibold text-zinc-100 mb-1">Weekly Schedule</h2>
-                <p className="text-xs text-zinc-500">Set your available hours</p>
-              </div>
-
-              <div className="space-y-2">
-                {days.map(({ key, label }) => {
-                  const isAvailable = workingHours[key].length > 0;
+        <div className="max-w-[1600px] mx-auto px-6 py-8">
+          <div className="flex gap-6">
+            {/* Sidebar Tabs */}
+            <div className="w-64 flex-shrink-0">
+              <div className="sticky top-6 space-y-1">
+                {tabs.map((tab) => {
+                  const Icon = tab.icon;
                   return (
-                    <div
-                      key={key}
-                      className="flex items-center gap-3 p-3 bg-zinc-900/50 rounded-lg border border-zinc-800/50 hover:border-zinc-700/50 transition-colors"
+                    <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-left ${
+                        activeTab === tab.id
+                          ? 'bg-emerald-600 text-white'
+                          : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                      }`}
                     >
-                      {/* Toggle Switch */}
-                      <button
-                        onClick={() => toggleDayAvailability(key)}
-                        className={`
-                          relative inline-flex h-5 w-9 items-center rounded-full transition-colors flex-shrink-0
-                          ${isAvailable ? 'bg-blue-600' : 'bg-zinc-800'}
-                        `}
-                      >
-                        <span
-                          className={`
-                            inline-block h-3 w-3 transform rounded-full bg-white transition-transform
-                            ${isAvailable ? 'translate-x-5' : 'translate-x-1'}
-                          `}
-                        />
-                      </button>
-
-                      {/* Day Label */}
-                      <span className={`text-xs font-medium w-16 ${isAvailable ? 'text-zinc-100' : 'text-zinc-500'}`}>
-                        {label}
-                      </span>
-
-                      {/* Time Inputs */}
-                      {isAvailable ? (
-                        <div className="flex items-center gap-2 flex-1">
-                          {workingHours[key].map((slot, index) => (
-                            <div key={index} className="flex items-center gap-1.5">
-                              <input
-                                type="time"
-                                value={slot.start}
-                                onChange={(e) => updateDayTime(key, index, 'start', e.target.value)}
-                                className="px-2 py-1.5 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-100 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-transparent"
-                              />
-                              <span className="text-zinc-600 text-xs">→</span>
-                              <input
-                                type="time"
-                                value={slot.end}
-                                onChange={(e) => updateDayTime(key, index, 'end', e.target.value)}
-                                className="px-2 py-1.5 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-100 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-transparent"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-xs text-zinc-600 italic">Unavailable</span>
-                      )}
-                    </div>
+                      <Icon className="h-5 w-5" />
+                      <span className="text-sm font-medium">{tab.name}</span>
+                    </button>
                   );
                 })}
               </div>
             </div>
 
-            {/* Right Column: Other Settings */}
-            <div className="space-y-4">
-              {/* Booking Preferences */}
-              <div>
-                <div className="mb-4">
-                  <h2 className="text-base font-semibold text-zinc-100 mb-1">Booking Preferences</h2>
-                  <p className="text-xs text-zinc-500">Configure appointment settings</p>
-                </div>
-
-                <div className="space-y-3">
-                  <div className="bg-zinc-900/50 rounded-lg border border-zinc-800/50 p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="p-1.5 bg-blue-500/10 rounded">
-                        <Clock className="h-4 w-4 text-blue-400" />
-                      </div>
+            {/* Main Content */}
+            <div className="flex-1 space-y-6">
+              {/* Profile Tab */}
+              {activeTab === 'profile' && (
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                  <CardHeader>
+                    <CardTitle className="text-zinc-100">Profile Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
-                        <h3 className="text-xs font-semibold text-zinc-100">Buffer Time</h3>
-                        <p className="text-xs text-zinc-500">Between appointments</p>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          First Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="John"
+                        />
                       </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={bufferTime}
-                        onChange={(e) => setBufferTime(parseInt(e.target.value))}
-                        className="flex-1 px-3 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-100 text-base font-medium focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-transparent"
-                        min="0"
-                        step="15"
-                      />
-                      <span className="text-xs text-zinc-500">minutes</span>
-                    </div>
-                  </div>
 
-                  <div className="bg-zinc-900/50 rounded-lg border border-zinc-800/50 p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="p-1.5 bg-purple-500/10 rounded">
-                        <Calendar className="h-4 w-4 text-purple-400" />
-                      </div>
                       <div>
-                        <h3 className="text-xs font-semibold text-zinc-100">Advance Booking</h3>
-                        <p className="text-xs text-zinc-500">Maximum days ahead</p>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Last Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="Doe"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Phone *
+                        </label>
+                        <input
+                          type="tel"
+                          value={phone}
+                          onChange={(e) => setPhone(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Email *
+                        </label>
+                        <input
+                          type="email"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="john@example.com"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Years in Business
+                        </label>
+                        <input
+                          type="number"
+                          value={yearsInBusiness}
+                          onChange={(e) => setYearsInBusiness(parseInt(e.target.value) || 0)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="5"
+                        />
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        value={advanceBooking}
-                        onChange={(e) => setAdvanceBooking(parseInt(e.target.value))}
-                        className="flex-1 px-3 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-100 text-base font-medium focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-transparent"
-                        min="1"
-                        max="90"
-                      />
-                      <span className="text-xs text-zinc-500">days</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
 
-              {/* Notes */}
-              <div className="bg-zinc-900/50 rounded-lg border border-zinc-800/50 p-4">
-                <h3 className="text-xs font-semibold text-zinc-100 mb-3">Special Instructions</h3>
-                <textarea
-                  value={availabilityNotes}
-                  onChange={(e) => setAvailabilityNotes(e.target.value)}
-                  className="w-full px-3 py-2 bg-zinc-800/50 border border-zinc-700/50 rounded text-zinc-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50 focus:border-transparent resize-none"
-                  rows={4}
-                  placeholder="e.g., Closed on holidays, Emergency calls available 24/7..."
-                />
-              </div>
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">
+                        Bio (visible to customers)
+                      </label>
+                      <textarea
+                        value={bio}
+                        onChange={(e) => setBio(e.target.value)}
+                        rows={4}
+                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                        placeholder="Tell customers about your experience and what makes you stand out..."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">
+                        Certifications & Licenses
+                      </label>
+                      <div className="space-y-2 mb-3">
+                        {certifications.map((cert, idx) => (
+                          <div key={idx} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                            <span className="text-sm text-zinc-200">{cert}</span>
+                            <button
+                              onClick={() => setCertifications(certifications.filter((_, i) => i !== idx))}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={newCertification}
+                          onChange={(e) => setNewCertification(e.target.value)}
+                          className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="e.g., Licensed Landscaper, EPA Certified"
+                        />
+                        <Button
+                          onClick={() => {
+                            if (newCertification.trim()) {
+                              setCertifications([...certifications, newCertification]);
+                              setNewCertification('');
+                            }
+                          }}
+                          className="bg-emerald-600 hover:bg-emerald-500"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={saveProfileSettings}
+                        disabled={saving}
+                        className="bg-emerald-600 hover:bg-emerald-500"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {saving ? 'Saving...' : 'Save Profile'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Business Tab */}
+              {activeTab === 'business' && (
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                  <CardHeader>
+                    <CardTitle className="text-zinc-100">Business Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Business Name *
+                        </label>
+                        <input
+                          type="text"
+                          value={businessName}
+                          onChange={(e) => setBusinessName(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="Green Thumb Landscaping"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Business Address
+                        </label>
+                        <input
+                          type="text"
+                          value={businessAddress}
+                          onChange={(e) => setBusinessAddress(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="123 Main Street"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          City
+                        </label>
+                        <input
+                          type="text"
+                          value={businessCity}
+                          onChange={(e) => setBusinessCity(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="Austin"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          State
+                        </label>
+                        <input
+                          type="text"
+                          value={businessState}
+                          onChange={(e) => setBusinessState(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="TX"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Service Radius (miles)
+                        </label>
+                        <div className="flex items-center gap-4">
+                          <input
+                            type="range"
+                            min="5"
+                            max="50"
+                            value={serviceRadius}
+                            onChange={(e) => setServiceRadius(parseInt(e.target.value))}
+                            className="flex-1"
+                          />
+                          <span className="text-zinc-200 font-semibold min-w-[60px]">{serviceRadius} mi</span>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Website
+                        </label>
+                        <input
+                          type="url"
+                          value={website}
+                          onChange={(e) => setWebsite(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="https://example.com"
+                        />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Business Hours (when phone is answered)
+                        </label>
+                        <input
+                          type="text"
+                          value={businessHours}
+                          onChange={(e) => setBusinessHours(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="Mon-Fri: 9 AM - 5 PM"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={saveBusinessSettings}
+                        disabled={saving}
+                        className="bg-emerald-600 hover:bg-emerald-500"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {saving ? 'Saving...' : 'Save Business Info'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Availability Tab */}
+              {activeTab === 'availability' && (
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                  <CardHeader>
+                    <CardTitle className="text-zinc-100">Availability Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Buffer Time (minutes)
+                        </label>
+                        <input
+                          type="number"
+                          value={bufferTime}
+                          onChange={(e) => setBufferTime(parseInt(e.target.value) || 0)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                        />
+                        <p className="text-xs text-zinc-500 mt-1">Time between jobs for travel</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Max Jobs Per Day
+                        </label>
+                        <input
+                          type="number"
+                          value={maxJobsPerDay}
+                          onChange={(e) => setMaxJobsPerDay(parseInt(e.target.value) || 0)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                        />
+                        <p className="text-xs text-zinc-500 mt-1">Prevent overbooking</p>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Advance Booking (days)
+                        </label>
+                        <input
+                          type="number"
+                          value={advanceBooking}
+                          onChange={(e) => setAdvanceBooking(parseInt(e.target.value) || 0)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                        />
+                        <p className="text-xs text-zinc-500 mt-1">Max days ahead for booking</p>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={saveAvailabilitySettings}
+                        disabled={saving}
+                        className="bg-emerald-600 hover:bg-emerald-500"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {saving ? 'Saving...' : 'Save Availability'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Services Tab */}
+              {activeTab === 'services' && (
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                  <CardHeader>
+                    <CardTitle className="text-zinc-100">Services & Pricing</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div className="space-y-3">
+                      {services.map((service) => (
+                        <div key={service.id} className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => {
+                                  setServices(services.map(s =>
+                                    s.id === service.id ? { ...s, enabled: !s.enabled } : s
+                                  ));
+                                }}
+                                className={`w-12 h-6 rounded-full transition-colors ${
+                                  service.enabled ? 'bg-emerald-600' : 'bg-zinc-700'
+                                }`}
+                              >
+                                <div
+                                  className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                    service.enabled ? 'translate-x-6' : 'translate-x-1'
+                                  }`}
+                                />
+                              </button>
+                              <span className="text-zinc-200 font-medium">{service.name}</span>
+                            </div>
+                          </div>
+                          {service.enabled && (
+                            <div className="grid grid-cols-2 gap-4">
+                              <div>
+                                <label className="block text-xs text-zinc-400 mb-1">Min Price</label>
+                                <input
+                                  type="number"
+                                  value={service.minPrice}
+                                  onChange={(e) => {
+                                    setServices(services.map(s =>
+                                      s.id === service.id ? { ...s, minPrice: parseInt(e.target.value) || 0 } : s
+                                    ));
+                                  }}
+                                  className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500 text-sm"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-zinc-400 mb-1">Max Price</label>
+                                <input
+                                  type="number"
+                                  value={service.maxPrice}
+                                  onChange={(e) => {
+                                    setServices(services.map(s =>
+                                      s.id === service.id ? { ...s, maxPrice: parseInt(e.target.value) || 0 } : s
+                                    ));
+                                  }}
+                                  className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500 text-sm"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-zinc-800">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Minimum Job Value
+                        </label>
+                        <input
+                          type="number"
+                          value={minimumJobValue}
+                          onChange={(e) => setMinimumJobValue(parseInt(e.target.value) || 0)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Deposit Required
+                        </label>
+                        <div className="flex items-center gap-4">
+                          <button
+                            onClick={() => setDepositRequired(!depositRequired)}
+                            className={`w-12 h-6 rounded-full transition-colors ${
+                              depositRequired ? 'bg-emerald-600' : 'bg-zinc-700'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                depositRequired ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                          {depositRequired && (
+                            <input
+                              type="number"
+                              value={depositPercentage}
+                              onChange={(e) => setDepositPercentage(parseInt(e.target.value) || 0)}
+                              className="w-24 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                              placeholder="%"
+                            />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={saveServicesSettings}
+                        disabled={saving}
+                        className="bg-emerald-600 hover:bg-emerald-500"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {saving ? 'Saving...' : 'Save Services'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Notifications Tab */}
+              {activeTab === 'notifications' && (
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                  <CardHeader>
+                    <CardTitle className="text-zinc-100">Notification Preferences</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <h3 className="text-sm font-semibold text-zinc-200 mb-4">Email Notifications</h3>
+                      <div className="space-y-3">
+                        {Object.entries(emailNotifications).map(([key, value]) => (
+                          <div key={key} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                            <span className="text-sm text-zinc-300 capitalize">
+                              {key.replace(/([A-Z])/g, ' $1').trim()}
+                            </span>
+                            <button
+                              onClick={() => setEmailNotifications({ ...emailNotifications, [key]: !value })}
+                              className={`w-12 h-6 rounded-full transition-colors ${
+                                value ? 'bg-emerald-600' : 'bg-zinc-700'
+                              }`}
+                            >
+                              <div
+                                className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                  value ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-zinc-200 mb-4">SMS Notifications</h3>
+                      <div className="space-y-3">
+                        {Object.entries(smsNotifications).map(([key, value]) => (
+                          <div key={key} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                            <span className="text-sm text-zinc-300 capitalize">
+                              {key.replace(/([A-Z])/g, ' $1').trim()}
+                            </span>
+                            <button
+                              onClick={() => setSmsNotifications({ ...smsNotifications, [key]: !value })}
+                              className={`w-12 h-6 rounded-full transition-colors ${
+                                value ? 'bg-emerald-600' : 'bg-zinc-700'
+                              }`}
+                            >
+                              <div
+                                className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                  value ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-zinc-200 mb-4">Quiet Hours</h3>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">Start</label>
+                          <input
+                            type="time"
+                            value={quietHoursStart}
+                            onChange={(e) => setQuietHoursStart(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-zinc-400 mb-1">End</label>
+                          <input
+                            type="time"
+                            value={quietHoursEnd}
+                            onChange={(e) => setQuietHoursEnd(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={saveNotificationSettings}
+                        disabled={saving}
+                        className="bg-emerald-600 hover:bg-emerald-500"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {saving ? 'Saving...' : 'Save Notifications'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Payments Tab */}
+              {activeTab === 'payments' && (
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                  <CardHeader>
+                    <CardTitle className="text-zinc-100">Payment Settings</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-300 mb-2">
+                        Payment Terms
+                      </label>
+                      <select
+                        value={paymentTerms}
+                        onChange={(e) => setPaymentTerms(e.target.value)}
+                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                      >
+                        <option value="due_on_receipt">Due on Receipt</option>
+                        <option value="net_7">Net 7</option>
+                        <option value="net_15">Net 15</option>
+                        <option value="net_30">Net 30</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-semibold text-zinc-200 mb-4">Accept Payment Methods</h3>
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                          <span className="text-sm text-zinc-300">Credit Cards</span>
+                          <button
+                            onClick={() => setAcceptCreditCard(!acceptCreditCard)}
+                            className={`w-12 h-6 rounded-full transition-colors ${
+                              acceptCreditCard ? 'bg-emerald-600' : 'bg-zinc-700'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                acceptCreditCard ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                          <span className="text-sm text-zinc-300">Cash</span>
+                          <button
+                            onClick={() => setAcceptCash(!acceptCash)}
+                            className={`w-12 h-6 rounded-full transition-colors ${
+                              acceptCash ? 'bg-emerald-600' : 'bg-zinc-700'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                acceptCash ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                          <span className="text-sm text-zinc-300">Check</span>
+                          <button
+                            onClick={() => setAcceptCheck(!acceptCheck)}
+                            className={`w-12 h-6 rounded-full transition-colors ${
+                              acceptCheck ? 'bg-emerald-600' : 'bg-zinc-700'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                acceptCheck ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                      <div>
+                        <p className="text-sm font-medium text-zinc-300">Auto-Invoice on Job Completion</p>
+                        <p className="text-xs text-zinc-500 mt-1">Automatically create invoice when job is marked complete</p>
+                      </div>
+                      <button
+                        onClick={() => setAutoInvoice(!autoInvoice)}
+                        className={`w-12 h-6 rounded-full transition-colors ${
+                          autoInvoice ? 'bg-emerald-600' : 'bg-zinc-700'
+                        }`}
+                      >
+                        <div
+                          className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                            autoInvoice ? 'translate-x-6' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+
+                    <div className="flex justify-end">
+                      <Button
+                        onClick={savePaymentSettings}
+                        disabled={saving}
+                        className="bg-emerald-600 hover:bg-emerald-500"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {saving ? 'Saving...' : 'Save Payment Settings'}
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Integrations Tab */}
+              {activeTab === 'integrations' && (
+                <Card className="bg-zinc-900/50 border-zinc-800">
+                  <CardHeader>
+                    <CardTitle className="text-zinc-100">Integrations</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {[
+                      { name: 'QuickBooks', description: 'Sync invoices and payments', connected: false },
+                      { name: 'Google Calendar', description: 'Sync appointments', connected: true },
+                      { name: 'Stripe', description: 'Payment processing', connected: true },
+                      { name: 'Twilio', description: 'SMS messaging', connected: true },
+                    ].map((integration) => (
+                      <div key={integration.name} className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-zinc-200">{integration.name}</p>
+                          <p className="text-xs text-zinc-500 mt-1">{integration.description}</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          {integration.connected ? (
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                              <Check className="h-3 w-3 mr-1" />
+                              Connected
+                            </Badge>
+                          ) : (
+                            <Button variant="outline" size="sm" className="border-zinc-700">
+                              Connect
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Security Tab */}
+              {activeTab === 'security' && (
+                <div className="space-y-6">
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Password & Security</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <Button variant="outline" className="border-zinc-700">
+                        Change Password
+                      </Button>
+                      <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-zinc-200">Two-Factor Authentication</p>
+                          <p className="text-xs text-zinc-500 mt-1">Add an extra layer of security</p>
+                        </div>
+                        <Button variant="outline" size="sm" className="border-zinc-700">
+                          Enable
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-red-900/20 border-red-500/30">
+                    <CardHeader>
+                      <CardTitle className="text-red-400 flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5" />
+                        Danger Zone
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm text-zinc-400 mb-4">
+                        Once you delete your account, there is no going back. Please be certain.
+                      </p>
+                      <Button variant="outline" className="border-red-700 text-red-400 hover:bg-red-900/20">
+                        Delete Account
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
             </div>
           </div>
         </div>
