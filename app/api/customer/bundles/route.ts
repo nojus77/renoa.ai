@@ -11,7 +11,8 @@ export async function GET(request: NextRequest) {
     // Determine current season if not specified
     const currentMonth = new Date().getMonth() + 1;
     let currentSeason = null;
-    if (!season) {
+    if (!season || season === 'all') {
+      // Default to current season unless 'all' is explicitly requested
       if (currentMonth >= 3 && currentMonth <= 5) currentSeason = 'spring';
       else if (currentMonth >= 6 && currentMonth <= 8) currentSeason = 'summer';
       else if (currentMonth >= 9 && currentMonth <= 11) currentSeason = 'fall';
@@ -21,10 +22,12 @@ export async function GET(request: NextRequest) {
     const bundles = await prisma.serviceBundle.findMany({
       where: {
         active: true,
-        ...(season
-          ? { season }
+        ...(season === 'all'
+          ? {} // No season filter - show all
+          : season
+          ? { season } // Specific season
           : {
-              OR: [{ season: currentSeason }, { season: null }], // Include year-round bundles
+              OR: [{ season: currentSeason }, { season: null }], // Current season + year-round
             }),
       },
       orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }],
