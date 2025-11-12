@@ -480,6 +480,7 @@ model Job {
   customer Customer   @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
   photos   JobPhoto[] @relation("JobPhotos")
   review   Review?    @relation("JobReview")
+  invoice  Invoice?   @relation("JobInvoice")
 
   @@index([providerId])
   @@index([customerId])
@@ -687,7 +688,7 @@ model Invoice {
   invoiceNumber String        @unique @map("invoice_number")
   providerId    String        @map("provider_id")
   customerId    String        @map("customer_id")
-  jobId         String?       @map("job_id")
+  jobId         String?       @unique @map("job_id")
   status        InvoiceStatus @default(draft)
 
   // Dates
@@ -721,11 +722,13 @@ model Invoice {
   // Relations
   provider  Provider          @relation("ProviderInvoices", fields: [providerId], references: [id], onDelete: Cascade)
   customer  Customer          @relation("CustomerInvoices", fields: [customerId], references: [id], onDelete: Cascade)
+  job       Job?              @relation("JobInvoice", fields: [jobId], references: [id], onDelete: SetNull)
   lineItems InvoiceLineItem[] @relation("InvoiceLineItems")
   payments  Payment[]         @relation("InvoicePayments")
 
   @@index([providerId])
   @@index([customerId])
+  @@index([jobId])
   @@index([status])
   @@index([invoiceDate])
   @@index([dueDate])
