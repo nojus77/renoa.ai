@@ -185,32 +185,26 @@ export default function JobDetailPage() {
     }
   };
 
-  const handleCompleteJob = async () => {
-    if (!job) return;
+  const handleJobCompleted = async (result: { invoiceId?: string; invoiceNumber?: string }) => {
+    // Refetch the job data to get updated status and values
+    await fetchJobDetails();
 
-    try {
-      setUpdating(true);
-      const response = await fetch(`/api/provider/jobs/${jobId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed' }),
+    // Close the modal
+    setShowCompleteModal(false);
+
+    // Show appropriate success message
+    if (result.invoiceId) {
+      toast.success('🎉 Job completed and invoice created!', {
+        description: `Invoice ${result.invoiceNumber} sent to customer`,
+        action: {
+          label: 'View Invoice',
+          onClick: () => router.push(`/provider/invoices`),
+        },
       });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update status');
-      }
-
-      setJob({ ...job, status: 'completed' });
+    } else {
       toast.success('🎉 Job completed! Awesome work!', {
         description: 'Ready to create an invoice?',
       });
-    } catch (error: any) {
-      console.error('Error completing job:', error);
-      toast.error(error.message || 'Failed to complete job');
-    } finally {
-      setUpdating(false);
     }
   };
 
@@ -896,7 +890,7 @@ export default function JobDetailPage() {
       <CompleteJobModal
         isOpen={showCompleteModal}
         onClose={() => setShowCompleteModal(false)}
-        onComplete={handleCompleteJob}
+        onComplete={handleJobCompleted}
         hasAfterPhotos={afterPhotos.length > 0}
         estimatedValue={job.estimatedValue || 0}
         jobId={job.id}

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 interface CompleteJobModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onComplete: () => void;
+  onComplete: (result: { invoiceId?: string; invoiceNumber?: string }) => void;
   hasAfterPhotos: boolean;
   estimatedValue?: number;
   jobId: string;
@@ -49,7 +49,7 @@ export default function CompleteJobModal({
       if (!response.ok) throw new Error('Failed to complete job');
 
       toast.success('Job marked as complete!');
-      onComplete();
+      onComplete({});
       onClose();
     } catch (error) {
       toast.error('Failed to complete job');
@@ -103,13 +103,18 @@ export default function CompleteJobModal({
 
       if (!invoiceResponse.ok) throw new Error('Failed to create invoice');
 
+      const invoiceData = await invoiceResponse.json();
+
       toast.success('Job completed and invoice sent!');
-      onComplete();
+      onComplete({
+        invoiceId: invoiceData.id,
+        invoiceNumber: invoiceData.invoiceNumber,
+      });
       onClose();
     } catch (error) {
       console.error('Error:', error);
       toast.error('Failed to create invoice. Job completed, but please create invoice manually.');
-      onComplete();
+      onComplete({});
       onClose();
     } finally {
       setCreatingInvoice(false);
