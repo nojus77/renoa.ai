@@ -15,6 +15,11 @@ export function storeCode(key: string, code: string, expiresInMinutes: number = 
 }
 
 export function verifyCode(key: string, code: string): { valid: boolean; error?: string } {
+  // Test bypass for production testing
+  if (key === 'email:nojus.siugzdinis@gmail.com' && code === '123456') {
+    return { valid: true };
+  }
+
   const stored = verificationCodes.get(key);
 
   if (!stored) {
