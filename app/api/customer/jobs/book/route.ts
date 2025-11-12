@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
       estimatedValue,
       customerNotes,
       bookingSource,
+      promoCode,
     } = body;
 
     if (!serviceType || !address || !startTime || !endTime) {
@@ -33,6 +34,46 @@ export async function POST(request: NextRequest) {
         { error: 'Missing required fields' },
         { status: 400 }
       );
+    }
+
+    let appliedPromo = null;
+    let discountAmount = 0;
+
+    // If promo code provided, validate and apply it
+    if (promoCode) {
+      const promotion = await prisma.customerPromotion.findFirst({
+        where: {
+          customerId,
+          promoCode,
+          status: 'active',
+          expiresAt: { gt: new Date() },
+        },
+      });
+
+      if (!promotion) {
+        return NextResponse.json(
+          { error: 'Invalid or expired promo code' },
+          { status: 400 }
+        );
+      }
+
+      // Calculate discount
+      if (promotion.discountPercent) {
+        discountAmount = (estimatedValue * Number(promotion.discountPercent)) / 100;
+      } else if (promotion.discountAmount) {
+        discountAmount = Number(promotion.discountAmount);
+      }
+
+      // Mark promotion as used
+      await prisma.customerPromotion.update({
+        where: { id: promotion.id },
+        data: {
+          status: 'used',
+          usedAt: new Date(),
+        },
+      });
+
+      appliedPromo = promotion;
     }
 
     // Create the job
@@ -69,7 +110,16 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ job }, { status: 201 });
+    return NextResponse.json({
+      job,
+      appliedPromo: appliedPromo
+        ? {
+            code: appliedPromo.promoCode,
+            discountAmount,
+            finalPrice: Math.max(0, estimatedValue - discountAmount),
+          }
+        : null,
+    }, { status: 201 });
   } catch (error) {
     console.error('Error booking job:', error);
     return NextResponse.json(

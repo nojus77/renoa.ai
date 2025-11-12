@@ -27,6 +27,8 @@ import SubscriptionSetupModal from '@/components/customer/SubscriptionSetupModal
 import BookAgainModal from '@/components/customer/BookAgainModal';
 import RecommendationsWidget from '@/components/customer/RecommendationsWidget';
 import ReferralWidget from '@/components/customer/ReferralWidget';
+import PromoBanner from '@/components/customer/PromoBanner';
+import WinbackModal from '@/components/customer/WinbackModal';
 
 interface Job {
   id: string;
@@ -176,6 +178,9 @@ export default function CustomerDashboard() {
           <span className="font-semibold text-zinc-900">{data.provider.businessName}</span>
         </p>
       </div>
+
+      {/* Promo Banner */}
+      <PromoBanner />
 
       {/* Alert for Unpaid Invoices */}
       {data.unpaidInvoicesCount > 0 && (
@@ -502,6 +507,9 @@ export default function CustomerDashboard() {
           bookingSource="rebook_dashboard"
         />
       )}
+
+      {/* Winback Modal */}
+      <WinbackModal isOpen={false} onClose={() => {}} />
     </CustomerLayout>
   );
 }

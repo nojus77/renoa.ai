@@ -1,9 +1,20 @@
 'use client';
 
-import { useState } from 'react';
-import { X, Calendar, Clock, MapPin, DollarSign, CheckCircle, Loader2 } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Calendar, Clock, MapPin, DollarSign, CheckCircle, Loader2, Tag, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+
+interface Promotion {
+  id: string;
+  promoCode: string;
+  discountPercent: number | null;
+  discountAmount: number | null;
+  expiresAt: string;
+  status: string;
+  triggerType: string;
+  message: string | null;
+}
 
 interface BookAgainModalProps {
   isOpen: boolean;
@@ -34,6 +45,63 @@ export default function BookAgainModal({
   const [duration, setDuration] = useState(2); // hours
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [availablePromos, setAvailablePromos] = useState<Promotion[]>([]);
+  const [selectedPromo, setSelectedPromo] = useState<Promotion | null>(null);
+  const [loadingPromos, setLoadingPromos] = useState(false);
+
+  // Fetch available promotions when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      fetchAvailablePromos();
+    }
+  }, [isOpen]);
+
+  const fetchAvailablePromos = async () => {
+    try {
+      setLoadingPromos(true);
+      const response = await fetch('/api/customer/promotions');
+      const data = await response.json();
+
+      if (data.active && data.active.length > 0) {
+        setAvailablePromos(data.active);
+
+        // Auto-apply the best promo (highest discount)
+        const bestPromo = data.active.reduce((best: Promotion, current: Promotion) => {
+          const bestValue = best.discountPercent
+            ? Number(best.discountPercent)
+            : Number(best.discountAmount || 0);
+          const currentValue = current.discountPercent
+            ? Number(current.discountPercent)
+            : Number(current.discountAmount || 0);
+          return currentValue > bestValue ? current : best;
+        });
+
+        setSelectedPromo(bestPromo);
+      }
+    } catch (error) {
+      console.error('Error fetching promos:', error);
+    } finally {
+      setLoadingPromos(false);
+    }
+  };
+
+  const calculateDiscount = () => {
+    if (!selectedPromo) return 0;
+
+    if (selectedPromo.discountPercent) {
+      return (estimatedValue * Number(selectedPromo.discountPercent)) / 100;
+    }
+
+    if (selectedPromo.discountAmount) {
+      return Number(selectedPromo.discountAmount);
+    }
+
+    return 0;
+  };
+
+  const getFinalPrice = () => {
+    return Math.max(0, estimatedValue - calculateDiscount());
+  };
 
   if (!isOpen) return null;
 
@@ -61,6 +129,7 @@ export default function BookAgainModal({
           estimatedValue,
           customerNotes: notes || undefined,
           bookingSource,
+          promoCode: selectedPromo?.promoCode || undefined,
         }),
       });
 
@@ -197,10 +266,89 @@ export default function BookAgainModal({
               <span className="text-zinc-600">Address:</span>
               <span className="font-semibold text-zinc-900">{address}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-zinc-600">Estimated Price:</span>
-              <span className="font-semibold text-emerald-600">${estimatedValue.toFixed(2)}</span>
+          </div>
+        </div>
+
+        {/* Promo Code Section */}
+        {availablePromos.length > 0 && (
+          <div className="mb-6">
+            <label className="block text-sm font-semibold text-zinc-700 mb-2">
+              Promo Code
+            </label>
+            <select
+              value={selectedPromo?.id || 'none'}
+              onChange={(e) => {
+                const promoId = e.target.value;
+                if (promoId === 'none') {
+                  setSelectedPromo(null);
+                } else {
+                  const promo = availablePromos.find((p) => p.id === promoId);
+                  setSelectedPromo(promo || null);
+                }
+              }}
+              className="w-full px-4 py-3 border border-zinc-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+            >
+              <option value="none">No promo code</option>
+              {availablePromos.map((promo) => (
+                <option key={promo.id} value={promo.id}>
+                  {promo.promoCode} -{' '}
+                  {promo.discountPercent
+                    ? `${promo.discountPercent}% OFF`
+                    : `$${promo.discountAmount} OFF`}
+                </option>
+              ))}
+            </select>
+            {selectedPromo && (
+              <div className="mt-2 flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                <Sparkles className="h-4 w-4 text-emerald-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-emerald-700">
+                  {selectedPromo.message || 'Promo code will be applied to your booking!'}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Price Breakdown */}
+        <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-lg p-4 mb-6">
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between text-zinc-700">
+              <span>Original Price:</span>
+              <span className={selectedPromo ? 'line-through' : 'font-semibold'}>
+                ${estimatedValue.toFixed(2)}
+              </span>
             </div>
+            {selectedPromo && (
+              <>
+                <div className="flex justify-between text-emerald-700 font-medium">
+                  <span className="flex items-center gap-1">
+                    <Tag className="h-4 w-4" />
+                    Promo Applied: {selectedPromo.promoCode}
+                  </span>
+                  <span>-${calculateDiscount().toFixed(2)}</span>
+                </div>
+                <div className="border-t border-emerald-300 my-2"></div>
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-zinc-900">Final Price:</span>
+                  <span className="text-2xl font-bold text-emerald-600">
+                    ${getFinalPrice().toFixed(2)}
+                  </span>
+                </div>
+                <div className="bg-green-100 border border-green-300 rounded-md px-3 py-2 text-center">
+                  <p className="text-sm font-semibold text-green-700">
+                    You saved ${calculateDiscount().toFixed(2)}!
+                  </p>
+                </div>
+              </>
+            )}
+            {!selectedPromo && (
+              <div className="flex justify-between items-center">
+                <span className="font-bold text-zinc-900">Total:</span>
+                <span className="text-2xl font-bold text-emerald-600">
+                  ${estimatedValue.toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
         </div>
 
