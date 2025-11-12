@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Calendar, Clock, MapPin, DollarSign, Phone, Mail, Loader2, AlertCircle, Star } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, DollarSign, Phone, Mail, Loader2, AlertCircle, Star, RefreshCw } from 'lucide-react';
 import CustomerLayout from '@/components/customer/CustomerLayout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import ReviewModal from '@/components/customer/ReviewModal';
+import BookAgainModal from '@/components/customer/BookAgainModal';
 
 interface Job {
   id: string;
@@ -40,6 +41,7 @@ export default function CustomerJobDetailPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showBookAgainModal, setShowBookAgainModal] = useState(false);
 
   useEffect(() => {
     if (jobId) {
@@ -336,6 +338,14 @@ export default function CustomerJobDetailPage() {
                     <span className="text-sm font-medium">Review Submitted</span>
                   </div>
                 )}
+                {/* Book Again Button */}
+                <Button
+                  onClick={() => setShowBookAgainModal(true)}
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white"
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Book This Service Again
+                </Button>
               </div>
             </div>
           )}
@@ -353,6 +363,25 @@ export default function CustomerJobDetailPage() {
           jobId={job.id}
           providerName={job.provider.businessName}
           serviceType={job.serviceType}
+        />
+      )}
+
+      {/* Book Again Modal */}
+      {showBookAgainModal && job && (
+        <BookAgainModal
+          isOpen={showBookAgainModal}
+          onClose={() => setShowBookAgainModal(false)}
+          onSuccess={() => {
+            setShowBookAgainModal(false);
+            toast.success('Service booked successfully!');
+            router.push('/customer-portal/jobs');
+          }}
+          serviceType={job.serviceType}
+          providerId={job.provider.businessName}
+          providerName={job.provider.businessName}
+          address={job.address}
+          estimatedValue={job.actualValue || job.estimatedValue || 150}
+          bookingSource="rebook_job_detail"
         />
       )}
     </CustomerLayout>

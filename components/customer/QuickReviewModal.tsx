@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { X, Star, ThumbsUp, ThumbsDown, Clock, MessageSquare, Sparkles } from 'lucide-react';
+import { X, Star, ThumbsUp, ThumbsDown, Clock, MessageSquare, Sparkles, Calendar, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import BookAgainModal from './BookAgainModal';
 
 interface QuickReviewModalProps {
   isOpen: boolean;
@@ -12,6 +13,8 @@ interface QuickReviewModalProps {
   providerId: string;
   providerName: string;
   serviceType: string;
+  address?: string;
+  estimatedValue?: number;
 }
 
 export default function QuickReviewModal({
@@ -21,6 +24,8 @@ export default function QuickReviewModal({
   providerId,
   providerName,
   serviceType,
+  address = '',
+  estimatedValue = 150,
 }: QuickReviewModalProps) {
   const [step, setStep] = useState<'review' | 'thankyou'>('review');
   const [rating, setRating] = useState(0);
@@ -31,6 +36,7 @@ export default function QuickReviewModal({
   const [comment, setComment] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [promoCode, setPromoCode] = useState<string>('');
+  const [bookAgainModalOpen, setBookAgainModalOpen] = useState(false);
 
   if (!isOpen) return null;
 
@@ -134,10 +140,32 @@ export default function QuickReviewModal({
               </div>
             )}
 
+            {/* Book Your Next Service Section */}
+            <div className="bg-white border-2 border-zinc-200 rounded-xl p-5 mb-6">
+              <h3 className="font-bold text-zinc-900 mb-2 flex items-center gap-2">
+                <Calendar className="h-5 w-5 text-emerald-600" />
+                Book Your Next Service
+              </h3>
+              <p className="text-sm text-zinc-600 mb-4">
+                Want {serviceType.toLowerCase()} again?
+              </p>
+              <Button
+                onClick={() => setBookAgainModalOpen(true)}
+                className="w-full bg-emerald-600 hover:bg-emerald-500 mb-3"
+              >
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Schedule Next Appointment
+              </Button>
+              <p className="text-xs text-zinc-500 text-center">
+                Or try: Landscaping, Tree Service, House Cleaning
+              </p>
+            </div>
+
             {/* CTA Button */}
             <Button
               onClick={onClose}
-              className="w-full bg-emerald-600 hover:bg-emerald-500"
+              variant="outline"
+              className="w-full"
             >
               Continue
             </Button>
@@ -332,6 +360,22 @@ export default function QuickReviewModal({
           {submitting ? 'Submitting...' : 'Submit Review'}
         </Button>
       </div>
+
+      {/* Book Again Modal */}
+      <BookAgainModal
+        isOpen={bookAgainModalOpen}
+        onClose={() => setBookAgainModalOpen(false)}
+        onSuccess={() => {
+          setBookAgainModalOpen(false);
+          onClose();
+        }}
+        serviceType={serviceType}
+        providerId={providerId}
+        providerName={providerName}
+        address={address}
+        estimatedValue={estimatedValue}
+        bookingSource="rebook_review"
+      />
     </div>
   );
 }

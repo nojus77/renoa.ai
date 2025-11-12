@@ -470,6 +470,7 @@ model Job {
   endTime        DateTime @map("end_time")
   status         String   @default("scheduled") // "scheduled", "in_progress", "completed", "cancelled"
   source         String   @default("own") // "renoa" or "own"
+  bookingSource  String?  @map("booking_source") // "new_lead", "rebook_dashboard", "rebook_review", "rebook_invoice", "rebook_job_detail"
   estimatedValue Float?   @map("estimated_value")
   actualValue    Float?   @map("actual_value")
   internalNotes  String?  @map("internal_notes") @db.Text
