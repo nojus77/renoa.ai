@@ -27,7 +27,17 @@ export async function GET(
       );
     }
 
-    // Map the job data to include flattened customer fields
+    // Check if invoice exists for this job
+    const invoice = await prisma.invoice.findFirst({
+      where: { jobId },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        status: true,
+      },
+    });
+
+    // Map the job data to include flattened customer fields and invoice info
     const jobData = {
       ...job,
       customerName: job.customer?.name || '',
@@ -35,6 +45,7 @@ export async function GET(
       customerPhone: job.customer?.phone || '',
       customerAddress: job.customer?.address || job.address || '',
       isRenoaLead: job.source === 'renoa',
+      invoice: invoice || null,
     };
 
     return NextResponse.json({ job: jobData });

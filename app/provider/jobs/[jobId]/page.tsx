@@ -73,6 +73,11 @@ interface Job {
     phone: string;
     email: string;
   };
+  invoice?: {
+    id: string;
+    invoiceNumber: string;
+    status: string;
+  } | null;
 }
 
 // Service type icons
@@ -364,7 +369,7 @@ export default function JobDetailPage() {
               <div className="flex-1 bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 lg:p-4 text-center">
                 <p className="text-xs text-zinc-500 mb-0.5">Value</p>
                 <p className="text-xl lg:text-2xl font-bold text-emerald-400">
-                  {formatCurrency(job.estimatedValue)}
+                  {formatCurrency(job.status === 'completed' && job.actualValue ? job.actualValue : job.estimatedValue)}
                 </p>
               </div>
             </div>
@@ -395,7 +400,11 @@ export default function JobDetailPage() {
               <span className="text-base font-bold text-emerald-400">
                 ✓ Job Completed on {formatDate(job.updatedAt)}
               </span>
-              <span className="text-sm text-emerald-400/70">• Next: Create Invoice</span>
+              {job.invoice ? (
+                <span className="text-sm text-emerald-400/70">• Invoice #{job.invoice.invoiceNumber} created</span>
+              ) : (
+                <span className="text-sm text-emerald-400/70">• Next: Create Invoice</span>
+              )}
             </div>
           </div>
         </div>
@@ -447,11 +456,22 @@ export default function JobDetailPage() {
               </button>
             )}
 
-            {/* Create Invoice - Show only when completed */}
-            {job.status === 'completed' && (
+            {/* Create Invoice - Show only when completed and no invoice exists */}
+            {job.status === 'completed' && !job.invoice && (
               <button className="flex items-center gap-2 px-4 py-2 lg:px-5 lg:py-2.5 bg-purple-600 hover:bg-purple-500 rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md hover:shadow-purple-500/50">
                 <FileSpreadsheet className="h-4 w-4 lg:h-4.5 lg:w-4.5 text-white" />
                 <span className="text-xs lg:text-sm font-semibold text-white hidden sm:inline">Create Invoice</span>
+              </button>
+            )}
+
+            {/* View Invoice - Show when completed and invoice exists */}
+            {job.status === 'completed' && job.invoice && (
+              <button
+                onClick={() => router.push('/provider/invoices')}
+                className="flex items-center gap-2 px-4 py-2 lg:px-5 lg:py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md hover:shadow-indigo-500/50"
+              >
+                <FileSpreadsheet className="h-4 w-4 lg:h-4.5 lg:w-4.5 text-white" />
+                <span className="text-xs lg:text-sm font-semibold text-white hidden sm:inline">View Invoice</span>
               </button>
             )}
 
