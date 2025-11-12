@@ -116,7 +116,7 @@ export default function QuickReviewModal({
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <Sparkles className="h-5 w-5 text-emerald-600" />
                   <h3 className="text-lg font-bold text-emerald-900">
-                    Here's a Special Thank You!
+                    Here&apos;s a Special Thank You!
                   </h3>
                 </div>
                 <p className="text-sm text-emerald-700 mb-3">

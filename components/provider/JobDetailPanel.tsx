@@ -191,7 +191,7 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
                   🏡
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-lg md:text-xl font-bold text-zinc-100 truncate">{job.customerName}'s Property</h2>
+                  <h2 className="text-lg md:text-xl font-bold text-zinc-100 truncate">{job.customerName}&apos;s Property</h2>
                   <div className="text-sm text-emerald-500 font-medium">{job.serviceType.replace(/_/g, ' ')}</div>
                 </div>
               </div>

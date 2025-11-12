@@ -164,7 +164,7 @@ export default function CustomerDashboard() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-zinc-900 mb-2">Welcome back!</h1>
         <p className="text-zinc-600">
-          Here's what's happening with your service from{' '}
+          Here&apos;s what&apos;s happening with your service from{' '}
           <span className="font-semibold text-zinc-900">{data.provider.businessName}</span>
         </p>
       </div>

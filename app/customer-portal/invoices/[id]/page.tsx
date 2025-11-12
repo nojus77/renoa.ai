@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import CustomerLayout from '@/components/customer/CustomerLayout';
 import QuickReviewModal from '@/components/customer/QuickReviewModal';
@@ -68,13 +68,7 @@ export default function CustomerInvoiceDetailPage() {
   const [paying, setPaying] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
 
-  useEffect(() => {
-    if (invoiceId) {
-      fetchInvoiceDetails();
-    }
-  }, [invoiceId]);
-
-  const fetchInvoiceDetails = async () => {
+  const fetchInvoiceDetails = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`/api/customer/invoices/${invoiceId}`);
@@ -95,7 +89,13 @@ export default function CustomerInvoiceDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [invoiceId, router]);
+
+  useEffect(() => {
+    if (invoiceId) {
+      fetchInvoiceDetails();
+    }
+  }, [invoiceId, fetchInvoiceDetails]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -145,7 +145,7 @@ export default function CustomerInvoiceDetailPage() {
         <div className="text-center py-12">
           <AlertCircle className="h-12 w-12 text-zinc-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-zinc-900 mb-2">Invoice not found</h2>
-          <p className="text-zinc-600 mb-4">This invoice doesn't exist or you don't have access to it</p>
+          <p className="text-zinc-600 mb-4">This invoice doesn&apos;t exist or you don&apos;t have access to it</p>
           <Button onClick={() => router.push('/customer-portal/invoices')}>
             Back to Invoices
           </Button>

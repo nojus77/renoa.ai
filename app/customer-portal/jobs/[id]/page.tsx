@@ -124,7 +124,7 @@ export default function CustomerJobDetailPage() {
         <div className="text-center py-12">
           <AlertCircle className="h-12 w-12 text-zinc-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-zinc-900 mb-2">Job not found</h2>
-          <p className="text-zinc-600 mb-4">This job doesn't exist or you don't have access to it</p>
+          <p className="text-zinc-600 mb-4">This job doesn&apos;t exist or you don&apos;t have access to it</p>
           <Button onClick={() => router.push('/customer-portal/jobs')}>
             Back to Jobs
           </Button>

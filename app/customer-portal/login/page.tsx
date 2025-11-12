@@ -176,7 +176,7 @@ export default function CustomerLoginPage() {
                     />
                   </div>
                   <p className="text-xs text-zinc-500 mt-2">
-                    We'll send you a verification code via SMS
+                    We&apos;ll send you a verification code via SMS
                   </p>
                 </div>
               )}
@@ -198,7 +198,7 @@ export default function CustomerLoginPage() {
                     />
                   </div>
                   <p className="text-xs text-zinc-500 mt-2">
-                    We'll send you a magic link to sign in
+                    We&apos;ll send you a magic link to sign in
                   </p>
                 </div>
               )}
@@ -275,7 +275,7 @@ export default function CustomerLoginPage() {
                 disabled={loading}
                 className="w-full text-zinc-600 hover:text-zinc-900 text-sm py-2 mt-2"
               >
-                Didn't receive the code? Resend
+                Didn&apos;t receive the code? Resend
               </button>
             </>
           )}
