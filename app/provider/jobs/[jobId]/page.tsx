@@ -203,7 +203,7 @@ export default function JobDetailPage() {
         description: `Invoice ${result.invoiceNumber} sent to customer`,
         action: {
           label: 'View Invoice',
-          onClick: () => router.push(`/provider/invoices`),
+          onClick: () => router.push(`/provider/invoices/${result.invoiceId}`),
         },
       });
     } else {
@@ -467,7 +467,7 @@ export default function JobDetailPage() {
             {/* View Invoice - Show when completed and invoice exists */}
             {job.status === 'completed' && job.invoice && (
               <button
-                onClick={() => router.push('/provider/invoices')}
+                onClick={() => router.push(`/provider/invoices/${job.invoice.id}`)}
                 className="flex items-center gap-2 px-4 py-2 lg:px-5 lg:py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg transition-all hover:scale-105 active:scale-95 shadow-md hover:shadow-indigo-500/50"
               >
                 <FileSpreadsheet className="h-4 w-4 lg:h-4.5 lg:w-4.5 text-white" />
