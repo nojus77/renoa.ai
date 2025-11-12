@@ -111,7 +111,9 @@ export default function RecommendationsWidget() {
                     <div className="flex items-center gap-1">
                       <DollarSign className="h-3 w-3" />
                       <span className="font-semibold text-emerald-600">
-                        ${recommendation.recommendedPrice.toFixed(0)}
+                        ${typeof recommendation.recommendedPrice === 'number'
+                          ? recommendation.recommendedPrice.toFixed(0)
+                          : Number(recommendation.recommendedPrice).toFixed(0)}
                       </span>
                     </div>
                     <div className="flex items-center gap-1">

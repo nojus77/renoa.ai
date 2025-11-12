@@ -70,6 +70,8 @@ export async function GET(request: NextRequest) {
       ([baseService, recs]) =>
         recs.map(rec => ({
           ...rec,
+          recommendedPrice: Number(rec.recommendedPrice), // Convert Decimal to number
+          conversionRate: Number(rec.conversionRate), // Convert Decimal to number
           baseServiceContext: baseService,
         }))
     );
@@ -112,7 +114,14 @@ export async function POST(request: NextRequest) {
       take: 3,
     });
 
-    return NextResponse.json({ recommendations });
+    // Convert Decimal fields to numbers
+    const formattedRecommendations = recommendations.map(rec => ({
+      ...rec,
+      recommendedPrice: Number(rec.recommendedPrice),
+      conversionRate: Number(rec.conversionRate),
+    }));
+
+    return NextResponse.json({ recommendations: formattedRecommendations });
   } catch (error) {
     console.error('Error fetching service recommendations:', error);
     return NextResponse.json(
