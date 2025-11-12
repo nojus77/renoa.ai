@@ -30,6 +30,7 @@ export async function GET(
       include: {
         provider: {
           select: {
+            id: true,
             businessName: true,
             ownerName: true,
             phone: true,
@@ -49,6 +50,13 @@ export async function GET(
         },
         payments: {
           orderBy: { paymentDate: 'desc' },
+        },
+        job: {
+          select: {
+            id: true,
+            serviceType: true,
+            status: true,
+          },
         },
       },
     });

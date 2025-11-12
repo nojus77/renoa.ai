@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import CustomerLayout from '@/components/customer/CustomerLayout';
+import QuickReviewModal from '@/components/customer/QuickReviewModal';
 import { ArrowLeft, Download, Mail, Phone, MapPin, Calendar, CreditCard, Loader2, AlertCircle, CheckCircle, DollarSign } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ interface Invoice {
   terms: string | null;
   paymentInstructions: string | null;
   provider: {
+    id: string;
     businessName: string;
     ownerName: string;
     email: string;
@@ -47,6 +49,11 @@ interface Invoice {
     paymentDate: string;
     paymentMethod: string;
   }>;
+  job: {
+    id: string;
+    serviceType: string;
+    status: string;
+  } | null;
 }
 
 export default function CustomerInvoiceDetailPage() {
@@ -59,6 +66,7 @@ export default function CustomerInvoiceDetailPage() {
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
 
   useEffect(() => {
     if (invoiceId) {
@@ -371,6 +379,18 @@ export default function CustomerInvoiceDetailPage() {
           Download PDF
         </Button>
       </div>
+
+      {/* Review Modal */}
+      {showReviewModal && invoice.job && (
+        <QuickReviewModal
+          isOpen={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          jobId={invoice.job.id}
+          providerId={invoice.provider.id}
+          providerName={invoice.provider.businessName}
+          serviceType={invoice.job.serviceType}
+        />
+      )}
     </CustomerLayout>
   );
 
@@ -400,6 +420,11 @@ export default function CustomerInvoiceDetailPage() {
 
       // Refresh invoice to show updated status
       await fetchInvoiceDetails();
+
+      // Show review modal if this invoice is linked to a job
+      if (invoice.job) {
+        setShowReviewModal(true);
+      }
     } catch (error: any) {
       console.error('Error processing payment:', error);
       toast.error(error.message || 'Failed to process payment');
