@@ -17,12 +17,14 @@ import {
   CheckCircle,
   Loader2,
   ArrowRight,
+  RefreshCw,
 } from 'lucide-react';
 import CustomerLayout from '@/components/customer/CustomerLayout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import SubscriptionWidget from '@/components/customer/SubscriptionWidget';
 import SubscriptionSetupModal from '@/components/customer/SubscriptionSetupModal';
+import BookAgainModal from '@/components/customer/BookAgainModal';
 
 interface Job {
   id: string;
@@ -58,6 +60,7 @@ export default function CustomerDashboard() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [setupModalOpen, setSetupModalOpen] = useState(false);
+  const [bookAgainJob, setBookAgainJob] = useState<Job | null>(null);
 
   useEffect(() => {
     fetchDashboardData();
@@ -331,19 +334,37 @@ export default function CustomerDashboard() {
                 data.recentJobs.map((job) => (
                   <div
                     key={job.id}
-                    className="p-4 hover:bg-zinc-50 transition-colors cursor-pointer"
-                    onClick={() => router.push(`/customer-portal/jobs/${job.id}`)}
+                    className="p-4 hover:bg-zinc-50 transition-colors"
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-semibold text-zinc-900">{job.serviceType}</h3>
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(job.status)}`}>
-                        {getStatusLabel(job.status)}
-                      </span>
+                    <div
+                      className="cursor-pointer"
+                      onClick={() => router.push(`/customer-portal/jobs/${job.id}`)}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="font-semibold text-zinc-900">{job.serviceType}</h3>
+                        <div className="flex items-center gap-2">
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(job.status)}`}>
+                            {getStatusLabel(job.status)}
+                          </span>
+                          {job.status === 'completed' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setBookAgainJob(job);
+                              }}
+                              className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-600 transition-colors"
+                              title="Book this service again"
+                            >
+                              <RefreshCw className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      <p className="text-sm text-zinc-600 flex items-center gap-2">
+                        <Calendar className="h-3.5 w-3.5" />
+                        {formatDate(job.startTime)}
+                      </p>
                     </div>
-                    <p className="text-sm text-zinc-600 flex items-center gap-2">
-                      <Calendar className="h-3.5 w-3.5" />
-                      {formatDate(job.startTime)}
-                    </p>
                   </div>
                 ))
               ) : (
@@ -452,6 +473,25 @@ export default function CustomerDashboard() {
           providerName={data.provider.businessName}
           serviceTypes={['Lawn Care', 'Landscaping', 'Tree Service', 'House Cleaning']}
           averageJobPrice={data.nextJob?.estimatedValue || 150}
+        />
+      )}
+
+      {/* Book Again Modal */}
+      {bookAgainJob && (
+        <BookAgainModal
+          isOpen={!!bookAgainJob}
+          onClose={() => setBookAgainJob(null)}
+          onSuccess={() => {
+            setBookAgainJob(null);
+            toast.success('Service booked successfully!');
+            fetchDashboardData();
+          }}
+          serviceType={bookAgainJob.serviceType}
+          providerId={bookAgainJob.provider.businessName}
+          providerName={bookAgainJob.provider.businessName}
+          address={bookAgainJob.address}
+          estimatedValue={bookAgainJob.estimatedValue || 150}
+          bookingSource="rebook_dashboard"
         />
       )}
     </CustomerLayout>

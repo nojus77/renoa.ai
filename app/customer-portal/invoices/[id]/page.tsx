@@ -4,7 +4,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import CustomerLayout from '@/components/customer/CustomerLayout';
 import QuickReviewModal from '@/components/customer/QuickReviewModal';
-import { ArrowLeft, Download, Mail, Phone, MapPin, Calendar, CreditCard, Loader2, AlertCircle, CheckCircle, DollarSign } from 'lucide-react';
+import BookAgainModal from '@/components/customer/BookAgainModal';
+import { ArrowLeft, Download, Mail, Phone, MapPin, Calendar, CreditCard, Loader2, AlertCircle, CheckCircle, DollarSign, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
@@ -67,6 +68,7 @@ export default function CustomerInvoiceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [showBookAgainModal, setShowBookAgainModal] = useState(false);
 
   const fetchInvoiceDetails = useCallback(async () => {
     try {
@@ -370,6 +372,15 @@ export default function CustomerInvoiceDetailPage() {
             <span className="font-medium">Invoice Paid in Full</span>
           </div>
         )}
+        {isPaid && invoice.job && (
+          <Button
+            onClick={() => setShowBookAgainModal(true)}
+            className="bg-emerald-600 hover:bg-emerald-500 flex items-center gap-2"
+          >
+            <RefreshCw className="h-4 w-4" />
+            Book Service Again
+          </Button>
+        )}
         <Button
           variant="outline"
           onClick={() => toast.info('Download feature coming soon!')}
@@ -389,6 +400,25 @@ export default function CustomerInvoiceDetailPage() {
           providerId={invoice.provider.id}
           providerName={invoice.provider.businessName}
           serviceType={invoice.job.serviceType}
+        />
+      )}
+
+      {/* Book Again Modal */}
+      {showBookAgainModal && invoice.job && (
+        <BookAgainModal
+          isOpen={showBookAgainModal}
+          onClose={() => setShowBookAgainModal(false)}
+          onSuccess={() => {
+            setShowBookAgainModal(false);
+            toast.success('Service booked successfully!');
+            router.push('/customer-portal/jobs');
+          }}
+          serviceType={invoice.job.serviceType}
+          providerId={invoice.provider.id}
+          providerName={invoice.provider.businessName}
+          address={invoice.customer.address}
+          estimatedValue={invoice.total}
+          bookingSource="rebook_invoice"
         />
       )}
     </CustomerLayout>

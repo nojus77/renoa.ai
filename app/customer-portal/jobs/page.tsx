@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Calendar, Clock, MapPin, Loader2, AlertCircle, Briefcase } from 'lucide-react';
+import { Calendar, Clock, MapPin, Loader2, AlertCircle, Briefcase, RefreshCw } from 'lucide-react';
 import CustomerLayout from '@/components/customer/CustomerLayout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import BookAgainModal from '@/components/customer/BookAgainModal';
 
 interface Job {
   id: string;
@@ -26,6 +27,7 @@ export default function CustomerJobsPage() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'all' | 'scheduled' | 'in_progress' | 'completed'>('all');
+  const [bookAgainJob, setBookAgainJob] = useState<Job | null>(null);
 
   useEffect(() => {
     fetchJobs();
@@ -191,9 +193,46 @@ export default function CustomerJobsPage() {
                   </div>
                 </div>
               )}
+
+              {/* Book Again Button for Completed Jobs */}
+              {job.status === 'completed' && (
+                <div className="mt-4 pt-4 border-t border-zinc-200">
+                  <Button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setBookAgainJob(job);
+                    }}
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                  >
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                    Book Again
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>
+      )}
+
+      {/* Book Again Modal */}
+      {bookAgainJob && (
+        <BookAgainModal
+          isOpen={!!bookAgainJob}
+          onClose={() => setBookAgainJob(null)}
+          onSuccess={() => {
+            setBookAgainJob(null);
+            toast.success('Service booked successfully!');
+            fetchJobs();
+          }}
+          serviceType={bookAgainJob.serviceType}
+          providerId={bookAgainJob.provider.businessName}
+          providerName={bookAgainJob.provider.businessName}
+          address={bookAgainJob.address}
+          estimatedValue={bookAgainJob.actualValue || bookAgainJob.estimatedValue || 150}
+          bookingSource="rebook_jobs_list"
+        />
       )}
     </CustomerLayout>
   );
