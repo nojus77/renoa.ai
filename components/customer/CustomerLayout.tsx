@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Briefcase, FileText, MessageSquare, LogOut, Menu, X, Repeat } from 'lucide-react';
+import { Home, Briefcase, FileText, MessageSquare, LogOut, Menu, X, Repeat, Gift, DollarSign } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -22,6 +22,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [customer, setCustomer] = useState<CustomerSession | null>(null);
+  const [creditBalance, setCreditBalance] = useState<number>(0);
 
   useEffect(() => {
     // Check authentication
@@ -30,6 +31,17 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
       .then(data => {
         if (data.customer) {
           setCustomer(data.customer);
+          // Fetch credit balance
+          fetch('/api/customer/credits')
+            .then(res => res.json())
+            .then(creditData => {
+              if (creditData.totalAvailable) {
+                setCreditBalance(creditData.totalAvailable);
+              }
+            })
+            .catch(() => {
+              // Silently fail - credits not critical for layout
+            });
         } else {
           router.push('/customer-portal/login');
         }
@@ -54,6 +66,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
     { name: 'Jobs', href: '/customer-portal/jobs', icon: Briefcase },
     { name: 'Invoices', href: '/customer-portal/invoices', icon: FileText },
     { name: 'Subscriptions', href: '/customer-portal/subscriptions', icon: Repeat },
+    { name: 'Referrals', href: '/customer-portal/referrals', icon: Gift },
     { name: 'Messages', href: '/customer-portal/messages', icon: MessageSquare },
   ];
 
@@ -101,6 +114,16 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
 
             {/* User Menu */}
             <div className="hidden md:flex items-center gap-4">
+              {creditBalance > 0 && (
+                <Link href="/customer-portal/referrals">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 hover:bg-emerald-200 transition-colors cursor-pointer border border-emerald-200">
+                    <DollarSign className="h-4 w-4 text-emerald-700" />
+                    <span className="text-sm font-bold text-emerald-700">
+                      ${creditBalance.toFixed(0)} Credit
+                    </span>
+                  </div>
+                </Link>
+              )}
               <span className="text-sm text-zinc-600">
                 Hi, <span className="font-semibold text-zinc-900">{customer.name.split(' ')[0]}</span>
               </span>

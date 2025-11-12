@@ -26,6 +26,7 @@ import SubscriptionWidget from '@/components/customer/SubscriptionWidget';
 import SubscriptionSetupModal from '@/components/customer/SubscriptionSetupModal';
 import BookAgainModal from '@/components/customer/BookAgainModal';
 import RecommendationsWidget from '@/components/customer/RecommendationsWidget';
+import ReferralWidget from '@/components/customer/ReferralWidget';
 
 interface Job {
   id: string;
@@ -387,6 +388,9 @@ export default function CustomerDashboard() {
 
           {/* Service Recommendations Widget */}
           <RecommendationsWidget />
+
+          {/* Referral Widget */}
+          <ReferralWidget />
 
           {/* Subscription Widget */}
           <SubscriptionWidget

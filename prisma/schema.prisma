@@ -428,12 +428,15 @@ model Customer {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   // Relations
-  provider      Provider                @relation("ProviderCustomers", fields: [providerId], references: [id], onDelete: Cascade)
-  jobs          Job[]                   @relation("CustomerJobs")
-  messages      ProviderCustomerMessage[] @relation("CustomerMessages")
-  invoices      Invoice[]               @relation("CustomerInvoices")
-  reviews       Review[]                @relation("CustomerReviews")
-  subscriptions CustomerSubscription[]  @relation("CustomerSubscriptions")
+  provider          Provider                @relation("ProviderCustomers", fields: [providerId], references: [id], onDelete: Cascade)
+  jobs              Job[]                   @relation("CustomerJobs")
+  messages          ProviderCustomerMessage[] @relation("CustomerMessages")
+  invoices          Invoice[]               @relation("CustomerInvoices")
+  reviews           Review[]                @relation("CustomerReviews")
+  subscriptions     CustomerSubscription[]  @relation("CustomerSubscriptions")
+  referrals         Referral[]              @relation("ReferrerReferrals")
+  referredBy        Referral[]              @relation("ReferredCustomer")
+  credits           CustomerCredit[]        @relation("CustomerCredits")
 
   @@index([providerId])
   @@index([phone])
@@ -917,4 +920,55 @@ model ServiceRecommendation {
   @@index([displayOrder])
   @@index([isActive])
   @@map("service_recommendations")
+}
+
+model Referral {
+  id                  String        @id @default(uuid())
+  referrerId          String        @map("referrer_id")
+  referredEmail       String        @map("referred_email")
+  referredPhone       String?       @map("referred_phone")
+  referredCustomerId  String?       @map("referred_customer_id")
+  status              ReferralStatus @default(pending)
+  referralCode        String        @unique @map("referral_code")
+  creditAmount        Decimal       @default(50) @map("credit_amount") @db.Decimal(10, 2)
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
+
+  referrer         Customer        @relation("ReferrerReferrals", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredCustomer Customer?       @relation("ReferredCustomer", fields: [referredCustomerId], references: [id], onDelete: SetNull)
+  credits          CustomerCredit[] @relation("ReferralCredits")
+
+  @@index([referrerId])
+  @@index([referredCustomerId])
+  @@index([referralCode])
+  @@index([status])
+  @@map("referrals")
+}
+
+model CustomerCredit {
+  id          String    @id @default(uuid())
+  customerId  String    @map("customer_id")
+  amount      Decimal   @db.Decimal(10, 2)
+  source      String    // "referral", "loyalty", "promotion"
+  referralId  String?   @map("referral_id")
+  usedAmount  Decimal   @default(0) @map("used_amount") @db.Decimal(10, 2)
+  expiresAt   DateTime? @map("expires_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  customer Customer  @relation("CustomerCredits", fields: [customerId], references: [id], onDelete: Cascade)
+  referral Referral? @relation("ReferralCredits", fields: [referralId], references: [id], onDelete: SetNull)
+
+  @@index([customerId])
+  @@index([referralId])
+  @@index([source])
+  @@index([expiresAt])
+  @@map("customer_credits")
+}
+
+enum ReferralStatus {
+  pending
+  signed_up
+  completed_job
+  credited
 }
