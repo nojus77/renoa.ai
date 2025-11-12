@@ -58,19 +58,13 @@ export default function CustomerInvoiceDetailPage() {
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showPaymentDialog, setShowPaymentDialog] = useState(false);
+  const [paying, setPaying] = useState(false);
 
   useEffect(() => {
     if (invoiceId) {
       fetchInvoiceDetails();
     }
   }, [invoiceId]);
-
-  useEffect(() => {
-    if (shouldOpenPayment && invoice && invoice.status !== 'paid') {
-      setShowPaymentDialog(true);
-    }
-  }, [shouldOpenPayment, invoice]);
 
   const fetchInvoiceDetails = async () => {
     try {
@@ -351,11 +345,15 @@ export default function CustomerInvoiceDetailPage() {
       <div className="flex gap-3">
         {!isPaid && balance > 0 && (
           <Button
-            onClick={() => toast.info('Payment integration coming soon!')}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500"
+            onClick={handlePayNow}
+            disabled={paying}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50"
           >
-            <CreditCard className="h-4 w-4" />
-            Pay {formatCurrency(balance)} Now
+            {paying ? (
+              <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
+            ) : (
+              <><CreditCard className="h-4 w-4" /> Pay {formatCurrency(balance)} Now</>
+            )}
           </Button>
         )}
         {isPaid && (
@@ -375,4 +373,38 @@ export default function CustomerInvoiceDetailPage() {
       </div>
     </CustomerLayout>
   );
+
+  async function handlePayNow() {
+    if (!invoice || paying) return;
+
+    try {
+      setPaying(true);
+
+      const response = await fetch(`/api/customer/invoices/${invoice.id}/pay`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: balance,
+          paymentMethod: 'online',
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to process payment');
+      }
+
+      toast.success('Payment successful! 🎉', {
+        description: `Paid ${formatCurrency(balance)}`,
+      });
+
+      // Refresh invoice to show updated status
+      await fetchInvoiceDetails();
+    } catch (error: any) {
+      console.error('Error processing payment:', error);
+      toast.error(error.message || 'Failed to process payment');
+    } finally {
+      setPaying(false);
+    }
+  }
 }

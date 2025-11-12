@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
     const now = new Date();
 
-    // Get active promotions
+    // Get active promotions (Renoa promotions + provider promotions)
     const promotions = await prisma.promotion.findMany({
       where: {
         isActive: true,
@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: [
+        { isRenoaPromo: 'desc' }, // Renoa promotions first
         { validUntil: 'asc' }, // Expiring soon first
         { discountValue: 'desc' }, // Higher discounts first
       ],
@@ -72,6 +73,7 @@ export async function GET(request: NextRequest) {
           ? `${promo.discountValue}% off`
           : `$${promo.discountValue.toFixed(2)} off`,
       isFromYourProvider: promo.providerId === customer.providerId,
+      providerName: promo.isRenoaPromo ? 'Renoa' : promo.provider?.businessName || 'Provider',
     }));
 
     return NextResponse.json({ promotions: promotionsWithSavings });

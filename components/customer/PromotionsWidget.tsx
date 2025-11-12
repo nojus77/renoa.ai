@@ -8,16 +8,19 @@ interface Promotion {
   id: string;
   title: string;
   description: string;
-  serviceType: string;
+  serviceType: string | null;
   discountType: string;
   discountValue: number;
   validUntil: string;
   estimatedSavings: string;
   isFromYourProvider: boolean;
+  isRenoaPromo: boolean;
+  code: string | null;
+  providerName: string;
   provider: {
     businessName: string;
     rating: number;
-  };
+  } | null;
 }
 
 export default function PromotionsWidget() {
@@ -73,17 +76,31 @@ export default function PromotionsWidget() {
         {promotions.map((promo) => (
           <div
             key={promo.id}
-            className="bg-white rounded-lg p-4 border border-purple-100 hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group"
+            className={`bg-white rounded-lg p-4 border ${
+              promo.isRenoaPromo
+                ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-teal-50'
+                : 'border-purple-100'
+            } hover:border-purple-300 hover:shadow-md transition-all cursor-pointer group`}
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <Tag className="h-4 w-4 text-purple-600" />
                   <span className="text-sm font-semibold text-purple-700">
                     {promo.estimatedSavings}
                   </span>
-                  {promo.isFromYourProvider && (
-                    <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">
+                  {promo.code && (
+                    <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-mono font-bold">
+                      {promo.code}
+                    </span>
+                  )}
+                  {promo.isRenoaPromo && (
+                    <span className="text-xs bg-emerald-600 text-white px-2 py-0.5 rounded-full font-medium">
+                      Renoa Exclusive
+                    </span>
+                  )}
+                  {promo.isFromYourProvider && !promo.isRenoaPromo && (
+                    <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
                       Your Provider
                     </span>
                   )}
@@ -99,7 +116,7 @@ export default function PromotionsWidget() {
                     <Clock className="h-3 w-3" />
                     {formatDate(promo.validUntil)}
                   </span>
-                  <span>by {promo.provider.businessName}</span>
+                  <span>by {promo.providerName}</span>
                 </div>
               </div>
               <ArrowRight className="h-5 w-5 text-purple-600 flex-shrink-0 group-hover:translate-x-1 transition-transform" />

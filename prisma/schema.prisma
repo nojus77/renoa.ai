@@ -822,12 +822,14 @@ model Review {
 
 model Promotion {
   id              String    @id @default(uuid())
-  providerId      String    @map("provider_id")
+  providerId      String?   @map("provider_id") // Nullable for Renoa promotions
   title           String
   description     String    @db.Text
-  serviceType     String    @map("service_type")
+  serviceType     String?   @map("service_type") // Can be null for all services
   discountType    String    @map("discount_type") // "percentage" or "fixed"
   discountValue   Float     @map("discount_value")
+  code            String?   @unique // Promo code like "FIRST20" or "SPRING2025"
+  isRenoaPromo    Boolean   @default(false) @map("is_renoa_promo") // True for Renoa promotions
   targetAreas     String[]  @map("target_areas") @default([]) // ZIP codes or cities
   minJobValue     Float?    @map("min_job_value")
   maxUses         Int?      @map("max_uses")
@@ -840,11 +842,13 @@ model Promotion {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  provider Provider @relation("ProviderPromotions", fields: [providerId], references: [id], onDelete: Cascade)
+  provider Provider? @relation("ProviderPromotions", fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([providerId])
   @@index([serviceType])
   @@index([isActive])
+  @@index([code])
+  @@index([isRenoaPromo])
   @@index([validFrom])
   @@index([validUntil])
   @@map("promotions")
