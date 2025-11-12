@@ -38,6 +38,12 @@ export async function GET(
         photos: {
           orderBy: { createdAt: 'asc' },
         },
+        review: {
+          select: {
+            id: true,
+            rating: true,
+          },
+        },
       },
     });
 
@@ -53,6 +59,7 @@ export async function GET(
         ...job,
         estimatedValue: job.estimatedValue ? Number(job.estimatedValue) : null,
         actualValue: job.actualValue ? Number(job.actualValue) : null,
+        hasReview: !!job.review,
       },
     });
   } catch (error) {

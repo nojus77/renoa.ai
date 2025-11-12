@@ -408,6 +408,8 @@ model Provider {
   jobs         Job[]                     @relation("ProviderJobs")
   customers    Customer[]                @relation("ProviderCustomers")
   messages     ProviderCustomerMessage[] @relation("ProviderMessages")
+  reviews      Review[]                  @relation("ProviderReviews")
+  promotions   Promotion[]               @relation("ProviderPromotions")
 }
 
 model Customer {
@@ -428,6 +430,7 @@ model Customer {
   jobs     Job[]                     @relation("CustomerJobs")
   messages ProviderCustomerMessage[] @relation("CustomerMessages")
   invoices Invoice[]                 @relation("CustomerInvoices")
+  reviews  Review[]                  @relation("CustomerReviews")
 
   @@index([providerId])
   @@index([phone])
@@ -476,6 +479,7 @@ model Job {
   provider Provider   @relation("ProviderJobs", fields: [providerId], references: [id], onDelete: Cascade)
   customer Customer   @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
   photos   JobPhoto[] @relation("JobPhotos")
+  review   Review?    @relation("JobReview")
 
   @@index([providerId])
   @@index([customerId])
@@ -786,4 +790,62 @@ enum PaymentMethod {
   bank_transfer
   online
   other
+}
+
+model Review {
+  id               String   @id @default(uuid())
+  jobId            String   @unique @map("job_id")
+  providerId       String   @map("provider_id")
+  customerId       String   @map("customer_id")
+  rating           Int // 1-5 stars
+  qualityRating    Int?     @map("quality_rating") // 1-5 stars for quality
+  timelinessRating Int?     @map("timeliness_rating") // 1-5 stars for timeliness
+  communicationRating Int?  @map("communication_rating") // 1-5 stars for communication
+  comment          String?  @db.Text
+  response         String?  @db.Text // Provider can respond to review
+  respondedAt      DateTime? @map("responded_at")
+  isPublic         Boolean  @default(true) @map("is_public")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  job      Job      @relation("JobReview", fields: [jobId], references: [id], onDelete: Cascade)
+  provider Provider @relation("ProviderReviews", fields: [providerId], references: [id], onDelete: Cascade)
+  customer Customer @relation("CustomerReviews", fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([customerId])
+  @@index([rating])
+  @@index([createdAt])
+  @@map("reviews")
+}
+
+model Promotion {
+  id              String    @id @default(uuid())
+  providerId      String    @map("provider_id")
+  title           String
+  description     String    @db.Text
+  serviceType     String    @map("service_type")
+  discountType    String    @map("discount_type") // "percentage" or "fixed"
+  discountValue   Float     @map("discount_value")
+  targetAreas     String[]  @map("target_areas") @default([]) // ZIP codes or cities
+  minJobValue     Float?    @map("min_job_value")
+  maxUses         Int?      @map("max_uses")
+  currentUses     Int       @default(0) @map("current_uses")
+  validFrom       DateTime  @map("valid_from")
+  validUntil      DateTime  @map("valid_until")
+  isActive        Boolean   @default(true) @map("is_active")
+  terms           String?   @db.Text
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  provider Provider @relation("ProviderPromotions", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([serviceType])
+  @@index([isActive])
+  @@index([validFrom])
+  @@index([validUntil])
+  @@map("promotions")
 }

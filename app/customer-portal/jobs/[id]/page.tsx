@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Calendar, Clock, MapPin, DollarSign, Phone, Mail, Loader2, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, DollarSign, Phone, Mail, Loader2, AlertCircle, Star } from 'lucide-react';
 import CustomerLayout from '@/components/customer/CustomerLayout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import ReviewModal from '@/components/customer/ReviewModal';
 
 interface Job {
   id: string;
@@ -17,6 +18,7 @@ interface Job {
   estimatedValue: number | null;
   actualValue: number | null;
   customerNotes: string | null;
+  hasReview: boolean;
   provider: {
     businessName: string;
     phone: string;
@@ -37,6 +39,7 @@ export default function CustomerJobDetailPage() {
 
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showReviewModal, setShowReviewModal] = useState(false);
 
   useEffect(() => {
     if (jobId) {
@@ -310,16 +313,48 @@ export default function CustomerJobDetailPage() {
             <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl border border-emerald-200 p-6">
               <h2 className="text-lg font-bold text-zinc-900 mb-3">Job Completed!</h2>
               <p className="text-sm text-zinc-600 mb-4">Thank you for choosing our service</p>
-              <Button
-                onClick={() => router.push('/customer-portal/invoices')}
-                className="w-full bg-emerald-600 hover:bg-emerald-500"
-              >
-                View Invoice
-              </Button>
+              <div className="space-y-3">
+                <Button
+                  onClick={() => router.push('/customer-portal/invoices')}
+                  className="w-full bg-emerald-600 hover:bg-emerald-500"
+                >
+                  View Invoice
+                </Button>
+                {!job.hasReview && (
+                  <Button
+                    onClick={() => setShowReviewModal(true)}
+                    variant="outline"
+                    className="w-full border-emerald-600 text-emerald-700 hover:bg-emerald-50"
+                  >
+                    <Star className="h-4 w-4 mr-2" />
+                    Leave a Review
+                  </Button>
+                )}
+                {job.hasReview && (
+                  <div className="flex items-center gap-2 justify-center p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+                    <Star className="h-4 w-4 fill-emerald-600" />
+                    <span className="text-sm font-medium">Review Submitted</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
       </div>
+
+      {/* Review Modal */}
+      {showReviewModal && job && (
+        <ReviewModal
+          isOpen={showReviewModal}
+          onClose={() => setShowReviewModal(false)}
+          onSubmit={() => {
+            fetchJobDetails(); // Refresh to show review was submitted
+          }}
+          jobId={job.id}
+          providerName={job.provider.businessName}
+          serviceType={job.serviceType}
+        />
+      )}
     </CustomerLayout>
   );
 }
