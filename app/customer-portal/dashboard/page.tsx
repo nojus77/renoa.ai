@@ -21,6 +21,8 @@ import {
 import CustomerLayout from '@/components/customer/CustomerLayout';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import SubscriptionWidget from '@/components/customer/SubscriptionWidget';
+import SubscriptionSetupModal from '@/components/customer/SubscriptionSetupModal';
 
 interface Job {
   id: string;
@@ -55,6 +57,7 @@ export default function CustomerDashboard() {
   const router = useRouter();
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [setupModalOpen, setSetupModalOpen] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -359,6 +362,14 @@ export default function CustomerDashboard() {
               </Link>
             </div>
           </div>
+
+          {/* Subscription Widget */}
+          <SubscriptionWidget
+            providerName={data.provider.businessName}
+            serviceType={data.nextJob?.serviceType || 'Lawn Care'}
+            averageJobPrice={data.nextJob?.estimatedValue || 150}
+            onSetupClick={() => setSetupModalOpen(true)}
+          />
         </div>
 
         {/* Right Column - Quick Actions & Provider Info */}
@@ -390,6 +401,14 @@ export default function CustomerDashboard() {
               >
                 <MessageSquare className="h-4 w-4 mr-3" />
                 Message Provider
+              </Button>
+              <Button
+                onClick={() => router.push('/customer-portal/subscriptions')}
+                variant="outline"
+                className="w-full justify-start border-zinc-300"
+              >
+                <CheckCircle className="h-4 w-4 mr-3" />
+                My Subscriptions
               </Button>
             </div>
           </div>
@@ -423,6 +442,18 @@ export default function CustomerDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Subscription Setup Modal */}
+      {data && (
+        <SubscriptionSetupModal
+          isOpen={setupModalOpen}
+          onClose={() => setSetupModalOpen(false)}
+          providerId={data.provider.id}
+          providerName={data.provider.businessName}
+          serviceTypes={['Lawn Care', 'Landscaping', 'Tree Service', 'House Cleaning']}
+          averageJobPrice={data.nextJob?.estimatedValue || 150}
+        />
+      )}
     </CustomerLayout>
   );
 }

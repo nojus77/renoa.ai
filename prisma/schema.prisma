@@ -401,15 +401,16 @@ model Provider {
   advanceBooking    Int     @default(14)
   availabilityNotes String?
 
-  leads        Lead[]                    @relation("AssignedProviderLeads")
-  leadNotes    LeadNote[]                @relation("ProviderNotes")
-  blockedTimes BlockedTime[]             @relation("ProviderBlockedTimes")
-  invoices     Invoice[]                 @relation("ProviderInvoices")
-  jobs         Job[]                     @relation("ProviderJobs")
-  customers    Customer[]                @relation("ProviderCustomers")
-  messages     ProviderCustomerMessage[] @relation("ProviderMessages")
-  reviews      Review[]                  @relation("ProviderReviews")
-  promotions   Promotion[]               @relation("ProviderPromotions")
+  leads         Lead[]                    @relation("AssignedProviderLeads")
+  leadNotes     LeadNote[]                @relation("ProviderNotes")
+  blockedTimes  BlockedTime[]             @relation("ProviderBlockedTimes")
+  invoices      Invoice[]                 @relation("ProviderInvoices")
+  jobs          Job[]                     @relation("ProviderJobs")
+  customers     Customer[]                @relation("ProviderCustomers")
+  messages      ProviderCustomerMessage[] @relation("ProviderMessages")
+  reviews       Review[]                  @relation("ProviderReviews")
+  promotions    Promotion[]               @relation("ProviderPromotions")
+  subscriptions CustomerSubscription[]    @relation("ProviderSubscriptions")
 }
 
 model Customer {
@@ -426,11 +427,12 @@ model Customer {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   // Relations
-  provider Provider                  @relation("ProviderCustomers", fields: [providerId], references: [id], onDelete: Cascade)
-  jobs     Job[]                     @relation("CustomerJobs")
-  messages ProviderCustomerMessage[] @relation("CustomerMessages")
-  invoices Invoice[]                 @relation("CustomerInvoices")
-  reviews  Review[]                  @relation("CustomerReviews")
+  provider      Provider                @relation("ProviderCustomers", fields: [providerId], references: [id], onDelete: Cascade)
+  jobs          Job[]                   @relation("CustomerJobs")
+  messages      ProviderCustomerMessage[] @relation("CustomerMessages")
+  invoices      Invoice[]               @relation("CustomerInvoices")
+  reviews       Review[]                @relation("CustomerReviews")
+  subscriptions CustomerSubscription[]  @relation("CustomerSubscriptions")
 
   @@index([providerId])
   @@index([phone])
@@ -855,4 +857,43 @@ model Promotion {
   @@index([validFrom])
   @@index([validUntil])
   @@map("promotions")
+}
+
+model CustomerSubscription {
+  id                String                 @id @default(uuid())
+  customerId        String                 @map("customer_id")
+  serviceType       String                 @map("service_type")
+  providerId        String                 @map("provider_id")
+  frequency         SubscriptionFrequency
+  price             Decimal                @db.Decimal(10, 2)
+  discountPercent   Decimal                @default(10) @map("discount_percent") @db.Decimal(5, 2)
+  status            SubscriptionStatus     @default(active)
+  nextScheduledDate DateTime               @map("next_scheduled_date")
+  startDate         DateTime               @map("start_date")
+  pausedUntil       DateTime?              @map("paused_until")
+  stripeSubscriptionId String?             @map("stripe_subscription_id")
+  stripeCustomerId  String?                @map("stripe_customer_id")
+  createdAt         DateTime               @default(now()) @map("created_at")
+  updatedAt         DateTime               @updatedAt @map("updated_at")
+
+  customer Customer @relation("CustomerSubscriptions", fields: [customerId], references: [id], onDelete: Cascade)
+  provider Provider @relation("ProviderSubscriptions", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([providerId])
+  @@index([status])
+  @@index([nextScheduledDate])
+  @@map("customer_subscriptions")
+}
+
+enum SubscriptionFrequency {
+  weekly
+  biweekly
+  monthly
+}
+
+enum SubscriptionStatus {
+  active
+  paused
+  cancelled
 }

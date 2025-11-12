@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Briefcase, FileText, MessageSquare, LogOut, Menu, X } from 'lucide-react';
+import { Home, Briefcase, FileText, MessageSquare, LogOut, Menu, X, Repeat } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -53,6 +53,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
     { name: 'Dashboard', href: '/customer-portal/dashboard', icon: Home },
     { name: 'Jobs', href: '/customer-portal/jobs', icon: Briefcase },
     { name: 'Invoices', href: '/customer-portal/invoices', icon: FileText },
+    { name: 'Subscriptions', href: '/customer-portal/subscriptions', icon: Repeat },
     { name: 'Messages', href: '/customer-portal/messages', icon: MessageSquare },
   ];
 
