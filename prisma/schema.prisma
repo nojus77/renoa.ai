@@ -437,6 +437,7 @@ model Customer {
   referrals         Referral[]              @relation("ReferrerReferrals")
   referredBy        Referral[]              @relation("ReferredCustomer")
   credits           CustomerCredit[]        @relation("CustomerCredits")
+  promotions        CustomerPromotion[]     @relation("CustomerPromotions")
 
   @@index([providerId])
   @@index([phone])
@@ -971,4 +972,34 @@ enum ReferralStatus {
   signed_up
   completed_job
   credited
+}
+
+model CustomerPromotion {
+  id              String         @id @default(uuid())
+  customerId      String         @map("customer_id")
+  promoCode       String         @unique @map("promo_code")
+  discountPercent Decimal?       @map("discount_percent") @db.Decimal(5, 2)
+  discountAmount  Decimal?       @map("discount_amount") @db.Decimal(10, 2)
+  expiresAt       DateTime       @map("expires_at")
+  status          PromotionStatus @default(active)
+  triggerType     String         @map("trigger_type") // "inactivity", "seasonal", "winback", "manual"
+  message         String?        @db.Text
+  usedAt          DateTime?      @map("used_at")
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  customer Customer @relation("CustomerPromotions", fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([promoCode])
+  @@index([status])
+  @@index([expiresAt])
+  @@index([triggerType])
+  @@map("customer_promotions")
+}
+
+enum PromotionStatus {
+  active
+  used
+  expired
 }

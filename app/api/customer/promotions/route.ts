@@ -4,79 +4,75 @@ import { cookies } from 'next/headers';
 
 const prisma = new PrismaClient();
 
-// GET - Get active promotions for customer's area
+// GET - Fetch customer's active promotions
 export async function GET(request: NextRequest) {
   try {
-    // Get customer session
     const cookieStore = cookies();
-    const sessionCookie = cookieStore.get('customer-session');
+    const session = cookieStore.get('customer-session');
 
-    if (!sessionCookie?.value) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const session = JSON.parse(sessionCookie.value);
-    const customerId = session.customerId;
-
-    // Get customer info for location
-    const customer = await prisma.customer.findUnique({
-      where: { id: customerId },
-      select: { address: true, providerId: true },
-    });
-
-    if (!customer) {
+    if (!session) {
       return NextResponse.json(
-        { error: 'Customer not found' },
-        { status: 404 }
+        { error: 'Not authenticated' },
+        { status: 401 }
       );
     }
 
-    const now = new Date();
+    const { customerId } = JSON.parse(session.value);
 
-    // Get active promotions (Renoa promotions + provider promotions)
-    const promotions = await prisma.promotion.findMany({
-      where: {
-        isActive: true,
-        validFrom: { lte: now },
-        validUntil: { gte: now },
-        OR: [
-          { maxUses: null }, // Unlimited uses
-          {
-            maxUses: { gt: prisma.promotion.fields.currentUses },
-          },
-        ],
-      },
-      include: {
-        provider: {
-          select: {
-            id: true,
-            businessName: true,
-            rating: true,
-            phone: true,
-            email: true,
-          },
-        },
-      },
+    // Get all promotions for this customer
+    const promotions = await prisma.customerPromotion.findMany({
+      where: { customerId },
       orderBy: [
-        { isRenoaPromo: 'desc' }, // Renoa promotions first
-        { validUntil: 'asc' }, // Expiring soon first
-        { discountValue: 'desc' }, // Higher discounts first
-      ],
-      take: 10, // Limit to 10 promotions
+        { status: 'asc' }, // active first
+        { createdAt: 'desc' }
+      ]
     });
 
-    // Calculate savings for each promotion
-    const promotionsWithSavings = promotions.map(promo => ({
-      ...promo,
-      estimatedSavings:
-        promo.discountType === 'percentage'
-          ? `${promo.discountValue}% off`
-          : `$${promo.discountValue.toFixed(2)} off`,
-      isFromYourProvider: promo.providerId === customer.providerId,
-      providerName: promo.isRenoaPromo ? 'Renoa' : promo.provider?.businessName || 'Provider',
-    }));
+    // Separate active and inactive
+    const now = new Date();
+    const activePromotions = promotions.filter(
+      p => p.status === 'active' && p.expiresAt > now
+    );
+    const expiredPromotions = promotions.filter(
+      p => p.status === 'expired' || (p.status === 'active' && p.expiresAt <= now)
+    );
+    const usedPromotions = promotions.filter(
+      p => p.status === 'used'
+    );
 
-    return NextResponse.json({ promotions: promotionsWithSavings });
+    // Auto-expire promotions that have passed their expiration
+    for (const promo of promotions) {
+      if (promo.status === 'active' && promo.expiresAt <= now) {
+        await prisma.customerPromotion.update({
+          where: { id: promo.id },
+          data: { status: 'expired' }
+        });
+      }
+    }
+
+    // Get best active promotion (highest value)
+    const bestPromo = activePromotions.length > 0
+      ? activePromotions.reduce((best, current) => {
+          const bestValue = best.discountPercent
+            ? Number(best.discountPercent)
+            : best.discountAmount
+            ? Number(best.discountAmount)
+            : 0;
+          const currentValue = current.discountPercent
+            ? Number(current.discountPercent)
+            : current.discountAmount
+            ? Number(current.discountAmount)
+            : 0;
+          return currentValue > bestValue ? current : best;
+        })
+      : null;
+
+    return NextResponse.json({
+      active: activePromotions,
+      expired: expiredPromotions,
+      used: usedPromotions,
+      bestPromo
+    });
   } catch (error) {
     console.error('Error fetching promotions:', error);
     return NextResponse.json(
