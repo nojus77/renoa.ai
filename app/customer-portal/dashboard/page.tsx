@@ -27,6 +27,7 @@ import SubscriptionSetupModal from '@/components/customer/SubscriptionSetupModal
 import BookAgainModal from '@/components/customer/BookAgainModal';
 import RecommendationsWidget from '@/components/customer/RecommendationsWidget';
 import ReferralWidget from '@/components/customer/ReferralWidget';
+import ServiceBundlesWidget from '@/components/customer/ServiceBundlesWidget';
 import PromoBanner from '@/components/customer/PromoBanner';
 import WinbackModal from '@/components/customer/WinbackModal';
 
@@ -390,6 +391,9 @@ export default function CustomerDashboard() {
               </Link>
             </div>
           </div>
+
+          {/* Service Bundles Widget */}
+          <ServiceBundlesWidget />
 
           {/* Service Recommendations Widget */}
           <RecommendationsWidget />

@@ -438,6 +438,7 @@ model Customer {
   referredBy        Referral[]              @relation("ReferredCustomer")
   credits           CustomerCredit[]        @relation("CustomerCredits")
   promotions        CustomerPromotion[]     @relation("CustomerPromotions")
+  paymentMethods    CustomerPaymentMethod[] @relation("CustomerPaymentMethods")
 
   @@index([providerId])
   @@index([phone])
@@ -480,6 +481,8 @@ model Job {
   actualValue    Float?   @map("actual_value")
   internalNotes  String?  @map("internal_notes") @db.Text
   customerNotes  String?  @map("customer_notes") @db.Text
+  upsells        Json?    // array of upsells: [{ service: 'Fertilization', price: 45, accepted: true }]
+  bundleId       String?  @map("bundle_id") // reference to service bundle if booked as part of package
   createdAt      DateTime @default(now()) @map("created_at")
   updatedAt      DateTime @updatedAt @map("updated_at")
 
@@ -1002,4 +1005,59 @@ enum PromotionStatus {
   active
   used
   expired
+}
+
+model ServiceBundle {
+  id           String   @id @default(uuid())
+  name         String
+  description  String   @db.Text
+  serviceTypes Json     @map("service_types") // array of included services
+  regularPrice Decimal  @map("regular_price") @db.Decimal(10, 2)
+  bundlePrice  Decimal  @map("bundle_price") @db.Decimal(10, 2)
+  savings      Decimal  @db.Decimal(10, 2) // calculated: regularPrice - bundlePrice
+  season       String? // 'spring', 'summer', 'fall', 'winter', null for year-round
+  active       Boolean  @default(true)
+  displayOrder Int      @default(0) @map("display_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([active])
+  @@index([season])
+  @@index([displayOrder])
+  @@map("service_bundles")
+}
+
+model ServiceUpsell {
+  id             String   @id @default(uuid())
+  baseService    String   @map("base_service")
+  upsellService  String   @map("upsell_service")
+  upsellPrice    Decimal  @map("upsell_price") @db.Decimal(10, 2)
+  description    String   @db.Text
+  displayOrder   Int      @default(0) @map("display_order")
+  conversionRate Decimal  @default(0) @map("conversion_rate") @db.Decimal(5, 4) // track performance
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@index([baseService])
+  @@index([displayOrder])
+  @@map("service_upsells")
+}
+
+model CustomerPaymentMethod {
+  id                     String   @id @default(uuid())
+  customerId             String   @map("customer_id")
+  stripePaymentMethodId  String   @unique @map("stripe_payment_method_id")
+  cardBrand              String   @map("card_brand") // 'visa', 'mastercard', 'amex', 'discover'
+  cardLast4              String   @map("card_last4")
+  expiryMonth            Int      @map("expiry_month")
+  expiryYear             Int      @map("expiry_year")
+  isDefault              Boolean  @default(false) @map("is_default")
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
+
+  customer Customer @relation("CustomerPaymentMethods", fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([isDefault])
+  @@map("customer_payment_methods")
 }
