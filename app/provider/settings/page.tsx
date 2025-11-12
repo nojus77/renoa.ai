@@ -266,16 +266,31 @@ export default function ProviderSettings() {
       <div className="min-h-screen bg-zinc-950">
         {/* Header */}
         <div className="border-b border-zinc-800 bg-zinc-900/30 backdrop-blur-sm">
-          <div className="max-w-[1600px] mx-auto px-6 py-6">
-            <h1 className="text-2xl font-bold text-zinc-100">Settings</h1>
-            <p className="text-sm text-zinc-400 mt-1">Manage your account and preferences</p>
+          <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-3 md:py-6">
+            <h1 className="text-xl md:text-2xl font-bold text-zinc-100">Settings</h1>
+            <p className="text-xs md:text-sm text-zinc-400 mt-0.5 md:mt-1">Manage your account and preferences</p>
           </div>
         </div>
 
-        <div className="max-w-[1600px] mx-auto px-6 py-8">
-          <div className="flex gap-6">
-            {/* Sidebar Tabs */}
-            <div className="w-64 flex-shrink-0">
+        <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-4 md:py-8">
+          <div className="flex flex-col md:flex-row gap-4 md:gap-6">
+            {/* Mobile: Dropdown Selector */}
+            <div className="md:hidden">
+              <select
+                value={activeTab}
+                onChange={(e) => setActiveTab(e.target.value as TabType)}
+                className="w-full px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+              >
+                {tabs.map((tab) => (
+                  <option key={tab.id} value={tab.id}>
+                    {tab.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Desktop: Sidebar Tabs */}
+            <div className="hidden md:block w-64 flex-shrink-0">
               <div className="sticky top-6 space-y-1">
                 {tabs.map((tab) => {
                   const Icon = tab.icon;
@@ -298,7 +313,7 @@ export default function ProviderSettings() {
             </div>
 
             {/* Main Content */}
-            <div className="flex-1 space-y-6">
+            <div className="flex-1 space-y-4 md:space-y-6">
               {/* Profile Tab */}
               {activeTab === 'profile' && (
                 <Card className="bg-zinc-900/50 border-zinc-800">
@@ -396,14 +411,14 @@ export default function ProviderSettings() {
                             <span className="text-sm text-zinc-200">{cert}</span>
                             <button
                               onClick={() => setCertifications(certifications.filter((_, i) => i !== idx))}
-                              className="text-red-400 hover:text-red-300"
+                              className="text-red-400 hover:text-red-300 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
                           </div>
                         ))}
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <input
                           type="text"
                           value={newCertification}
@@ -418,7 +433,7 @@ export default function ProviderSettings() {
                               setNewCertification('');
                             }
                           }}
-                          className="bg-emerald-600 hover:bg-emerald-500"
+                          className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add
@@ -430,7 +445,7 @@ export default function ProviderSettings() {
                       <Button
                         onClick={saveProfileSettings}
                         disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500"
+                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
                       >
                         <Save className="h-4 w-4 mr-2" />
                         {saving ? 'Saving...' : 'Save Profile'}
@@ -548,7 +563,7 @@ export default function ProviderSettings() {
                       <Button
                         onClick={saveBusinessSettings}
                         disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500"
+                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
                       >
                         <Save className="h-4 w-4 mr-2" />
                         {saving ? 'Saving...' : 'Save Business Info'}
@@ -610,7 +625,7 @@ export default function ProviderSettings() {
                       <Button
                         onClick={saveAvailabilitySettings}
                         disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500"
+                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
                       >
                         <Save className="h-4 w-4 mr-2" />
                         {saving ? 'Saving...' : 'Save Availability'}
@@ -629,7 +644,7 @@ export default function ProviderSettings() {
                   <CardContent className="space-y-6">
                     <div className="space-y-3">
                       {services.map((service) => (
-                        <div key={service.id} className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div key={service.id} className="p-3 md:p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
                           <div className="flex items-center justify-between mb-3">
                             <div className="flex items-center gap-3">
                               <button
@@ -638,7 +653,7 @@ export default function ProviderSettings() {
                                     s.id === service.id ? { ...s, enabled: !s.enabled } : s
                                   ));
                                 }}
-                                className={`w-12 h-6 rounded-full transition-colors ${
+                                className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
                                   service.enabled ? 'bg-emerald-600' : 'bg-zinc-700'
                                 }`}
                               >
@@ -648,11 +663,11 @@ export default function ProviderSettings() {
                                   }`}
                                 />
                               </button>
-                              <span className="text-zinc-200 font-medium">{service.name}</span>
+                              <span className="text-sm md:text-base text-zinc-200 font-medium">{service.name}</span>
                             </div>
                           </div>
                           {service.enabled && (
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3 md:gap-4">
                               <div>
                                 <label className="block text-xs text-zinc-400 mb-1">Min Price</label>
                                 <input
@@ -732,7 +747,7 @@ export default function ProviderSettings() {
                       <Button
                         onClick={saveServicesSettings}
                         disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500"
+                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
                       >
                         <Save className="h-4 w-4 mr-2" />
                         {saving ? 'Saving...' : 'Save Services'}
@@ -750,16 +765,16 @@ export default function ProviderSettings() {
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div>
-                      <h3 className="text-sm font-semibold text-zinc-200 mb-4">Email Notifications</h3>
-                      <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-zinc-200 mb-3 md:mb-4">Email Notifications</h3>
+                      <div className="space-y-2 md:space-y-3">
                         {Object.entries(emailNotifications).map(([key, value]) => (
                           <div key={key} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                            <span className="text-sm text-zinc-300 capitalize">
+                            <span className="text-xs md:text-sm text-zinc-300 capitalize">
                               {key.replace(/([A-Z])/g, ' $1').trim()}
                             </span>
                             <button
                               onClick={() => setEmailNotifications({ ...emailNotifications, [key]: !value })}
-                              className={`w-12 h-6 rounded-full transition-colors ${
+                              className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
                                 value ? 'bg-emerald-600' : 'bg-zinc-700'
                               }`}
                             >
@@ -775,16 +790,16 @@ export default function ProviderSettings() {
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-semibold text-zinc-200 mb-4">SMS Notifications</h3>
-                      <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-zinc-200 mb-3 md:mb-4">SMS Notifications</h3>
+                      <div className="space-y-2 md:space-y-3">
                         {Object.entries(smsNotifications).map(([key, value]) => (
                           <div key={key} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                            <span className="text-sm text-zinc-300 capitalize">
+                            <span className="text-xs md:text-sm text-zinc-300 capitalize">
                               {key.replace(/([A-Z])/g, ' $1').trim()}
                             </span>
                             <button
                               onClick={() => setSmsNotifications({ ...smsNotifications, [key]: !value })}
-                              className={`w-12 h-6 rounded-full transition-colors ${
+                              className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
                                 value ? 'bg-emerald-600' : 'bg-zinc-700'
                               }`}
                             >
@@ -827,7 +842,7 @@ export default function ProviderSettings() {
                       <Button
                         onClick={saveNotificationSettings}
                         disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500"
+                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
                       >
                         <Save className="h-4 w-4 mr-2" />
                         {saving ? 'Saving...' : 'Save Notifications'}
@@ -861,13 +876,13 @@ export default function ProviderSettings() {
                     </div>
 
                     <div>
-                      <h3 className="text-sm font-semibold text-zinc-200 mb-4">Accept Payment Methods</h3>
-                      <div className="space-y-3">
+                      <h3 className="text-sm font-semibold text-zinc-200 mb-3 md:mb-4">Accept Payment Methods</h3>
+                      <div className="space-y-2 md:space-y-3">
                         <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                          <span className="text-sm text-zinc-300">Credit Cards</span>
+                          <span className="text-xs md:text-sm text-zinc-300">Credit Cards</span>
                           <button
                             onClick={() => setAcceptCreditCard(!acceptCreditCard)}
-                            className={`w-12 h-6 rounded-full transition-colors ${
+                            className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
                               acceptCreditCard ? 'bg-emerald-600' : 'bg-zinc-700'
                             }`}
                           >
@@ -879,10 +894,10 @@ export default function ProviderSettings() {
                           </button>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                          <span className="text-sm text-zinc-300">Cash</span>
+                          <span className="text-xs md:text-sm text-zinc-300">Cash</span>
                           <button
                             onClick={() => setAcceptCash(!acceptCash)}
-                            className={`w-12 h-6 rounded-full transition-colors ${
+                            className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
                               acceptCash ? 'bg-emerald-600' : 'bg-zinc-700'
                             }`}
                           >
@@ -894,10 +909,10 @@ export default function ProviderSettings() {
                           </button>
                         </div>
                         <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                          <span className="text-sm text-zinc-300">Check</span>
+                          <span className="text-xs md:text-sm text-zinc-300">Check</span>
                           <button
                             onClick={() => setAcceptCheck(!acceptCheck)}
-                            className={`w-12 h-6 rounded-full transition-colors ${
+                            className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
                               acceptCheck ? 'bg-emerald-600' : 'bg-zinc-700'
                             }`}
                           >
@@ -911,14 +926,14 @@ export default function ProviderSettings() {
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium text-zinc-300">Auto-Invoice on Job Completion</p>
+                    <div className="flex items-center justify-between gap-3 p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs md:text-sm font-medium text-zinc-300">Auto-Invoice on Job Completion</p>
                         <p className="text-xs text-zinc-500 mt-1">Automatically create invoice when job is marked complete</p>
                       </div>
                       <button
                         onClick={() => setAutoInvoice(!autoInvoice)}
-                        className={`w-12 h-6 rounded-full transition-colors ${
+                        className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
                           autoInvoice ? 'bg-emerald-600' : 'bg-zinc-700'
                         }`}
                       >
@@ -934,7 +949,7 @@ export default function ProviderSettings() {
                       <Button
                         onClick={savePaymentSettings}
                         disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500"
+                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
                       >
                         <Save className="h-4 w-4 mr-2" />
                         {saving ? 'Saving...' : 'Save Payment Settings'}
@@ -950,26 +965,26 @@ export default function ProviderSettings() {
                   <CardHeader>
                     <CardTitle className="text-zinc-100">Integrations</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-3 md:space-y-4">
                     {[
                       { name: 'QuickBooks', description: 'Sync invoices and payments', connected: false },
                       { name: 'Google Calendar', description: 'Sync appointments', connected: true },
                       { name: 'Stripe', description: 'Payment processing', connected: true },
                       { name: 'Twilio', description: 'SMS messaging', connected: true },
                     ].map((integration) => (
-                      <div key={integration.name} className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-zinc-200">{integration.name}</p>
+                      <div key={integration.name} className="flex items-center justify-between gap-3 p-3 md:p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs md:text-sm font-medium text-zinc-200">{integration.name}</p>
                           <p className="text-xs text-zinc-500 mt-1">{integration.description}</p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 flex-shrink-0">
                           {integration.connected ? (
-                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30">
+                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
                               <Check className="h-3 w-3 mr-1" />
                               Connected
                             </Badge>
                           ) : (
-                            <Button variant="outline" size="sm" className="border-zinc-700">
+                            <Button variant="outline" size="sm" className="border-zinc-700 text-xs">
                               Connect
                             </Button>
                           )}
@@ -982,21 +997,21 @@ export default function ProviderSettings() {
 
               {/* Security Tab */}
               {activeTab === 'security' && (
-                <div className="space-y-6">
+                <div className="space-y-4 md:space-y-6">
                   <Card className="bg-zinc-900/50 border-zinc-800">
                     <CardHeader>
                       <CardTitle className="text-zinc-100">Password & Security</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <Button variant="outline" className="border-zinc-700">
+                      <Button variant="outline" className="border-zinc-700 w-full sm:w-auto">
                         Change Password
                       </Button>
-                      <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
-                        <div>
-                          <p className="text-sm font-medium text-zinc-200">Two-Factor Authentication</p>
+                      <div className="flex items-center justify-between gap-3 p-3 md:p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs md:text-sm font-medium text-zinc-200">Two-Factor Authentication</p>
                           <p className="text-xs text-zinc-500 mt-1">Add an extra layer of security</p>
                         </div>
-                        <Button variant="outline" size="sm" className="border-zinc-700">
+                        <Button variant="outline" size="sm" className="border-zinc-700 text-xs flex-shrink-0">
                           Enable
                         </Button>
                       </div>
@@ -1005,16 +1020,16 @@ export default function ProviderSettings() {
 
                   <Card className="bg-red-900/20 border-red-500/30">
                     <CardHeader>
-                      <CardTitle className="text-red-400 flex items-center gap-2">
-                        <AlertTriangle className="h-5 w-5" />
+                      <CardTitle className="text-red-400 flex items-center gap-2 text-base md:text-lg">
+                        <AlertTriangle className="h-4 w-4 md:h-5 md:w-5" />
                         Danger Zone
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-sm text-zinc-400 mb-4">
+                      <p className="text-xs md:text-sm text-zinc-400 mb-4">
                         Once you delete your account, there is no going back. Please be certain.
                       </p>
-                      <Button variant="outline" className="border-red-700 text-red-400 hover:bg-red-900/20">
+                      <Button variant="outline" className="border-red-700 text-red-400 hover:bg-red-900/20 w-full sm:w-auto text-xs md:text-sm">
                         Delete Account
                       </Button>
                     </CardContent>

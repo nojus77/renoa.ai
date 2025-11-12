@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import AddJobModal from '@/components/provider/AddJobModal';
 import {
   Mail,
   Phone,
@@ -35,6 +37,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 
 interface LeadNote {
   id: string;
@@ -94,16 +97,19 @@ export default function ProviderDashboard() {
   const router = useRouter();
   const [providerName, setProviderName] = useState('');
   const [providerId, setProviderId] = useState('');
+  const [providerServiceTypes, setProviderServiceTypes] = useState<string[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [todaysJobs, setTodaysJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [noteText, setNoteText] = useState<Record<string, string>>({});
   const [contractValues, setContractValues] = useState<Record<string, string>>({});
 
-  // Scheduling state
+  // Modal states
+  const [showAddJobModal, setShowAddJobModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState<string | null>(null);
   const [proposedDate, setProposedDate] = useState('');
   const [proposedTime, setProposedTime] = useState('');
+  const [showAllActivity, setShowAllActivity] = useState(false);
 
   // Stats
   const [weeklyEarnings, setWeeklyEarnings] = useState(0);
@@ -122,10 +128,24 @@ export default function ProviderDashboard() {
 
     setProviderId(id);
     setProviderName(name);
+    fetchProviderDetails(id);
     fetchLeads(id);
     fetchTodaysJobs(id);
     fetchStats(id);
   }, [router]);
+
+  const fetchProviderDetails = async (id: string) => {
+    try {
+      const res = await fetch(`/api/provider/details?providerId=${id}`);
+      const data = await res.json();
+
+      if (data.provider && data.provider.serviceTypes) {
+        setProviderServiceTypes(data.provider.serviceTypes);
+      }
+    } catch (error) {
+      console.error('Failed to load provider details:', error);
+    }
+  };
 
   const fetchLeads = async (id: string) => {
     setLoading(true);
@@ -156,23 +176,23 @@ export default function ProviderDashboard() {
         tomorrow.setDate(tomorrow.getDate() + 1);
 
         const jobsToday = data.jobs.filter((job: any) => {
-          const jobDate = new Date(job.providerProposedDate || job.createdAt);
+          const jobDate = new Date(job.startTime);
           return jobDate >= today && jobDate < tomorrow &&
                  (job.status === 'scheduled' || job.status === 'in_progress');
         });
 
         setTodaysJobs(jobsToday.map((job: any) => ({
           id: job.id,
-          customerName: `${job.firstName} ${job.lastName}`,
-          serviceType: job.serviceInterest || 'General Service',
+          customerName: job.customerName,
+          serviceType: job.serviceType,
           address: job.address,
-          city: job.city,
-          state: job.state,
-          startTime: job.providerProposedDate || job.createdAt,
-          endTime: job.providerProposedDate || job.createdAt,
+          city: job.customer?.address?.split(',')[1]?.trim() || '',
+          state: job.customer?.address?.split(',')[2]?.trim() || '',
+          startTime: job.startTime,
+          endTime: job.endTime,
           status: job.status,
-          phone: job.phone,
-          estimatedValue: job.contractValue || 0
+          phone: job.customerPhone || job.customer?.phone,
+          estimatedValue: job.estimatedValue || 0
         })));
       }
     } catch (error) {
@@ -183,19 +203,23 @@ export default function ProviderDashboard() {
   const fetchStats = async (id: string) => {
     try {
       const res = await fetch(`/api/provider/stats?providerId=${id}`);
-      const data = await res.json();
+      const stats = await res.json();
 
-      if (data.stats) {
-        setWeeklyEarnings(data.stats.weeklyEarnings || 1240);
-        setMonthlyEarnings(data.stats.monthlyEarnings || 4850);
-        setAvgJobValue(data.stats.avgJobValue || 287);
-        setAvgResponseTime(data.stats.avgResponseTime || 8);
+      if (stats) {
+        // Calculate weekly earnings (approximate from monthly revenue)
+        const weeklyEarnings = stats.revenue ? Math.round(stats.revenue / 4) : 0;
+        const avgJobValue = stats.completedJobs > 0 ? Math.round(stats.revenue / stats.completedJobs) : 0;
+
+        setWeeklyEarnings(weeklyEarnings);
+        setMonthlyEarnings(stats.revenue || 0);
+        setAvgJobValue(avgJobValue);
+        setAvgResponseTime(stats.avgResponseTime || 8);
       }
     } catch (error) {
       // Use default values if API fails
-      setWeeklyEarnings(1240);
-      setMonthlyEarnings(4850);
-      setAvgJobValue(287);
+      setWeeklyEarnings(0);
+      setMonthlyEarnings(0);
+      setAvgJobValue(0);
       setAvgResponseTime(8);
     }
   };
@@ -425,150 +449,418 @@ export default function ProviderDashboard() {
       <div className="min-h-screen bg-zinc-950 text-zinc-100">
         {/* Page Header */}
         <div className="border-b border-zinc-800 bg-zinc-900/50">
-          <div className="max-w-[1600px] mx-auto px-6 py-6">
-            <h1 className="text-2xl font-bold text-zinc-100">Dashboard</h1>
-            <p className="text-sm text-zinc-400 mt-1">Your daily command center</p>
+          <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-3 md:py-6">
+            <h1 className="text-xl md:text-2xl font-bold text-zinc-100">Dashboard</h1>
+            <p className="text-xs md:text-sm text-zinc-400 mt-1">Your daily command center</p>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="max-w-[1600px] mx-auto px-6 py-8">
-          {/* Top Stats Row - Enhanced */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-4 md:py-8">
+          {/* TODAY'S SCHEDULE - PRIORITY #1 - What's happening NOW */}
+          <Card className="bg-zinc-900/50 border-zinc-800 mb-4">
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-xs text-zinc-500 mb-1">Today</div>
+                  <CardTitle className="text-base md:text-lg font-semibold text-zinc-100 flex items-center gap-2">
+                    <Calendar className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
+                    {format(new Date(), 'EEEE, MMM d')}
+                  </CardTitle>
+                  <p className="text-xs text-zinc-500 mt-0.5">
+                    {todaysJobs.length} job{todaysJobs.length !== 1 ? 's' : ''} scheduled
+                  </p>
+                </div>
+                <Button
+                  onClick={() => setShowAddJobModal(true)}
+                  size="sm"
+                  className="bg-blue-600 hover:bg-blue-500"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Add Job</span>
+                  <span className="sm:hidden">Add</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {todaysJobs.length === 0 ? (
+                <div className="text-center py-8">
+                  <Calendar className="h-12 w-12 text-zinc-700 mx-auto mb-4" />
+                  <p className="text-zinc-400 font-medium mb-2">No jobs scheduled today</p>
+                  <p className="text-sm text-zinc-500 mb-4">Enjoy your free day or add a new job</p>
+                  <Button
+                    onClick={() => router.push('/provider/calendar')}
+                    variant="outline"
+                    className="border-zinc-700 hover:bg-zinc-800"
+                  >
+                    View Calendar
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {todaysJobs.map((job) => (
+                    <div
+                      key={job.id}
+                      onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                      className="p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg hover:bg-zinc-800/70 hover:border-emerald-600 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-semibold text-zinc-100 truncate">{job.customerName || 'Unknown Customer'}</h4>
+                            <Badge className={`${getStatusColor(job.status)} border text-xs flex-shrink-0`}>
+                              {job.status === 'in_progress' ? 'In Progress' : 'Scheduled'}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-zinc-400 truncate">{job.serviceType}</p>
+                        </div>
+                        <div className="text-right flex-shrink-0 ml-3">
+                          <p className="text-sm font-semibold text-blue-400">
+                            {formatTimeRange(job.startTime, job.endTime)}
+                          </p>
+                          {job.estimatedValue > 0 && (
+                            <p className="text-xs text-zinc-500 mt-1">
+                              ~{formatCurrency(job.estimatedValue)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {(job.address || job.city || job.state) && (
+                        <div className="flex items-center gap-2 mb-2 text-sm text-zinc-400">
+                          <MapPin className="h-4 w-4 flex-shrink-0" />
+                          <span className="truncate">
+                            {[job.address, job.city, job.state].filter(Boolean).join(', ')}
+                          </span>
+                        </div>
+                      )}
+
+                      <div
+                        className="flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-emerald-600 hover:bg-emerald-500"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            // Update job status
+                            const newStatus = job.status === 'in_progress' ? 'completed' : 'in_progress';
+                            try {
+                              const res = await fetch(`/api/provider/jobs/${job.id}`, {
+                                method: 'PATCH',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ status: newStatus }),
+                              });
+
+                              if (res.ok) {
+                                toast.success(`Job ${newStatus === 'in_progress' ? 'started' : 'completed'}!`);
+                                fetchTodaysJobs(providerId);
+                              }
+                            } catch (error) {
+                              toast.error('Failed to update job status');
+                            }
+                          }}
+                        >
+                          {job.status === 'in_progress' ? (
+                            <>
+                              <CheckCircle2 className="h-4 w-4 mr-1" />
+                              Complete
+                            </>
+                          ) : (
+                            <>
+                              <PlayCircle className="h-4 w-4 mr-1" />
+                              Start
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-zinc-700 hover:bg-zinc-800"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.location.href = `tel:${job.phone}`;
+                          }}
+                        >
+                          <Phone className="h-4 w-4 mr-1" />
+                          Call
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="border-zinc-700 hover:bg-zinc-800"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`https://maps.google.com/?q=${encodeURIComponent(job.address + ', ' + job.city)}`);
+                          }}
+                        >
+                          <Navigation className="h-4 w-4 mr-1" />
+                          Navigate
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* COMPACT STATS - PRIORITY #2 - Secondary info */}
+          <div className="grid grid-cols-2 gap-2 md:gap-3 mb-4">
             <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-zinc-400 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Target className="h-4 w-4" />
-                    New Leads
-                  </div>
-                  <Link href="/provider/leads" className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1">
-                    View All <ArrowRight className="h-3 w-3" />
-                  </Link>
+              <CardHeader className="pb-1 md:pb-2">
+                <CardTitle className="text-xs md:text-sm text-zinc-400 flex items-center gap-1 md:gap-2">
+                  <Target className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                  <span className="hidden md:inline">New Leads</span>
+                  <span className="md:hidden">Leads</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-blue-400">
+              <CardContent className="pb-3 md:pb-6">
+                <div className="text-2xl md:text-3xl font-bold text-blue-400">
                   {leads.filter(l => l.status === 'matched').length}
                 </div>
-                <p className="text-xs text-zinc-500 mt-1">Awaiting your review</p>
+                <p className="text-xs text-zinc-500 mt-0.5 md:mt-1 hidden md:block">Awaiting review</p>
               </CardContent>
             </Card>
 
             <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-zinc-400 flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Active Jobs
+              <CardHeader className="pb-1 md:pb-2">
+                <CardTitle className="text-xs md:text-sm text-zinc-400 flex items-center gap-1 md:gap-2">
+                  <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                  <span className="hidden md:inline">Active Jobs</span>
+                  <span className="md:hidden">Active</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-amber-400">
+              <CardContent className="pb-3 md:pb-6">
+                <div className="text-2xl md:text-3xl font-bold text-amber-400">
                   {todaysJobs.length}
                 </div>
-                <p className="text-xs text-zinc-500 mt-1">In progress today</p>
+                <p className="text-xs text-zinc-500 mt-0.5 md:mt-1 hidden md:block">Today</p>
               </CardContent>
             </Card>
 
             <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-zinc-400 flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4" />
-                  Converted
+              <CardHeader className="pb-1 md:pb-2">
+                <CardTitle className="text-xs md:text-sm text-zinc-400 flex items-center gap-1 md:gap-2">
+                  <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                  <span className="truncate">Converted</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="text-3xl font-bold text-emerald-400">
+              <CardContent className="pb-3 md:pb-6">
+                <div className="text-2xl md:text-3xl font-bold text-emerald-400">
                   {convertedCount}
                 </div>
-                <p className="text-xs text-emerald-400 mt-1">
-                  {formatCurrency(leads.filter(l => l.status === 'converted').reduce((sum, l) => sum + (l.contractValue || 0), 0))} this week
+                <p className="text-xs text-emerald-400 mt-0.5 md:mt-1 truncate">
+                  {formatCurrency(leads.filter(l => l.status === 'converted').reduce((sum, l) => sum + (l.contractValue || 0), 0))}
                 </p>
               </CardContent>
             </Card>
 
             <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm text-zinc-400 flex items-center gap-2">
-                  <Award className="h-4 w-4" />
-                  Conversion Rate
+              <CardHeader className="pb-1 md:pb-2">
+                <CardTitle className="text-xs md:text-sm text-zinc-400 flex items-center gap-1 md:gap-2">
+                  <Award className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
+                  <span className="hidden md:inline">Conversion</span>
+                  <span className="md:hidden">Rate</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-2">
-                  <div className="text-3xl font-bold text-blue-400">
+              <CardContent className="pb-3 md:pb-6">
+                <div className="flex items-center gap-1 md:gap-2">
+                  <div className="text-2xl md:text-3xl font-bold text-blue-400">
                     {conversionRate}%
                   </div>
                   {rateTrend === 'up' ? (
-                    <TrendingUp className="h-5 w-5 text-emerald-400" />
+                    <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-emerald-400" />
                   ) : (
-                    <TrendingDown className="h-5 w-5 text-red-400" />
+                    <TrendingDown className="h-4 w-4 md:h-5 md:w-5 text-red-400" />
                   )}
                 </div>
-                <p className="text-xs text-zinc-500 mt-1">
+                <p className="text-xs text-zinc-500 mt-0.5 md:mt-1 hidden md:block">
                   {rateTrend === 'up' ? '↑' : '↓'} {Math.abs(conversionRate - lastWeekRate)}% vs last week
                 </p>
               </CardContent>
             </Card>
           </div>
 
-          {/* Revenue Stats Row - NEW */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-            <Card className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border-emerald-500/20">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-5 w-5 text-emerald-400" />
-                  <p className="text-sm font-medium text-zinc-400">This Week</p>
+          {/* NEW LEADS - PRIORITY #3 - Conditional (only if leads exist) */}
+          {leads.filter(l => l.status === 'matched').length > 0 && (
+            <Card className="bg-zinc-900/50 border-zinc-800 mb-4">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-zinc-100 flex items-center gap-2">
+                    <Target className="h-5 w-5 text-blue-400" />
+                    New Leads ({leads.filter(l => l.status === 'matched').length})
+                  </CardTitle>
+                  <Button
+                    onClick={() => router.push('/provider/leads')}
+                    size="sm"
+                    variant="outline"
+                    className="border-zinc-700 hover:bg-zinc-800"
+                  >
+                    View All
+                  </Button>
                 </div>
-                <div className="text-3xl font-bold text-emerald-400">
-                  {formatCurrency(weeklyEarnings)}
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {leads
+                    .filter(l => l.status === 'matched')
+                    .slice(0, 3)
+                    .map((lead) => {
+                      const isBlurred = lead.status !== 'accepted' && lead.status !== 'converted';
+                      return (
+                        <Card key={lead.id} className="bg-zinc-800/30 border-zinc-700">
+                          <CardContent className="p-3">
+                            <div className="flex items-start justify-between mb-3">
+                              <div className="flex-1 min-w-0">
+                                <h4 className="font-semibold text-zinc-100 mb-1 flex items-center gap-2">
+                                  {isBlurred ? blurText(`${lead.firstName} ${lead.lastName}`, 5) : `${lead.firstName} ${lead.lastName}`}
+                                </h4>
+                                <div className="flex items-center gap-3 text-xs text-zinc-400">
+                                  <div className="flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    <span>{getTimeAgo(lead.createdAt)}</span>
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <DollarSign className="h-3 w-3" />
+                                    <span>{getEstimatedValue(lead)}</span>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2 px-2 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded-full flex-shrink-0">
+                                <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                                <span className="text-xs font-semibold text-emerald-400">{lead.leadScore}% match</span>
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                className="flex-1 bg-blue-600 hover:bg-blue-500"
+                                onClick={() => handleUpdateLeadStatus(lead.id, 'accepted')}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                Accept Lead
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-zinc-700 hover:bg-zinc-800"
+                              >
+                                Details
+                              </Button>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                 </div>
-                <p className="text-xs text-zinc-500 mt-1">+18% from last week</p>
               </CardContent>
             </Card>
+          )}
 
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-5 w-5 text-blue-400" />
-                  <p className="text-sm font-medium text-zinc-400">This Month</p>
+          {/* RECENT ACTIVITY - PRIORITY #4 - Collapsed by default */}
+          <details className="group mb-4">
+            <summary className="cursor-pointer bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 hover:bg-zinc-900/70 transition-colors flex items-center justify-between select-none">
+              <div className="flex items-center gap-2">
+                <Activity className="h-5 w-5 text-zinc-400" />
+                <span className="font-semibold text-zinc-100">Recent Activity</span>
+                <span className="text-sm text-zinc-500">({recentActivity.length})</span>
+              </div>
+              <span className="text-zinc-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <Card className="bg-zinc-900/50 border-zinc-800 mt-2 border-t-0 rounded-t-none">
+              <CardContent className="pt-4">
+                <div className="space-y-3">
+                  {recentActivity.slice(0, showAllActivity ? recentActivity.length : 5).map((activity) => {
+                    const Icon = activity.icon;
+                    return (
+                      <div key={activity.id} className="flex items-start gap-3">
+                        <div className="p-2 bg-zinc-800/50 rounded-lg">
+                          <Icon className={`h-4 w-4 ${activity.color}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-zinc-300 leading-snug">{activity.message}</p>
+                          <p className="text-xs text-zinc-500 mt-1">{getTimeAgo(activity.timestamp)}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-                <div className="text-2xl font-bold text-zinc-100">
-                  {formatCurrency(monthlyEarnings)}
-                </div>
-                <p className="text-xs text-zinc-500 mt-1">On track for ${Math.floor(monthlyEarnings * 1.5)}</p>
+                {recentActivity.length > 5 && (
+                  <button
+                    onClick={() => setShowAllActivity(!showAllActivity)}
+                    className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1 mt-4"
+                  >
+                    {showAllActivity ? 'Show Less ↑' : 'View All →'}
+                  </button>
+                )}
               </CardContent>
             </Card>
+          </details>
 
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <BarChart3 className="h-5 w-5 text-purple-400" />
-                  <p className="text-sm font-medium text-zinc-400">Avg Job Value</p>
+          {/* REVENUE CHART - PRIORITY #5 - Collapsed by default */}
+          <details className="group mb-4">
+            <summary className="cursor-pointer bg-zinc-900/50 border border-zinc-800 rounded-lg p-4 hover:bg-zinc-900/70 transition-colors flex items-center justify-between select-none">
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-emerald-400" />
+                <span className="font-semibold text-zinc-100">Revenue Stats</span>
+              </div>
+              <span className="text-zinc-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <Card className="bg-zinc-900/50 border-zinc-800 mt-2 border-t-0 rounded-t-none">
+              <CardContent className="pt-4">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="h-4 w-4 text-emerald-400" />
+                      <p className="text-xs font-medium text-zinc-400">This Week</p>
+                    </div>
+                    <div className="text-xl font-bold text-emerald-400">
+                      {formatCurrency(weeklyEarnings)}
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-1">+18% from last week</p>
+                  </div>
+
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <DollarSign className="h-4 w-4 text-blue-400" />
+                      <p className="text-xs font-medium text-zinc-400">This Month</p>
+                    </div>
+                    <div className="text-xl font-bold text-zinc-100">
+                      {formatCurrency(monthlyEarnings)}
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-1">On track for ${Math.floor(monthlyEarnings * 1.5)}</p>
+                  </div>
+
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <BarChart3 className="h-4 w-4 text-purple-400" />
+                      <p className="text-xs font-medium text-zinc-400">Avg Job Value</p>
+                    </div>
+                    <div className="text-xl font-bold text-zinc-100">
+                      {formatCurrency(avgJobValue)}
+                    </div>
+                    <p className="text-xs text-zinc-500 mt-1">Across {convertedCount} jobs</p>
+                  </div>
+
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Zap className="h-4 w-4 text-yellow-400" />
+                      <p className="text-xs font-medium text-zinc-400">Response Time</p>
+                    </div>
+                    <div className="text-xl font-bold text-zinc-100">
+                      {avgResponseTime} min
+                    </div>
+                    <p className="text-xs text-emerald-400 mt-1">↓ 2 min faster</p>
+                  </div>
                 </div>
-                <div className="text-2xl font-bold text-zinc-100">
-                  {formatCurrency(avgJobValue)}
-                </div>
-                <p className="text-xs text-zinc-500 mt-1">Across {convertedCount} jobs</p>
               </CardContent>
             </Card>
+          </details>
 
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardContent className="pt-6">
-                <div className="flex items-center gap-2 mb-2">
-                  <Zap className="h-5 w-5 text-yellow-400" />
-                  <p className="text-sm font-medium text-zinc-400">Response Time</p>
-                </div>
-                <div className="text-2xl font-bold text-zinc-100">
-                  {avgResponseTime} min
-                </div>
-                <p className="text-xs text-emerald-400 mt-1">↓ 2 min faster</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Two Column Layout */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* LEGACY Two Column Layout - Keep for compatibility */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8 hidden">
             {/* Left Column - Today's Schedule & Leads */}
             <div className="lg:col-span-2 space-y-6">
               {/* Today's Schedule Section - NEW */}
@@ -585,7 +877,7 @@ export default function ProviderDashboard() {
                       </p>
                     </div>
                     <Button
-                      onClick={() => router.push('/provider/calendar')}
+                      onClick={() => setShowAddJobModal(true)}
                       size="sm"
                       className="bg-blue-600 hover:bg-blue-500"
                     >
@@ -691,12 +983,13 @@ export default function ProviderDashboard() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-zinc-100">New Leads</CardTitle>
-                    <Link
+                    {/* TODO: Implement /provider/leads page */}
+                    {/* <Link
                       href="/provider/leads"
                       className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1"
                     >
                       View All <ArrowRight className="h-4 w-4" />
-                    </Link>
+                    </Link> */}
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -834,7 +1127,7 @@ export default function ProviderDashboard() {
                       <p className="text-xs font-medium text-zinc-300">Calendar</p>
                     </button>
                     <button
-                      onClick={() => router.push('/provider/calendar')}
+                      onClick={() => setShowAddJobModal(true)}
                       className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg hover:bg-zinc-800 transition-colors text-center"
                     >
                       <Plus className="h-6 w-6 text-emerald-400 mx-auto mb-2" />
@@ -866,14 +1159,17 @@ export default function ProviderDashboard() {
                       <Activity className="h-4 w-4" />
                       Recent Activity
                     </CardTitle>
-                    <button className="text-xs text-blue-400 hover:text-blue-300">
-                      View All
+                    <button
+                      onClick={() => setShowAllActivity(!showAllActivity)}
+                      className="text-xs text-blue-400 hover:text-blue-300 flex items-center gap-1"
+                    >
+                      {showAllActivity ? 'Show Less ↑' : 'View All →'}
                     </button>
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {recentActivity.slice(0, 5).map((activity) => {
+                    {recentActivity.slice(0, showAllActivity ? recentActivity.length : 5).map((activity) => {
                       const Icon = activity.icon;
                       return (
                         <div key={activity.id} className="flex items-start gap-3">
@@ -891,41 +1187,103 @@ export default function ProviderDashboard() {
                 </CardContent>
               </Card>
 
-              {/* Performance Chart - NEW (Simple version) */}
+              {/* Performance Chart - Revenue */}
               <Card className="bg-zinc-900/50 border-zinc-800">
                 <CardHeader>
                   <CardTitle className="text-zinc-100 text-sm flex items-center gap-2">
                     <TrendingUp className="h-4 w-4" />
-                    Revenue (Last 30 Days)
+                    Revenue (Last 7 Days)
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-32 flex items-end justify-between gap-1">
-                    {[...Array(30)].map((_, i) => {
-                      const height = Math.random() * 80 + 20;
-                      return (
-                        <div
-                          key={i}
-                          className="flex-1 bg-emerald-500/20 hover:bg-emerald-500/40 transition-colors rounded-t relative group cursor-pointer"
-                          style={{ height: `${height}%` }}
-                        >
-                          <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                            ${Math.floor(height * 10)}
-                          </div>
+                  {(() => {
+                    // Generate revenue data from converted leads
+                    const last7Days = [...Array(7)].map((_, i) => {
+                      const date = new Date();
+                      date.setDate(date.getDate() - (6 - i));
+                      return {
+                        date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+                        revenue: 0
+                      };
+                    });
+
+                    // Aggregate revenue by day from converted leads
+                    leads
+                      .filter(l => l.status === 'converted' && l.contractValue)
+                      .forEach(lead => {
+                        const leadDate = new Date(lead.createdAt);
+                        const dayKey = leadDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                        const dayEntry = last7Days.find(d => d.date === dayKey);
+                        if (dayEntry) {
+                          dayEntry.revenue += lead.contractValue || 0;
+                        }
+                      });
+
+                    const hasData = last7Days.some(d => d.revenue > 0);
+
+                    return hasData ? (
+                      <ResponsiveContainer width="100%" height={180}>
+                        <BarChart data={last7Days}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                          <XAxis
+                            dataKey="date"
+                            stroke="#71717a"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                          />
+                          <YAxis
+                            stroke="#71717a"
+                            fontSize={11}
+                            tickLine={false}
+                            axisLine={false}
+                            tickFormatter={(value) => `$${value}`}
+                          />
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#18181b',
+                              border: '1px solid #3f3f46',
+                              borderRadius: '8px',
+                              fontSize: '12px'
+                            }}
+                            formatter={(value: any) => [`$${value}`, 'Revenue']}
+                          />
+                          <Bar
+                            dataKey="revenue"
+                            fill="#10b981"
+                            radius={[4, 4, 0, 0]}
+                            maxBarSize={40}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    ) : (
+                      <div className="h-[180px] flex items-center justify-center">
+                        <div className="text-center">
+                          <BarChart3 className="h-8 w-8 text-zinc-700 mx-auto mb-2" />
+                          <p className="text-xs text-zinc-500">No revenue data yet</p>
                         </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex items-center justify-between mt-4 text-xs text-zinc-500">
-                    <span>30 days ago</span>
-                    <span>Today</span>
-                  </div>
+                      </div>
+                    );
+                  })()}
                 </CardContent>
               </Card>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Add Job Modal */}
+      <AddJobModal
+        isOpen={showAddJobModal}
+        providerId={providerId}
+        providerServiceTypes={providerServiceTypes}
+        onClose={() => setShowAddJobModal(false)}
+        onJobCreated={() => {
+          fetchTodaysJobs(providerId);
+          fetchStats(providerId);
+          setShowAddJobModal(false);
+        }}
+      />
 
       {/* Scheduling Modal */}
       {showScheduleModal && (

@@ -48,6 +48,7 @@ export default function ProviderCalendar() {
   const router = useRouter();
   const [providerName, setProviderName] = useState('');
   const [providerId, setProviderId] = useState('');
+  const [providerServiceTypes, setProviderServiceTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
@@ -63,6 +64,22 @@ export default function ProviderCalendar() {
   const [showDeleteBlockModal, setShowDeleteBlockModal] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<BlockedTime | null>(null);
 
+  // Set default view mode based on screen size
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setViewMode('day');
+      }
+    };
+
+    // Set initial view mode
+    handleResize();
+
+    // Listen for window resize
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   useEffect(() => {
     const id = localStorage.getItem('providerId');
     const name = localStorage.getItem('providerName');
@@ -74,9 +91,23 @@ export default function ProviderCalendar() {
 
     setProviderId(id);
     setProviderName(name);
+    fetchProviderDetails(id);
     fetchJobs(id);
     fetchBlockedTimes(id);
   }, [router]);
+
+  const fetchProviderDetails = async (id: string) => {
+    try {
+      const res = await fetch(`/api/provider/details?providerId=${id}`);
+      const data = await res.json();
+
+      if (data.provider && data.provider.serviceTypes) {
+        setProviderServiceTypes(data.provider.serviceTypes);
+      }
+    } catch (error) {
+      console.error('Failed to load provider details:', error);
+    }
+  };
 
   const fetchJobs = async (id: string) => {
     try {
@@ -201,44 +232,46 @@ export default function ProviderCalendar() {
       <div className="min-h-screen bg-zinc-950">
         {/* Header */}
         <div className="border-b border-zinc-800/50 bg-zinc-900/30 backdrop-blur-sm">
-          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
+          <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-3 md:py-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 md:gap-4 mb-3 md:mb-4">
               {/* Left: Title + Date Range */}
               <div>
-                <h1 className="text-2xl font-bold text-zinc-100">Calendar</h1>
-                <p className="text-sm text-zinc-400 mt-1">{getDateRangeText()}</p>
+                <h1 className="text-xl md:text-2xl font-bold text-zinc-100">Calendar</h1>
+                <p className="text-xs md:text-sm text-zinc-400 mt-0.5 md:mt-1">{getDateRangeText()}</p>
               </div>
 
               {/* Right: Actions */}
-              <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
                 <Button
                   onClick={() => {
                     setSelectedSlot(null);
                     setShowAddJobModal(true);
                   }}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white flex-1 sm:flex-none"
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white flex-1 sm:flex-none text-xs md:text-sm h-9 md:h-10"
                 >
-                  <Plus className="h-4 w-4 mr-2" />
+                  <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
                   Add Job
                 </Button>
                 <Button
                   onClick={() => setShowBlockTimeModal(true)}
+                  size="sm"
                   variant="outline"
-                  className="border-zinc-700 hover:bg-zinc-800 flex-1 sm:flex-none"
+                  className="border-zinc-700 hover:bg-zinc-800 flex-1 sm:flex-none text-xs md:text-sm h-9 md:h-10"
                 >
-                  <Clock className="h-4 w-4 mr-2" />
+                  <Clock className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
                   Block Time
                 </Button>
               </div>
             </div>
 
             {/* View Controls */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 md:gap-4">
               {/* View Toggles */}
-              <div className="flex items-center gap-2 bg-zinc-900/50 rounded-lg p-1 border border-zinc-800">
+              <div className="flex items-center gap-1 md:gap-2 bg-zinc-900/50 rounded-lg p-1 border border-zinc-800">
                 <button
                   onClick={() => setViewMode('day')}
-                  className={`flex-1 sm:flex-none px-4 py-1.5 text-sm font-medium rounded transition-all ${
+                  className={`flex-1 sm:flex-none px-3 md:px-4 py-2 md:py-1.5 text-xs md:text-sm font-medium rounded transition-all min-h-[44px] md:min-h-0 ${
                     viewMode === 'day'
                       ? 'bg-emerald-600 text-white'
                       : 'text-zinc-400 hover:text-zinc-200'
@@ -248,7 +281,7 @@ export default function ProviderCalendar() {
                 </button>
                 <button
                   onClick={() => setViewMode('week')}
-                  className={`flex-1 sm:flex-none px-4 py-1.5 text-sm font-medium rounded transition-all ${
+                  className={`flex-1 sm:flex-none px-3 md:px-4 py-2 md:py-1.5 text-xs md:text-sm font-medium rounded transition-all min-h-[44px] md:min-h-0 ${
                     viewMode === 'week'
                       ? 'bg-emerald-600 text-white'
                       : 'text-zinc-400 hover:text-zinc-200'
@@ -258,7 +291,7 @@ export default function ProviderCalendar() {
                 </button>
                 <button
                   onClick={() => setViewMode('month')}
-                  className={`flex-1 sm:flex-none px-4 py-1.5 text-sm font-medium rounded transition-all ${
+                  className={`flex-1 sm:flex-none px-3 md:px-4 py-2 md:py-1.5 text-xs md:text-sm font-medium rounded transition-all min-h-[44px] md:min-h-0 ${
                     viewMode === 'month'
                       ? 'bg-emerald-600 text-white'
                       : 'text-zinc-400 hover:text-zinc-200'
@@ -274,7 +307,7 @@ export default function ProviderCalendar() {
                   onClick={navigatePrev}
                   size="sm"
                   variant="outline"
-                  className="border-zinc-700 hover:bg-zinc-800 flex-1 sm:flex-none"
+                  className="border-zinc-700 hover:bg-zinc-800 flex-1 sm:flex-none h-11 md:h-9"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
@@ -282,7 +315,7 @@ export default function ProviderCalendar() {
                   onClick={goToToday}
                   size="sm"
                   variant="outline"
-                  className="border-zinc-700 hover:bg-zinc-800 px-6 flex-1 sm:flex-none"
+                  className="border-zinc-700 hover:bg-zinc-800 px-6 flex-1 sm:flex-none h-11 md:h-9 text-xs md:text-sm"
                 >
                   Today
                 </Button>
@@ -290,7 +323,7 @@ export default function ProviderCalendar() {
                   onClick={navigateNext}
                   size="sm"
                   variant="outline"
-                  className="border-zinc-700 hover:bg-zinc-800 flex-1 sm:flex-none"
+                  className="border-zinc-700 hover:bg-zinc-800 flex-1 sm:flex-none h-11 md:h-9"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
@@ -343,6 +376,7 @@ export default function ProviderCalendar() {
           setSelectedSlot(null);
         }}
         providerId={providerId}
+        providerServiceTypes={providerServiceTypes}
         onJobCreated={() => fetchJobs(providerId)}
         selectedDate={selectedSlot?.date}
         selectedHour={selectedSlot?.hour}
@@ -459,12 +493,25 @@ function WeekView({ jobs, blockedTimes, currentDate, onSlotClick, onJobClick, on
 
       return (blockStart <= dateEnd && blockEnd >= dateStart);
     }).map(block => {
-      const blockStart = new Date(block.fromDate);
-      const blockEnd = new Date(block.toDate);
+      // Check if this is an all-day block (no specific times set)
+      const isAllDay = !block.startTime || !block.endTime;
 
-      // Calculate start hour (clamp to 7 AM - 7 PM range)
-      const startHour = Math.max(7, Math.min(19, blockStart.getHours()));
-      const endHour = Math.max(7, Math.min(20, blockEnd.getHours() + 1)); // +1 to include the end hour
+      let startHour: number;
+      let endHour: number;
+
+      if (isAllDay) {
+        // All-day block: span entire calendar (7 AM - 8 PM)
+        startHour = 7;
+        endHour = 20; // 8 PM
+      } else {
+        // Specific time block: parse the time strings
+        const [startTimeHour, startTimeMin] = block.startTime!.split(':').map(Number);
+        const [endTimeHour, endTimeMin] = block.endTime!.split(':').map(Number);
+
+        // Clamp to calendar range (7 AM - 8 PM)
+        startHour = Math.max(7, Math.min(19, startTimeHour));
+        endHour = Math.max(7, Math.min(20, endTimeHour === 0 && endTimeMin === 0 ? 24 : endTimeHour));
+      }
 
       // Calculate position from top (0 = 7 AM)
       const topPosition = (startHour - 7) * HOUR_HEIGHT;
@@ -477,6 +524,7 @@ function WeekView({ jobs, blockedTimes, currentDate, onSlotClick, onJobClick, on
         height,
         startHour,
         endHour,
+        isAllDay,
       };
     });
   };
@@ -593,7 +641,7 @@ function WeekView({ jobs, blockedTimes, currentDate, onSlotClick, onJobClick, on
                             {block.reason}
                           </span>
                           <p className="text-[10px] text-red-400/70 mt-0.5">
-                            {block.startHour === 12 ? '12 PM' : block.startHour > 12 ? `${block.startHour - 12} PM` : `${block.startHour} AM`} - {block.endHour === 12 ? '12 PM' : block.endHour > 12 ? `${block.endHour - 12} PM` : `${block.endHour} AM`}
+                            {block.isAllDay ? '🔒 All Day' : `${block.startHour === 12 ? '12 PM' : block.startHour > 12 ? `${block.startHour - 12} PM` : `${block.startHour} AM`} - ${block.endHour === 12 ? '12 PM' : block.endHour > 12 ? `${block.endHour - 12} PM` : `${block.endHour} AM`}`}
                           </p>
                         </div>
                       </div>
@@ -659,12 +707,25 @@ function DayView({ jobs, blockedTimes, currentDate, onSlotClick, onJobClick, onS
 
       return (blockStart <= dateEnd && blockEnd >= dateStart);
     }).map(block => {
-      const blockStart = new Date(block.fromDate);
-      const blockEnd = new Date(block.toDate);
+      // Check if this is an all-day block (no specific times set)
+      const isAllDay = !block.startTime || !block.endTime;
 
-      // Calculate start hour (clamp to 7 AM - 7 PM range)
-      const startHour = Math.max(7, Math.min(19, blockStart.getHours()));
-      const endHour = Math.max(7, Math.min(20, blockEnd.getHours() + 1)); // +1 to include the end hour
+      let startHour: number;
+      let endHour: number;
+
+      if (isAllDay) {
+        // All-day block: span entire calendar (7 AM - 8 PM)
+        startHour = 7;
+        endHour = 20; // 8 PM
+      } else {
+        // Specific time block: parse the time strings
+        const [startTimeHour, startTimeMin] = block.startTime!.split(':').map(Number);
+        const [endTimeHour, endTimeMin] = block.endTime!.split(':').map(Number);
+
+        // Clamp to calendar range (7 AM - 8 PM)
+        startHour = Math.max(7, Math.min(19, startTimeHour));
+        endHour = Math.max(7, Math.min(20, endTimeHour === 0 && endTimeMin === 0 ? 24 : endTimeHour));
+      }
 
       // Calculate position from top (0 = 7 AM)
       const topPosition = (startHour - 7) * HOUR_HEIGHT;
@@ -677,6 +738,7 @@ function DayView({ jobs, blockedTimes, currentDate, onSlotClick, onJobClick, onS
         height,
         startHour,
         endHour,
+        isAllDay,
       };
     });
   };
@@ -734,7 +796,7 @@ function DayView({ jobs, blockedTimes, currentDate, onSlotClick, onJobClick, onS
               {block.reason}
             </span>
             <p className="text-[10px] text-red-400/70 mt-0.5">
-              {block.startHour === 12 ? '12 PM' : block.startHour > 12 ? `${block.startHour - 12} PM` : `${block.startHour} AM`} - {block.endHour === 12 ? '12 PM' : block.endHour > 12 ? `${block.endHour - 12} PM` : `${block.endHour} AM`}
+              {block.isAllDay ? '🔒 All Day' : `${block.startHour === 12 ? '12 PM' : block.startHour > 12 ? `${block.startHour - 12} PM` : `${block.startHour} AM`} - ${block.endHour === 12 ? '12 PM' : block.endHour > 12 ? `${block.endHour - 12} PM` : `${block.endHour} AM`}`}
             </p>
           </div>
         </div>

@@ -13,44 +13,81 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Provider ID is required' }, { status: 400 });
     }
 
-    // Fetch all leads/jobs for this provider to create conversations
-    const leads = await prisma.lead.findMany({
-      where: { assignedProviderId: providerId },
-      orderBy: { updatedAt: 'desc' },
+    // Get all messages for this provider
+    const messages = await prisma.providerCustomerMessage.findMany({
+      where: { providerId },
+      include: {
+        customer: true,
+      },
+      orderBy: { createdAt: 'desc' },
     });
 
-    // Group by customer (email as unique identifier) and create mock conversations
+    // Group messages by customer to create conversation list
     const conversationMap = new Map();
 
-    leads.forEach(lead => {
-      const customerId = lead.email.toLowerCase();
-      const customerName = `${lead.firstName} ${lead.lastName}`;
+    for (const message of messages) {
+      const customerId = message.customerId;
 
       if (!conversationMap.has(customerId)) {
-        // Create mock conversation with last message
-        const lastMessage = lead.status === 'converted'
-          ? 'Thank you! The job looks great.'
-          : lead.status === 'accepted'
-          ? 'Looking forward to working with you!'
-          : 'I\'m interested in your services.';
+        // Count unread messages for this customer
+        const unreadCount = messages.filter(
+          m => m.customerId === customerId && m.direction === 'received' && m.status !== 'read'
+        ).length;
 
         conversationMap.set(customerId, {
-          id: lead.id,
-          customerId: lead.id,
-          customerName,
-          jobReference: lead.providerProposedDate
-            ? `Re: ${lead.serviceInterest} on ${new Date(lead.providerProposedDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-            : `Re: ${lead.serviceInterest}`,
-          jobDate: lead.providerProposedDate,
-          lastMessage,
-          lastMessageTime: lead.updatedAt.toISOString(),
-          unread: lead.status === 'matched', // New matched leads are unread
-          source: 'renoa' as const,
+          id: customerId,
+          customerId: customerId,
+          customerName: message.customer.name,
+          customerPhone: message.customer.phone,
+          customerEmail: message.customer.email,
+          lastMessage: message.content,
+          lastMessageTime: message.createdAt.toISOString(),
+          unread: unreadCount > 0,
+          unreadCount,
+          source: message.customer.source,
+        });
+      }
+    }
+
+    // Also include customers with no messages but who have jobs (potential conversations)
+    const customersWithJobs = await prisma.customer.findMany({
+      where: {
+        providerId,
+        NOT: {
+          id: {
+            in: Array.from(conversationMap.keys()),
+          },
+        },
+      },
+      include: {
+        jobs: {
+          orderBy: { startTime: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    // Add customers with jobs but no messages yet
+    customersWithJobs.forEach(customer => {
+      if (customer.jobs.length > 0) {
+        conversationMap.set(customer.id, {
+          id: customer.id,
+          customerId: customer.id,
+          customerName: customer.name,
+          customerPhone: customer.phone,
+          customerEmail: customer.email,
+          lastMessage: null,
+          lastMessageTime: customer.jobs[0]?.startTime?.toISOString() || customer.createdAt.toISOString(),
+          unread: false,
+          unreadCount: 0,
+          source: customer.source,
+          jobReference: `${customer.jobs[0]?.serviceType} - ${new Date(customer.jobs[0]?.startTime).toLocaleDateString()}`,
         });
       }
     });
 
-    const conversations = Array.from(conversationMap.values());
+    const conversations = Array.from(conversationMap.values())
+      .sort((a, b) => new Date(b.lastMessageTime).getTime() - new Date(a.lastMessageTime).getTime());
 
     return NextResponse.json({ conversations });
   } catch (error) {
@@ -65,55 +102,59 @@ export async function GET(request: NextRequest) {
 // POST - Send a new message
 export async function POST(request: NextRequest) {
   try {
-    const formData = await request.formData();
-    const conversationId = formData.get('conversationId') as string;
-    const providerId = formData.get('providerId') as string;
-    const content = formData.get('content') as string;
-    const photo = formData.get('photo') as File | null;
+    const body = await request.json();
+    const { providerId, customerId, content, type = 'sms' } = body;
 
-    if (!conversationId || !providerId || (!content && !photo)) {
+    if (!providerId || !customerId || !content) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Provider ID, Customer ID, and message content are required' },
         { status: 400 }
       );
     }
 
-    // TODO: Store message in a dedicated messages table
-    // For now, we'll just return success and append to lead notes
-    const lead = await prisma.lead.findUnique({
-      where: { id: conversationId },
-    });
-
-    if (!lead) {
-      return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
-    }
-
-    // Append message to notes as temporary storage
-    const timestamp = new Date().toISOString();
-    const messageEntry = `[${timestamp}] Provider: ${content}`;
-    const updatedNotes = lead.notes
-      ? `${lead.notes}\n\n${messageEntry}`
-      : messageEntry;
-
-    await prisma.lead.update({
-      where: { id: conversationId },
-      data: {
-        notes: updatedNotes,
-        updatedAt: new Date(),
+    // Verify the customer belongs to this provider
+    const customer = await prisma.customer.findFirst({
+      where: {
+        id: customerId,
+        providerId: providerId,
       },
     });
 
-    // TODO: Send SMS/Email notification to customer
+    if (!customer) {
+      return NextResponse.json({ error: 'Customer not found or unauthorized' }, { status: 404 });
+    }
+
+    // Create the message
+    const message = await prisma.providerCustomerMessage.create({
+      data: {
+        providerId,
+        customerId,
+        content,
+        direction: 'sent',
+        type,
+        status: 'sent',
+      },
+      include: {
+        customer: true,
+      },
+    });
+
+    // TODO: Send actual SMS/Email via Twilio/SendGrid here
+    // For now, just save to database
 
     return NextResponse.json({
       success: true,
       message: {
-        id: Date.now().toString(),
-        conversationId,
+        id: message.id,
+        customerId: message.customerId,
+        customerName: message.customer.name,
         senderId: providerId,
         senderType: 'provider',
-        content,
-        timestamp,
+        content: message.content,
+        direction: message.direction,
+        type: message.type,
+        status: message.status,
+        timestamp: message.createdAt.toISOString(),
         read: false,
       }
     });

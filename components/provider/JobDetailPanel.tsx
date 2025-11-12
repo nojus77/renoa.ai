@@ -1,9 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react';
-import { X, Phone, MapPin, MessageCircle, Edit2, Save, Trash2, CheckCircle, Send, Camera, ChevronDown } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
+import { X, Phone, MapPin, MessageCircle, Edit2, Save, Trash2, CheckCircle, Send, Camera, ChevronDown, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import EditJobModal from './EditJobModal';
 
 interface Job {
   id: string;
@@ -31,11 +33,15 @@ interface JobDetailPanelProps {
 }
 
 export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: JobDetailPanelProps) {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [editedJob, setEditedJob] = useState<Partial<Job>>({});
   const [activeTab, setActiveTab] = useState<'internal' | 'customer'>('internal');
   const [isSaving, setSaving] = useState(false);
   const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const photosRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (job) {
@@ -175,138 +181,212 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
-        {/* Header Section */}
+        {/* Header Section - FIELD OPTIMIZED */}
         <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 z-10">
-          <div className="p-6 pb-4">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-zinc-100 mb-2">{job.customerName}</h2>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="px-3 py-1 text-sm font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-full">
-                    {job.serviceType.replace(/_/g, ' ')}
-                  </span>
-                  <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                    job.isRenoaLead
-                      ? 'bg-purple-500/20 text-purple-400 border border-purple-500/30'
-                      : 'bg-zinc-700/50 text-zinc-400 border border-zinc-600'
-                  }`}>
-                    {job.isRenoaLead ? 'Renoa Lead' : 'Own Client'}
-                  </span>
-                  <div className="relative">
-                    <button
-                      onClick={() => setShowStatusMenu(!showStatusMenu)}
-                      className={`px-3 py-1 text-sm font-medium rounded-full border flex items-center gap-1 ${getStatusColor(job.status)}`}
-                    >
-                      {job.status.replace('_', ' ').toUpperCase()}
-                      <ChevronDown className="h-3 w-3" />
-                    </button>
-                    {showStatusMenu && (
-                      <div className="absolute top-full mt-1 left-0 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-20 min-w-[150px]">
-                        {['scheduled', 'in_progress', 'completed', 'cancelled'].map(status => (
-                          <button
-                            key={status}
-                            onClick={() => handleStatusChange(status)}
-                            className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700 transition-colors capitalize"
-                          >
-                            {status.replace('_', ' ')}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+          <div className="p-4 md:p-6 pb-3 md:pb-4">
+            {/* Compact Header */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex items-center gap-3 flex-1 min-w-0">
+                <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-xl flex-shrink-0">
+                  🏡
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h2 className="text-lg md:text-xl font-bold text-zinc-100 truncate">{job.customerName}'s Property</h2>
+                  <div className="text-sm text-emerald-500 font-medium">{job.serviceType.replace(/_/g, ' ')}</div>
                 </div>
               </div>
               <button
                 onClick={onClose}
-                className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
+                className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            {/* Quick Actions Bar */}
-            <div className="flex items-center gap-2">
+            {/* Compact Info Grid */}
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className="bg-zinc-800/50 rounded-lg p-2.5 border border-zinc-700">
+                <div className="text-xs text-zinc-400 mb-0.5">Status</div>
+                <div className="relative">
+                  <button
+                    onClick={() => setShowStatusMenu(!showStatusMenu)}
+                    className={`text-sm font-semibold flex items-center gap-1 ${
+                      job.status === 'scheduled' ? 'text-blue-400' :
+                      job.status === 'in_progress' ? 'text-orange-400' :
+                      job.status === 'completed' ? 'text-emerald-400' :
+                      'text-red-400'
+                    }`}
+                  >
+                    {job.status.replace('_', ' ')}
+                    <ChevronDown className="h-3 w-3" />
+                  </button>
+                  {showStatusMenu && (
+                    <div className="absolute top-full mt-1 left-0 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-20 min-w-[140px]">
+                      {['scheduled', 'in_progress', 'completed', 'cancelled'].map(status => (
+                        <button
+                          key={status}
+                          onClick={() => handleStatusChange(status)}
+                          className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700 transition-colors capitalize"
+                        >
+                          {status.replace('_', ' ')}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="bg-zinc-800/50 rounded-lg p-2.5 border border-zinc-700">
+                <div className="text-xs text-zinc-400 mb-0.5">Value</div>
+                <div className="text-sm font-semibold text-emerald-500">
+                  ${job.estimatedValue || job.actualValue || 0}
+                </div>
+              </div>
+            </div>
+
+            {/* Timer Banner - Only when in progress */}
+            {job.status === 'in_progress' && (
+              <div className="bg-amber-900/20 border-2 border-amber-600 rounded-lg p-2.5 mb-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
+                    <span className="text-sm text-amber-500 font-medium">Job In Progress</span>
+                  </div>
+                  <div className="text-lg font-mono text-amber-500 font-bold">
+                    {/* Timer would go here */}
+                    --:--
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Compact Action Grid */}
+            <div className="grid grid-cols-4 gap-2">
               <a
                 href={`tel:${job.phone}`}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors text-sm font-medium"
+                className="aspect-square bg-emerald-600 hover:bg-emerald-500 rounded-lg flex flex-col items-center justify-center transition-colors active:scale-95"
               >
-                <Phone className="h-4 w-4" />
-                Call
+                <span className="text-xl mb-0.5">📞</span>
+                <span className="text-xs text-white">Call</span>
               </a>
               <a
                 href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg transition-colors text-sm font-medium"
+                className="aspect-square bg-blue-600 hover:bg-blue-500 rounded-lg flex flex-col items-center justify-center transition-colors active:scale-95"
               >
-                <MapPin className="h-4 w-4" />
-                Navigate
-              </a>
-              <a
-                href={`sms:${job.phone}`}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-200 rounded-lg transition-colors text-sm font-medium"
-              >
-                <MessageCircle className="h-4 w-4" />
-                Message
+                <span className="text-xl mb-0.5">🧭</span>
+                <span className="text-xs text-white">Navigate</span>
               </a>
               <button
-                onClick={() => setIsEditing(!isEditing)}
-                className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
-                  isEditing
-                    ? 'bg-orange-600 hover:bg-orange-500 text-white'
-                    : 'bg-zinc-800 hover:bg-zinc-700 text-zinc-200'
-                }`}
+                onClick={() => {
+                  photosRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }}
+                className="aspect-square bg-purple-600 hover:bg-purple-500 rounded-lg flex flex-col items-center justify-center transition-colors active:scale-95"
               >
-                <Edit2 className="h-4 w-4" />
-                {isEditing ? 'Editing' : 'Edit'}
+                <span className="text-xl mb-0.5">📷</span>
+                <span className="text-xs text-white">Photos</span>
               </button>
+              <div className="relative">
+                <button
+                  onClick={() => setShowMoreMenu(!showMoreMenu)}
+                  className="w-full aspect-square bg-gray-700 hover:bg-gray-600 rounded-lg flex flex-col items-center justify-center transition-colors active:scale-95"
+                >
+                  <span className="text-xl mb-0.5">⋯</span>
+                  <span className="text-xs text-white">More</span>
+                </button>
+                {showMoreMenu && (
+                  <div className="absolute top-full mt-1 right-0 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-20 min-w-[160px]">
+                    <button
+                      onClick={() => {
+                        setShowEditModal(true);
+                        setShowMoreMenu(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-zinc-700 transition-colors flex items-center gap-2"
+                    >
+                      <Edit2 className="h-4 w-4" />
+                      Edit Job
+                    </button>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-zinc-700 transition-colors flex items-center gap-2"
+                      onClick={() => setShowMoreMenu(false)}
+                    >
+                      <MapPin className="h-4 w-4" />
+                      Open in Maps
+                    </a>
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${job.customerName} - ${job.serviceType} - ${job.address}`);
+                        toast.success('Job details copied to clipboard');
+                        setShowMoreMenu(false);
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-zinc-300 hover:bg-zinc-700 transition-colors flex items-center gap-2"
+                    >
+                      <Share2 className="h-4 w-4" />
+                      Share
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowMoreMenu(false);
+                        handleDelete();
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm text-red-400 hover:bg-red-900/20 transition-colors flex items-center gap-2 border-t border-zinc-700"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      Delete Job
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Content */}
-        <div className="p-6 space-y-6">
-          {/* Job Information Grid */}
-          <section>
-            <h3 className="text-lg font-semibold text-zinc-100 mb-3">Job Details</h3>
-            <div className="bg-zinc-800/30 border border-zinc-800 rounded-xl p-4 space-y-3">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Date</label>
-                  <p className="text-sm text-zinc-200 mt-1">{formatDate(job.startTime)}</p>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Time</label>
-                  <p className="text-sm text-zinc-200 mt-1">
-                    {formatTime(job.startTime)} - {formatTime(job.endTime)}
-                  </p>
-                </div>
+        {/* Content - FIELD OPTIMIZED */}
+        <div className="p-4 md:p-6 space-y-4 md:space-y-6">
+          {/* Job Details - Collapsible */}
+          <details className="group" open>
+            <summary className="cursor-pointer bg-zinc-800/30 rounded-lg p-3 border border-zinc-700 hover:border-zinc-600 flex items-center justify-between select-none">
+              <span className="font-semibold text-zinc-100 flex items-center gap-2">
+                <span>ℹ️</span> Job Details
+              </span>
+              <span className="text-zinc-400 group-open:rotate-180 transition-transform">▼</span>
+            </summary>
+            <div className="mt-2 bg-zinc-800/30 border border-zinc-700 rounded-lg p-3 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Date</span>
+                <span className="font-medium text-zinc-200">{formatDate(job.startTime)}</span>
               </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Duration</label>
-                  <p className="text-sm text-zinc-200 mt-1">{getDuration()} hours</p>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Created</label>
-                  <p className="text-sm text-zinc-200 mt-1">{getTimeAgo(job.createdAt)}</p>
-                </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Time</span>
+                <span className="font-medium text-zinc-200">{formatTime(job.startTime)} - {formatTime(job.endTime)}</span>
               </div>
-
-              <div>
-                <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider flex items-center gap-2">
-                  Address
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-emerald-400 hover:text-emerald-300"
-                  >
-                    <MapPin className="h-3 w-3" />
-                  </a>
-                </label>
-                <p className="text-sm text-zinc-200 mt-1">{job.address}</p>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Duration</span>
+                <span className="font-medium text-zinc-200">{getDuration()} hours</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Created</span>
+                <span className="font-medium text-zinc-200">{getTimeAgo(job.createdAt)}</span>
+              </div>
+              <div className="flex justify-between items-start">
+                <span className="text-zinc-400">Address</span>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-medium text-blue-400 hover:text-blue-300 text-right max-w-[200px]"
+                >
+                  {job.address}
+                </a>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Source</span>
+                <span className={`font-medium ${job.isRenoaLead ? 'text-purple-400' : 'text-zinc-400'}`}>
+                  {job.isRenoaLead ? 'Renoa Lead' : 'Own Client'}
+                </span>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -334,7 +414,7 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
                 </div>
               </div>
             </div>
-          </section>
+          </details>
 
           {/* Status Timeline */}
           <section>
@@ -380,7 +460,7 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
           </section>
 
           {/* Photos Section */}
-          <section>
+          <section ref={photosRef}>
             <h3 className="text-lg font-semibold text-zinc-100 mb-3">Photos</h3>
             <div className="grid grid-cols-3 gap-3">
               {['Before', 'During', 'After'].map((label) => (
@@ -501,16 +581,38 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
 
             {job.status === 'completed' && (
               <Button
-                onClick={() => toast.info('Invoice feature coming soon')}
+                onClick={() => router.push(`/provider/invoices/create?jobId=${job.id}`)}
                 className="bg-emerald-600 hover:bg-emerald-500 text-white"
               >
                 <Send className="h-4 w-4 mr-2" />
-                Send Invoice
+                Create Invoice
               </Button>
             )}
           </div>
         </div>
       </div>
+
+      {/* Edit Job Modal */}
+      {showEditModal && (
+        <EditJobModal
+          isOpen={showEditModal}
+          onClose={() => setShowEditModal(false)}
+          jobId={job.id}
+          initialData={{
+            serviceType: job.serviceType,
+            startTime: job.startTime,
+            endTime: job.endTime,
+            estimatedValue: job.estimatedValue,
+            internalNotes: job.notes,
+            customerNotes: job.customerNotes,
+            status: job.status,
+          }}
+          onJobUpdated={() => {
+            onJobUpdated();
+            setShowEditModal(false);
+          }}
+        />
+      )}
     </>
   );
 }

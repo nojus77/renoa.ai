@@ -61,13 +61,14 @@ interface Job {
     phone: string;
     address: string;
   };
-  photos: Array<{
+  photos?: Array<{
     id: string;
     type: string;
     url: string;
     createdAt: string;
   }>;
   provider: {
+    id: string;
     businessName: string;
     phone: string;
     email: string;
@@ -299,10 +300,10 @@ export default function JobDetailPage() {
   const statusSteps = ['scheduled', 'in_progress', 'completed'];
   const currentStepIndex = statusSteps.indexOf(job.status);
 
-  // Get photos by type
-  const beforePhotos = job.photos.filter(p => p.type === 'before');
-  const duringPhotos = job.photos.filter(p => p.type === 'during');
-  const afterPhotos = job.photos.filter(p => p.type === 'after');
+  // Get photos by type (safe with null check)
+  const beforePhotos = job.photos?.filter(p => p.type === 'before') || [];
+  const duringPhotos = job.photos?.filter(p => p.type === 'during') || [];
+  const afterPhotos = job.photos?.filter(p => p.type === 'after') || [];
 
   // Format elapsed time for timer
   const formatElapsedTime = (seconds: number) => {
@@ -678,11 +679,11 @@ export default function JobDetailPage() {
               <div className="flex items-start gap-3 mb-4 lg:mb-5">
                 {/* Customer Avatar */}
                 <div className="h-12 w-12 lg:h-14 lg:w-14 rounded-full bg-emerald-600 flex items-center justify-center text-xl font-bold text-white">
-                  {job.customerName.charAt(0)}
+                  {(job.customerName || job.customer?.name || 'U').charAt(0)}
                 </div>
 
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-zinc-100 mb-1">{job.customerName}</h3>
+                  <h3 className="text-lg font-bold text-zinc-100 mb-1">{job.customerName || job.customer?.name || 'Unknown'}</h3>
                   <div className="flex items-center gap-2">
                     <div className="flex">
                       {[1, 2, 3, 4, 5].map((star) => (
@@ -897,6 +898,11 @@ export default function JobDetailPage() {
         onClose={() => setShowCompleteModal(false)}
         onComplete={handleCompleteJob}
         hasAfterPhotos={afterPhotos.length > 0}
+        estimatedValue={job.estimatedValue || 0}
+        jobId={job.id}
+        customerId={job.customer.id}
+        providerId={job.provider.id}
+        serviceType={job.serviceType}
       />
     </div>
   );

@@ -227,32 +227,35 @@ export default function ProviderInvoices() {
       <div className="min-h-screen bg-zinc-950">
         {/* Header */}
         <div className="border-b border-zinc-800 bg-zinc-900/30 backdrop-blur-sm">
-          <div className="max-w-[1600px] mx-auto px-6 py-6">
-            <div className="flex items-center justify-between mb-6">
+          <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-3 md:py-6">
+            <div className="flex items-center justify-between mb-3 md:mb-6">
               <div>
-                <h1 className="text-2xl font-bold text-zinc-100">Invoices</h1>
-                <p className="text-sm text-zinc-400 mt-1">Manage your billing and payments</p>
+                <h1 className="text-xl md:text-2xl font-bold text-zinc-100">Invoices</h1>
+                <p className="text-xs md:text-sm text-zinc-400 mt-0.5 md:mt-1">Manage your billing and payments</p>
               </div>
               <Button
                 onClick={() => setShowCreateModal(true)}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                size="sm"
+                className="bg-emerald-600 hover:bg-emerald-500 text-white text-xs md:text-sm h-9 md:h-10"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Create Invoice
+                <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
+                <span className="hidden sm:inline">Create Invoice</span>
+                <span className="sm:hidden">Create</span>
               </Button>
             </div>
 
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Stats Cards - Inline on mobile */}
+            <div className="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-4">
               <Card className="bg-red-500/10 border-red-500/30">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-red-500/20 rounded-lg">
-                      <AlertCircle className="h-5 w-5 text-red-400" />
+                <CardContent className="pt-3 md:pt-6 pb-3 md:pb-6">
+                  <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3">
+                    <div className="p-1.5 md:p-2 bg-red-500/20 rounded-lg">
+                      <AlertCircle className="h-4 w-4 md:h-5 md:w-5 text-red-400" />
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-zinc-400">Outstanding</p>
-                      <p className="text-2xl font-bold text-red-400">
+                    <div className="flex-1 text-center md:text-left">
+                      <p className="text-xs md:text-sm text-zinc-400 hidden md:block">Outstanding</p>
+                      <p className="text-xs md:text-sm text-zinc-400 md:hidden">Due</p>
+                      <p className="text-base md:text-2xl font-bold text-red-400">
                         {formatCurrency(stats.outstanding)}
                       </p>
                     </div>
@@ -261,14 +264,15 @@ export default function ProviderInvoices() {
               </Card>
 
               <Card className="bg-emerald-500/10 border-emerald-500/30">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-emerald-500/20 rounded-lg">
-                      <TrendingUp className="h-5 w-5 text-emerald-400" />
+                <CardContent className="pt-3 md:pt-6 pb-3 md:pb-6">
+                  <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3">
+                    <div className="p-1.5 md:p-2 bg-emerald-500/20 rounded-lg">
+                      <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-emerald-400" />
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-zinc-400">Paid This Month</p>
-                      <p className="text-2xl font-bold text-emerald-400">
+                    <div className="flex-1 text-center md:text-left">
+                      <p className="text-xs md:text-sm text-zinc-400 hidden md:block">Paid This Month</p>
+                      <p className="text-xs md:text-sm text-zinc-400 md:hidden">Paid</p>
+                      <p className="text-base md:text-2xl font-bold text-emerald-400">
                         {formatCurrency(stats.paidThisMonth)}
                       </p>
                     </div>
@@ -277,14 +281,14 @@ export default function ProviderInvoices() {
               </Card>
 
               <Card className="bg-orange-500/10 border-orange-500/30">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-orange-500/20 rounded-lg">
-                      <Clock className="h-5 w-5 text-orange-400" />
+                <CardContent className="pt-3 md:pt-6 pb-3 md:pb-6">
+                  <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3">
+                    <div className="p-1.5 md:p-2 bg-orange-500/20 rounded-lg">
+                      <Clock className="h-4 w-4 md:h-5 md:w-5 text-orange-400" />
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm text-zinc-400">Overdue</p>
-                      <p className="text-2xl font-bold text-orange-400">
+                    <div className="flex-1 text-center md:text-left">
+                      <p className="text-xs md:text-sm text-zinc-400">Overdue</p>
+                      <p className="text-base md:text-2xl font-bold text-orange-400">
                         {formatCurrency(stats.overdue)}
                       </p>
                     </div>
@@ -296,28 +300,28 @@ export default function ProviderInvoices() {
         </div>
 
         {/* Main Content */}
-        <div className="max-w-[1600px] mx-auto px-6 py-8">
+        <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-4 md:py-8">
           {/* Search and Filters */}
-          <div className="flex flex-col md:flex-row gap-3 mb-6">
+          <div className="flex flex-col md:flex-row gap-2 md:gap-3 mb-4 md:mb-6">
             {/* Search Bar */}
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 md:h-4 md:w-4 text-zinc-500" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search by customer name or invoice number..."
-                className="w-full pl-10 pr-4 py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                placeholder="Search invoices..."
+                className="w-full pl-9 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs md:text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
               />
             </div>
 
-            {/* Status Filter */}
-            <div className="flex gap-2">
+            {/* Status Filter - Horizontal scroll on mobile */}
+            <div className="flex gap-1.5 md:gap-2 overflow-x-auto pb-2 md:pb-0 -mx-3 px-3 md:mx-0 md:px-0">
               {(['all', 'paid', 'unpaid', 'overdue', 'draft'] as const).map((status) => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status)}
-                  className={`px-4 py-2.5 text-sm font-medium rounded-lg transition-colors capitalize ${
+                  className={`px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-medium rounded-lg transition-colors capitalize flex-shrink-0 min-h-[44px] md:min-h-0 ${
                     statusFilter === status
                       ? 'bg-emerald-600 text-white'
                       : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'

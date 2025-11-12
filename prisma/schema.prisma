@@ -75,7 +75,6 @@ model Lead {
   assignedProvider  Provider?          @relation("AssignedProviderLeads", fields: [assignedProviderId], references: [id])
   matches           Match[]            @relation("LeadMatches")
   providerNotes     LeadNote[]         @relation("LeadNotes")
-  invoices          Invoice[]          @relation("CustomerInvoices")
 
   @@index([email])
   @@index([zip])
@@ -379,6 +378,7 @@ model Provider {
   phone            String
   serviceTypes     String[] @default([]) // ✅ Default empty array
   serviceAreas     String[] @default([]) // ✅ Default empty array
+  customServices   Json[]   @default([]) // Custom service types added by provider
   yearsInBusiness  Int      @default(0) // ✅ Default 0
   status           String   @default("active") // ✅ Default "active"
   leadCapacity     Int      @default(10) // ✅ Default 10
@@ -401,12 +401,13 @@ model Provider {
   advanceBooking    Int     @default(14)
   availabilityNotes String?
 
-  leads        Lead[]        @relation("AssignedProviderLeads")
-  leadNotes    LeadNote[]    @relation("ProviderNotes")
-  blockedTimes BlockedTime[] @relation("ProviderBlockedTimes")
-  invoices     Invoice[]     @relation("ProviderInvoices")
-  jobs         Job[]         @relation("ProviderJobs")
-  customers    Customer[]    @relation("ProviderCustomers")
+  leads        Lead[]                    @relation("AssignedProviderLeads")
+  leadNotes    LeadNote[]                @relation("ProviderNotes")
+  blockedTimes BlockedTime[]             @relation("ProviderBlockedTimes")
+  invoices     Invoice[]                 @relation("ProviderInvoices")
+  jobs         Job[]                     @relation("ProviderJobs")
+  customers    Customer[]                @relation("ProviderCustomers")
+  messages     ProviderCustomerMessage[] @relation("ProviderMessages")
 }
 
 model Customer {
@@ -423,12 +424,35 @@ model Customer {
   updatedAt  DateTime @updatedAt @map("updated_at")
 
   // Relations
-  provider Provider @relation("ProviderCustomers", fields: [providerId], references: [id], onDelete: Cascade)
-  jobs     Job[]    @relation("CustomerJobs")
+  provider Provider                  @relation("ProviderCustomers", fields: [providerId], references: [id], onDelete: Cascade)
+  jobs     Job[]                     @relation("CustomerJobs")
+  messages ProviderCustomerMessage[] @relation("CustomerMessages")
+  invoices Invoice[]                 @relation("CustomerInvoices")
 
   @@index([providerId])
   @@index([phone])
   @@map("customers")
+}
+
+model ProviderCustomerMessage {
+  id         String   @id @default(cuid())
+  providerId String   @map("provider_id")
+  customerId String   @map("customer_id")
+  content    String   @db.Text
+  direction  String // 'sent' (from provider) or 'received' (from customer)
+  type       String   @default("sms") // 'sms' or 'email'
+  status     String   @default("sent") // 'sent', 'delivered', 'read', 'failed'
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  provider Provider @relation("ProviderMessages", fields: [providerId], references: [id], onDelete: Cascade)
+  customer Customer @relation("CustomerMessages", fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId, customerId])
+  @@index([customerId])
+  @@index([createdAt])
+  @@map("provider_customer_messages")
 }
 
 model Job {
@@ -692,7 +716,7 @@ model Invoice {
 
   // Relations
   provider  Provider          @relation("ProviderInvoices", fields: [providerId], references: [id], onDelete: Cascade)
-  customer  Lead              @relation("CustomerInvoices", fields: [customerId], references: [id], onDelete: Cascade)
+  customer  Customer          @relation("CustomerInvoices", fields: [customerId], references: [id], onDelete: Cascade)
   lineItems InvoiceLineItem[] @relation("InvoiceLineItems")
   payments  Payment[]         @relation("InvoicePayments")
 

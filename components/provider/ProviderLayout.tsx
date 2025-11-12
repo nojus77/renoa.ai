@@ -129,17 +129,17 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
         <div className="w-10" /> {/* Spacer for centering */}
       </div>
 
-      {/* Mobile Menu Overlay */}
+      {/* Mobile Menu Overlay - Backdrop */}
       {mobileMenuOpen && (
         <div
-          className="lg:hidden fixed inset-0 bg-black/50 z-40"
+          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-in fade-in duration-200"
           onClick={() => setMobileMenuOpen(false)}
         />
       )}
 
       {/* Sidebar - Desktop always visible, Mobile slides in */}
       <div className={`
-        w-64 border-r border-zinc-800 bg-zinc-900/50 flex flex-col fixed left-0 top-0 h-screen z-50 transition-transform duration-300
+        w-64 border-r border-zinc-800 bg-zinc-900 flex flex-col fixed left-0 top-0 h-screen z-[60] transition-transform duration-300 ease-out shadow-2xl
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
       `}>
         {/* Logo/Header - Desktop only, mobile has top bar */}
@@ -151,7 +151,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
         </div>
 
         {/* Mobile header in sidebar */}
-        <div className="lg:hidden p-4 border-b border-zinc-800 flex items-center justify-between">
+        <div className="lg:hidden p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900">
           <div>
             <h1 className="text-lg font-bold text-zinc-100">Menu</h1>
             {providerName && (
@@ -160,7 +160,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
           </div>
           <button
             onClick={() => setMobileMenuOpen(false)}
-            className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg"
+            className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg z-[70] relative"
           >
             <X className="h-5 w-5" />
           </button>

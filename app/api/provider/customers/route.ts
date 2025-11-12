@@ -7,107 +7,117 @@ export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;
     const providerId = searchParams.get('providerId');
+    const search = searchParams.get('search');
+    const filter = searchParams.get('filter'); // all, premium, hoa, new
+    const sort = searchParams.get('sort'); // name, spent, recent, since
 
     if (!providerId) {
       return NextResponse.json({ error: 'Provider ID required' }, { status: 400 });
     }
 
-    // Fetch all leads for this provider (these are their customers)
-    const leads = await prisma.lead.findMany({
-      where: {
-        assignedProviderId: providerId,
-      },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        address: true,
-        city: true,
-        state: true,
-        zip: true,
-        leadSource: true,
-        status: true,
-        contractValue: true,
-        createdAt: true,
-        providerProposedDate: true,
-        serviceInterest: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
+    // Build where clause
+    const where: any = {
+      providerId,
+    };
+
+    // Apply search filter
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search } },
+        { email: { contains: search, mode: 'insensitive' } },
+        { address: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    // Apply tag filter
+    if (filter && filter !== 'all') {
+      if (filter === 'new') {
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        where.createdAt = { gte: thirtyDaysAgo };
+      } else {
+        // Filter by tags (premium, hoa, etc)
+        where.tags = { has: filter };
+      }
+    }
+
+    // Fetch customers with job counts
+    const customers = await prisma.customer.findMany({
+      where,
+      include: {
+        jobs: {
+          select: {
+            id: true,
+            estimatedValue: true,
+            actualValue: true,
+            startTime: true,
+            serviceType: true,
+            status: true,
+          },
+          orderBy: {
+            startTime: 'desc',
+          },
+        },
       },
     });
 
-    // Group leads by customer (email as unique identifier)
-    const customerMap = new Map<string, any>();
+    // Transform data to include calculated fields
+    const transformedCustomers = customers.map(customer => {
+      const jobCount = customer.jobs.length;
+      const totalSpent = customer.jobs.reduce((sum, job) => {
+        return sum + (job.actualValue || job.estimatedValue || 0);
+      }, 0);
+      const lastJob = customer.jobs[0];
+      const lastJobDate = lastJob ? lastJob.startTime : null;
+      const lastJobService = lastJob ? lastJob.serviceType : null;
 
-    leads.forEach(lead => {
-      const customerId = lead.email.toLowerCase();
+      // Check if active this month
+      const now = new Date();
+      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const hasJobThisMonth = customer.jobs.some(
+        job => new Date(job.startTime) >= thisMonth
+      );
 
-      if (!customerMap.has(customerId)) {
-        // First time seeing this customer
-        customerMap.set(customerId, {
-          id: lead.id,
-          name: `${lead.firstName} ${lead.lastName}`,
-          email: lead.email,
-          phone: lead.phone,
-          address: `${lead.address}, ${lead.city}, ${lead.state} ${lead.zip}`,
-          source: lead.leadSource === 'landing_page_hero' || lead.leadSource?.includes('renoa') ? 'renoa' : 'own',
-          totalJobs: 0,
-          lifetimeValue: 0,
-          lastJobDate: null as string | null,
-          lastJobService: null as string | null,
-          tags: [] as string[],
-          rating: undefined as number | undefined,
-          isActive: false,
-          createdAt: lead.createdAt,
-          jobs: [] as any[],
-        });
-      }
-
-      const customer = customerMap.get(customerId);
-
-      // Add this job to the customer's record
-      customer.jobs.push(lead);
-      customer.totalJobs++;
-
-      if (lead.contractValue) {
-        customer.lifetimeValue += lead.contractValue;
-      }
-
-      // Update last job date if this is more recent
-      if (lead.providerProposedDate) {
-        if (!customer.lastJobDate || new Date(lead.providerProposedDate) > new Date(customer.lastJobDate)) {
-          customer.lastJobDate = lead.providerProposedDate;
-          customer.lastJobService = lead.serviceInterest?.replace(/_/g, ' ');
-        }
-      }
-
-      // Customer is active if they have any jobs in last 3 months
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-
-      if (lead.providerProposedDate && new Date(lead.providerProposedDate) > threeMonthsAgo) {
-        customer.isActive = true;
-      }
-
-      // Add tags based on job characteristics
-      if (customer.totalJobs >= 5 && !customer.tags.includes('Premium')) {
-        customer.tags.push('Premium');
-      }
-      if (customer.totalJobs >= 3 && !customer.tags.includes('Recurring')) {
-        customer.tags.push('Recurring');
-      }
-      if (customer.lifetimeValue >= 5000 && !customer.tags.includes('VIP')) {
-        customer.tags.push('VIP');
-      }
+      return {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        address: customer.address,
+        source: customer.source,
+        tags: customer.tags,
+        notes: customer.notes,
+        createdAt: customer.createdAt,
+        updatedAt: customer.updatedAt,
+        jobCount,
+        totalSpent,
+        averageJobValue: jobCount > 0 ? totalSpent / jobCount : 0,
+        lastJobDate,
+        lastJobService,
+        isActiveThisMonth: hasJobThisMonth,
+      };
     });
 
-    // Convert map to array and remove jobs array (not needed in response)
-    const customers = Array.from(customerMap.values()).map(({ jobs, ...customer }) => customer);
+    // Apply sorting
+    if (sort === 'name') {
+      transformedCustomers.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sort === 'spent') {
+      transformedCustomers.sort((a, b) => b.totalSpent - a.totalSpent);
+    } else if (sort === 'recent') {
+      transformedCustomers.sort((a, b) => {
+        if (!a.lastJobDate) return 1;
+        if (!b.lastJobDate) return -1;
+        return new Date(b.lastJobDate).getTime() - new Date(a.lastJobDate).getTime();
+      });
+    } else {
+      // Default: sort by creation date (newest first)
+      transformedCustomers.sort((a, b) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+    }
 
-    return NextResponse.json({ customers });
+    return NextResponse.json({ customers: transformedCustomers });
   } catch (error) {
     console.error('Error fetching customers:', error);
     return NextResponse.json(
@@ -122,40 +132,30 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       providerId,
-      firstName,
-      lastName,
+      name,
       email,
       phone,
       address,
-      city,
-      state,
-      zip,
       tags,
       notes,
     } = body;
 
-    if (!providerId || !firstName || !lastName || !email || !phone) {
-      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+    if (!providerId || !name || !phone) {
+      return NextResponse.json({
+        error: 'Missing required fields: providerId, name, phone'
+      }, { status: 400 });
     }
 
-    // Create a new lead/customer record
-    const customer = await prisma.lead.create({
+    // Create new customer
+    const customer = await prisma.customer.create({
       data: {
-        assignedProviderId: providerId,
-        firstName,
-        lastName,
-        email,
+        providerId,
+        name,
+        email: email || null,
         phone,
         address: address || '',
-        city: city || '',
-        state: state || '',
-        zip: zip || '',
-        propertyType: 'single_family',
-        serviceInterest: 'landscaping',
-        status: 'new',
-        schedulingStatus: 'pending',
-        leadSource: 'provider_manual',
-        tier: 1,
+        source: 'own',
+        tags: tags || [],
         notes: notes || null,
       },
     });

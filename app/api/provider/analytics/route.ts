@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { PrismaClient } from '@prisma/client';
+
+const prisma = new PrismaClient();
 
 export const dynamic = 'force-dynamic';
 
@@ -30,72 +32,85 @@ export async function GET(request: NextRequest) {
     previousStart.setDate(previousStart.getDate() - periodDays);
     const previousEnd = new Date(startDate);
 
-    // Get jobs for current period with invoices
-    const jobs = await prisma.lead.findMany({
+    // Get jobs for current period
+    const jobs = await prisma.job.findMany({
       where: {
-        assignedProviderId: providerId,
-        createdAt: { gte: startDate, lte: endDate },
+        providerId,
+        startTime: { gte: startDate, lte: endDate },
       },
       include: {
-        invoices: {
-          include: {
-            payments: true,
-          },
-        },
+        customer: true,
       },
     });
 
     // Get jobs for previous period
-    const previousJobs = await prisma.lead.findMany({
+    const previousJobs = await prisma.job.findMany({
       where: {
-        assignedProviderId: providerId,
-        createdAt: { gte: previousStart, lt: previousEnd },
+        providerId,
+        startTime: { gte: previousStart, lt: previousEnd },
       },
       include: {
-        invoices: true,
+        customer: true,
       },
     });
 
-    // Calculate total revenue from paid invoices
-    const totalRevenue = jobs.reduce((sum, job) => {
-      const paidInvoices = job.invoices.filter(inv => inv.status === 'paid');
-      return sum + paidInvoices.reduce((s, inv) => s + Number(inv.total), 0);
+    // Calculate total revenue from completed jobs
+    const completedJobs = jobs.filter(j => j.status === 'completed');
+    const totalRevenue = completedJobs.reduce((sum, job) => {
+      return sum + (job.actualValue || job.estimatedValue || 0);
     }, 0);
 
-    const previousRevenue = previousJobs.reduce((sum, job) => {
-      const paidInvoices = job.invoices.filter(inv => inv.status === 'paid');
-      return sum + paidInvoices.reduce((s, inv) => s + Number(inv.total), 0);
+    const previousCompletedJobs = previousJobs.filter(j => j.status === 'completed');
+    const previousRevenue = previousCompletedJobs.reduce((sum, job) => {
+      return sum + (job.actualValue || job.estimatedValue || 0);
     }, 0);
 
     const revenueChange = previousRevenue > 0 ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 : 0;
 
-    // Jobs completed
-    const jobsCompleted = jobs.filter(j => j.status === 'converted' || j.status === 'matched').length;
-    const previousJobsCompleted = previousJobs.filter(j => j.status === 'converted' || j.status === 'matched').length;
-    const jobsChange = previousJobsCompleted > 0 ? ((jobsCompleted - previousJobsCompleted) / previousJobsCompleted) * 100 : 0;
+    // Jobs completed count
+    const jobsCompletedCount = completedJobs.length;
+    const previousJobsCompletedCount = previousCompletedJobs.length;
+    const jobsChange = previousJobsCompletedCount > 0 ? ((jobsCompletedCount - previousJobsCompletedCount) / previousJobsCompletedCount) * 100 : 0;
 
     // Average job value
-    const avgJobValue = jobsCompleted > 0 ? totalRevenue / jobsCompleted : 0;
-    const previousAvgJobValue = previousJobsCompleted > 0 ? previousRevenue / previousJobsCompleted : 0;
+    const avgJobValue = jobsCompletedCount > 0 ? totalRevenue / jobsCompletedCount : 0;
+    const previousAvgJobValue = previousJobsCompletedCount > 0 ? previousRevenue / previousJobsCompletedCount : 0;
     const avgJobValueChange = previousAvgJobValue > 0 ? ((avgJobValue - previousAvgJobValue) / previousAvgJobValue) * 100 : 0;
 
     // New customers
-    const customerEmails = new Set(jobs.map(j => j.email));
-    const newCustomers = customerEmails.size;
-    const previousCustomerEmails = new Set(previousJobs.map(j => j.email));
-    const previousNewCustomers = previousCustomerEmails.size;
+    const newCustomers = await prisma.customer.count({
+      where: {
+        providerId,
+        createdAt: { gte: startDate, lte: endDate },
+      },
+    });
+
+    const previousNewCustomers = await prisma.customer.count({
+      where: {
+        providerId,
+        createdAt: { gte: previousStart, lt: previousEnd },
+      },
+    });
+
     const newCustomersChange = previousNewCustomers > 0 ? ((newCustomers - previousNewCustomers) / previousNewCustomers) * 100 : 0;
 
+    // Count Renoa leads in new customers
+    const renoaNewCustomers = await prisma.customer.count({
+      where: {
+        providerId,
+        createdAt: { gte: startDate, lte: endDate },
+        source: 'renoa',
+      },
+    });
+
     // Revenue over time
-    const revenueOverTime = groupRevenueByPeriod(jobs, startDate, endDate, periodDays);
+    const revenueOverTime = groupRevenueByPeriod(completedJobs, startDate, endDate, periodDays);
 
     // Service type breakdown
     const serviceBreakdown: Record<string, { count: number; revenue: number }> = {};
-    jobs.forEach(job => {
-      const service = job.serviceInterest || 'other';
-      const revenue = job.invoices
-        .filter(inv => inv.status === 'paid')
-        .reduce((s, inv) => s + Number(inv.total), 0);
+    completedJobs.forEach(job => {
+      const service = job.serviceType || 'Other';
+      const revenue = job.actualValue || job.estimatedValue || 0;
 
       if (!serviceBreakdown[service]) {
         serviceBreakdown[service] = { count: 0, revenue: 0 };
@@ -104,110 +119,99 @@ export async function GET(request: NextRequest) {
       serviceBreakdown[service].revenue += revenue;
     });
 
-    // Top customers
-    const customerRevenue: Record<string, { email: string; revenue: number; jobs: number }> = {};
-    jobs.forEach(job => {
-      const customer = `${job.firstName} ${job.lastName}`;
-      const revenue = job.invoices
-        .filter(inv => inv.status === 'paid')
-        .reduce((s, inv) => s + Number(inv.total), 0);
+    // Top customers by revenue
+    const customerRevenue: Record<string, { name: string; revenue: number; jobs: number }> = {};
+    completedJobs.forEach(job => {
+      const customerId = job.customerId;
+      const customer = job.customer;
+      const revenue = job.actualValue || job.estimatedValue || 0;
 
-      if (!customerRevenue[customer]) {
-        customerRevenue[customer] = { email: job.email, revenue: 0, jobs: 0 };
+      if (!customerRevenue[customerId]) {
+        customerRevenue[customerId] = {
+          name: customer.name,
+          revenue: 0,
+          jobs: 0
+        };
       }
-      customerRevenue[customer].revenue += revenue;
-      customerRevenue[customer].jobs++;
+      customerRevenue[customerId].revenue += revenue;
+      customerRevenue[customerId].jobs++;
     });
 
     const topCustomers = Object.entries(customerRevenue)
-      .map(([name, data]) => ({ name, ...data }))
+      .map(([id, data]) => ({ id, ...data }))
       .sort((a, b) => b.revenue - a.revenue)
       .slice(0, 10);
 
     // Renoa lead performance
-    const renoaLeads = jobs.filter(j =>
-      j.leadSource === 'landing_page_hero' || j.leadSource?.includes('renoa')
-    );
-    const ownLeads = jobs.filter(j =>
-      !(j.leadSource === 'landing_page_hero' || j.leadSource?.includes('renoa'))
-    );
+    const renoaJobs = jobs.filter(j => j.source === 'renoa');
+    const ownJobs = jobs.filter(j => j.source === 'own');
 
-    const renoaAccepted = renoaLeads.filter(j =>
-      j.status !== 'new' && j.status !== 'contacted'
-    ).length;
-    const renoaConverted = renoaLeads.filter(j =>
-      j.status === 'converted' || j.status === 'matched'
-    ).length;
-    const renoaRevenue = renoaLeads.reduce((sum, job) => {
-      const paidInvoices = job.invoices.filter(inv => inv.status === 'paid');
-      return sum + paidInvoices.reduce((s, inv) => s + Number(inv.total), 0);
+    const renoaCompleted = renoaJobs.filter(j => j.status === 'completed');
+    const ownCompleted = ownJobs.filter(j => j.status === 'completed');
+
+    const renoaRevenue = renoaCompleted.reduce((sum, job) => {
+      return sum + (job.actualValue || job.estimatedValue || 0);
     }, 0);
 
-    const ownRevenue = ownLeads.reduce((sum, job) => {
-      const paidInvoices = job.invoices.filter(inv => inv.status === 'paid');
-      return sum + paidInvoices.reduce((s, inv) => s + Number(inv.total), 0);
+    const ownRevenue = ownCompleted.reduce((sum, job) => {
+      return sum + (job.actualValue || job.estimatedValue || 0);
     }, 0);
 
-    // Customer retention
-    const allTimeJobs = await prisma.lead.findMany({
-      where: { assignedProviderId: providerId },
-      select: { email: true, createdAt: true },
+    // Customer retention - new vs returning
+    const customerIds = new Set(jobs.map(j => j.customerId));
+    const allTimeCustomers = await prisma.customer.findMany({
+      where: {
+        providerId,
+        createdAt: { lt: startDate },
+      },
+      select: { id: true },
     });
 
-    const customerFirstJob = new Map<string, Date>();
-    allTimeJobs.forEach(job => {
-      const existing = customerFirstJob.get(job.email);
-      if (!existing || job.createdAt < existing) {
-        customerFirstJob.set(job.email, job.createdAt);
-      }
-    });
+    const existingCustomerIds = new Set(allTimeCustomers.map(c => c.id));
+    const returningCustomers = Array.from(customerIds).filter(id => existingCustomerIds.has(id)).length;
+    const newCustomersInJobs = Array.from(customerIds).filter(id => !existingCustomerIds.has(id)).length;
 
-    const returningCustomers = jobs.filter(job => {
-      const firstJob = customerFirstJob.get(job.email);
-      return firstJob && firstJob < startDate;
-    }).length;
-
-    const newVsReturning = {
-      new: Math.max(0, customerEmails.size - returningCustomers),
-      returning: returningCustomers,
-    };
-
-    // Seasonal insights
+    // Day of week analysis
     const dayOfWeekCounts: Record<string, number> = {
       'Sunday': 0, 'Monday': 0, 'Tuesday': 0, 'Wednesday': 0,
       'Thursday': 0, 'Friday': 0, 'Saturday': 0
     };
     const hourCounts: Record<number, number> = {};
-    const monthCounts: Record<string, number> = {};
 
     jobs.forEach(job => {
-      if (job.providerProposedDate) {
-        const date = new Date(job.providerProposedDate);
-        const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
-        const hour = date.getHours();
-        const month = date.toLocaleDateString('en-US', { month: 'long' });
+      const date = new Date(job.startTime);
+      const dayName = date.toLocaleDateString('en-US', { weekday: 'long' });
+      const hour = date.getHours();
 
-        dayOfWeekCounts[dayName] = (dayOfWeekCounts[dayName] || 0) + 1;
-        hourCounts[hour] = (hourCounts[hour] || 0) + 1;
-        monthCounts[month] = (monthCounts[month] || 0) + 1;
-      }
+      dayOfWeekCounts[dayName] = (dayOfWeekCounts[dayName] || 0) + 1;
+      hourCounts[hour] = (hourCounts[hour] || 0) + 1;
     });
 
     // Performance metrics
-    const totalLeads = jobs.length;
-    const convertedLeads = jobs.filter(j => j.status === 'converted' || j.status === 'matched').length;
-    const conversionRate = totalLeads > 0 ? (convertedLeads / totalLeads) * 100 : 0;
+    const totalJobs = jobs.length;
+    const conversionRate = totalJobs > 0 ? (jobsCompletedCount / totalJobs) * 100 : 0;
+    const repeatCustomerRate = customerIds.size > 0 ? (returningCustomers / customerIds.size) * 100 : 0;
+
+    // Calculate average job duration
+    const avgDuration = completedJobs.length > 0
+      ? completedJobs.reduce((sum, job) => {
+          const duration = (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60);
+          return sum + duration;
+        }, 0) / completedJobs.length
+      : 0;
 
     return NextResponse.json({
       kpis: {
         totalRevenue: Math.round(totalRevenue),
         revenueChange: Math.round(revenueChange * 10) / 10,
-        jobsCompleted,
+        jobsCompleted: jobsCompletedCount,
         jobsChange: Math.round(jobsChange * 10) / 10,
+        previousJobsCompleted: previousJobsCompletedCount,
         avgJobValue: Math.round(avgJobValue),
         avgJobValueChange: Math.round(avgJobValueChange * 10) / 10,
         newCustomers,
         newCustomersChange: Math.round(newCustomersChange * 10) / 10,
+        renoaNewCustomers,
       },
       revenueOverTime,
       serviceBreakdown: Object.entries(serviceBreakdown).map(([name, data]) => ({
@@ -216,35 +220,39 @@ export async function GET(request: NextRequest) {
         percentage: totalRevenue > 0 ? Math.round((data.revenue / totalRevenue) * 100) : 0,
       })),
       topCustomers,
-      newVsReturning,
+      newVsReturning: {
+        new: newCustomersInJobs,
+        returning: returningCustomers,
+      },
       renoaPerformance: {
-        leadsReceived: renoaLeads.length,
-        leadsAccepted: renoaAccepted,
-        acceptanceRate: renoaLeads.length > 0 ? Math.round((renoaAccepted / renoaLeads.length) * 100) : 0,
-        leadsConverted: renoaConverted,
-        conversionRate: renoaAccepted > 0 ? Math.round((renoaConverted / renoaAccepted) * 100) : 0,
+        leadsReceived: renoaJobs.length,
+        leadsCompleted: renoaCompleted.length,
+        completionRate: renoaJobs.length > 0 ? Math.round((renoaCompleted.length / renoaJobs.length) * 100) : 0,
         revenue: Math.round(renoaRevenue),
-        ownLeadsRevenue: Math.round(ownRevenue),
-        avgRenoaJobValue: renoaConverted > 0 ? Math.round(renoaRevenue / renoaConverted) : 0,
-        avgOwnJobValue: ownLeads.length > 0 ? Math.round(ownRevenue / ownLeads.length) : 0,
+        avgRenoaJobValue: renoaCompleted.length > 0 ? Math.round(renoaRevenue / renoaCompleted.length) : 0,
+      },
+      ownClientPerformance: {
+        jobsCreated: ownJobs.length,
+        jobsCompleted: ownCompleted.length,
+        completionRate: ownJobs.length > 0 ? Math.round((ownCompleted.length / ownJobs.length) * 100) : 0,
+        revenue: Math.round(ownRevenue),
+        avgOwnJobValue: ownCompleted.length > 0 ? Math.round(ownRevenue / ownCompleted.length) : 0,
       },
       seasonalInsights: {
         busiestDays: Object.entries(dayOfWeekCounts)
-          .sort((a, b) => b[1] - a[1])
-          .map(([day, count]) => ({ day, count })),
+          .map(([day, count]) => ({ day, count }))
+          .sort((a, b) => b.count - a.count),
         peakHours: Object.entries(hourCounts)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([hour, count]) => ({ hour: parseInt(hour), count })),
-        busiestMonths: Object.entries(monthCounts)
-          .sort((a, b) => b[1] - a[1])
-          .map(([month, count]) => ({ month, count })),
+          .map(([hour, count]) => ({ hour: parseInt(hour), count }))
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 5),
       },
       performanceMetrics: {
-        avgResponseTime: 8, // Placeholder
         conversionRate: Math.round(conversionRate),
-        customerSatisfaction: 4.8, // Placeholder
-        onTimeRate: 94, // Placeholder
+        repeatCustomerRate: Math.round(repeatCustomerRate),
+        avgJobDuration: Math.round(avgDuration * 10) / 10,
+        onTimeRate: 94, // Placeholder - would need completion time tracking
+        customerSatisfaction: 4.8, // Placeholder - would need ratings system
       },
     });
   } catch (error) {
@@ -263,12 +271,10 @@ function groupRevenueByPeriod(
   periodDays: number
 ) {
   const groupBy = periodDays <= 7 ? 'day' : periodDays <= 90 ? 'week' : 'month';
-  const groups: Record<string, { revenue: number; jobs: number; avgJobValue: number }> = {};
+  const groups: Record<string, { revenue: number; jobs: number }> = {};
 
   jobs.forEach(job => {
-    if (!job.createdAt) return;
-
-    const date = new Date(job.createdAt);
+    const date = new Date(job.startTime);
     let key: string;
 
     if (groupBy === 'day') {
@@ -282,28 +288,20 @@ function groupRevenueByPeriod(
     }
 
     if (!groups[key]) {
-      groups[key] = { revenue: 0, jobs: 0, avgJobValue: 0 };
+      groups[key] = { revenue: 0, jobs: 0 };
     }
 
-    const revenue = job.invoices
-      .filter((inv: any) => inv.status === 'paid')
-      .reduce((s: number, inv: any) => s + Number(inv.total), 0);
-
+    const revenue = job.actualValue || job.estimatedValue || 0;
     groups[key].revenue += revenue;
     groups[key].jobs++;
-  });
-
-  // Calculate avg job value for each period
-  Object.keys(groups).forEach(key => {
-    groups[key].avgJobValue = groups[key].jobs > 0
-      ? Math.round(groups[key].revenue / groups[key].jobs)
-      : 0;
   });
 
   return Object.entries(groups).map(([label, data]) => ({
     label,
     revenue: Math.round(data.revenue),
     jobs: data.jobs,
-    avgJobValue: data.avgJobValue,
-  }));
+  })).sort((a, b) => {
+    // Sort chronologically
+    return new Date(a.label).getTime() - new Date(b.label).getTime();
+  });
 }
