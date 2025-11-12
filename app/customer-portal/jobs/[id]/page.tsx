@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import ReviewModal from '@/components/customer/ReviewModal';
 import BookAgainModal from '@/components/customer/BookAgainModal';
+import JobRecommendations from '@/components/customer/JobRecommendations';
 
 interface Job {
   id: string;
@@ -269,6 +270,11 @@ export default function CustomerJobDetailPage() {
                 )}
               </div>
             </div>
+          )}
+
+          {/* Service Recommendations */}
+          {job.status === 'completed' && (
+            <JobRecommendations serviceType={job.serviceType} />
           )}
         </div>
 

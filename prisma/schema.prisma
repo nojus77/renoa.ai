@@ -40,12 +40,13 @@ model Lead {
   contractValue    Decimal?        @map("contract_value")
   squareFootage    Int?            @map("square_footage")
   moveInDate       DateTime?       @map("move_in_date")
-  serviceInterest  ServiceCategory @map("service_interest")
-  leadSource       String          @map("lead_source")
-  leadScore        Int             @default(0) @map("lead_score")
-  tier             Int
-  campaign         String?
-  contactCount     Int             @default(0) @map("contact_count")
+  serviceInterest      ServiceCategory @map("service_interest")
+  leadSource           String          @map("lead_source")
+  recommendationSource String?         @map("recommendation_source") // Track if lead came from service recommendation
+  leadScore            Int             @default(0) @map("lead_score")
+  tier                 Int
+  campaign             String?
+  contactCount         Int             @default(0) @map("contact_count")
   urgencyScore     Int?
   propertyScore    Int?
   financialScore   Int?
@@ -897,4 +898,23 @@ enum SubscriptionStatus {
   active
   paused
   cancelled
+}
+
+model ServiceRecommendation {
+  id                  String   @id @default(uuid())
+  baseService         String   @map("base_service")
+  recommendedService  String   @map("recommended_service")
+  recommendedPrice    Decimal  @map("recommended_price") @db.Decimal(10, 2)
+  conversionRate      Decimal  @default(0) @map("conversion_rate") @db.Decimal(5, 2)
+  displayOrder        Int      @default(0) @map("display_order")
+  description         String?  @db.Text
+  badge               String?  // "Most popular add-on", "Seasonal favorite", etc
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([baseService])
+  @@index([displayOrder])
+  @@index([isActive])
+  @@map("service_recommendations")
 }

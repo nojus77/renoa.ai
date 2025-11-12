@@ -25,6 +25,7 @@ import { toast } from 'sonner';
 import SubscriptionWidget from '@/components/customer/SubscriptionWidget';
 import SubscriptionSetupModal from '@/components/customer/SubscriptionSetupModal';
 import BookAgainModal from '@/components/customer/BookAgainModal';
+import RecommendationsWidget from '@/components/customer/RecommendationsWidget';
 
 interface Job {
   id: string;
@@ -383,6 +384,9 @@ export default function CustomerDashboard() {
               </Link>
             </div>
           </div>
+
+          {/* Service Recommendations Widget */}
+          <RecommendationsWidget />
 
           {/* Subscription Widget */}
           <SubscriptionWidget
