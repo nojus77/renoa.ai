@@ -1454,3 +1454,13 @@ model ServiceTypeConfig {
   @@index([serviceType])
   @@map("service_type_configs")
 }
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  email     String
+  token     String   @unique
+  expires   DateTime
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("password_reset_tokens")
+}

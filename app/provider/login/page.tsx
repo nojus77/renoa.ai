@@ -139,6 +139,15 @@ export default function ProviderLoginPage() {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
 
+            <div className="flex justify-center">
+              <a
+                href="/provider/forgot-password"
+                className="text-sm text-emerald-400 hover:text-emerald-300 transition-colors"
+              >
+                Forgot password?
+              </a>
+            </div>
+
             <p className="text-xs text-zinc-500 text-center mt-4">
               Team members: Use your email and password provided by your administrator
             </p>
