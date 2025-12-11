@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch bundle details
-    const bundle = await prisma.serviceBundle.findUnique({
+    const bundle = await prisma.service_bundles.findUnique({
       where: { id: bundleId },
     });
 
@@ -32,10 +32,10 @@ export async function POST(request: NextRequest) {
 
     // Calculate total price (bundle + addons)
     const addonsTotal = addons?.reduce((sum: number, addon: any) => sum + addon.price, 0) || 0;
-    const totalValue = Number(bundle.bundlePrice) + addonsTotal;
+    const totalValue = Number(bundle.bundle_price) + addonsTotal;
 
     // Create jobs for each service in the bundle
-    const serviceTypes = bundle.serviceTypes as string[];
+    const serviceTypes = bundle.service_types as string[];
     const jobs = [];
 
     const startTime = new Date(date);
@@ -53,10 +53,10 @@ export async function POST(request: NextRequest) {
           endTime,
           status: 'scheduled',
           source: 'own',
-          bookingSource: 'package_bundle',
-          estimatedValue: Number(bundle.bundlePrice) / serviceTypes.length,
+          booking_source: 'package_bundle',
+          estimatedValue: Number(bundle.bundle_price) / serviceTypes.length,
           customerNotes: notes || undefined,
-          bundleId,
+          bundle_id: bundleId,
           upsells: addons || undefined,
         },
       });

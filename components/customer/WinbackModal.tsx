@@ -180,7 +180,7 @@ export default function WinbackModal({ isOpen: initialIsOpen, onClose }: Winback
             Welcome Back!
           </h1>
           <p className="text-xl text-zinc-700 mb-6">
-            We've Missed You
+            We&apos;ve Missed You
           </p>
 
           {/* Discount Display */}
@@ -233,7 +233,7 @@ export default function WinbackModal({ isOpen: initialIsOpen, onClose }: Winback
           {/* Message */}
           {promo.message && (
             <p className="text-sm text-zinc-600 mb-6 italic">
-              "{promo.message}"
+              &quot;{promo.message}&quot;
             </p>
           )}
 

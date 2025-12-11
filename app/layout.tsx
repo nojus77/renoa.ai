@@ -6,6 +6,7 @@ import { Providers } from './providers'
 import CookieBanner from '@/components/CookieBanner'
 import GoogleAnalytics from '@/components/GoogleAnalytics'
 import GoogleMaps from '@/components/GoogleMaps'
+import { ClickToComponentWrapper } from '@/components/ClickToComponentWrapper'
 
 export const dynamic = 'force-dynamic';
 
@@ -25,6 +26,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         <Providers>
+          <ClickToComponentWrapper />
           <div>
             {children}
           </div>

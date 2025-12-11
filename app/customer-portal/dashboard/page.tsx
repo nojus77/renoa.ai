@@ -30,6 +30,9 @@ import ReferralWidget from '@/components/customer/ReferralWidget';
 import ServiceBundlesWidget from '@/components/customer/ServiceBundlesWidget';
 import PromoBanner from '@/components/customer/PromoBanner';
 import WinbackModal from '@/components/customer/WinbackModal';
+import SeasonalBanner from '@/components/customer/SeasonalBanner';
+import LoyaltyWidget from '@/components/customer/LoyaltyWidget';
+import ServiceDueAlert from '@/components/customer/ServiceDueAlert';
 
 interface Job {
   id: string;
@@ -179,6 +182,12 @@ export default function CustomerDashboard() {
           <span className="font-semibold text-zinc-900">{data.provider.businessName}</span>
         </p>
       </div>
+
+      {/* Service Due Alert */}
+      <ServiceDueAlert />
+
+      {/* Seasonal Banner */}
+      <SeasonalBanner />
 
       {/* Promo Banner */}
       <PromoBanner />
@@ -394,6 +403,9 @@ export default function CustomerDashboard() {
 
           {/* Service Bundles Widget */}
           <ServiceBundlesWidget />
+
+          {/* Loyalty Widget */}
+          <LoyaltyWidget />
 
           {/* Service Recommendations Widget */}
           <RecommendationsWidget />

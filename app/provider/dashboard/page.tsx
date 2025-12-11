@@ -8,6 +8,7 @@ import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AddJobModal from '@/components/provider/AddJobModal';
+import OnboardingModal from '@/components/provider/OnboardingModal';
 import {
   Mail,
   Phone,
@@ -106,6 +107,7 @@ export default function ProviderDashboard() {
 
   // Modal states
   const [showAddJobModal, setShowAddJobModal] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [showScheduleModal, setShowScheduleModal] = useState<string | null>(null);
   const [proposedDate, setProposedDate] = useState('');
   const [proposedTime, setProposedTime] = useState('');
@@ -128,6 +130,15 @@ export default function ProviderDashboard() {
 
     setProviderId(id);
     setProviderName(name);
+
+    // Check if onboarding was dismissed before fetching provider details
+    // This prevents the modal from showing even for a moment
+    const onboardingDismissed = localStorage.getItem('onboarding_dismissed');
+    if (onboardingDismissed) {
+      // Don't show onboarding modal if user has dismissed it
+      setShowOnboardingModal(false);
+    }
+
     fetchProviderDetails(id);
     fetchLeads(id);
     fetchTodaysJobs(id);
@@ -136,11 +147,27 @@ export default function ProviderDashboard() {
 
   const fetchProviderDetails = async (id: string) => {
     try {
+      // IMPORTANT: Check localStorage FIRST before making any API call
+      // This ensures the modal never shows if user dismissed it
+      const onboardingDismissed = localStorage.getItem('onboarding_dismissed');
+
       const res = await fetch(`/api/provider/details?providerId=${id}`);
       const data = await res.json();
 
-      if (data.provider && data.provider.serviceTypes) {
-        setProviderServiceTypes(data.provider.serviceTypes);
+      if (data.provider) {
+        if (data.provider.serviceTypes) {
+          setProviderServiceTypes(data.provider.serviceTypes);
+        }
+
+        // Only show onboarding modal if:
+        // 1. User hasn't dismissed it before (localStorage check - PRIMARY)
+        // 2. Database says onboarding is not completed (SECONDARY)
+        if (!onboardingDismissed && !data.provider.onboardingCompleted) {
+          setShowOnboardingModal(true);
+        } else {
+          // Explicitly set to false if conditions aren't met
+          setShowOnboardingModal(false);
+        }
       }
     } catch (error) {
       console.error('Failed to load provider details:', error);
@@ -446,24 +473,98 @@ export default function ProviderDashboard() {
 
   return (
     <ProviderLayout providerName={providerName}>
-      <div className="min-h-screen bg-zinc-950 text-zinc-100">
+      <div className="min-h-screen bg-background text-foreground">
         {/* Page Header */}
-        <div className="border-b border-zinc-800 bg-zinc-900/50">
+        <div className="border-b border-border bg-card/50">
           <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-3 md:py-6">
-            <h1 className="text-xl md:text-2xl font-bold text-zinc-100">Dashboard</h1>
-            <p className="text-xs md:text-sm text-zinc-400 mt-1">Your daily command center</p>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">Dashboard</h1>
+            <p className="text-xs md:text-sm text-muted-foreground mt-1">Your daily command center</p>
           </div>
         </div>
 
         {/* Main Content */}
         <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-4 md:py-8">
-          {/* TODAY'S SCHEDULE - PRIORITY #1 - What's happening NOW */}
-          <Card className="bg-zinc-900/50 border-zinc-800 mb-4">
+          {/* COMPACT STATS - PRIORITY #1 - Key metrics */}
+          <div className="grid grid-cols-4 gap-1.5 md:gap-3 mb-4">
+            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors">
+              <CardHeader className="pb-1 px-2 pt-2 md:pb-2 md:px-4 md:pt-4">
+                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center gap-1">
+                  <Target className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                  <span className="truncate">Leads</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pb-2 px-2 pt-0 md:pb-4 md:px-4">
+                <div className="text-xl md:text-3xl font-bold text-blue-400">
+                  {leads.filter(l => ['new', 'contacted', 'replied', 'matched'].includes(l.status)).length}
+                </div>
+                <p className="text-[9px] md:text-xs text-zinc-500 mt-0.5 md:mt-1 truncate">New</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors">
+              <CardHeader className="pb-1 px-2 pt-2 md:pb-2 md:px-4 md:pt-4">
+                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center gap-1">
+                  <Clock className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                  <span className="truncate">Jobs</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pb-2 px-2 pt-0 md:pb-4 md:px-4">
+                <div className="text-xl md:text-3xl font-bold text-amber-400">
+                  {todaysJobs.length}
+                </div>
+                <p className="text-[9px] md:text-xs text-zinc-500 mt-0.5 md:mt-1 truncate">Today</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors">
+              <CardHeader className="pb-1 px-2 pt-2 md:pb-2 md:px-4 md:pt-4">
+                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center gap-1">
+                  <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                  <span className="truncate">Conv.</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pb-2 px-2 pt-0 md:pb-4 md:px-4">
+                <div className="text-xl md:text-3xl font-bold text-emerald-400">
+                  {convertedCount}
+                </div>
+                <p className="text-[9px] md:text-xs text-emerald-400 mt-0.5 md:mt-1 truncate">
+                  {formatCurrency(leads.filter(l => l.status === 'converted').reduce((sum, l) => sum + (l.contractValue || 0), 0))}
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors">
+              <CardHeader className="pb-1 px-2 pt-2 md:pb-2 md:px-4 md:pt-4">
+                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center gap-1">
+                  <Award className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                  <span className="truncate">Rate</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pb-2 px-2 pt-0 md:pb-4 md:px-4">
+                <div className="flex items-center gap-1">
+                  <div className="text-xl md:text-3xl font-bold text-blue-400">
+                    {conversionRate}%
+                  </div>
+                  {rateTrend === 'up' ? (
+                    <TrendingUp className="h-3 w-3 md:h-5 md:w-5 text-emerald-400" />
+                  ) : (
+                    <TrendingDown className="h-3 w-3 md:h-5 md:w-5 text-red-400" />
+                  )}
+                </div>
+                <p className="text-[9px] md:text-xs text-zinc-500 mt-0.5 md:mt-1 truncate">
+                  {rateTrend === 'up' ? '↑' : '↓'} {Math.abs(conversionRate - lastWeekRate)}%
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* TODAY'S SCHEDULE - PRIORITY #2 - What's happening NOW */}
+          <Card className="bg-card border-border mb-4">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-xs text-zinc-500 mb-1">Today</div>
-                  <CardTitle className="text-base md:text-lg font-semibold text-zinc-100 flex items-center gap-2">
+                  <div className="text-xs text-muted-foreground mb-1">Today</div>
+                  <CardTitle className="text-base md:text-lg font-semibold text-foreground flex items-center gap-2">
                     <Calendar className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
                     {format(new Date(), 'EEEE, MMM d')}
                   </CardTitle>
@@ -606,91 +707,14 @@ export default function ProviderDashboard() {
             </CardContent>
           </Card>
 
-          {/* COMPACT STATS - PRIORITY #2 - Secondary info */}
-          <div className="grid grid-cols-2 gap-2 md:gap-3 mb-4">
-            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors">
-              <CardHeader className="pb-1 md:pb-2">
-                <CardTitle className="text-xs md:text-sm text-zinc-400 flex items-center gap-1 md:gap-2">
-                  <Target className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
-                  <span className="hidden md:inline">New Leads</span>
-                  <span className="md:hidden">Leads</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pb-3 md:pb-6">
-                <div className="text-2xl md:text-3xl font-bold text-blue-400">
-                  {leads.filter(l => l.status === 'matched').length}
-                </div>
-                <p className="text-xs text-zinc-500 mt-0.5 md:mt-1 hidden md:block">Awaiting review</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader className="pb-1 md:pb-2">
-                <CardTitle className="text-xs md:text-sm text-zinc-400 flex items-center gap-1 md:gap-2">
-                  <Clock className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
-                  <span className="hidden md:inline">Active Jobs</span>
-                  <span className="md:hidden">Active</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pb-3 md:pb-6">
-                <div className="text-2xl md:text-3xl font-bold text-amber-400">
-                  {todaysJobs.length}
-                </div>
-                <p className="text-xs text-zinc-500 mt-0.5 md:mt-1 hidden md:block">Today</p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader className="pb-1 md:pb-2">
-                <CardTitle className="text-xs md:text-sm text-zinc-400 flex items-center gap-1 md:gap-2">
-                  <CheckCircle2 className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
-                  <span className="truncate">Converted</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pb-3 md:pb-6">
-                <div className="text-2xl md:text-3xl font-bold text-emerald-400">
-                  {convertedCount}
-                </div>
-                <p className="text-xs text-emerald-400 mt-0.5 md:mt-1 truncate">
-                  {formatCurrency(leads.filter(l => l.status === 'converted').reduce((sum, l) => sum + (l.contractValue || 0), 0))}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-zinc-900/50 border-zinc-800">
-              <CardHeader className="pb-1 md:pb-2">
-                <CardTitle className="text-xs md:text-sm text-zinc-400 flex items-center gap-1 md:gap-2">
-                  <Award className="h-3 w-3 md:h-4 md:w-4 flex-shrink-0" />
-                  <span className="hidden md:inline">Conversion</span>
-                  <span className="md:hidden">Rate</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="pb-3 md:pb-6">
-                <div className="flex items-center gap-1 md:gap-2">
-                  <div className="text-2xl md:text-3xl font-bold text-blue-400">
-                    {conversionRate}%
-                  </div>
-                  {rateTrend === 'up' ? (
-                    <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-emerald-400" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4 md:h-5 md:w-5 text-red-400" />
-                  )}
-                </div>
-                <p className="text-xs text-zinc-500 mt-0.5 md:mt-1 hidden md:block">
-                  {rateTrend === 'up' ? '↑' : '↓'} {Math.abs(conversionRate - lastWeekRate)}% vs last week
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* NEW LEADS - PRIORITY #3 - Conditional (only if leads exist) */}
-          {leads.filter(l => l.status === 'matched').length > 0 && (
+          {leads.filter(l => ['new', 'contacted', 'replied', 'matched'].includes(l.status)).length > 0 && (
             <Card className="bg-zinc-900/50 border-zinc-800 mb-4">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-zinc-100 flex items-center gap-2">
                     <Target className="h-5 w-5 text-blue-400" />
-                    New Leads ({leads.filter(l => l.status === 'matched').length})
+                    New Leads ({leads.filter(l => ['new', 'contacted', 'replied', 'matched'].includes(l.status)).length})
                   </CardTitle>
                   <Button
                     onClick={() => router.push('/provider/leads')}
@@ -705,7 +729,7 @@ export default function ProviderDashboard() {
               <CardContent>
                 <div className="space-y-3">
                   {leads
-                    .filter(l => l.status === 'matched')
+                    .filter(l => ['new', 'contacted', 'replied', 'matched'].includes(l.status))
                     .slice(0, 3)
                     .map((lead) => {
                       const isBlurred = lead.status !== 'accepted' && lead.status !== 'converted';
@@ -1271,6 +1295,21 @@ export default function ProviderDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        isOpen={showOnboardingModal}
+        onClose={() => {
+          localStorage.setItem('onboarding_dismissed', 'true');
+          setShowOnboardingModal(false);
+        }}
+        providerId={providerId}
+        onComplete={() => {
+          localStorage.setItem('onboarding_dismissed', 'true');
+          setShowOnboardingModal(false);
+          fetchProviderDetails(providerId);
+        }}
+      />
 
       {/* Add Job Modal */}
       <AddJobModal

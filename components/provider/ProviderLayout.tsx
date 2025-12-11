@@ -9,15 +9,29 @@ import {
   Users,
   Settings,
   LogOut,
-  ChevronRight,
   Calendar,
   MessageCircle,
   Menu,
   X,
   MoreHorizontal,
-  FileText
+  FileText,
+  UsersRound,
+  ChevronDown,
+  Search,
+  Bell,
+  Plus,
+  User,
+  CreditCard,
+  HelpCircle,
+  Mail,
+  Target
 } from 'lucide-react';
 import { useState, useEffect } from 'react';
+import { ThemeProvider } from 'next-themes';
+import ThemeToggle from './ThemeToggle';
+import NotificationsDropdown from './NotificationsDropdown';
+import AddJobModal from './AddJobModal';
+import { ClickToComponent } from 'click-to-react-component';
 
 interface ProviderLayoutProps {
   children: React.ReactNode;
@@ -28,6 +42,15 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
   const router = useRouter();
   const pathname = usePathname();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string>('');
+  const [showAddJobModal, setShowAddJobModal] = useState(false);
+  const [userRole, setUserRole] = useState<string>('owner');
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [providerId, setProviderId] = useState<string>('');
+  const [providerServiceTypes, setProviderServiceTypes] = useState<string[]>([]);
+  const [userEmail, setUserEmail] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -46,6 +69,52 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
     };
   }, [mobileMenuOpen]);
 
+  // Close profile dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest('.profile-dropdown')) {
+        setProfileDropdownOpen(false);
+      }
+    };
+
+    if (profileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [profileDropdownOpen]);
+
+  // Fetch provider profile photo, role, and service types
+  useEffect(() => {
+    const fetchProviderData = async () => {
+      const id = localStorage.getItem('providerId');
+      const role = localStorage.getItem('userRole') || 'owner';
+      const email = localStorage.getItem('userEmail') || '';
+      const name = localStorage.getItem('userName') || '';
+
+      setUserRole(role);
+      setUserEmail(email);
+      setUserName(name);
+
+      if (!id) return;
+      setProviderId(id);
+
+      try {
+        const res = await fetch(`/api/provider/profile?id=${id}`);
+        const data = await res.json();
+
+        if (res.ok && data.provider) {
+          setProfilePhotoUrl(data.provider.profilePhotoUrl || data.provider.avatar || '');
+          setProviderServiceTypes(data.provider.serviceTypes || []);
+        }
+      } catch (error) {
+        console.error('Error fetching provider data:', error);
+      }
+    };
+
+    fetchProviderData();
+  }, []);
+
   const handleLogout = () => {
     localStorage.removeItem('providerId');
     localStorage.removeItem('providerName');
@@ -54,11 +123,20 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
 
   const navItems = [
     {
-      name: 'Dashboard',
-      href: '/provider/dashboard',
+      name: 'Home',
+      href: '/provider/home',
       icon: LayoutDashboard,
       disabled: false,
       showInBottomNav: true,
+      showInTopNav: true,
+    },
+    {
+      name: 'Dashboard',
+      href: '/provider/dashboard',
+      icon: Target,
+      disabled: false,
+      showInBottomNav: false,
+      showInTopNav: true,
     },
     {
       name: 'Calendar',
@@ -66,6 +144,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       icon: Calendar,
       disabled: false,
       showInBottomNav: true,
+      showInTopNav: true,
     },
     {
       name: 'Customers',
@@ -73,6 +152,15 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       icon: Users,
       disabled: false,
       showInBottomNav: true,
+      showInTopNav: true,
+    },
+    {
+      name: 'Jobs',
+      href: '/provider/jobs',
+      icon: FileText,
+      disabled: false,
+      showInBottomNav: false,
+      showInTopNav: true,
     },
     {
       name: 'Messages',
@@ -80,6 +168,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       icon: MessageCircle,
       disabled: false,
       showInBottomNav: true,
+      showInTopNav: true,
     },
     {
       name: 'Invoices',
@@ -87,6 +176,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       icon: FileText,
       disabled: false,
       showInBottomNav: false,
+      showInTopNav: true,
     },
     {
       name: 'Analytics',
@@ -94,6 +184,15 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       icon: TrendingUp,
       disabled: false,
       showInBottomNav: false,
+      showInTopNav: false,
+    },
+    {
+      name: 'Team',
+      href: '/provider/team',
+      icon: UsersRound,
+      disabled: false,
+      showInBottomNav: false,
+      showInTopNav: true,
     },
     {
       name: 'Settings',
@@ -101,165 +200,405 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       icon: Settings,
       disabled: false,
       showInBottomNav: false,
+      showInTopNav: false,
     },
   ];
 
   const isActive = (href: string) => pathname === href;
   const bottomNavItems = navItems.filter(item => item.showInBottomNav);
-  const moreMenuItems = navItems.filter(item => !item.showInBottomNav);
+  const topNavItems = navItems.filter(item => item.showInTopNav);
 
   return (
-    <div className="flex h-screen bg-zinc-950 overflow-hidden">
-      {/* Mobile Header - Only visible on mobile */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-zinc-900/95 backdrop-blur-sm border-b border-zinc-800 z-40 flex items-center justify-between px-4">
-        <button
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
-        >
-          <Menu className="h-6 w-6" />
-        </button>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem={false}>
+      {process.env.NODE_ENV === 'development' && <ClickToComponent />}
+      <div className="flex flex-col h-screen bg-background overflow-hidden">
+        {/* Top Navigation Bar - Desktop */}
+        <div className="hidden lg:flex fixed top-0 left-0 right-0 h-[72px] bg-zinc-900 border-b border-zinc-800 z-50">
+          <div className="flex items-center w-full px-8 max-w-[1920px] mx-auto">
+            {/* Left: Logo + Business Name */}
+            <div className="flex items-center gap-3 flex-shrink-0 min-w-[240px]">
+              {profilePhotoUrl ? (
+                <img
+                  src={profilePhotoUrl}
+                  alt="Logo"
+                  className="w-10 h-10 rounded-lg object-cover border border-zinc-700"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                  {providerName?.charAt(0).toUpperCase() || 'R'}
+                </div>
+              )}
+              <div>
+                <h1 className="text-base font-bold text-zinc-100 whitespace-nowrap">
+                  {providerName || 'Provider Portal'}
+                </h1>
+              </div>
+            </div>
 
-        <div className="text-center">
-          <h1 className="text-lg font-bold text-zinc-100">Provider Portal</h1>
-          {providerName && (
-            <p className="text-xs text-zinc-400">{providerName}</p>
-          )}
+            {/* Center: Nav Items */}
+            <nav className="flex items-center justify-center gap-1 flex-1 px-4">
+              {topNavItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.disabled ? '#' : item.href}
+                    className={`
+                      flex items-center gap-2 px-4 py-4 rounded-full transition-all font-medium whitespace-nowrap
+                      ${active
+                        ? 'bg-emerald-600 text-white'
+                        : item.disabled
+                        ? 'text-zinc-500 cursor-not-allowed'
+                        : 'text-zinc-300 hover:bg-emerald-800/50 hover:text-white'
+                      }
+                    `}
+                    style={{ fontSize: '14px' }}
+                    onClick={(e) => {
+                      if (item.disabled) e.preventDefault();
+                    }}
+                  >
+                    <Icon className="h-4 w-4" />
+                    <span>{item.name}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Right: Quick Actions + Profile */}
+            <div className="flex items-center gap-4 flex-shrink-0 min-w-[240px] justify-end">
+              {/* Notifications Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setNotificationsOpen(!notificationsOpen)}
+                  className="p-2.5 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors relative"
+                  title="Notifications"
+                >
+                  <Bell className="h-5 w-5" />
+                  {/* Notification badge - placeholder */}
+                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                </button>
+
+                {/* Notifications Dropdown */}
+                <NotificationsDropdown
+                  isOpen={notificationsOpen}
+                  onClose={() => setNotificationsOpen(false)}
+                  providerId={providerId}
+                />
+              </div>
+
+              {/* New Button (Add Job) */}
+              <button
+                onClick={() => setShowAddJobModal(true)}
+                className="flex items-center gap-2 px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full font-semibold transition-colors shadow-sm"
+                style={{ fontSize: '15px' }}
+              >
+                <Plus className="h-4 w-4" />
+                <span>NEW</span>
+              </button>
+
+              {/* Profile Dropdown */}
+              <div className="relative profile-dropdown">
+                <button
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors"
+                >
+                  {profilePhotoUrl ? (
+                    <img
+                      src={profilePhotoUrl}
+                      alt="Profile"
+                      className="w-9 h-9 rounded-full object-cover border border-zinc-700"
+                    />
+                  ) : (
+                    <div className="w-9 h-9 rounded-full bg-zinc-700 flex items-center justify-center text-zinc-300 font-medium text-sm">
+                      {providerName?.charAt(0).toUpperCase() || 'P'}
+                    </div>
+                  )}
+                  <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {/* Dropdown Menu */}
+                {profileDropdownOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl overflow-hidden">
+                    {/* User Info Header */}
+                    <div className="px-4 py-4 bg-gradient-to-br from-emerald-600/10 to-emerald-800/5 border-b border-zinc-800">
+                      <div className="flex items-center gap-3 mb-2">
+                        {profilePhotoUrl ? (
+                          <img
+                            src={profilePhotoUrl}
+                            alt="Profile"
+                            className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500/30"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-400 flex items-center justify-center text-white text-lg font-bold">
+                            {(userName || providerName)?.charAt(0).toUpperCase() || 'U'}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-zinc-100 truncate">
+                            {userName || providerName || 'User'}
+                          </p>
+                          {userEmail && (
+                            <p className="text-xs text-zinc-400 truncate flex items-center gap-1">
+                              <Mail className="h-3 w-3" />
+                              {userEmail}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                          {userRole === 'owner' ? 'Owner' : userRole === 'office' ? 'Office' : 'Field'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Menu Items */}
+                    <div className="py-2">
+                      <Link
+                        href="/provider/dashboard"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        onClick={() => setProfileDropdownOpen(false)}
+                      >
+                        <Target className="h-4 w-4" />
+                        <span>Dashboard (Leads)</span>
+                      </Link>
+
+                      <Link
+                        href="/provider/profile"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        onClick={() => setProfileDropdownOpen(false)}
+                      >
+                        <User className="h-4 w-4" />
+                        <span>My Profile</span>
+                      </Link>
+
+                      {userRole === 'owner' && (
+                        <Link
+                          href="/provider/billing"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                          onClick={() => setProfileDropdownOpen(false)}
+                        >
+                          <CreditCard className="h-4 w-4" />
+                          <span>Subscription & Billing</span>
+                        </Link>
+                      )}
+
+                      <a
+                        href="https://docs.renoa.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                        <span>Help Center</span>
+                      </a>
+                    </div>
+
+                    {/* Divider */}
+                    <div className="border-t border-zinc-800 my-1"></div>
+
+                    {/* Settings & Theme */}
+                    <div className="py-2">
+                      <Link
+                        href="/provider/settings"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        onClick={() => setProfileDropdownOpen(false)}
+                      >
+                        <Settings className="h-4 w-4" />
+                        <span>Settings</span>
+                      </Link>
+                      <div className="px-4 py-2">
+                        <ThemeToggle />
+                      </div>
+                    </div>
+
+                    {/* Logout */}
+                    <div className="border-t border-zinc-800 pt-2">
+                      <button
+                        onClick={() => {
+                          setProfileDropdownOpen(false);
+                          handleLogout();
+                        }}
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-zinc-800 hover:text-red-300 transition-colors w-full text-left"
+                      >
+                        <LogOut className="h-4 w-4" />
+                        <span>Logout</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
-        <div className="w-10" /> {/* Spacer for centering */}
-      </div>
+        {/* Mobile Header */}
+        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-zinc-900 border-b border-zinc-800 z-40 flex items-center justify-between px-4">
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+          >
+            <Menu className="h-6 w-6" />
+          </button>
 
-      {/* Mobile Menu Overlay - Backdrop */}
-      {mobileMenuOpen && (
-        <div
-          className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-in fade-in duration-200"
-          onClick={() => setMobileMenuOpen(false)}
-        />
-      )}
-
-      {/* Sidebar - Desktop always visible, Mobile slides in */}
-      <div className={`
-        w-64 border-r border-zinc-800 bg-zinc-900 flex flex-col fixed left-0 top-0 h-screen z-[60] transition-transform duration-300 ease-out shadow-2xl
-        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-      `}>
-        {/* Logo/Header - Desktop only, mobile has top bar */}
-        <div className="hidden lg:block p-6 border-b border-zinc-800 flex-shrink-0">
-          <h1 className="text-xl font-bold text-zinc-100">Provider Portal</h1>
-          {providerName && (
-            <p className="text-sm text-zinc-400 mt-1">{providerName}</p>
-          )}
-        </div>
-
-        {/* Mobile header in sidebar */}
-        <div className="lg:hidden p-4 border-b border-zinc-800 flex items-center justify-between bg-zinc-900">
-          <div>
-            <h1 className="text-lg font-bold text-zinc-100">Menu</h1>
+          <div className="text-center">
+            <h1 className="text-lg font-bold text-zinc-100">Provider Portal</h1>
             {providerName && (
-              <p className="text-xs text-zinc-400 mt-1">{providerName}</p>
+              <p className="text-xs text-zinc-500">{providerName}</p>
             )}
           </div>
-          <button
+
+          <ThemeToggle />
+        </div>
+
+        {/* Mobile Menu Overlay */}
+        {mobileMenuOpen && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 animate-in fade-in duration-200"
             onClick={() => setMobileMenuOpen(false)}
-            className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg z-[70] relative"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+          />
+        )}
 
-        {/* Navigation - Scrollable middle section */}
-        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-
-            return (
-              <Link
-                key={item.name}
-                href={item.disabled ? '#' : item.href}
-                className={`
-                  flex items-center gap-3 px-4 py-3 rounded-lg transition-all min-h-[44px]
-                  ${active
-                    ? 'bg-emerald-600 text-white'
-                    : item.disabled
-                    ? 'text-zinc-600 cursor-not-allowed'
-                    : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100'
-                  }
-                `}
-                onClick={(e) => {
-                  if (item.disabled) e.preventDefault();
-                }}
-              >
-                <Icon className="h-5 w-5 flex-shrink-0" />
-                <span className="font-medium">{item.name}</span>
-                {active && <ChevronRight className="h-4 w-4 ml-auto" />}
-                {item.disabled && (
-                  <span className="ml-auto text-xs bg-zinc-800 px-2 py-1 rounded">
-                    Soon
-                  </span>
+        {/* Mobile Menu Sidebar */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden fixed left-0 top-0 bottom-0 w-72 bg-zinc-900 border-r border-zinc-800 z-[60] shadow-2xl animate-in slide-in-from-left duration-300">
+            {/* Mobile menu header */}
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {profilePhotoUrl ? (
+                  <img
+                    src={profilePhotoUrl}
+                    alt="Profile"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-emerald-600"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold">
+                    {providerName?.charAt(0).toUpperCase() || 'P'}
+                  </div>
                 )}
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Logout - Fixed at bottom */}
-        <div className="p-4 border-t border-zinc-800 flex-shrink-0 bg-zinc-900/50">
-          <Button
-            variant="outline"
-            className="w-full border-zinc-700 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 min-h-[44px]"
-            onClick={handleLogout}
-          >
-            <LogOut className="h-4 w-4 mr-2" />
-            Logout
-          </Button>
-        </div>
-      </div>
-
-      {/* Main Content - With left margin on desktop, full width on mobile with top/bottom padding */}
-      <div className="flex-1 lg:ml-64 overflow-auto h-screen pt-16 pb-20 lg:pt-0 lg:pb-0">
-        {children}
-      </div>
-
-      {/* Bottom Navigation - Mobile only */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-zinc-900/95 backdrop-blur-sm border-t border-zinc-800 z-40">
-        <div className="flex items-center justify-around h-full px-2">
-          {bottomNavItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.href);
-
-            return (
-              <Link
-                key={item.name}
-                href={item.disabled ? '#' : item.href}
-                className={`
-                  flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px] min-h-[44px]
-                  ${active
-                    ? 'text-emerald-500'
-                    : item.disabled
-                    ? 'text-zinc-600 cursor-not-allowed'
-                    : 'text-zinc-400 active:bg-zinc-800'
-                  }
-                `}
-                onClick={(e) => {
-                  if (item.disabled) e.preventDefault();
-                }}
+                <div>
+                  <h2 className="text-base font-bold text-zinc-100">Menu</h2>
+                  {providerName && (
+                    <p className="text-xs text-zinc-500">{providerName}</p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => setMobileMenuOpen(false)}
+                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg"
               >
-                <Icon className="h-5 w-5" />
-                <span className="text-[10px] font-medium">{item.name}</span>
-              </Link>
-            );
-          })}
+                <X className="h-5 w-5" />
+              </button>
+            </div>
 
-          {/* More button for additional menu items */}
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px] min-h-[44px] text-zinc-400 active:bg-zinc-800"
-          >
-            <MoreHorizontal className="h-5 w-5" />
-            <span className="text-[10px] font-medium">More</span>
-          </button>
+            {/* Mobile menu items */}
+            <nav className="p-4 space-y-1 overflow-y-auto max-h-[calc(100vh-180px)]">
+              {navItems.map((item) => {
+                const Icon = item.icon;
+                const active = isActive(item.href);
+
+                return (
+                  <Link
+                    key={item.name}
+                    href={item.disabled ? '#' : item.href}
+                    className={`
+                      flex items-center gap-3 px-4 py-3 rounded-lg transition-all min-h-[44px]
+                      ${active
+                        ? 'bg-emerald-600 text-white'
+                        : item.disabled
+                        ? 'text-zinc-500 cursor-not-allowed'
+                        : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'
+                      }
+                    `}
+                    onClick={(e) => {
+                      if (item.disabled) e.preventDefault();
+                      else setMobileMenuOpen(false);
+                    }}
+                  >
+                    <Icon className="h-5 w-5 flex-shrink-0" />
+                    <span className="font-medium">{item.name}</span>
+                  </Link>
+                );
+              })}
+            </nav>
+
+            {/* Mobile menu logout */}
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-zinc-800 bg-zinc-900">
+              <Button
+                variant="outline"
+                className="w-full min-h-[44px] bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Main Content - Full width with top padding */}
+        <div className="flex-1 overflow-auto pt-16 pb-20 lg:pt-[72px] lg:pb-0">
+          {children}
         </div>
+
+        {/* Bottom Navigation - Mobile only */}
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-zinc-900 border-t border-zinc-800 z-40">
+          <div className="flex items-center justify-around h-full px-2">
+            {bottomNavItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.href);
+
+              return (
+                <Link
+                  key={item.name}
+                  href={item.disabled ? '#' : item.href}
+                  className={`
+                    flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px] min-h-[44px]
+                    ${active
+                      ? 'text-emerald-400'
+                      : item.disabled
+                      ? 'text-zinc-600 cursor-not-allowed'
+                      : 'text-zinc-400 active:bg-zinc-800'
+                    }
+                  `}
+                  onClick={(e) => {
+                    if (item.disabled) e.preventDefault();
+                  }}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-[10px] font-medium">{item.name}</span>
+                </Link>
+              );
+            })}
+
+            {/* More button for additional menu items */}
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px] min-h-[44px] text-zinc-400 active:bg-zinc-800"
+            >
+              <MoreHorizontal className="h-5 w-5" />
+              <span className="text-[10px] font-medium">More</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Add Job Modal */}
+        {showAddJobModal && providerId && (
+          <AddJobModal
+            isOpen={showAddJobModal}
+            onClose={() => setShowAddJobModal(false)}
+            providerId={providerId}
+            providerServiceTypes={providerServiceTypes}
+            onJobCreated={() => {
+              setShowAddJobModal(false);
+              // Optionally refresh the page or trigger a reload
+              window.location.reload();
+            }}
+          />
+        )}
       </div>
-    </div>
+    </ThemeProvider>
   );
 }

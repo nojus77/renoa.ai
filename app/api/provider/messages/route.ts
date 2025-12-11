@@ -14,45 +14,45 @@ export async function GET(request: NextRequest) {
     }
 
     // Get all messages for this provider
-    const messages = await prisma.providerCustomerMessage.findMany({
-      where: { providerId },
+    const messages = await prisma.provider_customer_messages.findMany({
+      where: { provider_id: providerId },
       include: {
-        customer: true,
+        customers: true,
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
     });
 
     // Group messages by customer to create conversation list
     const conversationMap = new Map();
 
     for (const message of messages) {
-      const customerId = message.customerId;
+      const customerId = message.customer_id;
 
       if (!conversationMap.has(customerId)) {
         // Count unread messages for this customer
         const unreadCount = messages.filter(
-          m => m.customerId === customerId && m.direction === 'received' && m.status !== 'read'
+          m => m.customer_id === customerId && m.direction === 'received' && m.status !== 'read'
         ).length;
 
         conversationMap.set(customerId, {
           id: customerId,
           customerId: customerId,
-          customerName: message.customer.name,
-          customerPhone: message.customer.phone,
-          customerEmail: message.customer.email,
+          customerName: message.customers.name,
+          customerPhone: message.customers.phone,
+          customerEmail: message.customers.email,
           lastMessage: message.content,
-          lastMessageTime: message.createdAt.toISOString(),
+          lastMessageTime: message.created_at.toISOString(),
           unread: unreadCount > 0,
           unreadCount,
-          source: message.customer.source,
+          source: message.customers.source,
         });
       }
     }
 
     // Also include customers with no messages but who have jobs (potential conversations)
-    const customersWithJobs = await prisma.customer.findMany({
+    const customersWithJobs = await prisma.customers.findMany({
       where: {
-        providerId,
+        provider_id: providerId,
         NOT: {
           id: {
             in: Array.from(conversationMap.keys()),
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       },
       include: {
         jobs: {
-          orderBy: { startTime: 'desc' },
+          orderBy: { start_time: 'desc' },
           take: 1,
         },
       },
@@ -77,11 +77,11 @@ export async function GET(request: NextRequest) {
           customerPhone: customer.phone,
           customerEmail: customer.email,
           lastMessage: null,
-          lastMessageTime: customer.jobs[0]?.startTime?.toISOString() || customer.createdAt.toISOString(),
+          lastMessageTime: customer.jobs[0]?.start_time?.toISOString() || customer.created_at.toISOString(),
           unread: false,
           unreadCount: 0,
           source: customer.source,
-          jobReference: `${customer.jobs[0]?.serviceType} - ${new Date(customer.jobs[0]?.startTime).toLocaleDateString()}`,
+          jobReference: `${customer.jobs[0]?.service_type} - ${new Date(customer.jobs[0]?.start_time).toLocaleDateString()}`,
         });
       }
     });
@@ -113,10 +113,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the customer belongs to this provider
-    const customer = await prisma.customer.findFirst({
+    const customer = await prisma.customers.findFirst({
       where: {
         id: customerId,
-        providerId: providerId,
+        provider_id: providerId,
       },
     });
 
@@ -125,17 +125,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the message
-    const message = await prisma.providerCustomerMessage.create({
+    const message = await prisma.provider_customer_messages.create({
       data: {
-        providerId,
-        customerId,
+        provider_id: providerId,
+        customer_id: customerId,
         content,
         direction: 'sent',
         type,
         status: 'sent',
       },
       include: {
-        customer: true,
+        customers: true,
       },
     });
 
@@ -146,15 +146,15 @@ export async function POST(request: NextRequest) {
       success: true,
       message: {
         id: message.id,
-        customerId: message.customerId,
-        customerName: message.customer.name,
+        customerId: message.customer_id,
+        customerName: message.customers.name,
         senderId: providerId,
         senderType: 'provider',
         content: message.content,
         direction: message.direction,
         type: message.type,
         status: message.status,
-        timestamp: message.createdAt.toISOString(),
+        timestamp: message.created_at.toISOString(),
         read: false,
       }
     });

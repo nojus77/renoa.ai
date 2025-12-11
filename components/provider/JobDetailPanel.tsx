@@ -7,13 +7,20 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import EditJobModal from './EditJobModal';
 
+interface JobPhoto {
+  id: string;
+  url: string;
+  type: string;
+  createdAt: string;
+}
+
 interface Job {
   id: string;
   customerName: string;
   serviceType: string;
   startTime: string;
   endTime: string;
-  status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'dispatched' | 'on-the-way' | 'in-progress' | 'completed' | 'cancelled';
   isRenoaLead: boolean;
   phone: string;
   email: string;
@@ -23,6 +30,11 @@ interface Job {
   createdAt: string;
   notes?: string;
   customerNotes?: string;
+  dispatchedAt?: string | null;
+  onTheWayAt?: string | null;
+  arrivedAt?: string | null;
+  completedAt?: string | null;
+  completedByUserId?: string | null;
 }
 
 interface JobDetailPanelProps {
@@ -42,6 +54,10 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
   const [showEditModal, setShowEditModal] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const photosRef = useRef<HTMLElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [jobPhotos, setJobPhotos] = useState<JobPhoto[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [photoType, setPhotoType] = useState<'before' | 'during' | 'after'>('before');
 
   useEffect(() => {
     if (job) {
@@ -50,8 +66,106 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
         notes: job.notes || '',
         customerNotes: job.customerNotes || '',
       });
+      fetchJobPhotos();
     }
   }, [job]);
+
+  const fetchJobPhotos = async () => {
+    if (!job) return;
+
+    try {
+      const res = await fetch(`/api/provider/jobs/${job.id}/photos`);
+      const data = await res.json();
+
+      if (res.ok && data.photos) {
+        setJobPhotos(data.photos);
+      }
+    } catch (error) {
+      console.error('Error fetching job photos:', error);
+    }
+  };
+
+  const handlePhotoUpload = async (file: File, type: string) => {
+    console.log('📸 handlePhotoUpload called with:', { file: file?.name, type });
+
+    if (!file || !job) {
+      console.log('❌ No file or job', { file: !!file, job: !!job });
+      return;
+    }
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    // Check file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a JPG, PNG, or WebP image');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    toast.loading('Uploading photo...');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('type', type);
+
+      const res = await fetch(`/api/provider/jobs/${job.id}/photos/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to upload photo');
+      }
+
+      setJobPhotos([...jobPhotos, data.photo]);
+      toast.dismiss();
+      toast.success('Photo uploaded successfully!');
+    } catch (error: any) {
+      console.error('Error uploading photo:', error);
+      toast.dismiss();
+      toast.error(error.message || 'Failed to upload photo');
+    } finally {
+      setUploadingPhoto(false);
+    }
+  };
+
+  const handlePhotoDelete = async (photoId: string) => {
+    if (!job) return;
+
+    if (!confirm('Are you sure you want to delete this photo?')) {
+      return;
+    }
+
+    try {
+      toast.loading('Deleting photo...');
+
+      const res = await fetch(`/api/provider/jobs/${job.id}/photos/${photoId}/delete`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete photo');
+      }
+
+      setJobPhotos(jobPhotos.filter(p => p.id !== photoId));
+      toast.dismiss();
+      toast.success('Photo deleted successfully!');
+    } catch (error: any) {
+      console.error('Error deleting photo:', error);
+      toast.dismiss();
+      toast.error(error.message || 'Failed to delete photo');
+    }
+  };
 
   if (!job) return null;
 
@@ -78,15 +192,27 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
 
   const handleStatusChange = async (newStatus: string) => {
     try {
-      const res = await fetch(`/api/provider/jobs/${job.id}`, {
-        method: 'PATCH',
+      const userId = localStorage.getItem('userId');
+      const userRole = localStorage.getItem('userRole');
+
+      const res = await fetch(`/api/provider/jobs/${job.id}/status`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({
+          status: newStatus,
+          userId,
+          userRole,
+        }),
       });
 
-      if (!res.ok) throw new Error('Failed to update status');
+      const data = await res.json();
 
-      toast.success(`Status updated to ${newStatus.replace('_', ' ')}`);
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to update status');
+        return;
+      }
+
+      toast.success(`Status updated to ${newStatus.replace(/-/g, ' ').replace('_', ' ')}`);
       setShowStatusMenu(false);
       onJobUpdated();
     } catch (error) {
@@ -155,15 +281,31 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-      case 'in_progress': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case 'dispatched': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+      case 'on-the-way': return 'bg-orange-500/20 text-orange-400 border-orange-500/30';
+      case 'in-progress': return 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30';
       case 'completed': return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
       case 'cancelled': return 'bg-red-500/20 text-red-400 border-red-500/30';
       default: return 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30';
     }
   };
 
+  const calculateDuration = (start: string | null | undefined, end: string | null | undefined): string => {
+    if (!start || !end) return '--';
+    const startTime = new Date(start).getTime();
+    const endTime = new Date(end).getTime();
+    const diffMs = endTime - startTime;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(diffMins / 60);
+    const mins = diffMins % 60;
+    if (hours > 0) {
+      return `${hours}h ${mins}m`;
+    }
+    return `${mins}m`;
+  };
+
   const statusSteps = ['scheduled', 'in_progress', 'completed', 'paid'];
-  const currentStepIndex = statusSteps.indexOf(job.status);
+  const currentStepIndex = statusSteps.indexOf(job.status === 'on-the-way' ? 'in_progress' : job.status);
 
   return (
     <>
@@ -222,13 +364,13 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
                   </button>
                   {showStatusMenu && (
                     <div className="absolute top-full mt-1 left-0 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden z-20 min-w-[140px]">
-                      {['scheduled', 'in_progress', 'completed', 'cancelled'].map(status => (
+                      {['scheduled', 'dispatched', 'on-the-way', 'in-progress', 'completed', 'cancelled'].map(status => (
                         <button
                           key={status}
                           onClick={() => handleStatusChange(status)}
                           className="w-full px-3 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700 transition-colors capitalize"
                         >
-                          {status.replace('_', ' ')}
+                          {status.replace(/-/g, ' ').replace('_', ' ')}
                         </button>
                       ))}
                     </div>
@@ -459,17 +601,177 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
             </div>
           </section>
 
+          {/* Job Timeline - Time Tracking */}
+          {(job.dispatchedAt || job.onTheWayAt || job.arrivedAt || job.completedAt) && (
+            <section>
+              <h3 className="text-lg font-semibold text-zinc-100 mb-3">Job Timeline</h3>
+              <div className="bg-zinc-800/30 border border-zinc-800 rounded-xl p-4 space-y-3">
+                {/* Timeline Events */}
+                {job.dispatchedAt && (
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-2 h-2 rounded-full bg-purple-500 mt-1.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-zinc-300 font-medium">Dispatched</p>
+                      <p className="text-xs text-zinc-500">{formatDate(job.dispatchedAt)} at {formatTime(job.dispatchedAt)}</p>
+                    </div>
+                  </div>
+                )}
+
+                {job.onTheWayAt && (
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-2 h-2 rounded-full bg-orange-500 mt-1.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-zinc-300 font-medium">On the Way</p>
+                      <p className="text-xs text-zinc-500">{formatDate(job.onTheWayAt)} at {formatTime(job.onTheWayAt)}</p>
+                      {job.dispatchedAt && (
+                        <p className="text-xs text-emerald-400 mt-0.5">
+                          Response time: {calculateDuration(job.dispatchedAt, job.onTheWayAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {job.arrivedAt && (
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-2 h-2 rounded-full bg-yellow-500 mt-1.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-zinc-300 font-medium">Arrived / Started Work</p>
+                      <p className="text-xs text-zinc-500">{formatDate(job.arrivedAt)} at {formatTime(job.arrivedAt)}</p>
+                      {job.onTheWayAt && (
+                        <p className="text-xs text-emerald-400 mt-0.5">
+                          Travel time: {calculateDuration(job.onTheWayAt, job.arrivedAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {job.completedAt && (
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0 w-2 h-2 rounded-full bg-green-500 mt-1.5" />
+                    <div className="flex-1">
+                      <p className="text-sm text-zinc-300 font-medium">Completed</p>
+                      <p className="text-xs text-zinc-500">{formatDate(job.completedAt)} at {formatTime(job.completedAt)}</p>
+                      {job.arrivedAt && (
+                        <p className="text-xs text-emerald-400 mt-0.5">
+                          On-site time: {calculateDuration(job.arrivedAt, job.completedAt)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Summary Stats */}
+                {job.completedAt && job.onTheWayAt && (
+                  <div className="pt-3 mt-3 border-t border-zinc-700 grid grid-cols-2 gap-3">
+                    {job.onTheWayAt && job.arrivedAt && (
+                      <div className="bg-zinc-900/50 rounded-lg p-2.5">
+                        <p className="text-xs text-zinc-400 mb-0.5">Travel Time</p>
+                        <p className="text-sm font-semibold text-blue-400">
+                          {calculateDuration(job.onTheWayAt, job.arrivedAt)}
+                        </p>
+                      </div>
+                    )}
+                    {job.arrivedAt && job.completedAt && (
+                      <div className="bg-zinc-900/50 rounded-lg p-2.5">
+                        <p className="text-xs text-zinc-400 mb-0.5">On-Site Time</p>
+                        <p className="text-sm font-semibold text-emerald-400">
+                          {calculateDuration(job.arrivedAt, job.completedAt)}
+                        </p>
+                      </div>
+                    )}
+                    {job.onTheWayAt && job.completedAt && (
+                      <div className="bg-zinc-900/50 rounded-lg p-2.5 col-span-2">
+                        <p className="text-xs text-zinc-400 mb-0.5">Total Job Time</p>
+                        <p className="text-lg font-bold text-purple-400">
+                          {calculateDuration(job.onTheWayAt, job.completedAt)}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </section>
+          )}
+
           {/* Photos Section */}
           <section ref={photosRef}>
             <h3 className="text-lg font-semibold text-zinc-100 mb-3">Photos</h3>
-            <div className="grid grid-cols-3 gap-3">
-              {['Before', 'During', 'After'].map((label) => (
-                <div key={label} className="aspect-square bg-zinc-800/30 border border-zinc-800 rounded-xl flex flex-col items-center justify-center hover:bg-zinc-800/50 transition-colors cursor-pointer">
-                  <Camera className="h-8 w-8 text-zinc-600 mb-2" />
-                  <span className="text-sm font-medium text-zinc-500">{label}</span>
-                  <span className="text-xs text-zinc-600 mt-1">Click to upload</span>
-                </div>
+
+            {/* Photo type tabs */}
+            <div className="flex gap-2 mb-3">
+              {(['before', 'during', 'after'] as const).map((type) => (
+                <button
+                  key={type}
+                  onClick={() => setPhotoType(type)}
+                  className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-colors ${
+                    photoType === type
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                  }`}
+                >
+                  {type}
+                </button>
               ))}
+            </div>
+
+            {/* Photos grid */}
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {/* Uploaded photos of selected type */}
+              {jobPhotos
+                .filter(photo => photo.type === photoType)
+                .map((photo) => (
+                  <div key={photo.id} className="relative aspect-square bg-zinc-800/30 border border-zinc-800 rounded-xl overflow-hidden group">
+                    <img
+                      src={photo.url}
+                      alt={`${photo.type} photo`}
+                      className="w-full h-full object-cover"
+                    />
+                    <button
+                      onClick={() => handlePhotoDelete(photo.id)}
+                      className="absolute top-2 right-2 p-2 bg-red-600 hover:bg-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <Trash2 className="h-4 w-4 text-white" />
+                    </button>
+                  </div>
+                ))}
+
+              {/* Upload button */}
+              <div className="aspect-square bg-zinc-800/30 border-2 border-dashed border-zinc-700 rounded-xl flex flex-col items-center justify-center hover:bg-zinc-800/50 hover:border-emerald-600 transition-colors relative">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png,image/webp"
+                  onChange={(e) => {
+                    console.log('📁 File input onChange triggered');
+                    const file = e.target.files?.[0];
+                    console.log('📄 Selected file:', file?.name, file?.type);
+                    if (file) {
+                      handlePhotoUpload(file, photoType);
+                      // Reset input so same file can be selected again
+                      e.target.value = '';
+                    }
+                  }}
+                  className="absolute inset-0 opacity-0 cursor-pointer z-10"
+                  disabled={uploadingPhoto}
+                  onClick={(e) => {
+                    console.log('🖱️ File input clicked');
+                  }}
+                />
+                {uploadingPhoto ? (
+                  <div className="flex flex-col items-center justify-center pointer-events-none">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mb-2"></div>
+                    <span className="text-sm font-medium text-zinc-400">Uploading...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center pointer-events-none">
+                    <Camera className="h-8 w-8 text-zinc-600 mb-2" />
+                    <span className="text-sm font-medium text-zinc-500">Add {photoType}</span>
+                    <span className="text-xs text-zinc-600 mt-1">Click to upload</span>
+                  </div>
+                )}
+              </div>
             </div>
           </section>
 

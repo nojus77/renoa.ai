@@ -1,0 +1,816 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id               String            @id @default(uuid())
+  email            String            @unique
+  passwordHash     String            @map("password_hash")
+  role             UserRole
+  firstName        String            @map("first_name")
+  lastName         String            @map("last_name")
+  phone            String?
+  createdAt        DateTime          @default(now()) @map("created_at")
+  updatedAt        DateTime          @updatedAt @map("updated_at")
+  campaigns        Campaign[]
+  messageTemplates MessageTemplate[]
+  serviceProvider  ServiceProvider?
+
+  @@map("users")
+}
+
+model Lead {
+  id               String          @id @default(uuid())
+  firstName        String          @map("first_name")
+  lastName         String          @map("last_name")
+  email            String
+  phone            String
+  address          String
+  city             String
+  state            String
+  zip              String // ✅ Just this one, no zipCode!
+  propertyType     PropertyType    @map("property_type")
+  propertyValue    Decimal?        @map("property_value")
+  contractValue    Decimal?        @map("contract_value")
+  squareFootage    Int?            @map("square_footage")
+  moveInDate       DateTime?       @map("move_in_date")
+  serviceInterest  ServiceCategory @map("service_interest")
+  leadSource       String          @map("lead_source")
+  leadScore        Int             @default(0) @map("lead_score")
+  tier             Int
+  campaign         String?
+  contactCount     Int             @default(0) @map("contact_count")
+  urgencyScore     Int?
+  propertyScore    Int?
+  financialScore   Int?
+  demographicScore Int?
+  marketScore      Int?
+  urgencyReasons   String?         @map("urgency_reasons")
+  status           LeadStatus      @default(new)
+  notes            String?
+  aiTool1Metadata  Json?           @map("ai_tool_1_metadata")
+
+  // Scheduling fields
+  customerPreferredDate DateTime? @map("customer_preferred_date")
+  providerProposedDate  DateTime? @map("provider_proposed_date")
+  schedulingStatus      String?   @map("scheduling_status")
+  schedulingNotes       String?   @map("scheduling_notes")
+
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  assignedProviderId String?  @map("assigned_provider_id")
+
+  // Relations
+  campaignLeads     CampaignLead[]     @relation("CampaignLeadRelation")
+  inboundMessages   InboundMessage[]   @relation("LeadInboundMessages")
+  messages          Message[]          @relation("LeadMessages")
+  emailLogs         EmailLog[]         @relation("LeadEmailLogs")
+  engagementMetrics EngagementMetric[] @relation("LeadEngagementMetrics")
+  assignedProvider  Provider?          @relation("AssignedProviderLeads", fields: [assignedProviderId], references: [id])
+  matches           Match[]            @relation("LeadMatches")
+  providerNotes     LeadNote[]         @relation("LeadNotes")
+  invoices          Invoice[]          @relation("CustomerInvoices")
+
+  @@index([email])
+  @@index([zip])
+  @@index([status])
+  @@index([serviceInterest])
+  @@index([leadScore])
+  @@index([tier])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([assignedProviderId])
+  @@map("leads")
+}
+
+model LeadNote {
+  id         String   @id @default(uuid())
+  leadId     String   @map("lead_id")
+  providerId String   @map("provider_id")
+  note       String   @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  lead       Lead     @relation("LeadNotes", fields: [leadId], references: [id], onDelete: Cascade)
+  provider   Provider @relation("ProviderNotes", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([providerId])
+  @@index([createdAt])
+  @@map("lead_notes")
+}
+
+model EmailLog {
+  id           String    @id @default(uuid())
+  messageId    String    @unique @map("message_id")
+  leadId       String    @map("lead_id")
+  campaignId   String?   @map("campaign_id")
+  fromEmail    String    @map("from_email")
+  toEmail      String    @map("to_email")
+  subject      String
+  body         String
+  sentAt       DateTime  @map("sent_at")
+  openedAt     DateTime? @map("opened_at")
+  clickedAt    DateTime? @map("clicked_at")
+  repliedAt    DateTime? @map("replied_at")
+  bouncedAt    DateTime? @map("bounced_at")
+  complainedAt DateTime? @map("complained_at")
+  lead         Lead      @relation("LeadEmailLogs", fields: [leadId], references: [id])
+
+  @@map("email_logs")
+}
+
+model InboundMessage {
+  id            String   @id @default(cuid())
+  originalMsgId String
+  leadId        String
+  messageId     String   @unique
+  inReplyTo     String?
+  references    String?
+  fromEmail     String
+  subject       String
+  body          String
+  htmlBody      String?
+  receivedAt    DateTime @default(now())
+  lead          Lead     @relation("LeadInboundMessages", fields: [leadId], references: [id], onDelete: Cascade)
+  originalMsg   Message  @relation("MessageInboundReplies", fields: [originalMsgId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([originalMsgId])
+}
+
+model Campaign {
+  id                String             @id @default(uuid())
+  name              String
+  serviceType       ServiceCategory    @map("service_type")
+  targetAudience    Json               @map("target_audience")
+  sequenceType      SequenceType       @map("sequence_type")
+  status            CampaignStatus     @default(draft)
+  totalLeads        Int                @default(0) @map("total_leads")
+  messagesSent      Int                @default(0) @map("messages_sent")
+  deliveredCount    Int                @default(0) @map("delivered_count")
+  openedCount       Int                @default(0) @map("opened_count")
+  repliedCount      Int                @default(0) @map("replied_count")
+  convertedCount    Int                @default(0) @map("converted_count")
+  scheduledStart    DateTime?          @map("scheduled_start")
+  startedAt         DateTime?          @map("started_at")
+  completedAt       DateTime?          @map("completed_at")
+  createdBy         String?            @map("created_by")
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  type              CampaignType       @default(EMAIL)
+  campaignLeads     CampaignLead[]     @relation("CampaignLeadsRelation")
+  sequences         CampaignSequence[] @relation("CampaignSequences")
+  messages          Message[]          @relation("CampaignMessages")
+  creator           User?              @relation(fields: [createdBy], references: [id])
+  engagementMetrics EngagementMetric[] @relation("CampaignEngagementMetrics")
+  matches           Match[]            @relation("CampaignMatches")
+
+  @@index([status])
+  @@index([serviceType])
+  @@map("campaigns")
+}
+
+model Message {
+  id                String             @id @default(cuid())
+  leadId            String
+  campaignId        String?
+  sequenceStepId    String?
+  messageId         String             @unique
+  trackingToken     String             @unique
+  inReplyTo         String?
+  subject           String
+  body              String
+  fromEmail         String
+  toEmail           String
+  status            EmailStatus        @default(QUEUED)
+  sentAt            DateTime?
+  scheduledFor      DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  events            EmailEvent[]       @relation("MessageEvents")
+  replies           InboundMessage[]   @relation("MessageInboundReplies")
+  campaign          Campaign?          @relation("CampaignMessages", fields: [campaignId], references: [id])
+  lead              Lead               @relation("LeadMessages", fields: [leadId], references: [id], onDelete: Cascade)
+  engagementMetrics EngagementMetric[] @relation("MessageEngagementMetrics")
+
+  @@index([leadId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([scheduledFor])
+}
+
+model EngagementMetric {
+  id             String          @id @default(uuid())
+  messageId      String          @map("message_id")
+  leadId         String          @map("lead_id")
+  campaignId     String          @map("campaign_id")
+  delivered      Boolean         @default(false)
+  opened         Boolean         @default(false)
+  clicked        Boolean         @default(false)
+  replied        Boolean         @default(false)
+  replyText      String?         @map("reply_text")
+  replySentiment ReplySentiment? @map("reply_sentiment")
+  openedAt       DateTime?       @map("opened_at")
+  clickedAt      DateTime?       @map("clicked_at")
+  repliedAt      DateTime?       @map("replied_at")
+  createdAt      DateTime        @default(now()) @map("created_at")
+  updatedAt      DateTime        @updatedAt @map("updated_at")
+  campaign       Campaign        @relation("CampaignEngagementMetrics", fields: [campaignId], references: [id])
+  lead           Lead            @relation("LeadEngagementMetrics", fields: [leadId], references: [id])
+  message        Message         @relation("MessageEngagementMetrics", fields: [messageId], references: [id])
+
+  @@index([messageId])
+  @@index([leadId])
+  @@index([campaignId])
+  @@map("engagement_metrics")
+}
+
+model EmailEvent {
+  id         String    @id @default(cuid())
+  messageId  String
+  eventType  EventType
+  timestamp  DateTime  @default(now())
+  ipAddress  String?
+  userAgent  String?
+  clickUrl   String?
+  bounceType String?
+  metadata   Json?
+  message    Message   @relation("MessageEvents", fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([eventType])
+  @@index([timestamp])
+}
+
+model ServiceProvider {
+  id                  String            @id @default(uuid())
+  userId              String            @unique @map("user_id")
+  businessName        String            @map("business_name")
+  serviceCategories   ServiceCategory[] @map("service_categories")
+  coverageAreas       Json              @map("coverage_areas")
+  rating              Decimal           @default(0) @db.Decimal(3, 2)
+  totalReviews        Int               @default(0) @map("total_reviews")
+  subscriptionTier    SubscriptionTier  @default(free) @map("subscription_tier")
+  priceRange          PriceRange        @map("price_range")
+  specializations     String[]
+  capacityStatus      CapacityStatus    @default(accepting) @map("capacity_status")
+  leadsReceivedCount  Int               @default(0) @map("leads_received_count")
+  leadsConvertedCount Int               @default(0) @map("leads_converted_count")
+  conversionRate      Decimal           @default(0) @map("conversion_rate") @db.Decimal(5, 2)
+  isVerified          Boolean           @default(false) @map("is_verified")
+  isActive            Boolean           @default(true) @map("is_active")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
+  matches             Match[]           @relation("ServiceProviderMatches")
+  user                User              @relation(fields: [userId], references: [id])
+
+  @@map("service_providers")
+}
+
+model Match {
+  id                 String          @id @default(uuid())
+  leadId             String          @map("lead_id")
+  providerId         String          @map("provider_id")
+  campaignId         String          @map("campaign_id")
+  status             MatchStatus     @default(pending)
+  matchScore         Decimal         @map("match_score") @db.Decimal(5, 2)
+  estimatedValue     Decimal?        @map("estimated_value")
+  providerNotifiedAt DateTime?       @map("provider_notified_at")
+  providerResponseAt DateTime?       @map("provider_response_at")
+  dealClosedAt       DateTime?       @map("deal_closed_at")
+  createdAt          DateTime        @default(now()) @map("created_at")
+  updatedAt          DateTime        @updatedAt @map("updated_at")
+  campaign           Campaign        @relation("CampaignMatches", fields: [campaignId], references: [id])
+  lead               Lead            @relation("LeadMatches", fields: [leadId], references: [id])
+  provider           ServiceProvider @relation("ServiceProviderMatches", fields: [providerId], references: [id])
+
+  @@index([leadId])
+  @@index([providerId])
+  @@index([status])
+  @@map("matches")
+}
+
+model MessageTemplate {
+  id               String           @id @default(uuid())
+  name             String
+  type             MessageType
+  serviceCategory  ServiceCategory? @map("service_category")
+  subject          String?
+  body             String
+  isActive         Boolean          @default(true) @map("is_active")
+  performanceScore Decimal          @default(0) @map("performance_score") @db.Decimal(5, 2)
+  timesUsed        Int              @default(0) @map("times_used")
+  avgReplyRate     Decimal          @default(0) @map("avg_reply_rate") @db.Decimal(5, 2)
+  createdBy        String           @map("created_by")
+  createdAt        DateTime         @default(now()) @map("created_at")
+  updatedAt        DateTime         @updatedAt @map("updated_at")
+  creator          User             @relation(fields: [createdBy], references: [id])
+
+  @@index([type])
+  @@index([isActive])
+  @@map("message_templates")
+}
+
+model CampaignSequence {
+  id         String        @id @default(cuid())
+  campaignId String
+  stepNumber Int
+  delayDays  Int           @default(0)
+  templateId String
+  createdAt  DateTime      @default(now())
+  status     String        @default("active")
+  campaign   Campaign      @relation("CampaignSequences", fields: [campaignId], references: [id], onDelete: Cascade)
+  template   EmailTemplate @relation("TemplateSequences", fields: [templateId], references: [id])
+
+  @@unique([campaignId, stepNumber])
+  @@index([campaignId])
+}
+
+model EmailTemplate {
+  id        String             @id @default(cuid())
+  name      String
+  subject   String
+  body      String
+  variables Json?
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+  sequences CampaignSequence[] @relation("TemplateSequences")
+}
+
+model AIOptimization {
+  id                    String           @id @default(uuid())
+  optimizationType      OptimizationType @map("optimization_type")
+  beforeMetric          Json             @map("before_metric")
+  afterMetric           Json             @map("after_metric")
+  improvementPercentage Decimal          @map("improvement_percentage") @db.Decimal(5, 2)
+  appliedAt             DateTime         @map("applied_at")
+  details               Json
+  createdAt             DateTime         @default(now()) @map("created_at")
+
+  @@index([optimizationType])
+  @@map("ai_optimizations")
+}
+
+model CampaignLead {
+  id         String   @id @default(cuid())
+  campaignId String
+  leadId     String
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  campaign   Campaign @relation("CampaignLeadsRelation", fields: [campaignId], references: [id], onDelete: Cascade)
+  lead       Lead     @relation("CampaignLeadRelation", fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, leadId])
+  @@index([campaignId])
+  @@index([leadId])
+}
+
+model Provider {
+  id               String   @id @default(uuid())
+  businessName     String
+  ownerName        String
+  email            String   @unique
+  phone            String
+  serviceTypes     String[] @default([]) // ✅ Default empty array
+  serviceAreas     String[] @default([]) // ✅ Default empty array
+  yearsInBusiness  Int      @default(0) // ✅ Default 0
+  status           String   @default("active") // ✅ Default "active"
+  leadCapacity     Int      @default(10) // ✅ Default 10
+  currentLeadCount Int      @default(0)
+  rating           Float    @default(4.5) // ✅ Better default
+  totalLeadsSent   Int      @default(0)
+  leadsAccepted    Int      @default(0)
+  leadsConverted   Int      @default(0)
+  totalRevenue     Float    @default(0)
+  commissionRate   Float    @default(0.15)
+  averageJobValue  Float    @default(5000) // ✅ Better default
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  lastActivityAt   DateTime @default(now())
+
+  // Availability fields
+  workingHours      Json?
+  timeZone          String  @default("America/Chicago")
+  bufferTime        Int     @default(30)
+  advanceBooking    Int     @default(14)
+  availabilityNotes String?
+
+  leads        Lead[]           @relation("AssignedProviderLeads")
+  leadNotes    LeadNote[]       @relation("ProviderNotes")
+  blockedTimes BlockedTime[]    @relation("ProviderBlockedTimes")
+  invoices     Invoice[]        @relation("ProviderInvoices")
+  jobs         Job[]            @relation("ProviderJobs")
+  customers    Customer[]       @relation("ProviderCustomers")
+  reviews      ProviderReview[] @relation("ProviderReviews")
+}
+
+model Customer {
+  id                 String    @id @default(cuid())
+  providerId         String    @map("provider_id")
+  name               String
+  email              String?
+  phone              String
+  address            String
+  source             String    @default("own") // "renoa" or "own"
+  tags               String[]  @default([]) // ["Premium", "HOA", "Recurring", etc]
+  notes              String?   @db.Text
+  birthday           DateTime? // For birthday bonus points
+  lastBirthdayReward Int?      @map("last_birthday_reward") // Year of last birthday reward
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  provider Provider @relation("ProviderCustomers", fields: [providerId], references: [id], onDelete: Cascade)
+  jobs     Job[]    @relation("CustomerJobs")
+
+  @@index([providerId])
+  @@index([phone])
+  @@index([birthday])
+  @@map("customers")
+}
+
+model Job {
+  id             String   @id @default(cuid())
+  providerId     String   @map("provider_id")
+  customerId     String   @map("customer_id")
+  serviceType    String   @map("service_type") // "Lawn Mowing", "Landscaping", etc
+  address        String
+  startTime      DateTime @map("start_time")
+  endTime        DateTime @map("end_time")
+  status         String   @default("scheduled") // "scheduled", "in_progress", "completed", "cancelled"
+  source         String   @default("own") // "renoa" or "own"
+  estimatedValue Float?   @map("estimated_value")
+  actualValue    Float?   @map("actual_value")
+  internalNotes  String?  @map("internal_notes") @db.Text
+  customerNotes  String?  @map("customer_notes") @db.Text
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  provider Provider        @relation("ProviderJobs", fields: [providerId], references: [id], onDelete: Cascade)
+  customer Customer        @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
+  photos   JobPhoto[]      @relation("JobPhotos")
+  review   ProviderReview? @relation("JobReview")
+
+  @@index([providerId])
+  @@index([customerId])
+  @@index([startTime])
+  @@map("jobs")
+}
+
+model JobPhoto {
+  id         String   @id @default(cuid())
+  jobId      String   @map("job_id")
+  uploadedBy String   @map("uploaded_by") // 'provider' or 'customer'
+  photoUrl   String   @map("photo_url")
+  photoType  String   @map("photo_type") // 'before', 'in_progress', 'after'
+  caption    String?  @db.Text
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  // Relations
+  job Job @relation("JobPhotos", fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([photoType])
+  @@map("job_photos")
+}
+
+model BlockedTime {
+  id                   String    @id @default(uuid())
+  providerId           String    @map("provider_id")
+  fromDate             DateTime  @map("from_date")
+  toDate               DateTime  @map("to_date")
+  startTime            String?   @map("start_time")
+  endTime              String?   @map("end_time")
+  reason               String
+  notes                String?   @db.Text
+  isRecurring          Boolean   @default(false) @map("is_recurring")
+  recurringType        String?   @map("recurring_type") // 'weekly' or 'monthly'
+  recurringDaysOfWeek  Int[]     @default([]) @map("recurring_days_of_week") // [0-6] Sunday-Saturday
+  recurringEndsType    String?   @map("recurring_ends_type") // 'never', 'after', 'on'
+  recurringOccurrences Int?      @map("recurring_occurrences")
+  recurringEndsOnDate  DateTime? @map("recurring_ends_on_date")
+  createdAt            DateTime  @default(now()) @map("created_at")
+  updatedAt            DateTime  @updatedAt @map("updated_at")
+
+  provider Provider @relation("ProviderBlockedTimes", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
+  @@index([fromDate])
+  @@index([toDate])
+  @@map("blocked_times")
+}
+
+model Admin {
+  id                 String    @id @default(uuid())
+  email              String    @unique
+  hashedPassword     String    @map("hashed_password")
+  name               String
+  role               AdminRole @default(sales_rep)
+  mustChangePassword Boolean   @default(false) @map("must_change_password")
+  lastLoginAt        DateTime? @map("last_login_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  @@index([email])
+  @@map("admins")
+}
+
+enum UserRole {
+  homeowner
+  provider
+  admin
+}
+
+enum PropertyType {
+  single_family
+  condo
+  townhouse
+  multi_family
+}
+
+enum ServiceCategory {
+  landscaping
+  remodeling
+  roofing
+  fencing
+  hvac
+  plumbing
+  painting
+  flooring
+  lawn_care
+  tree_service
+  hardscaping
+}
+
+enum LeadStatus {
+  new
+  contacted
+  replied
+  matched
+  accepted
+  converted
+  unqualified
+}
+
+enum CampaignStatus {
+  draft
+  scheduled
+  active
+  paused
+  completed
+}
+
+enum SequenceType {
+  sms_sms_email
+  email_sms_email
+  sms_email
+  custom
+}
+
+enum MessageType {
+  sms
+  email
+}
+
+enum MessageStatus {
+  scheduled
+  sent
+  delivered
+  failed
+  bounced
+}
+
+enum ReplySentiment {
+  positive
+  neutral
+  negative
+  question
+}
+
+enum SubscriptionTier {
+  free
+  basic
+  pro
+  enterprise
+}
+
+enum PriceRange {
+  budget
+  mid_range
+  premium
+  luxury
+}
+
+enum CapacityStatus {
+  accepting
+  limited
+  full
+}
+
+enum MatchStatus {
+  pending
+  sent_to_provider
+  accepted
+  declined
+  contacted
+  closed_won
+  closed_lost
+}
+
+enum OptimizationType {
+  message_template
+  send_timing
+  lead_scoring
+  matching_criteria
+}
+
+enum EmailStatus {
+  QUEUED
+  SENDING
+  SENT
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  FAILED
+}
+
+enum EventType {
+  DELIVERED
+  BOUNCED
+  COMPLAINED
+  OPENED
+  CLICKED
+}
+
+enum CampaignType {
+  EMAIL
+  SMS
+  MULTI_CHANNEL
+}
+
+enum AdminRole {
+  super_admin
+  sales_rep
+  customer_support
+  developer
+}
+
+model Invoice {
+  id            String        @id @default(uuid())
+  invoiceNumber String        @unique @map("invoice_number")
+  providerId    String        @map("provider_id")
+  customerId    String        @map("customer_id")
+  jobId         String?       @map("job_id")
+  status        InvoiceStatus @default(draft)
+
+  // Dates
+  invoiceDate DateTime  @map("invoice_date")
+  dueDate     DateTime  @map("due_date")
+  paidDate    DateTime? @map("paid_date")
+
+  // Amounts
+  subtotal       Decimal       @db.Decimal(10, 2)
+  taxRate        Decimal?      @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount      Decimal       @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  discountType   DiscountType? @map("discount_type")
+  discountValue  Decimal?      @default(0) @map("discount_value") @db.Decimal(10, 2)
+  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  total          Decimal       @db.Decimal(10, 2)
+  amountPaid     Decimal       @default(0) @map("amount_paid") @db.Decimal(10, 2)
+
+  // Customer-visible fields
+  notes               String? @db.Text
+  terms               String? @db.Text
+  paymentInstructions String? @map("payment_instructions") @db.Text
+
+  // Email tracking
+  sentAt   DateTime? @map("sent_at")
+  sentTo   String?   @map("sent_to")
+  viewedAt DateTime? @map("viewed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  provider  Provider          @relation("ProviderInvoices", fields: [providerId], references: [id], onDelete: Cascade)
+  customer  Lead              @relation("CustomerInvoices", fields: [customerId], references: [id], onDelete: Cascade)
+  lineItems InvoiceLineItem[] @relation("InvoiceLineItems")
+  payments  Payment[]         @relation("InvoicePayments")
+
+  @@index([providerId])
+  @@index([customerId])
+  @@index([status])
+  @@index([invoiceDate])
+  @@index([dueDate])
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id          String   @id @default(uuid())
+  invoiceId   String   @map("invoice_id")
+  description String   @db.Text
+  quantity    Decimal  @db.Decimal(10, 2)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  invoice Invoice @relation("InvoiceLineItems", fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_line_items")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  invoiceId     String        @map("invoice_id")
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentDate   DateTime      @map("payment_date")
+  paymentMethod PaymentMethod @map("payment_method")
+  transactionId String?       @map("transaction_id")
+  notes         String?       @db.Text
+  recordedBy    String?       @map("recorded_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  invoice Invoice @relation("InvoicePayments", fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([paymentDate])
+  @@map("payments")
+}
+
+enum InvoiceStatus {
+  draft
+  sent
+  viewed
+  paid
+  partial
+  overdue
+  cancelled
+}
+
+enum DiscountType {
+  percentage
+  fixed
+}
+
+enum PaymentMethod {
+  cash
+  check
+  credit_card
+  bank_transfer
+  online
+  other
+}
+
+// ═══════════════════════════════════════════════════════════════
+// PROVIDER REVIEWS
+// ═══════════════════════════════════════════════════════════════
+
+model ProviderReview {
+  id                  String   @id @default(uuid())
+  providerId          String   @map("provider_id")
+  jobId               String   @map("job_id")
+  customerId          String   @map("customer_id")
+  customerFirstName   String   @map("customer_first_name")
+  rating              Int // 1-5
+  serviceType         String   @map("service_type")
+  comment             String   @db.Text
+  verified            Boolean  @default(true)
+  helpfulCount        Int      @default(0) @map("helpful_count")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  provider    Provider             @relation("ProviderReviews", fields: [providerId], references: [id], onDelete: Cascade)
+  job         Job                  @relation("JobReview", fields: [jobId], references: [id], onDelete: Cascade)
+  helpfulness ReviewHelpfulness[]  @relation("ReviewHelpfulness")
+
+  @@unique([jobId])
+  @@index([providerId])
+  @@index([rating])
+  @@map("provider_reviews")
+}
+
+model ReviewHelpfulness {
+  id         String   @id @default(uuid())
+  reviewId   String   @map("review_id")
+  customerId String   @map("customer_id")
+  helpful    Boolean
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  review ProviderReview @relation("ReviewHelpfulness", fields: [reviewId], references: [id], onDelete: Cascade)
+
+  @@unique([reviewId, customerId])
+  @@index([reviewId])
+  @@map("review_helpfulness")
+}

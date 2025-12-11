@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { sendNotification } from '@/lib/notifications/notification-service';
 
 const prisma = new PrismaClient();
 
@@ -30,9 +31,38 @@ export async function POST(
       );
     }
 
-    // TODO: Implement actual email/SMS sending
-    // For now, we'll just update the invoice status
+    // Generate payment and invoice links
+    const invoiceLink = `${process.env.NEXT_PUBLIC_APP_URL}/customer-portal/invoices/${invoice.id}`;
+    const paymentLink = `${process.env.NEXT_PUBLIC_APP_URL}/customer-portal/invoices/${invoice.id}`;
 
+    // Send notification via email and/or SMS
+    try {
+      const notificationResult = await sendNotification(
+        'invoice_sent',
+        {
+          customerName: invoice.customer.name,
+          customerEmail: invoice.customer.email,
+          customerPhone: invoice.customer.phone || '',
+          providerName: invoice.provider.businessName,
+          providerCompany: invoice.provider.businessName,
+          serviceType: 'service',
+          amount: Number(invoice.total),
+          invoiceLink: invoiceLink,
+          paymentLink: paymentLink,
+        },
+        {
+          sendSMS: sms || false,
+          sendEmail: email || false,
+        }
+      );
+
+      console.log('Invoice notification sent:', notificationResult);
+    } catch (notificationError) {
+      console.error('Failed to send invoice notification:', notificationError);
+      // Continue anyway - we still want to mark as sent
+    }
+
+    // Update invoice status
     const updatedInvoice = await prisma.invoice.update({
       where: { id: params.id },
       data: {
@@ -54,7 +84,7 @@ export async function POST(
         total: Number(updatedInvoice.total),
         amountPaid: Number(updatedInvoice.amountPaid),
       },
-      message: `Invoice sent successfully via ${email ? 'email' : 'SMS'}`,
+      message: `Invoice sent successfully via ${email ? 'email' : ''}${email && sms ? ' and ' : ''}${sms ? 'SMS' : ''}`,
     });
   } catch (error) {
     console.error('Error sending invoice:', error);

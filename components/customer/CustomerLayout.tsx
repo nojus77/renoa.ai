@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Briefcase, FileText, MessageSquare, LogOut, Menu, X, Repeat, Gift, DollarSign } from 'lucide-react';
+import { Home, Briefcase, FileText, MessageSquare, LogOut, Menu, X, Repeat, Gift, DollarSign, Package, CreditCard, Trophy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -64,9 +64,12 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
   const navigation = [
     { name: 'Dashboard', href: '/customer-portal/dashboard', icon: Home },
     { name: 'Jobs', href: '/customer-portal/jobs', icon: Briefcase },
+    { name: 'Packages', href: '/customer-portal/packages', icon: Package },
     { name: 'Invoices', href: '/customer-portal/invoices', icon: FileText },
     { name: 'Subscriptions', href: '/customer-portal/subscriptions', icon: Repeat },
+    { name: 'Rewards', href: '/customer-portal/rewards', icon: Trophy },
     { name: 'Referrals', href: '/customer-portal/referrals', icon: Gift },
+    { name: 'Payment Methods', href: '/customer-portal/payment-methods', icon: CreditCard },
     { name: 'Messages', href: '/customer-portal/messages', icon: MessageSquare },
   ];
 

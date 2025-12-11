@@ -4,31 +4,41 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    /* Light theme - MODERN 2026 DESIGN - Pure white like Linear/Stripe */
+    --background: 0 0% 100%;           /* Pure white #ffffff */
+    --foreground: 222 47% 11%;         /* Near-black #111827 */
+
+    --card: 0 0% 100%;                 /* White cards */
+    --card-foreground: 222 47% 11%;    /* Near-black */
+
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 100 65% 16%;            /* #2d5016 forest green */
+    --primary-foreground: 0 0% 100%;   /* White text on primary */
+
+    --secondary: 220 13% 97%;          /* Subtle gray #f9fafb */
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 220 13% 97%;              /* Gray-50 #f9fafb */
+    --muted-foreground: 215 14% 42%;   /* Gray-500 #6b7280 */
+
+    --accent: 138 76% 97%;             /* Light green #f0fdf4 */
+    --accent-foreground: 100 65% 16%;  /* Forest green */
+
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+
+    --border: 220 13% 91%;             /* Clean gray #e5e7eb */
+    --input: 220 13% 91%;              /* Gray-200 */
+    --ring: 100 65% 16%;               /* Forest green focus ring */
+
     --radius: 0.5rem;
-    --chart-1: 12 76% 61%;
-    --chart-2: 173 58% 39%;
-    --chart-3: 197 37% 24%;
-    --chart-4: 43 74% 66%;
-    --chart-5: 27 87% 67%;
+    --chart-1: 100 65% 16%;            /* Forest green */
+    --chart-2: 217 91% 60%;            /* Blue */
+    --chart-3: 142 76% 45%;            /* Emerald */
+    --chart-4: 43 96% 56%;             /* Yellow */
+    --chart-5: 340 75% 55%;            /* Rose */
   }
 
   .dark {
@@ -66,6 +76,310 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ========================================
+   LIGHT THEME - MODERN & CLEAN
+   ======================================== */
+
+.light {
+  color-scheme: light;
+
+  /* CSS Variables for light theme - MODERN 2026 DESIGN */
+  --background: 116 23% 85%;         /* Light sage green #c8d5b9 */
+  --foreground: 222 47% 11%;         /* Near-black #111827 */
+
+  --card: 0 0% 100%;                 /* White */
+  --card-foreground: 222 47% 11%;    /* Near-black */
+
+  --primary: 100 65% 16%;            /* #2d5016 forest green */
+  --primary-foreground: 0 0% 100%;
+
+  --secondary: 116 23% 85%;          /* Light sage green #c8d5b9 */
+  --secondary-foreground: 222 47% 11%;
+
+  --muted: 116 23% 85%;              /* Light sage green #c8d5b9 */
+  --muted-foreground: 215 14% 42%;   /* Gray-500 #6b7280 */
+
+  --accent: 138 76% 97%;             /* Light green #f0fdf4 */
+  --accent-foreground: 100 65% 16%;
+
+  --border: 220 13% 91%;             /* Clean gray #e5e7eb */
+  --input: 220 13% 91%;              /* Gray-200 */
+  --ring: 100 65% 16%;
+}
+
+/* ============================================
+   MODERN 2026 LIGHT THEME - Like Linear/Stripe
+   ============================================ */
+
+/* Base styles - Light sage green background */
+.light body {
+  background-color: #c8d5b9;  /* Light sage green */
+  color: #111827;  /* Near-black */
+}
+
+.light .bg-background {
+  background-color: #c8d5b9 !important;  /* Light sage green */
+}
+
+/* Main content area - Light sage green */
+.light main,
+.light .main-content,
+.light [class*="min-h-screen"] {
+  background-color: #c8d5b9 !important;  /* Light sage green */
+}
+
+/* Override gray backgrounds with light sage green */
+.light .bg-gray-50,
+.light .bg-slate-50 {
+  background-color: #c8d5b9 !important;  /* Light sage green */
+}
+
+.light .bg-gray-100,
+.light .bg-gray-200,
+.light .bg-slate-100,
+.light .bg-slate-200 {
+  background-color: #c8d5b9 !important;  /* Light sage green */
+}
+
+/* Page wrapper - Light sage green */
+.light div.min-h-screen.bg-zinc-950,
+.light div.min-h-screen.bg-background {
+  background-color: #c8d5b9 !important;
+}
+
+/* Cards with modern shadows - white on white with clean borders */
+.light .bg-card,
+.light .bg-white {
+  background-color: white !important;
+  border: 1px solid #e5e7eb !important;  /* Clean gray border */
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Zinc backgrounds that are CARDS should be white */
+.light .bg-zinc-900\/50:not(.min-h-screen),
+.light .bg-zinc-800\/50,
+.light .bg-zinc-800\/30 {
+  background-color: white !important;
+  border: 1px solid #e5e7eb !important;  /* Clean gray border */
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
+}
+
+.light .bg-zinc-800 {
+  background-color: #c8d5b9 !important;  /* Light sage green */
+  border: 1px solid #e5e7eb !important;
+}
+
+/* High contrast text - Modern & readable */
+.light .text-foreground,
+.light .text-zinc-100,
+.light .text-white {
+  color: #111827 !important;  /* Near-black */
+}
+
+.light .text-muted-foreground,
+.light .text-zinc-400,
+.light .text-zinc-500 {
+  color: #6b7280 !important;  /* Gray-500 */
+}
+
+.light .text-zinc-600 {
+  color: #4b5563 !important;  /* Gray-600 */
+}
+
+/* Headings - Bold and clear */
+.light h1,
+.light h2,
+.light h3 {
+  color: #111827 !important;  /* Near-black */
+  font-weight: 600;
+}
+
+/* Clean borders - Subtle gray */
+.light .border,
+.light .border-border,
+.light .border-zinc-800,
+.light .border-zinc-700 {
+  border-color: #e5e7eb !important;  /* Gray-200 */
+}
+
+/* Brand primary buttons - forest green */
+.light .bg-primary,
+.light .bg-emerald-600,
+.light .bg-emerald-500 {
+  background-color: #2d5016 !important;
+  color: white !important;
+  border: none !important;
+}
+
+.light .bg-primary:hover,
+.light .bg-emerald-600:hover,
+.light .bg-emerald-500:hover {
+  background-color: #1f3810 !important;
+}
+
+.light .text-emerald-400,
+.light .text-emerald-500,
+.light .text-emerald-600 {
+  color: #2d5016 !important;
+}
+
+/* Secondary colors */
+.light .bg-secondary {
+  background-color: #c8d5b9 !important;  /* Light sage green */
+  color: #111827 !important;  /* Near-black */
+  border: 1px solid #e5e7eb !important;  /* Gray-200 */
+}
+
+.light .bg-secondary:hover {
+  background-color: #b8c9a4 !important;  /* Slightly darker light sage */
+}
+
+/* Accent hover states - light green */
+.light .hover\:bg-accent:hover,
+.light .bg-accent {
+  background-color: #f0fdf4 !important;
+  color: #166534 !important;
+}
+
+/* Icon colors */
+.light .text-blue-400 {
+  color: #3b82f6 !important;
+}
+
+.light .text-yellow-400 {
+  color: #f59e0b !important;
+}
+
+.light .text-green-400 {
+  color: #10b981 !important;
+}
+
+.light .text-red-400 {
+  color: #ef4444 !important;
+}
+
+.light .text-purple-400 {
+  color: #a855f7 !important;
+}
+
+/* Status badges */
+.light [class*="bg-green"] {
+  background-color: #dcfce7 !important;
+  color: #166534 !important;
+}
+
+.light [class*="bg-yellow"] {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+}
+
+.light [class*="bg-red"] {
+  background-color: #fee2e2 !important;
+  color: #991b1b !important;
+}
+
+.light [class*="bg-blue"] {
+  background-color: #dbeafe !important;
+  color: #1e40af !important;
+}
+
+/* Form inputs */
+.light input,
+.light textarea,
+.light select {
+  background-color: white !important;
+  border: 1px solid #e5e7eb !important;
+  color: #111827 !important;
+}
+
+.light input:focus,
+.light textarea:focus,
+.light select:focus {
+  border-color: #2d5016 !important;
+  outline: none !important;
+  box-shadow: 0 0 0 3px rgba(45, 80, 22, 0.1) !important;
+}
+
+.light input::placeholder,
+.light textarea::placeholder {
+  color: #9ca3af !important;
+}
+
+/* Hover effects */
+.light .hover\:bg-zinc-800:hover {
+  background-color: #c8d5b9 !important;  /* Light sage green */
+}
+
+.light [class*="hover:bg-emerald"]:hover {
+  background-color: #1f3810 !important;
+}
+
+/* Card hover effects */
+.light .card:hover,
+.light .hover-lift:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
+  transform: translateY(-1px);
+  transition: all 0.2s ease;
+}
+
+/* Table rows */
+.light tr:hover {
+  background-color: #c8d5b9 !important;  /* Light sage green */
+}
+
+/* Dropdown menus */
+.light [role="menu"],
+.light [role="listbox"],
+.light .dropdown-content {
+  background-color: white !important;
+  border: 1px solid #e5e7eb !important;  /* Gray-200 */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Charts */
+.light .recharts-text {
+  fill: #6b7280 !important;  /* Gray-500 */
+}
+
+.light .recharts-cartesian-grid line {
+  stroke: #e5e7eb !important;  /* Gray-200 */
+}
+
+/* Sidebar */
+.light aside,
+.light nav {
+  background-color: white !important;
+  border-right: 1px solid #e5e7eb !important;  /* Gray-200 */
+}
+
+/* Header bars */
+.light header {
+  background-color: white !important;
+  border-bottom: 1px solid #e5e7eb !important;
+}
+
+/* Active navigation */
+.light [aria-current="page"],
+.light .nav-active {
+  background-color: #f0fdf4 !important;
+  color: #2d5016 !important;
+  font-weight: 500 !important;
+}
+
+/* Scrollbars in light mode */
+.light ::-webkit-scrollbar-track {
+  background: #c8d5b9;  /* Light sage green */
+}
+
+.light ::-webkit-scrollbar-thumb {
+  background: #a3be8c;  /* Medium sage */
+  border-radius: 4px;
+}
+
+.light ::-webkit-scrollbar-thumb:hover {
+  background: #8faa73;  /* Darker sage */
 }
 
 /* ===========================================
@@ -114,4 +428,47 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Image Crop Modal Slider */
+input[type="range"].slider {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 8px;
+  background: #3f3f46;
+  outline: none;
+  border-radius: 4px;
+}
+
+input[type="range"].slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: #10b981;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+input[type="range"].slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: #10b981;
+  cursor: pointer;
+  border-radius: 50%;
+  border: none;
+}
+
+input[type="range"].slider:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+input[type="range"].slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+input[type="range"].slider:disabled::-moz-range-thumb {
+  cursor: not-allowed;
 }

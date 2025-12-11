@@ -5,6 +5,7 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import CustomerLayout from '@/components/customer/CustomerLayout';
 import QuickReviewModal from '@/components/customer/QuickReviewModal';
 import BookAgainModal from '@/components/customer/BookAgainModal';
+import PaymentModal from '@/components/customer/PaymentModal';
 import { ArrowLeft, Download, Mail, Phone, MapPin, Calendar, CreditCard, Loader2, AlertCircle, CheckCircle, DollarSign, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -50,11 +51,11 @@ interface Invoice {
     paymentDate: string;
     paymentMethod: string;
   }>;
-  job: {
+  jobs: Array<{
     id: string;
     serviceType: string;
     status: string;
-  } | null;
+  }>;
 }
 
 export default function CustomerInvoiceDetailPage() {
@@ -66,7 +67,7 @@ export default function CustomerInvoiceDetailPage() {
 
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [loading, setLoading] = useState(true);
-  const [paying, setPaying] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showBookAgainModal, setShowBookAgainModal] = useState(false);
 
@@ -131,6 +132,39 @@ export default function CustomerInvoiceDetailPage() {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    try {
+      toast.loading('Generating PDF...');
+
+      const res = await fetch(`/api/customer/invoices/${invoiceId}/download`);
+
+      if (!res.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      // Get the PDF blob
+      const blob = await res.blob();
+
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${invoice?.invoiceNumber || invoiceId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.dismiss();
+      toast.success('PDF downloaded successfully!');
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Failed to download PDF');
+    }
+  };
+
   if (loading) {
     return (
       <CustomerLayout>
@@ -158,6 +192,7 @@ export default function CustomerInvoiceDetailPage() {
 
   const balance = invoice.total - invoice.amountPaid;
   const isPaid = invoice.status === 'paid';
+  const job = invoice.jobs && invoice.jobs.length > 0 ? invoice.jobs[0] : null;
 
   return (
     <CustomerLayout>
@@ -355,15 +390,10 @@ export default function CustomerInvoiceDetailPage() {
       <div className="flex gap-3">
         {!isPaid && balance > 0 && (
           <Button
-            onClick={handlePayNow}
-            disabled={paying}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50"
+            onClick={() => setShowPaymentModal(true)}
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-500"
           >
-            {paying ? (
-              <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</>
-            ) : (
-              <><CreditCard className="h-4 w-4" /> Pay {formatCurrency(balance)} Now</>
-            )}
+            <CreditCard className="h-4 w-4" /> Pay {formatCurrency(balance)} Now
           </Button>
         )}
         {isPaid && (
@@ -383,8 +413,8 @@ export default function CustomerInvoiceDetailPage() {
         )}
         <Button
           variant="outline"
-          onClick={() => toast.info('Download feature coming soon!')}
-          className="flex items-center gap-2"
+          onClick={handleDownloadPDF}
+          className="flex items-center gap-2 bg-zinc-900 text-white hover:bg-zinc-800 border-zinc-900"
         >
           <Download className="h-4 w-4" />
           Download PDF
@@ -421,45 +451,27 @@ export default function CustomerInvoiceDetailPage() {
           bookingSource="rebook_invoice"
         />
       )}
+
+      {/* Payment Modal */}
+      {showPaymentModal && invoice && (
+        <PaymentModal
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+          onSuccess={async () => {
+            setShowPaymentModal(false);
+            await fetchInvoiceDetails();
+
+            // Show review modal if this invoice is linked to a job
+            if (invoice.job) {
+              setTimeout(() => setShowReviewModal(true), 500);
+            }
+          }}
+          invoiceId={invoice.id}
+          amount={balance}
+          invoiceNumber={invoice.invoiceNumber}
+          providerName={invoice.provider.businessName}
+        />
+      )}
     </CustomerLayout>
   );
-
-  async function handlePayNow() {
-    if (!invoice || paying) return;
-
-    try {
-      setPaying(true);
-
-      const response = await fetch(`/api/customer/invoices/${invoice.id}/pay`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: balance,
-          paymentMethod: 'online',
-        }),
-      });
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to process payment');
-      }
-
-      toast.success('Payment successful! 🎉', {
-        description: `Paid ${formatCurrency(balance)}`,
-      });
-
-      // Refresh invoice to show updated status
-      await fetchInvoiceDetails();
-
-      // Show review modal if this invoice is linked to a job
-      if (invoice.job) {
-        setShowReviewModal(true);
-      }
-    } catch (error: any) {
-      console.error('Error processing payment:', error);
-      toast.error(error.message || 'Failed to process payment');
-    } finally {
-      setPaying(false);
-    }
-  }
 }

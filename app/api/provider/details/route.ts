@@ -22,6 +22,11 @@ export async function GET(request: NextRequest) {
         serviceAreas: true,
         email: true,
         phone: true,
+        onboardingCompleted: true,
+        avatar: true,
+        bio: true,
+        certifications: true,
+        yearsInBusiness: true,
       },
     });
 

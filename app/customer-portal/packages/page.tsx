@@ -151,7 +151,7 @@ export default function PackagesPage() {
                 <Accordion type="single" collapsible className="mb-4">
                   <AccordionItem value="services" className="border-none">
                     <AccordionTrigger className="text-sm font-semibold text-purple-600 hover:text-purple-700 py-2">
-                      What's Included ({bundle.serviceTypes.length} services)
+                      What&apos;s Included ({bundle.serviceTypes.length} services)
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-2 pt-2">

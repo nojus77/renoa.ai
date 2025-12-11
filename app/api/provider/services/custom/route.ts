@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Add new service if it doesn't already exist
-    const customServices = provider.customServices as any[];
+    const customServices = (provider.customServices as any[]) || [];
     const serviceExists = customServices.some(
       (s: any) => s.name?.toLowerCase() === serviceName.toLowerCase()
     );
@@ -54,10 +54,18 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ success: true, service: newService });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error adding custom service:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      meta: error.meta,
+    });
     return NextResponse.json(
-      { error: 'Failed to add custom service' },
+      {
+        error: 'Failed to add custom service',
+        details: error.message || 'Unknown error',
+      },
       { status: 500 }
     );
   }

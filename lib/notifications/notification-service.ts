@@ -34,7 +34,8 @@ export type NotificationType =
   | 'provider_on_way'
   | 'job_complete'
   | 'invoice_sent'
-  | 'payment_received';
+  | 'payment_received'
+  | 'payment_failed';
 
 // Notification templates
 export const NOTIFICATION_TEMPLATES: Record<NotificationType, NotificationTemplate> = {
@@ -147,6 +148,23 @@ export const NOTIFICATION_TEMPLATES: Record<NotificationType, NotificationTempla
         <p><a href="{ratingLink}" style="background-color: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Rate Your Experience</a></p>
         <p>Your feedback helps us improve and helps other customers make informed decisions.</p>
         <p>We look forward to serving you again!</p>
+      `
+    }
+  },
+
+  payment_failed: {
+    sms: "Payment failed for invoice {invoiceLink}. Please update payment method and try again.",
+    email: {
+      subject: "Payment Failed - Action Required",
+      body: `
+        <h2>Payment Failed</h2>
+        <p>Hi {customerName},</p>
+        <p>Unfortunately, we were unable to process your payment for invoice.</p>
+        <p><strong>Error:</strong> {amount}</p>
+        <p>Please update your payment method and try again:</p>
+        <p><a href="{invoiceLink}" style="background-color: #ef4444; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">Retry Payment</a></p>
+        <p>If you continue to experience issues, please contact {providerName} directly.</p>
+        <p>Thank you for your attention to this matter.</p>
       `
     }
   }

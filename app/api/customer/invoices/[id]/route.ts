@@ -6,11 +6,13 @@ const prisma = new PrismaClient();
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id: invoiceId } = await params;
+
     // Get customer session
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('customer-session');
 
     if (!sessionCookie?.value) {
@@ -19,7 +21,6 @@ export async function GET(
 
     const session = JSON.parse(sessionCookie.value);
     const customerId = session.customerId;
-    const invoiceId = params.id;
 
     // Get invoice details
     const invoice = await prisma.invoice.findFirst({
@@ -51,7 +52,7 @@ export async function GET(
         payments: {
           orderBy: { paymentDate: 'desc' },
         },
-        job: {
+        jobs: {
           select: {
             id: true,
             serviceType: true,

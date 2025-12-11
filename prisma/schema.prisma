@@ -4,8 +4,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
@@ -26,56 +27,51 @@ model User {
 }
 
 model Lead {
-  id               String          @id @default(uuid())
-  firstName        String          @map("first_name")
-  lastName         String          @map("last_name")
-  email            String
-  phone            String
-  address          String
-  city             String
-  state            String
-  zip              String // ✅ Just this one, no zipCode!
-  propertyType     PropertyType    @map("property_type")
-  propertyValue    Decimal?        @map("property_value")
-  contractValue    Decimal?        @map("contract_value")
-  squareFootage    Int?            @map("square_footage")
-  moveInDate       DateTime?       @map("move_in_date")
-  serviceInterest      ServiceCategory @map("service_interest")
-  leadSource           String          @map("lead_source")
-  recommendationSource String?         @map("recommendation_source") // Track if lead came from service recommendation
-  leadScore            Int             @default(0) @map("lead_score")
-  tier                 Int
-  campaign             String?
-  contactCount         Int             @default(0) @map("contact_count")
-  urgencyScore     Int?
-  propertyScore    Int?
-  financialScore   Int?
-  demographicScore Int?
-  marketScore      Int?
-  urgencyReasons   String?         @map("urgency_reasons")
-  status           LeadStatus      @default(new)
-  notes            String?
-  aiTool1Metadata  Json?           @map("ai_tool_1_metadata")
-
-  // Scheduling fields
-  customerPreferredDate DateTime? @map("customer_preferred_date")
-  providerProposedDate  DateTime? @map("provider_proposed_date")
-  schedulingStatus      String?   @map("scheduling_status")
-  schedulingNotes       String?   @map("scheduling_notes")
-
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
-  assignedProviderId String?  @map("assigned_provider_id")
-
-  // Relations
-  campaignLeads     CampaignLead[]     @relation("CampaignLeadRelation")
-  inboundMessages   InboundMessage[]   @relation("LeadInboundMessages")
-  messages          Message[]          @relation("LeadMessages")
-  emailLogs         EmailLog[]         @relation("LeadEmailLogs")
-  engagementMetrics EngagementMetric[] @relation("LeadEngagementMetrics")
-  assignedProvider  Provider?          @relation("AssignedProviderLeads", fields: [assignedProviderId], references: [id])
-  matches           Match[]            @relation("LeadMatches")
-  providerNotes     LeadNote[]         @relation("LeadNotes")
+  id                    String             @id @default(uuid())
+  firstName             String             @map("first_name")
+  lastName              String             @map("last_name")
+  email                 String
+  phone                 String
+  address               String
+  city                  String
+  state                 String
+  zip                   String
+  propertyType          PropertyType       @map("property_type")
+  propertyValue         Decimal?           @map("property_value")
+  contractValue         Decimal?           @map("contract_value")
+  squareFootage         Int?               @map("square_footage")
+  moveInDate            DateTime?          @map("move_in_date")
+  serviceInterest       ServiceCategory    @map("service_interest")
+  leadSource            String             @map("lead_source")
+  leadScore             Int                @default(0) @map("lead_score")
+  tier                  Int
+  campaign              String?
+  contactCount          Int                @default(0) @map("contact_count")
+  urgencyScore          Int?
+  propertyScore         Int?
+  financialScore        Int?
+  demographicScore      Int?
+  marketScore           Int?
+  urgencyReasons        String?            @map("urgency_reasons")
+  status                LeadStatus         @default(new)
+  notes                 String?
+  aiTool1Metadata       Json?              @map("ai_tool_1_metadata")
+  customerPreferredDate DateTime?          @map("customer_preferred_date")
+  providerProposedDate  DateTime?          @map("provider_proposed_date")
+  schedulingStatus      String?            @map("scheduling_status")
+  schedulingNotes       String?            @map("scheduling_notes")
+  createdAt             DateTime           @default(now()) @map("created_at")
+  updatedAt             DateTime           @updatedAt @map("updated_at")
+  assignedProviderId    String?            @map("assigned_provider_id")
+  recommendation_source String?
+  campaignLeads         CampaignLead[]     @relation("CampaignLeadRelation")
+  inboundMessages       InboundMessage[]   @relation("LeadInboundMessages")
+  messages              Message[]          @relation("LeadMessages")
+  emailLogs             EmailLog[]         @relation("LeadEmailLogs")
+  engagementMetrics     EngagementMetric[] @relation("LeadEngagementMetrics")
+  providerNotes         LeadNote[]         @relation("LeadNotes")
+  assignedProvider      Provider?          @relation("AssignedProviderLeads", fields: [assignedProviderId], references: [id])
+  matches               Match[]            @relation("LeadMatches")
 
   @@index([email])
   @@index([zip])
@@ -93,7 +89,7 @@ model LeadNote {
   id         String   @id @default(uuid())
   leadId     String   @map("lead_id")
   providerId String   @map("provider_id")
-  note       String   @db.Text
+  note       String
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
   lead       Lead     @relation("LeadNotes", fields: [leadId], references: [id], onDelete: Cascade)
@@ -372,142 +368,249 @@ model CampaignLead {
 }
 
 model Provider {
-  id               String   @id @default(uuid())
-  businessName     String
-  ownerName        String
-  email            String   @unique
-  phone            String
-  serviceTypes     String[] @default([]) // ✅ Default empty array
-  serviceAreas     String[] @default([]) // ✅ Default empty array
-  customServices   Json[]   @default([]) // Custom service types added by provider
-  yearsInBusiness  Int      @default(0) // ✅ Default 0
-  status           String   @default("active") // ✅ Default "active"
-  leadCapacity     Int      @default(10) // ✅ Default 10
-  currentLeadCount Int      @default(0)
-  rating           Float    @default(4.5) // ✅ Better default
-  totalLeadsSent   Int      @default(0)
-  leadsAccepted    Int      @default(0)
-  leadsConverted   Int      @default(0)
-  totalRevenue     Float    @default(0)
-  commissionRate   Float    @default(0.15)
-  averageJobValue  Float    @default(5000) // ✅ Better default
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  lastActivityAt   DateTime @default(now())
-
-  // Availability fields
-  workingHours      Json?
-  timeZone          String  @default("America/Chicago")
-  bufferTime        Int     @default(30)
-  advanceBooking    Int     @default(14)
-  availabilityNotes String?
-
-  leads         Lead[]                    @relation("AssignedProviderLeads")
-  leadNotes     LeadNote[]                @relation("ProviderNotes")
-  blockedTimes  BlockedTime[]             @relation("ProviderBlockedTimes")
-  invoices      Invoice[]                 @relation("ProviderInvoices")
-  jobs          Job[]                     @relation("ProviderJobs")
-  customers     Customer[]                @relation("ProviderCustomers")
-  messages      ProviderCustomerMessage[] @relation("ProviderMessages")
-  reviews       Review[]                  @relation("ProviderReviews")
-  promotions    Promotion[]               @relation("ProviderPromotions")
-  subscriptions CustomerSubscription[]    @relation("ProviderSubscriptions")
+  id                         String                       @id @default(uuid())
+  businessName               String
+  ownerName                  String
+  email                      String                       @unique
+  phone                      String
+  serviceTypes               String[]                     @default([])
+  serviceAreas               String[]                     @default([])
+  yearsInBusiness            Int                          @default(0)
+  status                     String                       @default("active")
+  leadCapacity               Int                          @default(10)
+  currentLeadCount           Int                          @default(0)
+  rating                     Float                        @default(4.5)
+  totalLeadsSent             Int                          @default(0)
+  leadsAccepted              Int                          @default(0)
+  leadsConverted             Int                          @default(0)
+  totalRevenue               Float                        @default(0)
+  commissionRate             Float                        @default(0.15)
+  averageJobValue            Float                        @default(5000)
+  createdAt                  DateTime                     @default(now())
+  updatedAt                  DateTime                     @updatedAt
+  lastActivityAt             DateTime                     @default(now())
+  workingHours               Json?
+  timeZone                   String                       @default("America/Chicago")
+  bufferTime                 Int                          @default(30)
+  advanceBooking             Int                          @default(14)
+  availabilityNotes          String?
+  customServices             Json[]                       @default([])
+  avatar                     String?
+  profilePhotoUrl            String?                      @map("profile_photo_url")
+  profilePhotoBlobPath       String?                      @map("profile_photo_blob_path")
+  bio                        String?
+  certifications             String[]                     @default([])
+  onboardingCompleted        Boolean                      @default(false)
+  businessAddress            String?
+  city                       String?
+  state                      String?
+  zipCode                    String?                      @map("zip_code")
+  taxId                      String?                      @map("tax_id")
+  businessEntity             String?                      @map("business_entity")
+  serviceRadius              Int                          @default(25)
+  website                    String?
+  businessHours              String?
+  servicePricing             Json?
+  minimumJobValue            Float?
+  depositRequired            Boolean                      @default(false)
+  depositPercentage          Int                          @default(25)
+  paymentTerms               String                       @default("net_30")
+  acceptedPaymentMethods     String[]                     @default(["cash", "check", "credit_card"])
+  autoInvoiceOnCompletion    Boolean                      @default(true)
+  ownerId                    String?                      @map("owner_id")
+  activeSeats                Int                          @default(1) @map("active_seats")
+  stripeCustomerId           String?                      @map("stripe_customer_id")
+  stripeSubscriptionId       String?                      @map("stripe_subscription_id")
+  subscriptionStatus         String?                      @map("subscription_status")
+  planType                   String?                      @map("plan_type")
+  pricePerSeat               Int?                         @map("price_per_seat")
+  maxSeats                   Int                          @default(50) @map("max_seats")
+  currentPeriodEnd           DateTime?                    @map("current_period_end")
+  blockedTimes               BlockedTime[]                @relation("ProviderBlockedTimes")
+  customer_subscriptions     customer_subscriptions[]
+  customers                  Customer[]                   @relation("ProviderCustomers")
+  invoices                   Invoice[]                    @relation("ProviderInvoices")
+  jobs                       Job[]                        @relation("ProviderJobs")
+  leadNotes                  LeadNote[]                   @relation("ProviderNotes")
+  leads                      Lead[]                       @relation("AssignedProviderLeads")
+  promotions                 promotions[]
+  provider_customer_messages provider_customer_messages[]
+  reviews                    reviews[]
+  users                      ProviderUser[]               @relation("ProviderUsers")
+  crews                      Crew[]                       @relation("ProviderCrews")
+  skills                     Skill[]                      @relation("ProviderSkills")
+  notifications              Notification[]               @relation("ProviderNotifications")
 }
 
-model Customer {
+model Notification {
+  id          String   @id @default(cuid())
+  providerId  String   @map("provider_id")
+  provider    Provider @relation("ProviderNotifications", fields: [providerId], references: [id], onDelete: Cascade)
+  type        String   // 'new_team_member', 'job_completed', 'payment_received', etc.
+  title       String
+  message     String
+  data        Json?
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([providerId])
+  @@index([read])
+  @@map("notifications")
+}
+
+model ProviderUser {
+  id                String              @id @default(cuid())
+  providerId        String              @map("provider_id")
+  email             String              @unique
+  passwordHash      String              @map("password_hash")
+  firstName         String              @map("first_name")
+  lastName          String              @map("last_name")
+  phone             String?
+  role              String              // "owner", "office", "field"
+  status            String              @default("active") // "active", "inactive", "on_leave"
+  skills            String[]            @default([]) // DEPRECATED: Use workerSkills relation instead
+  color             String?             // Hex color for calendar display
+  hourlyRate        Float?              @map("hourly_rate")
+  workingHours      Json?               @map("working_hours") // {"monday": {"start": "08:00", "end": "17:00"}}
+  profilePhotoUrl   String?             @map("profile_photo_url")
+  // Smart Scheduler fields
+  homeAddress       String?             @map("home_address") // For travel distance calculations
+  homeLatitude      Float?              @map("home_latitude")
+  homeLongitude     Float?              @map("home_longitude")
+  createdAt         DateTime            @default(now()) @map("created_at")
+  updatedAt         DateTime            @updatedAt @map("updated_at")
+  provider          Provider            @relation("ProviderUsers", fields: [providerId], references: [id], onDelete: Cascade)
+  workerSkills      ProviderUserSkill[] @relation("UserSkills")
+
+  @@index([providerId])
+  @@index([email])
+  @@index([role])
+  @@map("provider_users")
+}
+
+model Crew {
   id         String   @id @default(cuid())
   providerId String   @map("provider_id")
   name       String
-  email      String?
-  phone      String
-  address    String
-  source     String   @default("own") // "renoa" or "own"
-  tags       String[] @default([]) // ["Premium", "HOA", "Recurring", etc]
-  notes      String?  @db.Text
+  userIds    String[] @default([]) @map("user_ids")
+  leaderId   String?  @map("leader_id")
+  color      String   @default("#10b981")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
+  provider   Provider @relation("ProviderCrews", fields: [providerId], references: [id], onDelete: Cascade)
+  jobs       Job[]    @relation("AssignedCrewJobs")
 
-  // Relations
-  provider          Provider                @relation("ProviderCustomers", fields: [providerId], references: [id], onDelete: Cascade)
-  jobs              Job[]                   @relation("CustomerJobs")
-  messages          ProviderCustomerMessage[] @relation("CustomerMessages")
-  invoices          Invoice[]               @relation("CustomerInvoices")
-  reviews           Review[]                @relation("CustomerReviews")
-  subscriptions     CustomerSubscription[]  @relation("CustomerSubscriptions")
-  referrals         Referral[]              @relation("ReferrerReferrals")
-  referredBy        Referral[]              @relation("ReferredCustomer")
-  credits           CustomerCredit[]        @relation("CustomerCredits")
-  promotions        CustomerPromotion[]     @relation("CustomerPromotions")
-  paymentMethods    CustomerPaymentMethod[] @relation("CustomerPaymentMethods")
+  @@index([providerId])
+  @@map("crews")
+}
+
+model Customer {
+  id                                                  String                       @id @default(cuid())
+  providerId                                          String                       @map("provider_id")
+  name                                                String
+  email                                               String?
+  phone                                               String
+  address                                             String
+  source                                              String                       @default("own")
+  tags                                                String[]                     @default([])
+  notes                                               String?
+  // Smart Scheduler fields
+  latitude                                            Float? // For distance calculations
+  longitude                                           Float? // For distance calculations
+  zone                                                String? // ZIP code or service area
+  createdAt                                           DateTime                     @default(now()) @map("created_at")
+  updatedAt                                           DateTime                     @updatedAt @map("updated_at")
+  customer_credits                                    customer_credits[]
+  customer_notifications                              customer_notifications[]
+  customer_payment_methods                            customer_payment_methods[]
+  customer_promotions                                 customer_promotions[]
+  customer_subscriptions                              customer_subscriptions[]
+  provider                                            Provider                     @relation("ProviderCustomers", fields: [providerId], references: [id], onDelete: Cascade)
+  invoices                                            Invoice[]                    @relation("CustomerInvoices")
+  jobs                                                Job[]                        @relation("CustomerJobs")
+  loyalty_points                                      loyalty_points?
+  provider_customer_messages                          provider_customer_messages[]
+  referrals_referrals_referred_customer_idTocustomers referrals[]            @relation("referrals_referred_customer_idTocustomers")
+  referrals_referrals_referrer_idTocustomers          referrals[]            @relation("referrals_referrer_idTocustomers")
+  reviews                                             reviews[]
+  review_helpfulness                                  review_helpfulness[]
 
   @@index([providerId])
   @@index([phone])
+  @@index([zone])
   @@map("customers")
 }
 
-model ProviderCustomerMessage {
-  id         String   @id @default(cuid())
-  providerId String   @map("provider_id")
-  customerId String   @map("customer_id")
-  content    String   @db.Text
-  direction  String // 'sent' (from provider) or 'received' (from customer)
-  type       String   @default("sms") // 'sms' or 'email'
-  status     String   @default("sent") // 'sent', 'delivered', 'read', 'failed'
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  provider Provider @relation("ProviderMessages", fields: [providerId], references: [id], onDelete: Cascade)
-  customer Customer @relation("CustomerMessages", fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([providerId, customerId])
-  @@index([customerId])
-  @@index([createdAt])
-  @@map("provider_customer_messages")
-}
-
 model Job {
-  id             String   @id @default(cuid())
-  providerId     String   @map("provider_id")
-  customerId     String   @map("customer_id")
-  serviceType    String   @map("service_type") // "Lawn Mowing", "Landscaping", etc
-  address        String
-  startTime      DateTime @map("start_time")
-  endTime        DateTime @map("end_time")
-  status         String   @default("scheduled") // "scheduled", "in_progress", "completed", "cancelled"
-  source         String   @default("own") // "renoa" or "own"
-  bookingSource  String?  @map("booking_source") // "new_lead", "rebook_dashboard", "rebook_review", "rebook_invoice", "rebook_job_detail"
-  estimatedValue Float?   @map("estimated_value")
-  actualValue    Float?   @map("actual_value")
-  internalNotes  String?  @map("internal_notes") @db.Text
-  customerNotes  String?  @map("customer_notes") @db.Text
-  upsells        Json?    // array of upsells: [{ service: 'Fertilization', price: 45, accepted: true }]
-  bundleId       String?  @map("bundle_id") // reference to service bundle if booked as part of package
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  provider Provider   @relation("ProviderJobs", fields: [providerId], references: [id], onDelete: Cascade)
-  customer Customer   @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
-  photos   JobPhoto[] @relation("JobPhotos")
-  review   Review?    @relation("JobReview")
-  invoice  Invoice?   @relation("JobInvoice")
+  id                    String                 @id @default(cuid())
+  providerId            String                 @map("provider_id")
+  customerId            String                 @map("customer_id")
+  serviceType           String                 @map("service_type")
+  address               String
+  startTime             DateTime               @map("start_time")
+  endTime               DateTime               @map("end_time")
+  status                String                 @default("scheduled")
+  source                String                 @default("own")
+  estimatedValue        Float?                 @map("estimated_value")
+  actualValue           Float?                 @map("actual_value")
+  internalNotes         String?                @map("internal_notes")
+  customerNotes         String?                @map("customer_notes")
+  createdAt             DateTime               @default(now()) @map("created_at")
+  updatedAt             DateTime               @updatedAt @map("updated_at")
+  booking_source        String?
+  bundle_id             String?
+  upsells               Json?
+  last_reminder_date    DateTime?
+  next_due_date         DateTime?
+  recommended_frequency Int?
+  reminder_sent         Boolean                @default(false)
+  isRecurring           Boolean                @default(false) @map("is_recurring")
+  recurringFrequency    String?                @map("recurring_frequency")
+  recurringEndDate      DateTime?              @map("recurring_end_date")
+  parentRecurringJobId  String?                @map("parent_recurring_job_id")
+  assignedUserIds       String[]               @default([]) @map("assigned_user_ids")
+  assignedCrewId        String?                @map("assigned_crew_id")
+  dispatchedAt          DateTime?              @map("dispatched_at")
+  onTheWayAt            DateTime?              @map("on_the_way_at")
+  arrivedAt             DateTime?              @map("arrived_at")
+  completedByUserId     String?                @map("completed_by_user_id")
+  completedAt           DateTime?              @map("completed_at")
+  // Smart Scheduler fields
+  crewSizeRequired      Int?                   @map("crew_size_required") // Number of workers needed
+  jobPriority           Int                    @default(5) @map("job_priority") // 1-10, higher = more important
+  jobCategory           String?                @map("job_category") // "emergency", "urgent", "recurring", "maintenance", "first_visit"
+  serviceWindowMins     Int?                   @map("service_window_mins") // Acceptable delay in minutes
+  requiredEquipment     String[]               @default([]) @map("required_equipment") // Equipment IDs needed
+  latitude              Float? // For distance calculations
+  longitude             Float? // For distance calculations
+  zone                  String? // ZIP code or service area
+  estimatedDuration     Float?                 @map("estimated_duration") // hours
+  invoices              Invoice?
+  photos                JobPhoto[]             @relation("JobPhotos")
+  customer              Customer               @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
+  provider              Provider               @relation("ProviderJobs", fields: [providerId], references: [id], onDelete: Cascade)
+  assignedCrew          Crew?                  @relation("AssignedCrewJobs", fields: [assignedCrewId], references: [id])
+  loyalty_transactions  loyalty_transactions[]
+  reviews               reviews?
 
   @@index([providerId])
+  @@index([assignedCrewId])
   @@index([customerId])
   @@index([startTime])
+  @@index([assignedUserIds])
+  @@index([zone])
+  @@index([jobCategory])
   @@map("jobs")
 }
 
 model JobPhoto {
-  id        String   @id @default(cuid())
-  jobId     String   @map("job_id")
-  type      String // "before", "during", "after"
-  url       String
-  createdAt DateTime @default(now()) @map("created_at")
-
-  // Relations
-  job Job @relation("JobPhotos", fields: [jobId], references: [id], onDelete: Cascade)
+  id            String   @id @default(cuid())
+  jobId         String   @map("job_id")
+  type          String
+  url           String
+  blobPathname  String   @map("blob_pathname")
+  createdAt     DateTime @default(now()) @map("created_at")
+  job           Job      @relation("JobPhotos", fields: [jobId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
   @@map("job_photos")
@@ -521,17 +624,16 @@ model BlockedTime {
   startTime            String?   @map("start_time")
   endTime              String?   @map("end_time")
   reason               String
-  notes                String?   @db.Text
+  notes                String?
   isRecurring          Boolean   @default(false) @map("is_recurring")
-  recurringType        String?   @map("recurring_type") // 'weekly' or 'monthly'
-  recurringDaysOfWeek  Int[]     @default([]) @map("recurring_days_of_week") // [0-6] Sunday-Saturday
-  recurringEndsType    String?   @map("recurring_ends_type") // 'never', 'after', 'on'
+  recurringType        String?   @map("recurring_type")
+  recurringDaysOfWeek  Int[]     @default([]) @map("recurring_days_of_week")
+  recurringEndsType    String?   @map("recurring_ends_type")
   recurringOccurrences Int?      @map("recurring_occurrences")
   recurringEndsOnDate  DateTime? @map("recurring_ends_on_date")
   createdAt            DateTime  @default(now()) @map("created_at")
   updatedAt            DateTime  @updatedAt @map("updated_at")
-
-  provider Provider @relation("ProviderBlockedTimes", fields: [providerId], references: [id], onDelete: Cascade)
+  provider             Provider  @relation("ProviderBlockedTimes", fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([providerId])
   @@index([fromDate])
@@ -552,6 +654,412 @@ model Admin {
 
   @@index([email])
   @@map("admins")
+}
+
+model Invoice {
+  id                  String            @id @default(uuid())
+  invoiceNumber       String            @unique @map("invoice_number")
+  providerId          String            @map("provider_id")
+  customerId          String            @map("customer_id")
+  jobId               String?           @unique @map("job_id")
+  status              InvoiceStatus     @default(draft)
+  invoiceDate         DateTime          @map("invoice_date")
+  dueDate             DateTime          @map("due_date")
+  paidDate            DateTime?         @map("paid_date")
+  subtotal            Decimal           @db.Decimal(10, 2)
+  taxRate             Decimal?          @default(0) @map("tax_rate") @db.Decimal(5, 2)
+  taxAmount           Decimal           @default(0) @map("tax_amount") @db.Decimal(10, 2)
+  discountType        DiscountType?     @map("discount_type")
+  discountValue       Decimal?          @default(0) @map("discount_value") @db.Decimal(10, 2)
+  discountAmount      Decimal           @default(0) @map("discount_amount") @db.Decimal(10, 2)
+  total               Decimal           @db.Decimal(10, 2)
+  amountPaid          Decimal           @default(0) @map("amount_paid") @db.Decimal(10, 2)
+  notes               String?
+  terms               String?
+  paymentInstructions String?           @map("payment_instructions")
+  sentAt                DateTime?         @map("sent_at")
+  sentTo                String?           @map("sent_to")
+  viewedAt              DateTime?         @map("viewed_at")
+  stripePaymentIntentId String?           @unique @map("stripe_payment_intent_id")
+  lastPaymentError      String?           @map("last_payment_error")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+  lineItems             InvoiceLineItem[] @relation("InvoiceLineItems")
+  customer            Customer          @relation("CustomerInvoices", fields: [customerId], references: [id], onDelete: Cascade)
+  jobs                Job?              @relation(fields: [jobId], references: [id])
+  provider            Provider          @relation("ProviderInvoices", fields: [providerId], references: [id], onDelete: Cascade)
+  payments            Payment[]         @relation("InvoicePayments")
+
+  @@index([providerId])
+  @@index([customerId])
+  @@index([status])
+  @@index([invoiceDate])
+  @@index([dueDate])
+  @@index([jobId])
+  @@map("invoices")
+}
+
+model InvoiceLineItem {
+  id          String   @id @default(uuid())
+  invoiceId   String   @map("invoice_id")
+  description String
+  quantity    Decimal  @db.Decimal(10, 2)
+  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
+  total       Decimal  @db.Decimal(10, 2)
+  order       Int      @default(0)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  invoice     Invoice  @relation("InvoiceLineItems", fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_line_items")
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  invoiceId     String        @map("invoice_id")
+  amount        Decimal       @db.Decimal(10, 2)
+  paymentDate   DateTime      @map("payment_date")
+  paymentMethod PaymentMethod @map("payment_method")
+  transactionId String?       @map("transaction_id")
+  notes         String?
+  recordedBy    String?       @map("recorded_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  invoice       Invoice       @relation("InvoicePayments", fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@index([paymentDate])
+  @@map("payments")
+}
+
+model customer_credits {
+  id          String     @id
+  customer_id String
+  amount      Decimal    @db.Decimal(10, 2)
+  source      String
+  referral_id String?
+  used_amount Decimal    @default(0) @db.Decimal(10, 2)
+  expires_at  DateTime?
+  created_at  DateTime   @default(now())
+  updated_at  DateTime
+  customers   Customer   @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  referrals   referrals? @relation(fields: [referral_id], references: [id])
+
+  @@index([customer_id])
+  @@index([expires_at])
+  @@index([referral_id])
+  @@index([source])
+}
+
+model customer_notifications {
+  id          String   @id
+  customer_id String
+  type        String
+  title       String
+  message     String
+  action_url  String?
+  read        Boolean  @default(false)
+  created_at  DateTime @default(now())
+  customers   Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([customer_id])
+  @@index([read])
+}
+
+model customer_payment_methods {
+  id                       String   @id
+  customer_id              String
+  stripe_payment_method_id String   @unique
+  card_brand               String
+  card_last4               String
+  expiry_month             Int
+  expiry_year              Int
+  is_default               Boolean  @default(false)
+  created_at               DateTime @default(now())
+  updated_at               DateTime
+  customers                Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@index([customer_id])
+  @@index([is_default])
+}
+
+model customer_promotions {
+  id               String          @id
+  customer_id      String
+  promo_code       String          @unique
+  discount_percent Decimal?        @db.Decimal(5, 2)
+  discount_amount  Decimal?        @db.Decimal(10, 2)
+  expires_at       DateTime
+  status           PromotionStatus @default(active)
+  trigger_type     String
+  message          String?
+  used_at          DateTime?
+  created_at       DateTime        @default(now())
+  updated_at       DateTime
+  customers        Customer        @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@index([customer_id])
+  @@index([expires_at])
+  @@index([promo_code])
+  @@index([status])
+  @@index([trigger_type])
+}
+
+model customer_subscriptions {
+  id                     String                @id
+  customer_id            String
+  service_type           String
+  provider_id            String
+  frequency              SubscriptionFrequency
+  price                  Decimal               @db.Decimal(10, 2)
+  discount_percent       Decimal               @default(10) @db.Decimal(5, 2)
+  status                 SubscriptionStatus    @default(active)
+  next_scheduled_date    DateTime
+  start_date             DateTime
+  paused_until           DateTime?
+  stripe_subscription_id String?
+  stripe_customer_id     String?
+  created_at             DateTime              @default(now())
+  updated_at             DateTime
+  customers              Customer              @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  Provider               Provider              @relation(fields: [provider_id], references: [id], onDelete: Cascade)
+
+  @@index([customer_id])
+  @@index([next_scheduled_date])
+  @@index([provider_id])
+  @@index([status])
+}
+
+model loyalty_points {
+  id                   String                 @id
+  customer_id          String                 @unique
+  points               Int                    @default(0)
+  lifetime_points      Int                    @default(0)
+  tier                 String                 @default("bronze")
+  tier_updated_at      DateTime               @default(now())
+  created_at           DateTime               @default(now())
+  updated_at           DateTime
+  customers            Customer               @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  loyalty_transactions loyalty_transactions[]
+
+  @@index([customer_id])
+  @@index([tier])
+}
+
+model loyalty_rewards {
+  id           String   @id
+  name         String
+  description  String
+  points_cost  Int
+  reward_value Decimal  @db.Decimal(10, 2)
+  reward_type  String
+  active       Boolean  @default(true)
+  image_url    String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime
+
+  @@index([active])
+  @@index([points_cost])
+}
+
+model loyalty_transactions {
+  id             String         @id
+  customer_id    String
+  points         Int
+  type           String
+  source         String
+  description    String
+  job_id         String?
+  created_at     DateTime       @default(now())
+  loyalty_points loyalty_points @relation(fields: [customer_id], references: [customer_id], onDelete: Cascade)
+  jobs           Job?           @relation(fields: [job_id], references: [id])
+
+  @@index([created_at])
+  @@index([customer_id])
+  @@index([type])
+}
+
+model promotions {
+  id             String    @id
+  provider_id    String?
+  title          String
+  description    String
+  service_type   String?
+  discount_type  String
+  discount_value Float
+  target_areas   String[]  @default([])
+  min_job_value  Float?
+  max_uses       Int?
+  current_uses   Int       @default(0)
+  valid_from     DateTime
+  valid_until    DateTime
+  is_active      Boolean   @default(true)
+  terms          String?
+  created_at     DateTime  @default(now())
+  updated_at     DateTime
+  code           String?   @unique
+  is_renoa_promo Boolean   @default(false)
+  Provider       Provider? @relation(fields: [provider_id], references: [id], onDelete: Cascade)
+
+  @@index([code])
+  @@index([is_active])
+  @@index([is_renoa_promo])
+  @@index([provider_id])
+  @@index([service_type])
+  @@index([valid_from])
+  @@index([valid_until])
+}
+
+model provider_customer_messages {
+  id          String   @id
+  provider_id String
+  customer_id String
+  content     String
+  direction   String
+  type        String   @default("sms")
+  status      String   @default("sent")
+  created_at  DateTime @default(now())
+  updated_at  DateTime
+  customers   Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  Provider    Provider @relation(fields: [provider_id], references: [id], onDelete: Cascade)
+
+  @@index([created_at])
+  @@index([customer_id])
+  @@index([provider_id, customer_id])
+}
+
+model referrals {
+  id                                                  String             @id
+  referrer_id                                         String
+  referred_email                                      String
+  referred_phone                                      String?
+  referred_customer_id                                String?
+  status                                              ReferralStatus     @default(pending)
+  referral_code                                       String             @unique
+  credit_amount                                       Decimal            @default(50) @db.Decimal(10, 2)
+  created_at                                          DateTime           @default(now())
+  updated_at                                          DateTime
+  customer_credits                                    customer_credits[]
+  customers_referrals_referred_customer_idTocustomers Customer?          @relation("referrals_referred_customer_idTocustomers", fields: [referred_customer_id], references: [id])
+  customers_referrals_referrer_idTocustomers          Customer           @relation("referrals_referrer_idTocustomers", fields: [referrer_id], references: [id], onDelete: Cascade)
+
+  @@index([referral_code])
+  @@index([referred_customer_id])
+  @@index([referrer_id])
+  @@index([status])
+}
+
+model reviews {
+  id                   String                 @id
+  job_id               String                 @unique
+  provider_id          String
+  customer_id          String
+  rating               Int
+  quality_rating       Int?
+  timeliness_rating    Int?
+  communication_rating Int?
+  comment              String?
+  response             String?
+  responded_at         DateTime?
+  is_public            Boolean                @default(true)
+  helpful_count        Int                    @default(0)
+  created_at           DateTime               @default(now())
+  updated_at           DateTime
+  customers            Customer               @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  jobs                 Job                    @relation(fields: [job_id], references: [id], onDelete: Cascade)
+  Provider             Provider               @relation(fields: [provider_id], references: [id], onDelete: Cascade)
+  helpfulness          review_helpfulness[]
+
+  @@index([created_at])
+  @@index([customer_id])
+  @@index([provider_id])
+  @@index([rating])
+}
+
+model review_helpfulness {
+  id          String   @id @default(uuid())
+  review_id   String
+  customer_id String
+  helpful     Boolean
+  created_at  DateTime @default(now())
+
+  review   reviews  @relation(fields: [review_id], references: [id], onDelete: Cascade)
+  customer Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+
+  @@unique([review_id, customer_id])
+  @@index([review_id])
+}
+
+model seasonal_campaigns {
+  id               String   @id
+  season           String
+  campaign_name    String
+  service_types    Json
+  discount_percent Decimal? @db.Decimal(5, 2)
+  email_subject    String
+  email_body       String
+  start_month      Int
+  end_month        Int
+  active           Boolean  @default(true)
+  created_at       DateTime @default(now())
+  updated_at       DateTime
+
+  @@index([active])
+  @@index([season])
+}
+
+model service_bundles {
+  id            String   @id
+  name          String
+  description   String
+  service_types Json
+  regular_price Decimal  @db.Decimal(10, 2)
+  bundle_price  Decimal  @db.Decimal(10, 2)
+  savings       Decimal  @db.Decimal(10, 2)
+  season        String?
+  active        Boolean  @default(true)
+  display_order Int      @default(0)
+  created_at    DateTime @default(now())
+  updated_at    DateTime
+
+  @@index([active])
+  @@index([display_order])
+  @@index([season])
+}
+
+model service_recommendations {
+  id                  String   @id
+  base_service        String
+  recommended_service String
+  recommended_price   Decimal  @db.Decimal(10, 2)
+  conversion_rate     Decimal  @default(0) @db.Decimal(5, 2)
+  display_order       Int      @default(0)
+  description         String?
+  badge               String?
+  is_active           Boolean  @default(true)
+  created_at          DateTime @default(now())
+  updated_at          DateTime
+
+  @@index([base_service])
+  @@index([display_order])
+  @@index([is_active])
+}
+
+model service_upsells {
+  id              String   @id
+  base_service    String
+  upsell_service  String
+  upsell_price    Decimal  @db.Decimal(10, 2)
+  description     String
+  display_order   Int      @default(0)
+  conversion_rate Decimal  @default(0) @db.Decimal(5, 4)
+  created_at      DateTime @default(now())
+  updated_at      DateTime
+
+  @@index([base_service])
+  @@index([display_order])
 }
 
 enum UserRole {
@@ -694,94 +1202,6 @@ enum AdminRole {
   developer
 }
 
-model Invoice {
-  id            String        @id @default(uuid())
-  invoiceNumber String        @unique @map("invoice_number")
-  providerId    String        @map("provider_id")
-  customerId    String        @map("customer_id")
-  jobId         String?       @unique @map("job_id")
-  status        InvoiceStatus @default(draft)
-
-  // Dates
-  invoiceDate DateTime  @map("invoice_date")
-  dueDate     DateTime  @map("due_date")
-  paidDate    DateTime? @map("paid_date")
-
-  // Amounts
-  subtotal       Decimal       @db.Decimal(10, 2)
-  taxRate        Decimal?      @default(0) @map("tax_rate") @db.Decimal(5, 2)
-  taxAmount      Decimal       @default(0) @map("tax_amount") @db.Decimal(10, 2)
-  discountType   DiscountType? @map("discount_type")
-  discountValue  Decimal?      @default(0) @map("discount_value") @db.Decimal(10, 2)
-  discountAmount Decimal       @default(0) @map("discount_amount") @db.Decimal(10, 2)
-  total          Decimal       @db.Decimal(10, 2)
-  amountPaid     Decimal       @default(0) @map("amount_paid") @db.Decimal(10, 2)
-
-  // Customer-visible fields
-  notes               String? @db.Text
-  terms               String? @db.Text
-  paymentInstructions String? @map("payment_instructions") @db.Text
-
-  // Email tracking
-  sentAt   DateTime? @map("sent_at")
-  sentTo   String?   @map("sent_to")
-  viewedAt DateTime? @map("viewed_at")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  provider  Provider          @relation("ProviderInvoices", fields: [providerId], references: [id], onDelete: Cascade)
-  customer  Customer          @relation("CustomerInvoices", fields: [customerId], references: [id], onDelete: Cascade)
-  job       Job?              @relation("JobInvoice", fields: [jobId], references: [id], onDelete: SetNull)
-  lineItems InvoiceLineItem[] @relation("InvoiceLineItems")
-  payments  Payment[]         @relation("InvoicePayments")
-
-  @@index([providerId])
-  @@index([customerId])
-  @@index([jobId])
-  @@index([status])
-  @@index([invoiceDate])
-  @@index([dueDate])
-  @@map("invoices")
-}
-
-model InvoiceLineItem {
-  id          String   @id @default(uuid())
-  invoiceId   String   @map("invoice_id")
-  description String   @db.Text
-  quantity    Decimal  @db.Decimal(10, 2)
-  unitPrice   Decimal  @map("unit_price") @db.Decimal(10, 2)
-  total       Decimal  @db.Decimal(10, 2)
-  order       Int      @default(0)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
-
-  invoice Invoice @relation("InvoiceLineItems", fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  @@index([invoiceId])
-  @@map("invoice_line_items")
-}
-
-model Payment {
-  id            String        @id @default(uuid())
-  invoiceId     String        @map("invoice_id")
-  amount        Decimal       @db.Decimal(10, 2)
-  paymentDate   DateTime      @map("payment_date")
-  paymentMethod PaymentMethod @map("payment_method")
-  transactionId String?       @map("transaction_id")
-  notes         String?       @db.Text
-  recordedBy    String?       @map("recorded_by")
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
-
-  invoice Invoice @relation("InvoicePayments", fields: [invoiceId], references: [id], onDelete: Cascade)
-
-  @@index([invoiceId])
-  @@index([paymentDate])
-  @@map("payments")
-}
-
 enum InvoiceStatus {
   draft
   sent
@@ -806,93 +1226,17 @@ enum PaymentMethod {
   other
 }
 
-model Review {
-  id               String   @id @default(uuid())
-  jobId            String   @unique @map("job_id")
-  providerId       String   @map("provider_id")
-  customerId       String   @map("customer_id")
-  rating           Int // 1-5 stars
-  qualityRating    Int?     @map("quality_rating") // 1-5 stars for quality
-  timelinessRating Int?     @map("timeliness_rating") // 1-5 stars for timeliness
-  communicationRating Int?  @map("communication_rating") // 1-5 stars for communication
-  comment          String?  @db.Text
-  response         String?  @db.Text // Provider can respond to review
-  respondedAt      DateTime? @map("responded_at")
-  isPublic         Boolean  @default(true) @map("is_public")
-  createdAt        DateTime @default(now()) @map("created_at")
-  updatedAt        DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  job      Job      @relation("JobReview", fields: [jobId], references: [id], onDelete: Cascade)
-  provider Provider @relation("ProviderReviews", fields: [providerId], references: [id], onDelete: Cascade)
-  customer Customer @relation("CustomerReviews", fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([providerId])
-  @@index([customerId])
-  @@index([rating])
-  @@index([createdAt])
-  @@map("reviews")
+enum PromotionStatus {
+  active
+  used
+  expired
 }
 
-model Promotion {
-  id              String    @id @default(uuid())
-  providerId      String?   @map("provider_id") // Nullable for Renoa promotions
-  title           String
-  description     String    @db.Text
-  serviceType     String?   @map("service_type") // Can be null for all services
-  discountType    String    @map("discount_type") // "percentage" or "fixed"
-  discountValue   Float     @map("discount_value")
-  code            String?   @unique // Promo code like "FIRST20" or "SPRING2025"
-  isRenoaPromo    Boolean   @default(false) @map("is_renoa_promo") // True for Renoa promotions
-  targetAreas     String[]  @map("target_areas") @default([]) // ZIP codes or cities
-  minJobValue     Float?    @map("min_job_value")
-  maxUses         Int?      @map("max_uses")
-  currentUses     Int       @default(0) @map("current_uses")
-  validFrom       DateTime  @map("valid_from")
-  validUntil      DateTime  @map("valid_until")
-  isActive        Boolean   @default(true) @map("is_active")
-  terms           String?   @db.Text
-  createdAt       DateTime  @default(now()) @map("created_at")
-  updatedAt       DateTime  @updatedAt @map("updated_at")
-
-  // Relations
-  provider Provider? @relation("ProviderPromotions", fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@index([providerId])
-  @@index([serviceType])
-  @@index([isActive])
-  @@index([code])
-  @@index([isRenoaPromo])
-  @@index([validFrom])
-  @@index([validUntil])
-  @@map("promotions")
-}
-
-model CustomerSubscription {
-  id                String                 @id @default(uuid())
-  customerId        String                 @map("customer_id")
-  serviceType       String                 @map("service_type")
-  providerId        String                 @map("provider_id")
-  frequency         SubscriptionFrequency
-  price             Decimal                @db.Decimal(10, 2)
-  discountPercent   Decimal                @default(10) @map("discount_percent") @db.Decimal(5, 2)
-  status            SubscriptionStatus     @default(active)
-  nextScheduledDate DateTime               @map("next_scheduled_date")
-  startDate         DateTime               @map("start_date")
-  pausedUntil       DateTime?              @map("paused_until")
-  stripeSubscriptionId String?             @map("stripe_subscription_id")
-  stripeCustomerId  String?                @map("stripe_customer_id")
-  createdAt         DateTime               @default(now()) @map("created_at")
-  updatedAt         DateTime               @updatedAt @map("updated_at")
-
-  customer Customer @relation("CustomerSubscriptions", fields: [customerId], references: [id], onDelete: Cascade)
-  provider Provider @relation("ProviderSubscriptions", fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId])
-  @@index([providerId])
-  @@index([status])
-  @@index([nextScheduledDate])
-  @@map("customer_subscriptions")
+enum ReferralStatus {
+  pending
+  signed_up
+  completed_job
+  credited
 }
 
 enum SubscriptionFrequency {
@@ -907,157 +1251,206 @@ enum SubscriptionStatus {
   cancelled
 }
 
-model ServiceRecommendation {
-  id                  String   @id @default(uuid())
-  baseService         String   @map("base_service")
-  recommendedService  String   @map("recommended_service")
-  recommendedPrice    Decimal  @map("recommended_price") @db.Decimal(10, 2)
-  conversionRate      Decimal  @default(0) @map("conversion_rate") @db.Decimal(5, 2)
-  displayOrder        Int      @default(0) @map("display_order")
-  description         String?  @db.Text
-  badge               String?  // "Most popular add-on", "Seasonal favorite", etc
-  isActive            Boolean  @default(true) @map("is_active")
-  createdAt           DateTime @default(now()) @map("created_at")
-  updatedAt           DateTime @updatedAt @map("updated_at")
+// Worker Skills System
+model Skill {
+  id          String                    @id @default(cuid())
+  name        String
+  category    String?                   // "landscaping", "hardscaping", "equipment", "certification"
+  description String?
+  providerId  String                    @map("provider_id")
+  provider    Provider                  @relation("ProviderSkills", fields: [providerId], references: [id], onDelete: Cascade)
+  createdAt   DateTime                  @default(now()) @map("created_at")
+  workers     ProviderUserSkill[]       @relation("SkillWorkers")
+  services    ServiceSkillRequirement[] @relation("SkillRequirements")
+  serviceTypeConfigs ServiceTypeConfig[] @relation("ServiceTypeSkillRequirements")
 
-  @@index([baseService])
-  @@index([displayOrder])
-  @@index([isActive])
-  @@map("service_recommendations")
+  @@unique([providerId, name])
+  @@index([providerId])
+  @@index([category])
+  @@map("skills")
 }
 
-model Referral {
-  id                  String        @id @default(uuid())
-  referrerId          String        @map("referrer_id")
-  referredEmail       String        @map("referred_email")
-  referredPhone       String?       @map("referred_phone")
-  referredCustomerId  String?       @map("referred_customer_id")
-  status              ReferralStatus @default(pending)
-  referralCode        String        @unique @map("referral_code")
-  creditAmount        Decimal       @default(50) @map("credit_amount") @db.Decimal(10, 2)
-  createdAt           DateTime      @default(now()) @map("created_at")
-  updatedAt           DateTime      @updatedAt @map("updated_at")
+model ProviderUserSkill {
+  id            String       @id @default(cuid())
+  userId        String       @map("user_id")
+  skillId       String       @map("skill_id")
+  level         String       @default("basic") // "basic", "intermediate", "expert"
+  certifiedDate DateTime?    @map("certified_date")
+  expiresAt     DateTime?    @map("expires_at")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  user          ProviderUser @relation("UserSkills", fields: [userId], references: [id], onDelete: Cascade)
+  skill         Skill        @relation("SkillWorkers", fields: [skillId], references: [id], onDelete: Cascade)
 
-  referrer         Customer        @relation("ReferrerReferrals", fields: [referrerId], references: [id], onDelete: Cascade)
-  referredCustomer Customer?       @relation("ReferredCustomer", fields: [referredCustomerId], references: [id], onDelete: SetNull)
-  credits          CustomerCredit[] @relation("ReferralCredits")
+  @@unique([userId, skillId])
+  @@index([userId])
+  @@index([skillId])
+  @@map("provider_user_skills")
+}
 
-  @@index([referrerId])
-  @@index([referredCustomerId])
-  @@index([referralCode])
+model ServiceSkillRequirement {
+  id          String  @id @default(cuid())
+  serviceType String  @map("service_type")
+  skillId     String  @map("skill_id")
+  required    Boolean @default(true) // true = required, false = preferred
+  skill       Skill   @relation("SkillRequirements", fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([serviceType, skillId])
+  @@index([serviceType])
+  @@index([skillId])
+  @@map("service_skill_requirements")
+}
+
+// ============================================
+// SMART SCHEDULER SYSTEM
+// ============================================
+
+// Worker schedules - when they work each day
+model WorkerSchedule {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  dayOfWeek  Int      @map("day_of_week") // 0=Sunday, 6=Saturday
+  startTime  String   @map("start_time") // "08:00"
+  endTime    String   @map("end_time") // "17:00"
+  isAvailable Boolean @default(true) @map("is_available")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([userId, dayOfWeek])
+  @@index([userId])
+  @@map("worker_schedules")
+}
+
+// Worker time off - vacation, sick days, appointments
+model WorkerTimeOff {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  startDate  DateTime @map("start_date")
+  endDate    DateTime @map("end_date")
+  reason     String? // "vacation", "sick", "appointment", "other"
+  notes      String?
+  approved   Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([startDate, endDate])
+  @@map("worker_time_off")
+}
+
+// Worker metrics - track performance
+model WorkerMetrics {
+  id                 String   @id @default(cuid())
+  userId             String   @unique @map("user_id")
+  weeklyHours        Float    @default(0) @map("weekly_hours")
+  monthlyHours       Float    @default(0) @map("monthly_hours")
+  jobsCompleted      Int      @default(0) @map("jobs_completed")
+  avgJobRating       Float?   @map("avg_job_rating")
+  customerComplaints Int      @default(0) @map("customer_complaints")
+  lateArrivals       Int      @default(0) @map("late_arrivals")
+  lastJobDate        DateTime? @map("last_job_date")
+  lastUpdated        DateTime @updatedAt @map("last_updated")
+
+  @@index([userId])
+  @@map("worker_metrics")
+}
+
+// Worker settings - preferences and constraints
+model WorkerSettings {
+  id                 String   @id @default(cuid())
+  userId             String   @unique @map("user_id")
+  maxHoursPerDay     Float    @default(8) @map("max_hours_per_day")
+  maxHoursPerWeek    Float    @default(40) @map("max_hours_per_week")
+  preferredZones     String[] @default([]) @map("preferred_zones") // ZIP codes
+  maxTravelDistance  Float?   @map("max_travel_distance") // miles
+  canWorkWeekends    Boolean  @default(false) @map("can_work_weekends")
+  preferredStartTime String?  @map("preferred_start_time") // "08:00"
+  notes              String?
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("worker_settings")
+}
+
+// Customer preferences - preferred/blocked workers
+model CustomerPreferences {
+  id              String   @id @default(cuid())
+  customerId      String   @map("customer_id")
+  preferredWorkers String[] @default([]) @map("preferred_workers") // User IDs
+  blockedWorkers   String[] @default([]) @map("blocked_workers") // User IDs
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([customerId])
+  @@index([customerId])
+  @@map("customer_preferences")
+}
+
+// Schedule proposals - AI-generated assignment suggestions
+model ScheduleProposal {
+  id          String              @id @default(cuid())
+  providerId  String              @map("provider_id")
+  scheduleDate DateTime            @map("schedule_date") // Day this proposal is for
+  totalJobs   Int                 @default(0) @map("total_jobs")
+  assignedJobs Int                @default(0) @map("assigned_jobs")
+  unassignedJobs Int              @default(0) @map("unassigned_jobs")
+  totalDriveTime Int              @default(0) @map("total_drive_time") // minutes
+  averageScore Float?             @map("average_score")
+  status      String              @default("pending") // "pending", "approved", "rejected"
+  createdBy   String?             @map("created_by")
+  reviewedBy  String?             @map("reviewed_by")
+  reviewedAt  DateTime?           @map("reviewed_at")
+  createdAt   DateTime            @default(now()) @map("created_at")
+  assignments ProposedAssignment[] @relation("ProposalAssignments")
+
+  @@index([providerId])
+  @@index([scheduleDate])
   @@index([status])
-  @@map("referrals")
+  @@map("schedule_proposals")
 }
 
-model CustomerCredit {
-  id          String    @id @default(uuid())
-  customerId  String    @map("customer_id")
-  amount      Decimal   @db.Decimal(10, 2)
-  source      String    // "referral", "loyalty", "promotion"
-  referralId  String?   @map("referral_id")
-  usedAmount  Decimal   @default(0) @map("used_amount") @db.Decimal(10, 2)
-  expiresAt   DateTime? @map("expires_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
+// Individual job assignment proposals
+model ProposedAssignment {
+  id          String            @id @default(cuid())
+  proposalId  String            @map("proposal_id")
+  jobId       String            @map("job_id")
+  workerIds   String[]          @default([]) @map("worker_ids")
+  suggestedStart DateTime        @map("suggested_start")
+  suggestedEnd   DateTime        @map("suggested_end")
+  orderInRoute   Int             @map("order_in_route")
+  driveTimeFromPrev Int          @default(0) @map("drive_time_from_prev") // minutes
+  totalScore  Float // Overall match score 0-100
+  scoreBreakdown Json            @map("score_breakdown") // {sla, route, continuity, balance}
+  reasoning   String? // Why this assignment was suggested
+  warnings    String[] @default([]) // Any issues (skill gaps, conflicts, etc.)
+  createdAt   DateTime          @default(now()) @map("created_at")
+  proposal    ScheduleProposal  @relation("ProposalAssignments", fields: [proposalId], references: [id], onDelete: Cascade)
 
-  customer Customer  @relation("CustomerCredits", fields: [customerId], references: [id], onDelete: Cascade)
-  referral Referral? @relation("ReferralCredits", fields: [referralId], references: [id], onDelete: SetNull)
-
-  @@index([customerId])
-  @@index([referralId])
-  @@index([source])
-  @@index([expiresAt])
-  @@map("customer_credits")
+  @@index([proposalId])
+  @@index([jobId])
+  @@map("proposed_assignments")
 }
 
-enum ReferralStatus {
-  pending
-  signed_up
-  completed_job
-  credited
-}
+// Service type configuration - skill requirements and weights
+model ServiceTypeConfig {
+  id                String   @id @default(cuid())
+  providerId        String   @map("provider_id")
+  serviceType       String   @map("service_type")
+  requiredSkills    String[] @default([]) @map("required_skills") // Skill IDs
+  preferredSkills   String[] @default([]) @map("preferred_skills") // Skill IDs
+  crewSizeMin       Int      @default(1) @map("crew_size_min")
+  crewSizeMax       Int      @default(4) @map("crew_size_max")
+  estimatedDuration Float    @map("estimated_duration") // hours
+  skillWeight       Float    @default(40) @map("skill_weight") // 0-100
+  availabilityWeight Float   @default(30) @map("availability_weight")
+  workloadWeight    Float    @default(20) @map("workload_weight")
+  historyWeight     Float    @default(10) @map("history_weight")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  skills            Skill[]  @relation("ServiceTypeSkillRequirements")
 
-model CustomerPromotion {
-  id              String         @id @default(uuid())
-  customerId      String         @map("customer_id")
-  promoCode       String         @unique @map("promo_code")
-  discountPercent Decimal?       @map("discount_percent") @db.Decimal(5, 2)
-  discountAmount  Decimal?       @map("discount_amount") @db.Decimal(10, 2)
-  expiresAt       DateTime       @map("expires_at")
-  status          PromotionStatus @default(active)
-  triggerType     String         @map("trigger_type") // "inactivity", "seasonal", "winback", "manual"
-  message         String?        @db.Text
-  usedAt          DateTime?      @map("used_at")
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
-
-  customer Customer @relation("CustomerPromotions", fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId])
-  @@index([promoCode])
-  @@index([status])
-  @@index([expiresAt])
-  @@index([triggerType])
-  @@map("customer_promotions")
-}
-
-enum PromotionStatus {
-  active
-  used
-  expired
-}
-
-model ServiceBundle {
-  id           String   @id @default(uuid())
-  name         String
-  description  String   @db.Text
-  serviceTypes Json     @map("service_types") // array of included services
-  regularPrice Decimal  @map("regular_price") @db.Decimal(10, 2)
-  bundlePrice  Decimal  @map("bundle_price") @db.Decimal(10, 2)
-  savings      Decimal  @db.Decimal(10, 2) // calculated: regularPrice - bundlePrice
-  season       String? // 'spring', 'summer', 'fall', 'winter', null for year-round
-  active       Boolean  @default(true)
-  displayOrder Int      @default(0) @map("display_order")
-  createdAt    DateTime @default(now()) @map("created_at")
-  updatedAt    DateTime @updatedAt @map("updated_at")
-
-  @@index([active])
-  @@index([season])
-  @@index([displayOrder])
-  @@map("service_bundles")
-}
-
-model ServiceUpsell {
-  id             String   @id @default(uuid())
-  baseService    String   @map("base_service")
-  upsellService  String   @map("upsell_service")
-  upsellPrice    Decimal  @map("upsell_price") @db.Decimal(10, 2)
-  description    String   @db.Text
-  displayOrder   Int      @default(0) @map("display_order")
-  conversionRate Decimal  @default(0) @map("conversion_rate") @db.Decimal(5, 4) // track performance
-  createdAt      DateTime @default(now()) @map("created_at")
-  updatedAt      DateTime @updatedAt @map("updated_at")
-
-  @@index([baseService])
-  @@index([displayOrder])
-  @@map("service_upsells")
-}
-
-model CustomerPaymentMethod {
-  id                     String   @id @default(uuid())
-  customerId             String   @map("customer_id")
-  stripePaymentMethodId  String   @unique @map("stripe_payment_method_id")
-  cardBrand              String   @map("card_brand") // 'visa', 'mastercard', 'amex', 'discover'
-  cardLast4              String   @map("card_last4")
-  expiryMonth            Int      @map("expiry_month")
-  expiryYear             Int      @map("expiry_year")
-  isDefault              Boolean  @default(false) @map("is_default")
-  createdAt              DateTime @default(now()) @map("created_at")
-  updatedAt              DateTime @updatedAt @map("updated_at")
-
-  customer Customer @relation("CustomerPaymentMethods", fields: [customerId], references: [id], onDelete: Cascade)
-
-  @@index([customerId])
-  @@index([isDefault])
-  @@map("customer_payment_methods")
+  @@unique([providerId, serviceType])
+  @@index([providerId])
+  @@index([serviceType])
+  @@map("service_type_configs")
 }

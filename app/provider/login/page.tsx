@@ -7,16 +7,18 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Building2 } from 'lucide-react';
+import { Building2, Eye, EyeOff } from 'lucide-react';
 
 export default function ProviderLoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email) {
       toast.error('Please enter your email');
       return;
@@ -27,7 +29,7 @@ export default function ProviderLoginPage() {
       const res = await fetch('/api/provider/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, password: password || undefined }),
       });
 
       const data = await res.json();
@@ -37,12 +39,33 @@ export default function ProviderLoginPage() {
         return;
       }
 
-      // Store provider session
+      // Store session data
       localStorage.setItem('providerId', data.provider.id);
       localStorage.setItem('providerName', data.provider.businessName);
-      
-      toast.success('Login successful!');
-      router.push('/provider/dashboard');
+
+      // If multi-user login, also store user data
+      if (data.user) {
+        localStorage.setItem('userId', data.user.id);
+        localStorage.setItem('userEmail', data.user.email);
+        localStorage.setItem('userRole', data.user.role);
+        localStorage.setItem('userName', `${data.user.firstName} ${data.user.lastName}`);
+      }
+
+      // If needs password setup (legacy provider auto-migrated)
+      if (data.needsPasswordSetup) {
+        toast.success('Login successful! Please set up a password for your account.', {
+          duration: 5000,
+        });
+      } else {
+        toast.success('Login successful!');
+      }
+
+      // Route based on user role
+      if (data.user && data.user.role === 'field') {
+        router.push('/field/today');
+      } else {
+        router.push('/provider/dashboard');
+      }
     } catch (error) {
       toast.error('Login failed');
     } finally {
@@ -79,8 +102,37 @@ export default function ProviderLoginPage() {
               />
             </div>
 
-            <Button 
-              type="submit" 
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-zinc-200">
+                Password <span className="text-zinc-500 text-xs">(optional for legacy accounts)</span>
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="bg-zinc-900 border-zinc-800 text-zinc-100 pr-10"
+                  disabled={loading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-300"
+                  tabIndex={-1}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <Button
+              type="submit"
               className="w-full bg-emerald-600 hover:bg-emerald-500"
               disabled={loading}
             >
@@ -88,7 +140,7 @@ export default function ProviderLoginPage() {
             </Button>
 
             <p className="text-xs text-zinc-500 text-center mt-4">
-              For security, we&apos;ll verify your email is registered in our system
+              Team members: Use your email and password provided by your administrator
             </p>
           </form>
         </CardContent>

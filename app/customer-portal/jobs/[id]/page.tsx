@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { ArrowLeft, Calendar, Clock, MapPin, DollarSign, Phone, Mail, Loader2, AlertCircle, Star, RefreshCw } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, MapPin, DollarSign, Phone, Mail, Loader2, AlertCircle, Star, RefreshCw, Download, Image as ImageIcon } from 'lucide-react';
 import CustomerLayout from '@/components/customer/CustomerLayout';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import ReviewModal from '@/components/customer/ReviewModal';
 import BookAgainModal from '@/components/customer/BookAgainModal';
 import JobRecommendations from '@/components/customer/JobRecommendations';
+import Lightbox from 'yet-another-react-lightbox';
+import 'yet-another-react-lightbox/styles.css';
+import { ReactCompareSlider, ReactCompareSliderImage } from 'react-compare-slider';
 
 interface Job {
   id: string;
@@ -43,6 +47,9 @@ export default function CustomerJobDetailPage() {
   const [loading, setLoading] = useState(true);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [showBookAgainModal, setShowBookAgainModal] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxPhotos, setLightboxPhotos] = useState<string[]>([]);
 
   useEffect(() => {
     if (jobId) {
@@ -109,6 +116,34 @@ export default function CustomerJobDetailPage() {
 
   const getStatusLabel = (status: string) => {
     return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+  };
+
+  const openLightbox = (photos: string[], index: number) => {
+    setLightboxPhotos(photos);
+    setLightboxIndex(index);
+    setLightboxOpen(true);
+  };
+
+  const downloadAllPhotos = async () => {
+    if (!job?.photos || job.photos.length === 0) return;
+
+    toast.info('Downloading photos...');
+    for (let i = 0; i < job.photos.length; i++) {
+      const photo = job.photos[i];
+      try {
+        const response = await fetch(photo.url);
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `job-${jobId}-${photo.type}-${i + 1}.jpg`;
+        link.click();
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error downloading photo:', error);
+      }
+    }
+    toast.success('All photos downloaded!');
   };
 
   if (loading) {
@@ -215,60 +250,141 @@ export default function CustomerJobDetailPage() {
             </div>
           )}
 
-          {/* Photos */}
+          {/* Photos with Enhanced Gallery */}
           {(beforePhotos.length > 0 || duringPhotos.length > 0 || afterPhotos.length > 0) && (
             <div className="bg-white rounded-xl border border-zinc-200 p-6">
-              <h2 className="text-lg font-bold text-zinc-900 mb-4">Photos</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2">
+                  <ImageIcon className="h-5 w-5" />
+                  Job Photos ({job.photos?.length || 0})
+                </h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={downloadAllPhotos}
+                  className="text-emerald-600 border-emerald-600 hover:bg-emerald-50"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Download All
+                </Button>
+              </div>
 
-              <div className="space-y-6">
-                {beforePhotos.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-zinc-700 mb-3">Before</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {beforePhotos.map(photo => (
+              <Tabs defaultValue="all" className="w-full">
+                <TabsList className="grid w-full grid-cols-4 mb-4">
+                  <TabsTrigger value="all">All ({job.photos?.length || 0})</TabsTrigger>
+                  <TabsTrigger value="before">Before ({beforePhotos.length})</TabsTrigger>
+                  <TabsTrigger value="after">After ({afterPhotos.length})</TabsTrigger>
+                  <TabsTrigger value="compare">Compare</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="all" className="space-y-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {job.photos?.map((photo, index) => (
+                      <div
+                        key={photo.id}
+                        className="relative cursor-pointer group"
+                        onClick={() => openLightbox(job.photos?.map(p => p.url) || [], index)}
+                      >
                         <img
-                          key={photo.id}
+                          src={photo.url}
+                          alt={photo.type}
+                          className="w-full aspect-square object-cover rounded-lg border border-zinc-200 group-hover:border-emerald-500 transition-all"
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded-lg flex items-center justify-center">
+                          <ImageIcon className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                        <span className="absolute top-2 right-2 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+                          {photo.type}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="before" className="space-y-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {beforePhotos.map((photo, index) => (
+                      <div
+                        key={photo.id}
+                        className="relative cursor-pointer group"
+                        onClick={() => openLightbox(beforePhotos.map(p => p.url), index)}
+                      >
+                        <img
                           src={photo.url}
                           alt="Before"
-                          className="w-full aspect-square object-cover rounded-lg border border-zinc-200"
+                          className="w-full aspect-square object-cover rounded-lg border border-zinc-200 group-hover:border-emerald-500 transition-all"
                         />
-                      ))}
-                    </div>
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded-lg flex items-center justify-center">
+                          <ImageIcon className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                )}
+                  {beforePhotos.length === 0 && (
+                    <p className="text-center text-zinc-500 py-8">No before photos available</p>
+                  )}
+                </TabsContent>
 
-                {duringPhotos.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-zinc-700 mb-3">During</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {duringPhotos.map(photo => (
+                <TabsContent value="after" className="space-y-3">
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    {afterPhotos.map((photo, index) => (
+                      <div
+                        key={photo.id}
+                        className="relative cursor-pointer group"
+                        onClick={() => openLightbox(afterPhotos.map(p => p.url), index)}
+                      >
                         <img
-                          key={photo.id}
-                          src={photo.url}
-                          alt="During"
-                          className="w-full aspect-square object-cover rounded-lg border border-zinc-200"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {afterPhotos.length > 0 && (
-                  <div>
-                    <h3 className="text-sm font-semibold text-zinc-700 mb-3">After</h3>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                      {afterPhotos.map(photo => (
-                        <img
-                          key={photo.id}
                           src={photo.url}
                           alt="After"
-                          className="w-full aspect-square object-cover rounded-lg border border-zinc-200"
+                          className="w-full aspect-square object-cover rounded-lg border border-zinc-200 group-hover:border-emerald-500 transition-all"
                         />
-                      ))}
-                    </div>
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all rounded-lg flex items-center justify-center">
+                          <ImageIcon className="h-8 w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
+                  {afterPhotos.length === 0 && (
+                    <p className="text-center text-zinc-500 py-8">No after photos available</p>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="compare">
+                  {beforePhotos.length > 0 && afterPhotos.length > 0 ? (
+                    <div className="space-y-4">
+                      <p className="text-sm text-zinc-600">Drag the slider to compare before and after</p>
+                      <div className="rounded-lg overflow-hidden border-2 border-zinc-200">
+                        <ReactCompareSlider
+                          itemOne={
+                            <ReactCompareSliderImage
+                              src={beforePhotos[0].url}
+                              alt="Before"
+                            />
+                          }
+                          itemTwo={
+                            <ReactCompareSliderImage
+                              src={afterPhotos[0].url}
+                              alt="After"
+                            />
+                          }
+                          style={{ height: '400px' }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-sm font-medium text-zinc-700">
+                        <span>← Before</span>
+                        <span>After →</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <p className="text-zinc-500 mb-2">Comparison not available</p>
+                      <p className="text-sm text-zinc-400">
+                        Need both before and after photos to compare
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
             </div>
           )}
 
@@ -390,6 +506,14 @@ export default function CustomerJobDetailPage() {
           bookingSource="rebook_job_detail"
         />
       )}
+
+      {/* Photo Lightbox */}
+      <Lightbox
+        open={lightboxOpen}
+        close={() => setLightboxOpen(false)}
+        index={lightboxIndex}
+        slides={lightboxPhotos.map((url) => ({ src: url }))}
+      />
     </CustomerLayout>
   );
 }

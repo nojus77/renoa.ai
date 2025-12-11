@@ -200,6 +200,125 @@ export async function GET(request: NextRequest) {
         }, 0) / completedJobs.length
       : 0;
 
+    // ===== INVOICE METRICS =====
+
+    // Get invoices for current period
+    const invoices = await prisma.invoice.findMany({
+      where: {
+        providerId,
+        invoiceDate: { gte: startDate, lte: endDate },
+      },
+      include: {
+        payments: true,
+      },
+    });
+
+    // Previous period invoices for comparison
+    const previousInvoices = await prisma.invoice.findMany({
+      where: {
+        providerId,
+        invoiceDate: { gte: previousStart, lt: previousEnd },
+      },
+    });
+
+    // Calculate invoice-based revenue metrics
+    const paidInvoices = invoices.filter(inv => inv.status === 'paid');
+    const totalInvoiceRevenue = paidInvoices.reduce((sum, inv) => sum + Number(inv.total), 0);
+
+    const previousPaidInvoices = previousInvoices.filter(inv => inv.status === 'paid');
+    const previousInvoiceRevenue = previousPaidInvoices.reduce((sum, inv) => sum + Number(inv.total), 0);
+
+    const invoiceRevenueChange = previousInvoiceRevenue > 0
+      ? ((totalInvoiceRevenue - previousInvoiceRevenue) / previousInvoiceRevenue) * 100
+      : 0;
+
+    // Outstanding invoices (sent, viewed, overdue, partial)
+    const outstandingInvoices = invoices.filter(inv =>
+      ['sent', 'viewed', 'overdue', 'partial'].includes(inv.status)
+    );
+    const outstandingAmount = outstandingInvoices.reduce((sum, inv) =>
+      sum + (Number(inv.total) - Number(inv.amountPaid)), 0
+    );
+
+    // Overdue amount
+    const now = new Date();
+    const overdueInvoices = outstandingInvoices.filter(inv => new Date(inv.dueDate) < now);
+    const overdueAmount = overdueInvoices.reduce((sum, inv) =>
+      sum + (Number(inv.total) - Number(inv.amountPaid)), 0
+    );
+
+    // Average invoice value
+    const avgInvoiceValue = invoices.length > 0
+      ? invoices.reduce((sum, inv) => sum + Number(inv.total), 0) / invoices.length
+      : 0;
+
+    // Payment collection metrics
+    const totalInvoices = invoices.length;
+    const paymentCollectionRate = totalInvoices > 0
+      ? (paidInvoices.length / totalInvoices) * 100
+      : 0;
+
+    // Average days to payment
+    const paidInvoicesWithDate = paidInvoices.filter(inv => inv.paidDate);
+    const avgDaysToPayment = paidInvoicesWithDate.length > 0
+      ? paidInvoicesWithDate.reduce((sum, inv) => {
+          const days = (new Date(inv.paidDate!).getTime() - new Date(inv.invoiceDate).getTime())
+            / (1000 * 60 * 60 * 24);
+          return sum + days;
+        }, 0) / paidInvoicesWithDate.length
+      : 0;
+
+    // Collected this period (from payments)
+    const paymentsThisPeriod = await prisma.payment.findMany({
+      where: {
+        invoice: { providerId },
+        paymentDate: { gte: startDate, lte: endDate },
+      },
+    });
+    const collectedThisPeriod = paymentsThisPeriod.reduce((sum, payment) =>
+      sum + Number(payment.amount), 0
+    );
+
+    // Invoice status breakdown
+    const invoicesByStatus = {
+      draft: invoices.filter(inv => inv.status === 'draft').length,
+      sent: invoices.filter(inv => inv.status === 'sent').length,
+      viewed: invoices.filter(inv => inv.status === 'viewed').length,
+      paid: paidInvoices.length,
+      partial: invoices.filter(inv => inv.status === 'partial').length,
+      overdue: overdueInvoices.length,
+      cancelled: invoices.filter(inv => inv.status === 'cancelled').length,
+    };
+
+    // Revenue by month (last 12 months) - from invoices
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+
+    const last12MonthsInvoices = await prisma.invoice.findMany({
+      where: {
+        providerId,
+        invoiceDate: { gte: twelveMonthsAgo },
+        status: 'paid',
+      },
+      select: {
+        invoiceDate: true,
+        total: true,
+      },
+    });
+
+    const revenueByMonth: Record<string, number> = {};
+    last12MonthsInvoices.forEach(inv => {
+      const monthKey = new Date(inv.invoiceDate).toLocaleDateString('en-US', {
+        month: 'short',
+        year: 'numeric'
+      });
+      revenueByMonth[monthKey] = (revenueByMonth[monthKey] || 0) + Number(inv.total);
+    });
+
+    const revenueByMonthArray = Object.entries(revenueByMonth)
+      .map(([month, revenue]) => ({ month, revenue: Math.round(revenue) }))
+      .sort((a, b) => new Date(a.month).getTime() - new Date(b.month).getTime());
+
     return NextResponse.json({
       kpis: {
         totalRevenue: Math.round(totalRevenue),
@@ -254,6 +373,20 @@ export async function GET(request: NextRequest) {
         onTimeRate: 94, // Placeholder - would need completion time tracking
         customerSatisfaction: 4.8, // Placeholder - would need ratings system
       },
+      invoiceMetrics: {
+        totalInvoices,
+        totalInvoiceRevenue: Math.round(totalInvoiceRevenue),
+        invoiceRevenueChange: Math.round(invoiceRevenueChange * 10) / 10,
+        outstandingAmount: Math.round(outstandingAmount),
+        overdueAmount: Math.round(overdueAmount),
+        overdueCount: overdueInvoices.length,
+        collectedThisPeriod: Math.round(collectedThisPeriod),
+        avgInvoiceValue: Math.round(avgInvoiceValue),
+        paymentCollectionRate: Math.round(paymentCollectionRate),
+        avgDaysToPayment: Math.round(avgDaysToPayment),
+        invoicesByStatus,
+      },
+      revenueByMonth: revenueByMonthArray,
     });
   } catch (error) {
     console.error('Error fetching analytics:', error);

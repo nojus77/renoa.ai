@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Plus, Search, User, Sparkles } from 'lucide-react';
+import { X, Plus, Search, User, Sparkles, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AddressAutocomplete from '@/components/ui/AddressAutocomplete';
 import { toast } from 'sonner';
@@ -24,6 +24,22 @@ interface Customer {
   phone: string;
 }
 
+interface TeamMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  profilePhotoUrl?: string;
+}
+
+interface Crew {
+  id: string;
+  name: string;
+  userIds: string[];
+  users: TeamMember[];
+  memberCount: number;
+}
+
 export default function AddJobModal({
   isOpen,
   onClose,
@@ -42,7 +58,16 @@ export default function AddJobModal({
   const [searching, setSearching] = useState(false);
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false);
   const [savingCustomService, setSavingCustomService] = useState(false);
+  const [conflict, setConflict] = useState<string | null>(null);
+  const [checkingConflict, setCheckingConflict] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Team assignment state
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [crews, setCrews] = useState<Crew[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [selectedCrew, setSelectedCrew] = useState<Crew | null>(null);
+  const [loadingTeam, setLoadingTeam] = useState(false);
 
   // New customer fields
   const [newCustomer, setNewCustomer] = useState({
@@ -64,6 +89,9 @@ export default function AddJobModal({
     internalNotes: '',
     customerNotes: '',
     status: 'scheduled' as 'scheduled' | 'in_progress' | 'completed',
+    isRecurring: false,
+    recurringFrequency: '',
+    recurringEndDate: '',
   });
 
   // All available service types
@@ -135,6 +163,77 @@ export default function AddJobModal({
       setJobDetails(prev => ({ ...prev, endTime }));
     }
   }, [jobDetails.startTime, jobDetails.duration]);
+
+  // Check for conflicts when date/time/duration changes
+  useEffect(() => {
+    const checkConflicts = async () => {
+      if (!jobDetails.date || !jobDetails.startTime || !jobDetails.duration) {
+        setConflict(null);
+        return;
+      }
+
+      setCheckingConflict(true);
+      try {
+        const startDateTime = new Date(`${jobDetails.date}T${jobDetails.startTime}`);
+        const durationMinutes = parseFloat(jobDetails.duration) * 60;
+
+        const res = await fetch('/api/provider/jobs/validate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            providerId,
+            startTime: startDateTime.toISOString(),
+            duration: durationMinutes
+          })
+        });
+
+        const result = await res.json();
+
+        if (!result.available) {
+          setConflict(result.reason);
+        } else {
+          setConflict(null);
+        }
+      } catch (error) {
+        console.error('Error checking conflicts:', error);
+      } finally {
+        setCheckingConflict(false);
+      }
+    };
+
+    const timeoutId = setTimeout(checkConflicts, 500); // Debounce
+    return () => clearTimeout(timeoutId);
+  }, [jobDetails.date, jobDetails.startTime, jobDetails.duration, providerId]);
+
+  // Load team members and crews when modal opens
+  useEffect(() => {
+    const fetchTeamData = async () => {
+      if (!isOpen) return;
+
+      setLoadingTeam(true);
+      try {
+        // Fetch team members
+        const teamRes = await fetch(`/api/provider/team?providerId=${providerId}`);
+        const teamData = await teamRes.json();
+        if (teamRes.ok) {
+          setTeamMembers(teamData.users || []);
+        }
+
+        // Fetch crews
+        const crewsRes = await fetch(`/api/provider/crews?providerId=${providerId}`);
+        const crewsData = await crewsRes.json();
+        if (crewsRes.ok) {
+          setCrews(crewsData.crews || []);
+        }
+      } catch (error) {
+        console.error('Error loading team data:', error);
+      } finally {
+        setLoadingTeam(false);
+      }
+    };
+
+    fetchTeamData();
+  }, [isOpen, providerId]);
 
   // Load customers when searching
   useEffect(() => {
@@ -256,6 +355,10 @@ export default function AddJobModal({
         internalNotes: jobDetails.internalNotes || null,
         customerNotes: jobDetails.customerNotes || null,
         status: jobDetails.status,
+        isRecurring: jobDetails.isRecurring,
+        recurringFrequency: jobDetails.isRecurring ? jobDetails.recurringFrequency : null,
+        recurringEndDate: jobDetails.isRecurring && jobDetails.recurringEndDate ? jobDetails.recurringEndDate : null,
+        assignedUserIds: selectedUserIds,
       };
 
       const res = await fetch('/api/provider/jobs', {
@@ -264,7 +367,22 @@ export default function AddJobModal({
         body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      console.log('📥 Job creation response:', {
+        status: res.status,
+        statusText: res.statusText,
+        ok: res.ok,
+        headers: Object.fromEntries(res.headers.entries()),
+      });
+
+      let data;
+      try {
+        const responseText = await res.text();
+        console.log('📄 Response body:', responseText.substring(0, 200));
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        console.error('❌ JSON parse error:', parseError);
+        throw new Error('Invalid response from server. Please check console for details.');
+      }
 
       if (!res.ok) {
         throw new Error(data.error || 'Failed to create job');
@@ -305,7 +423,12 @@ export default function AddJobModal({
       internalNotes: '',
       customerNotes: '',
       status: 'scheduled',
+      isRecurring: false,
+      recurringFrequency: '',
+      recurringEndDate: '',
     });
+    setSelectedUserIds([]);
+    setSelectedCrew(null);
   };
 
   // Keyboard shortcuts
@@ -348,7 +471,7 @@ export default function AddJobModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-      <div className="bg-zinc-900 w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-hidden shadow-2xl border-t md:border border-zinc-800">
+      <div className="bg-zinc-900 w-full md:max-w-2xl md:rounded-2xl rounded-t-2xl max-h-[90vh] overflow-hidden shadow-2xl border-t md:border border-zinc-800 flex flex-col">
         {/* Success Animation Overlay */}
         {showSuccessAnimation && (
           <div className="absolute inset-0 bg-emerald-500/20 backdrop-blur-sm z-50 flex items-center justify-center animate-in fade-in duration-300">
@@ -359,7 +482,7 @@ export default function AddJobModal({
           </div>
         )}
         {/* Header with Progress */}
-        <div className="border-b border-zinc-800">
+        <div className="flex-shrink-0 border-b border-zinc-800">
           <div className="flex items-center justify-between px-4 md:px-6 py-4 md:py-6">
             <div>
               <h2 className="text-xl md:text-2xl font-bold text-zinc-100">Add New Job</h2>
@@ -383,8 +506,27 @@ export default function AddJobModal({
           </div>
         </div>
 
+        {/* Context Banner - shows when adding from calendar */}
+        {selectedDate && (
+          <div className="mx-4 md:mx-6 mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+            <p className="text-sm font-medium text-emerald-400">
+              📅 Adding job for {new Date(jobDetails.date).toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric'
+              })}
+              {selectedHour !== undefined && (
+                <span className="ml-2">
+                  at {selectedHour > 12 ? selectedHour - 12 : selectedHour}:00 {selectedHour >= 12 ? 'PM' : 'AM'}
+                </span>
+              )}
+            </p>
+          </div>
+        )}
+
         {/* Content */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto max-h-[calc(90vh-180px)] overscroll-contain">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto">
           <div className="px-4 md:px-6 py-4 md:py-6 space-y-6">
             {/* Customer Section */}
             <div>
@@ -629,6 +771,11 @@ export default function AddJobModal({
                   <div>
                     <label className="block text-sm font-medium text-zinc-300 mb-2">
                       Date <span className="text-red-400">*</span>
+                      {selectedDate && (
+                        <span className="ml-2 text-xs text-emerald-400 font-normal">
+                          📅 {new Date(jobDetails.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
                     </label>
                     <input
                       type="date"
@@ -637,6 +784,11 @@ export default function AddJobModal({
                       className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm md:text-base"
                       required
                     />
+                    {selectedDate && (
+                      <p className="mt-1 text-xs text-zinc-500">
+                        You can change this date if needed
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -670,6 +822,26 @@ export default function AddJobModal({
                     </Listbox>
                   </div>
                 </div>
+
+                {/* Conflict Warning */}
+                {conflict && (
+                  <div className="p-3 md:p-4 bg-red-500/10 border border-red-500/30 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <span className="text-red-400 text-lg">⚠️</span>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-red-400">Time Conflict Detected</p>
+                        <p className="text-xs text-red-300 mt-1">{conflict}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Checking Conflict Indicator */}
+                {checkingConflict && (
+                  <div className="p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                    <p className="text-xs text-yellow-400">Checking availability...</p>
+                  </div>
+                )}
 
                 {/* Duration - Visual Button Picker */}
                 <div>
@@ -713,6 +885,226 @@ export default function AddJobModal({
                     </p>
                   )}
                 </div>
+
+                {/* Recurring Job Options */}
+                <div className="p-4 bg-zinc-800/30 border border-zinc-700 rounded-lg">
+                  <label className="flex items-center gap-3 cursor-pointer group">
+                    <input
+                      type="checkbox"
+                      checked={jobDetails.isRecurring}
+                      onChange={(e) => {
+                        setJobDetails(prev => ({
+                          ...prev,
+                          isRecurring: e.target.checked,
+                          recurringFrequency: e.target.checked ? 'weekly' : '',
+                          recurringEndDate: '',
+                        }));
+                      }}
+                      className="w-5 h-5 rounded border-zinc-600 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-900"
+                    />
+                    <div className="flex-1">
+                      <span className="text-sm font-medium text-zinc-200 group-hover:text-zinc-100">
+                        ↻ Make this a recurring job
+                      </span>
+                      <p className="text-xs text-zinc-500 mt-0.5">
+                        Automatically create this job on a schedule
+                      </p>
+                    </div>
+                  </label>
+
+                  {jobDetails.isRecurring && (
+                    <div className="mt-4 space-y-3 pl-8 border-l-2 border-emerald-500/30">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Repeat Frequency
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {[
+                            { value: 'weekly', label: 'Weekly' },
+                            { value: 'biweekly', label: 'Every 2 Weeks' },
+                            { value: 'monthly', label: 'Monthly' },
+                            { value: 'quarterly', label: 'Quarterly' },
+                          ].map((freq) => (
+                            <button
+                              key={freq.value}
+                              type="button"
+                              onClick={() => setJobDetails(prev => ({ ...prev, recurringFrequency: freq.value }))}
+                              className={`
+                                py-2.5 px-3 rounded-lg border-2 transition-all text-sm font-medium active:scale-95
+                                ${jobDetails.recurringFrequency === freq.value
+                                  ? 'border-emerald-500 bg-emerald-500/10 text-emerald-400'
+                                  : 'border-zinc-700 bg-zinc-800/50 hover:border-zinc-600 text-zinc-300'
+                                }
+                              `}
+                            >
+                              {freq.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          End Date (optional)
+                        </label>
+                        <input
+                          type="date"
+                          value={jobDetails.recurringEndDate}
+                          onChange={(e) => setJobDetails(prev => ({ ...prev, recurringEndDate: e.target.value }))}
+                          className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                          placeholder="Leave empty for no end date"
+                        />
+                        <p className="text-xs text-zinc-500 mt-1.5">
+                          Leave empty to continue indefinitely
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Team Assignment Section */}
+            <div>
+              <h3 className="text-base md:text-lg font-semibold text-zinc-100 mb-3 md:mb-4 flex items-center gap-2">
+                <Users className="h-4 w-4 md:h-5 md:w-5 text-emerald-400" />
+                Assign Team (optional)
+              </h3>
+
+              <div className="space-y-4">
+                {/* Crew Quick Select */}
+                {crews.length > 0 && (
+                  <div>
+                    <label className="block text-sm font-medium text-zinc-300 mb-2">
+                      Select Crew
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {crews.map((crew) => (
+                        <button
+                          key={crew.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCrew(crew);
+                            setSelectedUserIds(crew.userIds);
+                          }}
+                          className={`
+                            p-3 rounded-lg border-2 transition-all text-left active:scale-95
+                            ${selectedCrew?.id === crew.id
+                              ? 'border-emerald-500 bg-emerald-500/10'
+                              : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600'
+                            }
+                          `}
+                        >
+                          <p className="text-sm font-medium text-zinc-200">{crew.name}</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">{crew.memberCount} members</p>
+                        </button>
+                      ))}
+                    </div>
+                    <div className="text-center my-2">
+                      <span className="text-xs text-zinc-500">or select individual members</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Individual Team Members */}
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">
+                    Team Members
+                  </label>
+                  {loadingTeam ? (
+                    <div className="p-4 text-center text-sm text-zinc-400">
+                      Loading team members...
+                    </div>
+                  ) : teamMembers.length === 0 ? (
+                    <div className="p-4 bg-zinc-800/30 border border-zinc-700 rounded-lg text-center">
+                      <p className="text-sm text-zinc-400">No team members found</p>
+                      <p className="text-xs text-zinc-500 mt-1">Add team members in Team Management</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto border border-zinc-700 rounded-lg p-2">
+                      {teamMembers.map((member) => {
+                        const isSelected = selectedUserIds.includes(member.id);
+                        return (
+                          <label
+                            key={member.id}
+                            className={`
+                              flex items-center gap-3 p-2.5 rounded-lg cursor-pointer transition-all
+                              ${isSelected
+                                ? 'bg-emerald-500/10 border-2 border-emerald-500/30'
+                                : 'bg-zinc-800/30 border-2 border-transparent hover:bg-zinc-800/50'
+                              }
+                            `}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedUserIds([...selectedUserIds, member.id]);
+                                  setSelectedCrew(null); // Clear crew selection when manually selecting
+                                } else {
+                                  setSelectedUserIds(selectedUserIds.filter(id => id !== member.id));
+                                  setSelectedCrew(null);
+                                }
+                              }}
+                              className="w-4 h-4 rounded border-zinc-600 text-emerald-500 focus:ring-emerald-500 focus:ring-offset-zinc-900"
+                            />
+                            <div className="flex items-center gap-2 flex-1">
+                              <div className="h-8 w-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                {member.profilePhotoUrl ? (
+                                  <img
+                                    src={member.profilePhotoUrl}
+                                    alt={`${member.firstName} ${member.lastName}`}
+                                    className="h-8 w-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-sm font-medium text-emerald-400">
+                                    {member.firstName[0]}{member.lastName[0]}
+                                  </span>
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-zinc-200">
+                                  {member.firstName} {member.lastName}
+                                </p>
+                                <p className="text-xs text-zinc-500 capitalize">{member.role}</p>
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Selected Users Summary */}
+                {selectedUserIds.length > 0 && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                    <p className="text-xs text-emerald-400 font-medium mb-2">
+                      {selectedUserIds.length} team member{selectedUserIds.length !== 1 ? 's' : ''} assigned
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {selectedUserIds.map(userId => {
+                        const member = teamMembers.find(m => m.id === userId);
+                        if (!member) return null;
+                        return (
+                          <button
+                            key={userId}
+                            type="button"
+                            onClick={() => {
+                              setSelectedUserIds(selectedUserIds.filter(id => id !== userId));
+                              setSelectedCrew(null);
+                            }}
+                            className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/20 border border-emerald-500/30 rounded text-xs text-emerald-300 hover:bg-emerald-500/30 transition-colors"
+                          >
+                            {member.firstName} {member.lastName}
+                            <X className="h-3 w-3" />
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -821,7 +1213,7 @@ export default function AddJobModal({
           </div>
 
           {/* Footer */}
-          <div className="sticky bottom-0 flex items-center justify-end gap-3 px-4 md:px-6 py-4 md:py-6 border-t border-zinc-800 bg-zinc-900/95 backdrop-blur-sm">
+          <div className="flex-shrink-0 flex items-center justify-end gap-3 px-4 md:px-6 py-4 md:py-6 border-t border-zinc-800 bg-zinc-900/95 backdrop-blur-sm">
             <Button
               type="button"
               onClick={onClose}
@@ -832,7 +1224,7 @@ export default function AddJobModal({
             </Button>
             <Button
               type="submit"
-              disabled={submitting || !(selectedCustomer || (showNewCustomerForm && newCustomer.name && newCustomer.phone)) || !jobDetails.serviceType}
+              disabled={submitting || conflict || !(selectedCustomer || (showNewCustomerForm && newCustomer.name && newCustomer.phone)) || !jobDetails.serviceType}
               className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 flex-1 md:flex-none disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 min-h-[44px]"
             >
               {submitting ? (

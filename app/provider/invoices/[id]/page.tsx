@@ -189,6 +189,39 @@ export default function InvoiceDetailPage() {
     }
   };
 
+  const handleDownloadPDF = async () => {
+    try {
+      toast.loading('Generating PDF...');
+
+      const res = await fetch(`/api/provider/invoices/${invoiceId}/download`);
+
+      if (!res.ok) {
+        throw new Error('Failed to generate PDF');
+      }
+
+      // Get the PDF blob
+      const blob = await res.blob();
+
+      // Create a download link
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${invoice?.invoiceNumber || invoiceId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+
+      // Cleanup
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.dismiss();
+      toast.success('PDF downloaded successfully!');
+    } catch (error) {
+      toast.dismiss();
+      toast.error('Failed to download PDF');
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -266,7 +299,12 @@ export default function InvoiceDetailPage() {
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" className="border-zinc-700">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-zinc-700"
+                onClick={handleDownloadPDF}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Download PDF
               </Button>

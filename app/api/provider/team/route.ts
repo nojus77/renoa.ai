@@ -1,0 +1,142 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { PrismaClient } from '@prisma/client';
+import { startOfWeek, isSameDay } from 'date-fns';
+
+const prisma = new PrismaClient();
+
+export async function GET(request: NextRequest) {
+  try {
+    const searchParams = request.nextUrl.searchParams;
+    const providerId = searchParams.get('providerId');
+
+    if (!providerId) {
+      return NextResponse.json(
+        { error: 'Provider ID required' },
+        { status: 400 }
+      );
+    }
+
+    // Fetch all team members for this provider
+    const users = await prisma.providerUser.findMany({
+      where: {
+        providerId,
+      },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        status: true,
+        skills: true,
+        color: true,
+        hourlyRate: true,
+        workingHours: true,
+        createdAt: true,
+        updatedAt: true,
+        profilePhotoUrl: true,
+        workerSkills: {
+          include: {
+            skill: {
+              select: {
+                id: true,
+                name: true,
+                category: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        },
+      },
+      orderBy: [
+        { role: 'asc' }, // Owners first
+        { createdAt: 'asc' },
+      ],
+    });
+
+    // Add stats for each member
+    const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }); // Monday
+    const today = new Date();
+
+    const usersWithStats = await Promise.all(users.map(async (user) => {
+      // Only calculate stats for field workers
+      if (user.role !== 'field') {
+        return {
+          ...user,
+          hoursThisWeek: 0,
+          jobsCompleted: 0,
+          availableToday: true,
+        };
+      }
+
+      // Get jobs for this worker
+      const jobs = await prisma.job.findMany({
+        where: {
+          assignedUserIds: { has: user.id },
+          startTime: { gte: weekStart },
+        },
+        select: {
+          startTime: true,
+          endTime: true,
+          status: true,
+        },
+      });
+
+      // Calculate hours this week
+      const hoursThisWeek = jobs.reduce((sum, job) => {
+        const hours = (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60);
+        return sum + hours;
+      }, 0);
+
+      // Count completed jobs (all time)
+      const jobsCompleted = await prisma.job.count({
+        where: {
+          assignedUserIds: { has: user.id },
+          status: 'completed',
+        },
+      });
+
+      // Check availability today
+      const todayJobs = jobs.filter(j => isSameDay(new Date(j.startTime), today));
+      const todayHours = todayJobs.reduce((sum, job) => {
+        const hours = (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60);
+        return sum + hours;
+      }, 0);
+      const availableToday = todayHours < 8; // Available if working less than 8 hours today
+
+      // Get next upcoming job
+      const nextJob = await prisma.job.findFirst({
+        where: {
+          assignedUserIds: { has: user.id },
+          startTime: { gte: today },
+          status: { in: ['scheduled', 'confirmed'] },
+        },
+        orderBy: { startTime: 'asc' },
+        select: {
+          id: true,
+          startTime: true,
+          serviceType: true,
+        },
+      });
+
+      return {
+        ...user,
+        hoursThisWeek: Math.round(hoursThisWeek * 10) / 10,
+        jobsCompleted,
+        availableToday,
+        nextJob,
+      };
+    }));
+
+    return NextResponse.json({ users: usersWithStats });
+  } catch (error) {
+    console.error('Error fetching team members:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch team members' },
+      { status: 500 }
+    );
+  }
+}

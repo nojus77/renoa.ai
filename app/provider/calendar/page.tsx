@@ -4,16 +4,23 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Plus, Clock, Lock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Clock, Lock, Eye, Users, AlertCircle, DollarSign, TrendingUp, CheckCircle, AlertTriangle, XCircle, TrendingDown } from 'lucide-react';
+import { format, isSameDay, startOfDay, differenceInHours } from 'date-fns';
 import { toast } from 'sonner';
 import AddJobModal from '@/components/provider/AddJobModal';
 import BlockTimeModal from '@/components/provider/BlockTimeModal';
 import DeleteBlockTimeModal from '@/components/provider/DeleteBlockTimeModal';
-import JobDetailPanel from '@/components/provider/JobDetailPanel';
+import { JobDetailsDrawer } from '@/components/provider/calendar/JobDetailsDrawer';
 import StatusChangeDialog from '@/components/provider/StatusChangeDialog';
 import JobCardContextMenu from '@/components/provider/JobCardContextMenu';
+import TeamDispatchView from '@/components/provider/TeamDispatchView';
+import DailyTeamCalendar from '@/components/provider/calendar/DailyTeamCalendar';
+import WeeklyTeamCalendar from '@/components/provider/calendar/WeeklyTeamCalendar';
+import GanttDailyCalendar from '@/components/provider/calendar/GanttDailyCalendar';
+import { DndContext, DragEndEvent, DragStartEvent, pointerWithin, useDraggable } from '@dnd-kit/core';
 
 type ViewMode = 'day' | 'week' | 'month';
+type CalendarViewMode = 'my-schedule' | 'team-schedule';
 
 interface Job {
   id: string;
@@ -31,6 +38,15 @@ interface Job {
   createdAt: string;
   notes?: string;
   customerNotes?: string;
+  assignedUserIds: string[];
+}
+
+interface TeamMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  email: string;
 }
 
 interface BlockedTime {
@@ -48,11 +64,16 @@ export default function ProviderCalendar() {
   const router = useRouter();
   const [providerName, setProviderName] = useState('');
   const [providerId, setProviderId] = useState('');
+  const [userId, setUserId] = useState('');
+  const [userRole, setUserRole] = useState('');
   const [providerServiceTypes, setProviderServiceTypes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('week');
+  const [viewMode, setViewMode] = useState<ViewMode>('day');
+  // Default to team schedule - my-schedule is for mobile field worker view
+  const [calendarViewMode, setCalendarViewMode] = useState<CalendarViewMode>('team-schedule');
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [showAddJobModal, setShowAddJobModal] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<{ date: Date; hour: number } | null>(null);
@@ -63,6 +84,7 @@ export default function ProviderCalendar() {
   const [targetStatus, setTargetStatus] = useState<string>('');
   const [showDeleteBlockModal, setShowDeleteBlockModal] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<BlockedTime | null>(null);
+  const [activeDragJob, setActiveDragJob] = useState<Job | null>(null);
 
   // Set default view mode based on screen size
   useEffect(() => {
@@ -83,6 +105,8 @@ export default function ProviderCalendar() {
   useEffect(() => {
     const id = localStorage.getItem('providerId');
     const name = localStorage.getItem('providerName');
+    const uid = localStorage.getItem('userId');
+    const role = localStorage.getItem('userRole');
 
     if (!id || !name) {
       router.push('/provider/login');
@@ -91,9 +115,12 @@ export default function ProviderCalendar() {
 
     setProviderId(id);
     setProviderName(name);
+    setUserId(uid || '');
+    setUserRole(role || 'owner');
     fetchProviderDetails(id);
     fetchJobs(id);
     fetchBlockedTimes(id);
+    fetchTeamMembers(id);
   }, [router]);
 
   const fetchProviderDetails = async (id: string) => {
@@ -134,6 +161,85 @@ export default function ProviderCalendar() {
       }
     } catch (error) {
       console.error('Failed to load blocked times:', error);
+    }
+  };
+
+  const fetchTeamMembers = async (id: string) => {
+    try {
+      const res = await fetch(`/api/provider/team?providerId=${id}`);
+      const data = await res.json();
+
+      if (data.users) {
+        setTeamMembers(data.users);
+      }
+    } catch (error) {
+      console.error('Failed to load team members:', error);
+    }
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event;
+    const job = jobs.find(j => j.id === active.id);
+    if (job) {
+      setActiveDragJob(job);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragJob(null);
+
+    if (!over) {
+      console.log('No drop target');
+      return;
+    }
+
+    const jobId = active.id as string;
+    const dropData = over.id.toString().split('_');
+
+    // Format: timeslot_YYYY-MM-DD_HH_userId
+    if (dropData[0] === 'timeslot') {
+      const dateStr = dropData[1];
+      const hour = Number(dropData[2]);
+      const droppedUserId = dropData[3];
+
+      const job = jobs.find(j => j.id === jobId);
+      if (!job) return;
+
+      // Calculate job duration
+      const jobDuration = (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60);
+
+      // Create new start time
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const newStartTime = new Date(year, month - 1, day, hour, 0, 0);
+
+      // Update job via API
+      try {
+        const res = await fetch('/api/provider/jobs/bulk-update', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            providerId,
+            userId,
+            updates: [{
+              id: jobId,
+              startTime: newStartTime.toISOString(),
+              duration: jobDuration,
+              assignedUserIds: droppedUserId ? [droppedUserId] : job.assignedUserIds,
+            }],
+          }),
+        });
+
+        if (!res.ok) {
+          throw new Error('Failed to update job');
+        }
+
+        toast.success('Job updated successfully');
+        await fetchJobs(providerId);
+      } catch (error) {
+        console.error('Failed to update job:', error);
+        toast.error('Failed to update job');
+      }
     }
   };
 
@@ -210,6 +316,102 @@ export default function ProviderCalendar() {
     }
   };
 
+  // Calculate comprehensive daily stats for selected date (matching weekly view)
+  // NOTE: Stats show metrics for the SELECTED DATE only.
+  // The Gantt calendar sidebar may show all unassigned jobs for convenience,
+  // but this stats calculation only counts jobs scheduled for the selected date.
+  const getDailyStats = () => {
+    if (viewMode !== 'day') return null;
+
+    // Filter jobs for selected date that are not cancelled
+    const selectedDateJobs = jobs.filter(job => {
+      const jobDate = new Date(job.startTime);
+      return (
+        isSameDay(jobDate, currentDate) &&
+        job.status !== 'cancelled'
+      );
+    });
+
+    // Calculate total hours scheduled
+    const totalHours = Math.round(selectedDateJobs.reduce((sum, j) => {
+      const start = new Date(j.startTime);
+      const end = new Date(j.endTime);
+      const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+      return sum + hours;
+    }, 0));
+
+    // Count active workers (workers with jobs today)
+    const activeWorkerIds = new Set(
+      selectedDateJobs
+        .filter(j => j.assignedUserIds && j.assignedUserIds.length > 0)
+        .flatMap(j => j.assignedUserIds || [])
+    );
+    const activeWorkers = activeWorkerIds.size;
+
+    // Total capacity (8 hours per active worker, or total team if no assignments yet)
+    const totalCapacity = Math.max(activeWorkers, teamMembers.length) * 8;
+    const avgCapacity = totalCapacity > 0 ? Math.round((totalHours / totalCapacity) * 100) : 0;
+
+    // Unassigned jobs - ONLY for the selected date, excluding cancelled/completed
+    const unassignedJobs = selectedDateJobs.filter(
+      j => (!j.assignedUserIds || j.assignedUserIds.length === 0)
+    ).length;
+
+    // Detect conflicts (overlapping jobs for same worker)
+    let conflicts = 0;
+    const workerJobsMap = new Map<string, Job[]>();
+
+    selectedDateJobs.forEach(job => {
+      if (job.assignedUserIds) {
+        job.assignedUserIds.forEach(workerId => {
+          if (!workerJobsMap.has(workerId)) {
+            workerJobsMap.set(workerId, []);
+          }
+          workerJobsMap.get(workerId)!.push(job);
+        });
+      }
+    });
+
+    workerJobsMap.forEach(workerJobs => {
+      const sorted = workerJobs.sort((a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const current = sorted[i];
+        const next = sorted[i + 1];
+        if (new Date(current.endTime) > new Date(next.startTime)) {
+          conflicts++;
+        }
+      }
+    });
+
+    // Calculate worker utilization
+    const workerUtilization = new Map<string, number>();
+    workerJobsMap.forEach((workerJobs, workerId) => {
+      const hours = workerJobs.reduce((sum, j) => {
+        const start = new Date(j.startTime);
+        const end = new Date(j.endTime);
+        return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+      }, 0);
+      workerUtilization.set(workerId, (hours / 8) * 100);
+    });
+
+    const overbookedWorkers = Array.from(workerUtilization.values()).filter(util => util > 90).length;
+    const underutilizedWorkers = Array.from(workerUtilization.values()).filter(util => util < 40).length;
+
+    return {
+      totalJobs: selectedDateJobs.length,
+      totalHours,
+      totalCapacity,
+      avgCapacity,
+      activeWorkers,
+      unassignedJobs,
+      conflicts,
+      overbookedWorkers,
+      underutilizedWorkers,
+    };
+  };
+
   const getWeekStart = (date: Date) => {
     const d = new Date(date);
     const day = d.getDay();
@@ -232,46 +434,14 @@ export default function ProviderCalendar() {
       <div className="min-h-screen bg-zinc-950">
         {/* Header */}
         <div className="border-b border-zinc-800/50 bg-zinc-900/30 backdrop-blur-sm">
-          <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-3 md:py-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 md:gap-4 mb-3 md:mb-4">
-              {/* Left: Title + Date Range */}
-              <div>
-                <h1 className="text-xl md:text-2xl font-bold text-zinc-100">Calendar</h1>
-                <p className="text-xs md:text-sm text-zinc-400 mt-0.5 md:mt-1">{getDateRangeText()}</p>
-              </div>
-
-              {/* Right: Actions */}
-              <div className="flex items-center gap-2 md:gap-3 w-full sm:w-auto">
-                <Button
-                  onClick={() => {
-                    setSelectedSlot(null);
-                    setShowAddJobModal(true);
-                  }}
-                  size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white flex-1 sm:flex-none text-xs md:text-sm h-9 md:h-10"
-                >
-                  <Plus className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
-                  Add Job
-                </Button>
-                <Button
-                  onClick={() => setShowBlockTimeModal(true)}
-                  size="sm"
-                  variant="outline"
-                  className="border-zinc-700 hover:bg-zinc-800 flex-1 sm:flex-none text-xs md:text-sm h-9 md:h-10"
-                >
-                  <Clock className="h-3.5 w-3.5 md:h-4 md:w-4 mr-1.5 md:mr-2" />
-                  Block Time
-                </Button>
-              </div>
-            </div>
-
-            {/* View Controls */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 md:gap-4">
+          <div className="w-full px-4 py-3">
+            {/* Top Row: View Controls + Action Buttons */}
+            <div className="flex items-center justify-between gap-2 mb-3">
               {/* View Toggles */}
               <div className="flex items-center gap-1 md:gap-2 bg-zinc-900/50 rounded-lg p-1 border border-zinc-800">
                 <button
                   onClick={() => setViewMode('day')}
-                  className={`flex-1 sm:flex-none px-3 md:px-4 py-2 md:py-1.5 text-xs md:text-sm font-medium rounded transition-all min-h-[44px] md:min-h-0 ${
+                  className={`px-3 md:px-4 py-2 md:py-1.5 text-xs md:text-sm font-medium rounded transition-all ${
                     viewMode === 'day'
                       ? 'bg-emerald-600 text-white'
                       : 'text-zinc-400 hover:text-zinc-200'
@@ -281,7 +451,7 @@ export default function ProviderCalendar() {
                 </button>
                 <button
                   onClick={() => setViewMode('week')}
-                  className={`flex-1 sm:flex-none px-3 md:px-4 py-2 md:py-1.5 text-xs md:text-sm font-medium rounded transition-all min-h-[44px] md:min-h-0 ${
+                  className={`px-3 md:px-4 py-2 md:py-1.5 text-xs md:text-sm font-medium rounded transition-all ${
                     viewMode === 'week'
                       ? 'bg-emerald-600 text-white'
                       : 'text-zinc-400 hover:text-zinc-200'
@@ -291,7 +461,7 @@ export default function ProviderCalendar() {
                 </button>
                 <button
                   onClick={() => setViewMode('month')}
-                  className={`flex-1 sm:flex-none px-3 md:px-4 py-2 md:py-1.5 text-xs md:text-sm font-medium rounded transition-all min-h-[44px] md:min-h-0 ${
+                  className={`px-3 md:px-4 py-2 md:py-1.5 text-xs md:text-sm font-medium rounded transition-all ${
                     viewMode === 'month'
                       ? 'bg-emerald-600 text-white'
                       : 'text-zinc-400 hover:text-zinc-200'
@@ -301,71 +471,254 @@ export default function ProviderCalendar() {
                 </button>
               </div>
 
-              {/* Navigation */}
+              {/* Date Navigation */}
               <div className="flex items-center gap-2">
                 <Button
-                  onClick={navigatePrev}
-                  size="sm"
+                  onClick={() => {
+                    const newDate = new Date(currentDate);
+                    if (viewMode === 'day') {
+                      newDate.setDate(newDate.getDate() - 1);
+                    } else if (viewMode === 'week') {
+                      newDate.setDate(newDate.getDate() - 7);
+                    } else {
+                      newDate.setMonth(newDate.getMonth() - 1);
+                    }
+                    setCurrentDate(newDate);
+                  }}
                   variant="outline"
-                  className="border-zinc-700 hover:bg-zinc-800 flex-1 sm:flex-none h-11 md:h-9"
+                  size="icon"
+                  className="border-zinc-700 hover:bg-zinc-800"
                 >
                   <ChevronLeft className="h-4 w-4" />
                 </Button>
                 <Button
-                  onClick={goToToday}
-                  size="sm"
+                  onClick={() => setCurrentDate(new Date())}
                   variant="outline"
-                  className="border-zinc-700 hover:bg-zinc-800 px-6 flex-1 sm:flex-none h-11 md:h-9 text-xs md:text-sm"
+                  size="sm"
+                  className="border-zinc-700 hover:bg-zinc-800"
                 >
                   Today
                 </Button>
                 <Button
-                  onClick={navigateNext}
-                  size="sm"
+                  onClick={() => {
+                    const newDate = new Date(currentDate);
+                    if (viewMode === 'day') {
+                      newDate.setDate(newDate.getDate() + 1);
+                    } else if (viewMode === 'week') {
+                      newDate.setDate(newDate.getDate() + 7);
+                    } else {
+                      newDate.setMonth(newDate.getMonth() + 1);
+                    }
+                    setCurrentDate(newDate);
+                  }}
                   variant="outline"
-                  className="border-zinc-700 hover:bg-zinc-800 flex-1 sm:flex-none h-11 md:h-9"
+                  size="icon"
+                  className="border-zinc-700 hover:bg-zinc-800"
                 >
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
+
+              {/* Action Buttons */}
+              <div className="flex items-center gap-2">
+                <Button
+                  onClick={() => {
+                    setSelectedSlot(null);
+                    setShowAddJobModal(true);
+                  }}
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                >
+                  <Plus className="h-4 w-4 mr-1.5" />
+                  Add Job
+                </Button>
+                <Button
+                  onClick={() => setShowBlockTimeModal(true)}
+                  size="sm"
+                  variant="outline"
+                  className="border-zinc-700 hover:bg-zinc-800 hidden md:flex"
+                >
+                  <Clock className="h-4 w-4 mr-1.5" />
+                  Block Time
+                </Button>
+              </div>
             </div>
+
+            {/* Daily Stats Section (Day view only) - Matches Weekly View */}
+            {(() => {
+              const stats = getDailyStats();
+              if (!stats) return null;
+
+              const capacityColor =
+                stats.avgCapacity > 90
+                  ? 'text-red-400'
+                  : stats.avgCapacity > 70
+                    ? 'text-yellow-400'
+                    : 'text-emerald-400';
+
+              return (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+                  {/* Title Row */}
+                  <div className="flex items-start justify-between mb-6">
+                    <div>
+                      <h2 className="text-2xl font-bold text-zinc-100">
+                        {format(currentDate, 'EEEE, MMMM d, yyyy')}
+                      </h2>
+                      <p className="text-zinc-400 mt-1">
+                        {stats.totalJobs} jobs scheduled across {stats.activeWorkers} workers
+                      </p>
+                    </div>
+
+                    {/* Average capacity badge */}
+                    <div className="text-center">
+                      <div className={`text-4xl font-bold ${capacityColor}`}>
+                        {stats.avgCapacity}%
+                      </div>
+                      <div className="text-sm text-zinc-500">Avg Capacity</div>
+                    </div>
+                  </div>
+
+                  {/* Stat Cards Row - 5 cards matching weekly view */}
+                  <div className="grid grid-cols-5 gap-4">
+                    {/* Total Hours */}
+                    <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Clock className="h-4 w-4 text-zinc-300 opacity-70" />
+                        <span className="text-xs font-medium text-zinc-300 opacity-70">Total Hours</span>
+                      </div>
+                      <div className="text-2xl font-bold text-zinc-300">{stats.totalHours}h</div>
+                      <div className="text-xs text-zinc-300 opacity-60 mt-0.5">
+                        of {stats.totalCapacity}h capacity
+                      </div>
+                    </div>
+
+                    {/* Unassigned */}
+                    <div className={`rounded-lg border p-3 ${
+                      stats.unassignedJobs > 0
+                        ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                        : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        {stats.unassignedJobs > 0 ? (
+                          <AlertTriangle className="h-4 w-4 opacity-70" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4 opacity-70" />
+                        )}
+                        <span className="text-xs font-medium opacity-70">Unassigned</span>
+                      </div>
+                      <div className="text-2xl font-bold">{stats.unassignedJobs}</div>
+                      <div className="text-xs opacity-60 mt-0.5">jobs need workers</div>
+                    </div>
+
+                    {/* Conflicts */}
+                    <div className={`rounded-lg border p-3 ${
+                      stats.conflicts > 0
+                        ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                        : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        {stats.conflicts > 0 ? (
+                          <XCircle className="h-4 w-4 opacity-70" />
+                        ) : (
+                          <CheckCircle className="h-4 w-4 opacity-70" />
+                        )}
+                        <span className="text-xs font-medium opacity-70">Conflicts</span>
+                      </div>
+                      <div className="text-2xl font-bold">{stats.conflicts}</div>
+                      <div className="text-xs opacity-60 mt-0.5">scheduling conflicts</div>
+                    </div>
+
+                    {/* Overbooked */}
+                    <div className={`rounded-lg border p-3 ${
+                      stats.overbookedWorkers > 0
+                        ? 'bg-red-500/10 border-red-500/30 text-red-400'
+                        : 'bg-zinc-800 border-zinc-700 text-zinc-300'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Users className="h-4 w-4 opacity-70" />
+                        <span className="text-xs font-medium opacity-70">Overbooked</span>
+                      </div>
+                      <div className="text-2xl font-bold">{stats.overbookedWorkers}</div>
+                      <div className="text-xs opacity-60 mt-0.5">workers &gt;90%</div>
+                    </div>
+
+                    {/* Underutilized */}
+                    <div className={`rounded-lg border p-3 ${
+                      stats.underutilizedWorkers > 0
+                        ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                        : 'bg-zinc-800 border-zinc-700 text-zinc-300'
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <TrendingDown className="h-4 w-4 opacity-70" />
+                        <span className="text-xs font-medium opacity-70">Underutilized</span>
+                      </div>
+                      <div className="text-2xl font-bold">{stats.underutilizedWorkers}</div>
+                      <div className="text-xs opacity-60 mt-0.5">workers &lt;40%</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
 
-        {/* Calendar Views */}
-        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 py-6">
-          {viewMode === 'week' && (
-            <WeekView
-              jobs={jobs}
-              blockedTimes={blockedTimes}
-              currentDate={currentDate}
-              onSlotClick={(date, hour) => {
-                setSelectedSlot({ date, hour });
-                setShowAddJobModal(true);
-              }}
-              onJobClick={(job) => setSelectedJob(job)}
-              onStatusChange={handleStatusChange}
-              onDeleteJob={handleDeleteJob}
-              onBlockClick={handleBlockClick}
-            />
-          )}
-          {viewMode === 'day' && (
-            <DayView
-              jobs={jobs}
-              blockedTimes={blockedTimes}
-              currentDate={currentDate}
-              onSlotClick={(hour) => {
-                setSelectedSlot({ date: currentDate, hour });
-                setShowAddJobModal(true);
-              }}
-              onJobClick={(job) => setSelectedJob(job)}
-              onStatusChange={handleStatusChange}
-              onDeleteJob={handleDeleteJob}
-              onBlockClick={handleBlockClick}
-            />
-          )}
-          {viewMode === 'month' && <MonthView jobs={jobs} currentDate={currentDate} />}
-        </div>
+        {/* Calendar Views - Wrapped in DndContext */}
+        <DndContext
+          collisionDetection={pointerWithin}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="w-full py-2">
+            {viewMode === 'week' && (
+              <WeeklyTeamCalendar
+                providerId={providerId}
+                onJobClick={(jobId) => {
+                  const job = jobs.find(j => j.id === jobId);
+                  if (job) setSelectedJob(job);
+                }}
+                onDayClick={(workerId, date) => {
+                  // Switch to daily view for the selected day
+                  setCurrentDate(new Date(date));
+                  setViewMode('day');
+                  setCalendarViewMode('team-schedule');
+                }}
+              />
+            )}
+            {viewMode === 'day' && calendarViewMode === 'my-schedule' && (
+              <DayView
+                jobs={jobs}
+                blockedTimes={blockedTimes}
+                currentDate={currentDate}
+                onSlotClick={(hour) => {
+                  setSelectedSlot({ date: currentDate, hour });
+                  setShowAddJobModal(true);
+                }}
+                onJobClick={(job) => setSelectedJob(job)}
+                onStatusChange={handleStatusChange}
+                onDeleteJob={handleDeleteJob}
+                onBlockClick={handleBlockClick}
+              />
+            )}
+            {viewMode === 'day' && calendarViewMode === 'team-schedule' && (
+              <GanttDailyCalendar
+                providerId={providerId}
+                initialDate={currentDate}
+                onJobClick={(jobId) => {
+                  const job = jobs.find(j => j.id === jobId);
+                  if (job) setSelectedJob(job);
+                }}
+                onAddJob={(workerId, hour) => {
+                  if (hour !== undefined) {
+                    setSelectedSlot({ date: currentDate, hour });
+                  }
+                  setShowAddJobModal(true);
+                }}
+              />
+            )}
+            {viewMode === 'month' && <MonthView jobs={jobs} currentDate={currentDate} />}
+          </div>
+
+        </DndContext>
       </div>
 
       {/* Add Job Modal */}
@@ -392,12 +745,12 @@ export default function ProviderCalendar() {
         }}
       />
 
-      {/* Job Detail Panel */}
-      <JobDetailPanel
+      {/* Job Details Drawer */}
+      <JobDetailsDrawer
         job={selectedJob}
         isOpen={!!selectedJob}
         onClose={() => setSelectedJob(null)}
-        onJobUpdated={() => fetchJobs(providerId)}
+        onDelete={handleDeleteJob}
       />
 
       {/* Status Change Dialog */}
@@ -549,7 +902,7 @@ function WeekView({ jobs, blockedTimes, currentDate, onSlotClick, onJobClick, on
 
   return (
     <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 overflow-hidden">
-      <div className="overflow-auto max-h-[calc(100vh-250px)]">
+      <div className="overflow-x-auto">
         {/* FIXED: Day Headers - Now sticky and above grid */}
         <div className="grid grid-cols-8 border-b border-zinc-800/50 bg-zinc-900 sticky top-0 z-20">
           <div className="p-3 border-r border-zinc-800/30">

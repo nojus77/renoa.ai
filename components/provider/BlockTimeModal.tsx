@@ -203,7 +203,14 @@ export default function BlockTimeModal({
           <div className="p-6 space-y-6">
             {/* Date Range */}
             <div>
-              <h3 className="text-lg font-semibold text-zinc-100 mb-4">Date Range</h3>
+              <h3 className="text-lg font-semibold text-zinc-100 mb-4">
+                Date Range
+                {selectedDate && (
+                  <span className="ml-2 text-sm text-orange-400 font-normal">
+                    📅 {new Date(blockData.fromDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                  </span>
+                )}
+              </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-2">
@@ -216,6 +223,11 @@ export default function BlockTimeModal({
                     className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
                     required
                   />
+                  {selectedDate && (
+                    <p className="mt-1 text-xs text-zinc-500">
+                      Blocking time for the selected date
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -229,6 +241,9 @@ export default function BlockTimeModal({
                     className="w-full px-4 py-2.5 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-orange-500"
                     required
                   />
+                  <p className="mt-1 text-xs text-zinc-500">
+                    Same day block or multi-day
+                  </p>
                 </div>
               </div>
             </div>
@@ -236,6 +251,32 @@ export default function BlockTimeModal({
             {/* Time Range */}
             <div>
               <h3 className="text-lg font-semibold text-zinc-100 mb-4">Time Range</h3>
+
+              {/* Quick Time Presets */}
+              <div className="flex gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setBlockData(prev => ({ ...prev, startTime: '', endTime: '' }))}
+                  className="px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700 transition-colors"
+                >
+                  All Day
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBlockData(prev => ({ ...prev, startTime: '07:00', endTime: '12:00' }))}
+                  className="px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700 transition-colors"
+                >
+                  Morning (7AM-12PM)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBlockData(prev => ({ ...prev, startTime: '12:00', endTime: '17:00' }))}
+                  className="px-3 py-1.5 text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-lg border border-zinc-700 transition-colors"
+                >
+                  Afternoon (12PM-5PM)
+                </button>
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-2">

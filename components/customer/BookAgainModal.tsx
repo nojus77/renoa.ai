@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Calendar, Clock, MapPin, DollarSign, CheckCircle, Loader2, Tag, Sparkles } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, DollarSign, CheckCircle, Loader2, Tag, Sparkles, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { toast } from 'sonner';
 
 interface Promotion {
@@ -14,6 +15,13 @@ interface Promotion {
   status: string;
   triggerType: string;
   message: string | null;
+}
+
+interface Upsell {
+  id: string;
+  upsellService: string;
+  upsellPrice: number;
+  description: string;
 }
 
 interface BookAgainModalProps {
@@ -48,13 +56,17 @@ export default function BookAgainModal({
   const [availablePromos, setAvailablePromos] = useState<Promotion[]>([]);
   const [selectedPromo, setSelectedPromo] = useState<Promotion | null>(null);
   const [loadingPromos, setLoadingPromos] = useState(false);
+  const [availableUpsells, setAvailableUpsells] = useState<Upsell[]>([]);
+  const [selectedUpsells, setSelectedUpsells] = useState<string[]>([]);
+  const [loadingUpsells, setLoadingUpsells] = useState(false);
 
-  // Fetch available promotions when modal opens
+  // Fetch available promotions and upsells when modal opens
   useEffect(() => {
     if (isOpen) {
       fetchAvailablePromos();
+      fetchAvailableUpsells();
     }
-  }, [isOpen]);
+  }, [isOpen, serviceType]);
 
   const fetchAvailablePromos = async () => {
     try {
@@ -85,6 +97,28 @@ export default function BookAgainModal({
     }
   };
 
+  const fetchAvailableUpsells = async () => {
+    try {
+      setLoadingUpsells(true);
+      const response = await fetch(`/api/customer/upsells?baseService=${encodeURIComponent(serviceType)}`);
+      const data = await response.json();
+
+      if (data.upsells && data.upsells.length > 0) {
+        setAvailableUpsells(data.upsells);
+      }
+    } catch (error) {
+      console.error('Error fetching upsells:', error);
+    } finally {
+      setLoadingUpsells(false);
+    }
+  };
+
+  const calculateUpsellsTotal = () => {
+    return availableUpsells
+      .filter((upsell) => selectedUpsells.includes(upsell.id))
+      .reduce((sum, upsell) => sum + upsell.upsellPrice, 0);
+  };
+
   const calculateDiscount = () => {
     if (!selectedPromo) return 0;
 
@@ -99,8 +133,12 @@ export default function BookAgainModal({
     return 0;
   };
 
+  const getSubtotal = () => {
+    return estimatedValue + calculateUpsellsTotal();
+  };
+
   const getFinalPrice = () => {
-    return Math.max(0, estimatedValue - calculateDiscount());
+    return Math.max(0, getSubtotal() - calculateDiscount());
   };
 
   if (!isOpen) return null;
@@ -118,6 +156,14 @@ export default function BookAgainModal({
       const endDateTime = new Date(startDateTime);
       endDateTime.setHours(endDateTime.getHours() + duration);
 
+      // Prepare upsells data
+      const upsellsData = availableUpsells
+        .filter((upsell) => selectedUpsells.includes(upsell.id))
+        .map((upsell) => ({
+          service: upsell.upsellService,
+          price: upsell.upsellPrice,
+        }));
+
       const response = await fetch('/api/customer/jobs/book', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -130,6 +176,7 @@ export default function BookAgainModal({
           customerNotes: notes || undefined,
           bookingSource,
           promoCode: selectedPromo?.promoCode || undefined,
+          upsells: upsellsData.length > 0 ? upsellsData : undefined,
         }),
       });
 
@@ -313,40 +360,52 @@ export default function BookAgainModal({
         <div className="bg-gradient-to-br from-emerald-50 to-teal-50 border-2 border-emerald-200 rounded-lg p-4 mb-6">
           <div className="space-y-2 text-sm">
             <div className="flex justify-between text-zinc-700">
-              <span>Original Price:</span>
-              <span className={selectedPromo ? 'line-through' : 'font-semibold'}>
-                ${estimatedValue.toFixed(2)}
-              </span>
+              <span>Base Service:</span>
+              <span>${estimatedValue.toFixed(2)}</span>
             </div>
+            {calculateUpsellsTotal() > 0 && (
+              <div className="flex justify-between text-purple-700 font-medium">
+                <span className="flex items-center gap-1">
+                  <Plus className="h-4 w-4" />
+                  Add-ons ({selectedUpsells.length})
+                </span>
+                <span>+${calculateUpsellsTotal().toFixed(2)}</span>
+              </div>
+            )}
+            {(calculateUpsellsTotal() > 0 || selectedPromo) && (
+              <>
+                <div className="border-t border-emerald-300 my-2"></div>
+                <div className="flex justify-between text-zinc-700">
+                  <span>Subtotal:</span>
+                  <span className={selectedPromo ? 'line-through' : 'font-semibold'}>
+                    ${getSubtotal().toFixed(2)}
+                  </span>
+                </div>
+              </>
+            )}
             {selectedPromo && (
               <>
                 <div className="flex justify-between text-emerald-700 font-medium">
                   <span className="flex items-center gap-1">
                     <Tag className="h-4 w-4" />
-                    Promo Applied: {selectedPromo.promoCode}
+                    Promo: {selectedPromo.promoCode}
                   </span>
                   <span>-${calculateDiscount().toFixed(2)}</span>
                 </div>
                 <div className="border-t border-emerald-300 my-2"></div>
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-zinc-900">Final Price:</span>
-                  <span className="text-2xl font-bold text-emerald-600">
-                    ${getFinalPrice().toFixed(2)}
-                  </span>
-                </div>
-                <div className="bg-green-100 border border-green-300 rounded-md px-3 py-2 text-center">
-                  <p className="text-sm font-semibold text-green-700">
-                    You saved ${calculateDiscount().toFixed(2)}!
-                  </p>
-                </div>
               </>
             )}
-            {!selectedPromo && (
-              <div className="flex justify-between items-center">
-                <span className="font-bold text-zinc-900">Total:</span>
-                <span className="text-2xl font-bold text-emerald-600">
-                  ${estimatedValue.toFixed(2)}
-                </span>
+            <div className="flex justify-between items-center">
+              <span className="font-bold text-zinc-900">Total:</span>
+              <span className="text-2xl font-bold text-emerald-600">
+                ${getFinalPrice().toFixed(2)}
+              </span>
+            </div>
+            {selectedPromo && (
+              <div className="bg-green-100 border border-green-300 rounded-md px-3 py-2 text-center">
+                <p className="text-sm font-semibold text-green-700">
+                  You saved ${calculateDiscount().toFixed(2)}!
+                </p>
               </div>
             )}
           </div>
@@ -400,6 +459,81 @@ export default function BookAgainModal({
             <option value={8}>Full day (8 hours)</option>
           </select>
         </div>
+
+        {/* Maximize Your Visit - Upsells Section */}
+        {availableUpsells.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Plus className="h-5 w-5 text-purple-600" />
+              <h3 className="text-lg font-bold text-zinc-900">Maximize Your Visit</h3>
+            </div>
+            <p className="text-sm text-zinc-600 mb-4">
+              While we&apos;re there, add these popular services and save time:
+            </p>
+
+            {loadingUpsells ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {availableUpsells.map((upsell) => (
+                  <div
+                    key={upsell.id}
+                    className={`p-4 border-2 rounded-lg transition-all cursor-pointer ${
+                      selectedUpsells.includes(upsell.id)
+                        ? 'border-purple-300 bg-purple-50'
+                        : 'border-zinc-200 hover:border-purple-200 bg-white'
+                    }`}
+                    onClick={() => {
+                      if (selectedUpsells.includes(upsell.id)) {
+                        setSelectedUpsells(selectedUpsells.filter((id) => id !== upsell.id));
+                      } else {
+                        setSelectedUpsells([...selectedUpsells, upsell.id]);
+                      }
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <Checkbox
+                        checked={selectedUpsells.includes(upsell.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedUpsells([...selectedUpsells, upsell.id]);
+                          } else {
+                            setSelectedUpsells(selectedUpsells.filter((id) => id !== upsell.id));
+                          }
+                        }}
+                        className="mt-1"
+                      />
+                      <div className="flex-1">
+                        <div className="flex justify-between items-start mb-1">
+                          <h4 className="font-semibold text-zinc-900">{upsell.upsellService}</h4>
+                          <span className="text-emerald-600 font-bold text-sm whitespace-nowrap ml-2">
+                            +${upsell.upsellPrice}
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-600">{upsell.description}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {selectedUpsells.length > 0 && (
+              <div className="mt-3 p-3 bg-purple-50 border border-purple-200 rounded-lg">
+                <div className="flex justify-between items-center text-sm">
+                  <span className="text-purple-900 font-semibold">
+                    {selectedUpsells.length} add-on{selectedUpsells.length > 1 ? 's' : ''} selected
+                  </span>
+                  <span className="text-purple-600 font-bold">
+                    +${calculateUpsellsTotal().toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Optional Notes */}
         <div className="mb-6">

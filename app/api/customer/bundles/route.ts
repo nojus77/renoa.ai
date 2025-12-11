@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
       else currentSeason = 'winter';
     }
 
-    const bundles = await prisma.serviceBundle.findMany({
+    const bundles = await prisma.service_bundles.findMany({
       where: {
         active: true,
         ...(season === 'all'
@@ -30,14 +30,14 @@ export async function GET(request: NextRequest) {
               OR: [{ season: currentSeason }, { season: null }], // Current season + year-round
             }),
       },
-      orderBy: [{ displayOrder: 'asc' }, { createdAt: 'desc' }],
+      orderBy: [{ display_order: 'asc' }, { created_at: 'desc' }],
     });
 
     // Convert Decimal fields to numbers
     const formattedBundles = bundles.map((bundle) => ({
       ...bundle,
-      regularPrice: Number(bundle.regularPrice),
-      bundlePrice: Number(bundle.bundlePrice),
+      regularPrice: Number(bundle.regular_price),
+      bundlePrice: Number(bundle.bundle_price),
       savings: Number(bundle.savings),
     }));
 

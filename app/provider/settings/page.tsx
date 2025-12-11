@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ProviderLayout from '@/components/provider/ProviderLayout';
@@ -24,6 +24,8 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import Cropper from 'react-easy-crop';
+import type { Area } from 'react-easy-crop';
 
 type TabType = 'profile' | 'business' | 'availability' | 'services' | 'notifications' | 'payments' | 'integrations' | 'security';
 
@@ -67,6 +69,16 @@ export default function ProviderSettings() {
   const [yearsInBusiness, setYearsInBusiness] = useState(0);
   const [certifications, setCertifications] = useState<string[]>([]);
   const [newCertification, setNewCertification] = useState('');
+  const [avatar, setAvatar] = useState('');
+  const [uploading, setUploading] = useState(false);
+
+  // Photo cropping
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imageSrc, setImageSrc] = useState<string | null>(null);
+  const [crop, setCrop] = useState({ x: 0, y: 0 });
+  const [zoom, setZoom] = useState(1);
+  const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
+  const [showCropModal, setShowCropModal] = useState(false);
 
   // Business
   const [businessName, setBusinessName] = useState('');
@@ -74,6 +86,8 @@ export default function ProviderSettings() {
   const [businessCity, setBusinessCity] = useState('');
   const [businessState, setBusinessState] = useState('');
   const [businessZip, setBusinessZip] = useState('');
+  const [taxId, setTaxId] = useState('');
+  const [businessEntity, setBusinessEntity] = useState('');
   const [serviceRadius, setServiceRadius] = useState(25);
   const [website, setWebsite] = useState('');
   const [businessHours, setBusinessHours] = useState('Mon-Fri: 9 AM - 5 PM');
@@ -142,6 +156,51 @@ export default function ProviderSettings() {
   const loadSettings = async (id: string) => {
     setLoading(true);
     try {
+      // Load profile settings
+      const profileRes = await fetch(`/api/provider/profile?providerId=${id}`);
+      const profileData = await profileRes.json();
+
+      if (profileData.provider) {
+        const provider = profileData.provider;
+        setBusinessName(provider.businessName || '');
+        setEmail(provider.email || '');
+        setPhone(provider.phone || '');
+        setBio(provider.bio || '');
+        setYearsInBusiness(provider.yearsInBusiness || 0);
+        setCertifications(provider.certifications || []);
+        setAvatar(provider.avatar || '');
+
+        // Split ownerName into firstName and lastName
+        if (provider.ownerName) {
+          const nameParts = provider.ownerName.trim().split(' ');
+          if (nameParts.length === 1) {
+            setFirstName(nameParts[0]);
+            setLastName('');
+          } else {
+            setFirstName(nameParts[0]);
+            setLastName(nameParts.slice(1).join(' '));
+          }
+        }
+      }
+
+      // Load business settings
+      const businessRes = await fetch(`/api/provider/settings/business?providerId=${id}`);
+      const businessData = await businessRes.json();
+
+      if (businessData.provider) {
+        const provider = businessData.provider;
+        setBusinessName(provider.businessName || '');
+        setBusinessAddress(provider.businessAddress || '');
+        setBusinessCity(provider.city || '');
+        setBusinessState(provider.state || '');
+        setBusinessZip(provider.zipCode || '');
+        setTaxId(provider.taxId || '');
+        setBusinessEntity(provider.businessEntity || '');
+        setServiceRadius(provider.serviceRadius || 25);
+        setWebsite(provider.website || '');
+        setBusinessHours(provider.businessHours || 'Mon-Fri: 9 AM - 5 PM');
+      }
+
       // Load availability settings
       const res = await fetch(`/api/provider/availability?providerId=${id}`);
       const data = await res.json();
@@ -159,22 +218,248 @@ export default function ProviderSettings() {
   const saveProfileSettings = async () => {
     setSaving(true);
     try {
-      // API call would go here
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Combine firstName and lastName into ownerName
+      const ownerName = `${firstName.trim()} ${lastName.trim()}`.trim();
+
+      const res = await fetch('/api/provider/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId,
+          businessName,
+          ownerName,
+          bio,
+          yearsInBusiness,
+          certifications,
+          avatar,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save profile');
+      }
+
       toast.success('Profile settings saved');
-    } catch (error) {
-      toast.error('Failed to save profile settings');
+    } catch (error: any) {
+      console.error('Error saving profile:', error);
+      toast.error(error.message || 'Failed to save profile settings');
     } finally {
       setSaving(false);
     }
   };
 
+  const handlePhotoUpload = async (file: File) => {
+    if (!file) return;
+
+    // Check file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    // Check file type
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a JPG, PNG, or WebP image');
+      return;
+    }
+
+    // Open crop modal instead of immediately uploading
+    setSelectedImage(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageSrc(reader.result as string);
+      setShowCropModal(true);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const onCropComplete = useCallback((croppedArea: Area, croppedAreaPixels: Area) => {
+    setCroppedAreaPixels(croppedAreaPixels);
+  }, []);
+
+  const createImage = (url: string): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const image = new Image();
+      image.addEventListener('load', () => resolve(image));
+      image.addEventListener('error', (error) => reject(error));
+      image.setAttribute('crossOrigin', 'anonymous');
+      image.src = url;
+    });
+
+  const getCroppedImg = async (
+    imageSrc: string,
+    pixelCrop: Area
+  ): Promise<Blob> => {
+    const image = await createImage(imageSrc);
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) {
+      throw new Error('No 2d context');
+    }
+
+    canvas.width = pixelCrop.width;
+    canvas.height = pixelCrop.height;
+
+    ctx.drawImage(
+      image,
+      pixelCrop.x,
+      pixelCrop.y,
+      pixelCrop.width,
+      pixelCrop.height,
+      0,
+      0,
+      pixelCrop.width,
+      pixelCrop.height
+    );
+
+    return new Promise((resolve, reject) => {
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Canvas is empty'));
+          return;
+        }
+        resolve(blob);
+      }, 'image/jpeg');
+    });
+  };
+
+  const handleCropComplete = async () => {
+    if (!imageSrc || !croppedAreaPixels) return;
+
+    setUploading(true);
+    toast.loading('Uploading photo...');
+
+    try {
+      const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
+
+      const formDataObj = new FormData();
+      formDataObj.append('file', croppedBlob, 'profile-photo.jpg');
+      formDataObj.append('providerId', providerId);
+
+      const res = await fetch('/api/provider/profile/photo/upload', {
+        method: 'POST',
+        body: formDataObj,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to upload photo');
+      }
+
+      setAvatar(data.url);
+      toast.dismiss();
+      toast.success('Photo uploaded successfully!');
+
+      // Close modal and reset states
+      setShowCropModal(false);
+      setSelectedImage(null);
+      setImageSrc(null);
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+      setCroppedAreaPixels(null);
+
+      // Reload page to refresh sidebar
+      window.location.reload();
+    } catch (error: any) {
+      console.error('Error uploading photo:', error);
+      toast.dismiss();
+      toast.error(error.message || 'Failed to upload photo');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handlePhotoDelete = async () => {
+    if (!avatar) return;
+
+    try {
+      toast.loading('Deleting photo...');
+
+      const res = await fetch('/api/provider/profile/photo/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete photo');
+      }
+
+      setAvatar('');
+      toast.dismiss();
+      toast.success('Photo deleted successfully!');
+    } catch (error: any) {
+      console.error('Error deleting photo:', error);
+      toast.dismiss();
+      toast.error(error.message || 'Failed to delete photo');
+    }
+  };
+
   const saveBusinessSettings = async () => {
+    // Validate required fields
+    if (!businessName.trim()) {
+      toast.error('Business name is required');
+      return;
+    }
+    if (!taxId.trim()) {
+      toast.error('EIN/Tax ID is required');
+      return;
+    }
+    if (!businessAddress.trim()) {
+      toast.error('Business address is required');
+      return;
+    }
+    if (!businessCity.trim()) {
+      toast.error('City is required');
+      return;
+    }
+    if (!businessState.trim()) {
+      toast.error('State is required');
+      return;
+    }
+    if (!businessZip.trim()) {
+      toast.error('ZIP code is required');
+      return;
+    }
+    if (!businessEntity) {
+      toast.error('Business entity type is required');
+      return;
+    }
+
     setSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const res = await fetch('/api/provider/settings/business', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId,
+          businessName,
+          businessAddress,
+          city: businessCity,
+          state: businessState,
+          zipCode: businessZip,
+          taxId,
+          businessEntity,
+          serviceRadius,
+          website,
+          businessHours,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save business settings');
+      }
+
       toast.success('Business settings saved');
     } catch (error) {
+      console.error('Error saving business settings:', error);
       toast.error('Failed to save business settings');
     } finally {
       setSaving(false);
@@ -207,9 +492,37 @@ export default function ProviderSettings() {
   const saveServicesSettings = async () => {
     setSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Convert services array to pricing object
+      const servicePricing = services.reduce((acc, service) => {
+        if (service.enabled) {
+          acc[service.id] = {
+            enabled: true,
+            minPrice: service.minPrice,
+            maxPrice: service.maxPrice,
+          };
+        }
+        return acc;
+      }, {} as Record<string, { enabled: boolean; minPrice: number; maxPrice: number }>);
+
+      const res = await fetch('/api/provider/settings/services', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId,
+          servicePricing,
+          minimumJobValue,
+          depositRequired,
+          depositPercentage,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save services settings');
+      }
+
       toast.success('Services settings saved');
     } catch (error) {
+      console.error('Error saving services settings:', error);
       toast.error('Failed to save services settings');
     } finally {
       setSaving(false);
@@ -231,9 +544,28 @@ export default function ProviderSettings() {
   const savePaymentSettings = async () => {
     setSaving(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const acceptedMethods = paymentMethods
+        .filter(m => m.enabled)
+        .map(m => m.id);
+
+      const res = await fetch('/api/provider/settings/payments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId,
+          paymentTerms,
+          acceptedPaymentMethods: acceptedMethods,
+          autoInvoiceOnCompletion: autoInvoice,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save payment settings');
+      }
+
       toast.success('Payment settings saved');
     } catch (error) {
+      console.error('Error saving payment settings:', error);
       toast.error('Failed to save payment settings');
     } finally {
       setSaving(false);
@@ -321,6 +653,61 @@ export default function ProviderSettings() {
                     <CardTitle className="text-zinc-100">Profile Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
+                    {/* Photo Upload */}
+                    <div>
+                      <label className="block text-sm font-medium text-zinc-300 mb-3">
+                        Business Logo / Avatar
+                      </label>
+                      <div className="flex items-center gap-6">
+                        {avatar ? (
+                          <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-emerald-500">
+                            <img
+                              src={avatar}
+                              alt="Profile"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ) : (
+                          <div className="w-24 h-24 rounded-lg border-2 border-dashed border-zinc-700 flex items-center justify-center bg-zinc-900">
+                            <Upload className="h-8 w-8 text-zinc-600" />
+                          </div>
+                        )}
+                        <div className="flex-1">
+                          <div className="flex gap-3">
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handlePhotoUpload(file);
+                              }}
+                              id="avatar-upload"
+                              className="hidden"
+                            />
+                            <label
+                              htmlFor="avatar-upload"
+                              className="inline-flex items-center px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg cursor-pointer hover:bg-zinc-700 transition-colors"
+                            >
+                              <Upload className="h-4 w-4 mr-2" />
+                              {uploading ? 'Uploading...' : avatar ? 'Change Photo' : 'Upload Photo'}
+                            </label>
+                            {avatar && !uploading && (
+                              <button
+                                onClick={handlePhotoDelete}
+                                className="inline-flex items-center px-4 py-2 bg-red-900/20 border border-red-800 text-red-400 rounded-lg hover:bg-red-900/40 transition-colors"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-xs text-zinc-500 mt-2">
+                            PNG, JPG up to 5MB. Recommended: 400x400px
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <label className="block text-sm font-medium text-zinc-300 mb-2">
@@ -460,25 +847,65 @@ export default function ProviderSettings() {
                 <Card className="bg-zinc-900/50 border-zinc-800">
                   <CardHeader>
                     <CardTitle className="text-zinc-100">Business Information</CardTitle>
+                    <p className="text-sm text-zinc-400 mt-1">
+                      Required for invoicing and legal compliance
+                    </p>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Business Name *
+                          Business Legal Name <span className="text-red-400">*</span>
                         </label>
                         <input
                           type="text"
                           value={businessName}
                           onChange={(e) => setBusinessName(e.target.value)}
                           className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="Green Thumb Landscaping"
+                          placeholder="Green Thumb Landscaping LLC"
+                          required
                         />
                       </div>
 
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Business Address
+                          EIN / Tax ID <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={taxId}
+                          onChange={(e) => setTaxId(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="XX-XXXXXXX"
+                          required
+                        />
+                        <p className="text-xs text-zinc-500 mt-1">
+                          Required for tax reporting and professional invoices
+                        </p>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Business Entity Type <span className="text-red-400">*</span>
+                        </label>
+                        <select
+                          value={businessEntity}
+                          onChange={(e) => setBusinessEntity(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          required
+                        >
+                          <option value="">Select entity type...</option>
+                          <option value="llc">LLC (Limited Liability Company)</option>
+                          <option value="corporation">Corporation</option>
+                          <option value="s_corp">S Corporation</option>
+                          <option value="sole_proprietor">Sole Proprietor</option>
+                          <option value="partnership">Partnership</option>
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Business Address <span className="text-red-400">*</span>
                         </label>
                         <input
                           type="text"
@@ -486,12 +913,13 @@ export default function ProviderSettings() {
                           onChange={(e) => setBusinessAddress(e.target.value)}
                           className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
                           placeholder="123 Main Street"
+                          required
                         />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          City
+                          City <span className="text-red-400">*</span>
                         </label>
                         <input
                           type="text"
@@ -499,19 +927,86 @@ export default function ProviderSettings() {
                           onChange={(e) => setBusinessCity(e.target.value)}
                           className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
                           placeholder="Austin"
+                          required
                         />
                       </div>
 
                       <div>
                         <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          State
+                          State <span className="text-red-400">*</span>
                         </label>
-                        <input
-                          type="text"
+                        <select
                           value={businessState}
                           onChange={(e) => setBusinessState(e.target.value)}
                           className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="TX"
+                          required
+                        >
+                          <option value="">Select state...</option>
+                          <option value="AL">Alabama</option>
+                          <option value="AK">Alaska</option>
+                          <option value="AZ">Arizona</option>
+                          <option value="AR">Arkansas</option>
+                          <option value="CA">California</option>
+                          <option value="CO">Colorado</option>
+                          <option value="CT">Connecticut</option>
+                          <option value="DE">Delaware</option>
+                          <option value="FL">Florida</option>
+                          <option value="GA">Georgia</option>
+                          <option value="HI">Hawaii</option>
+                          <option value="ID">Idaho</option>
+                          <option value="IL">Illinois</option>
+                          <option value="IN">Indiana</option>
+                          <option value="IA">Iowa</option>
+                          <option value="KS">Kansas</option>
+                          <option value="KY">Kentucky</option>
+                          <option value="LA">Louisiana</option>
+                          <option value="ME">Maine</option>
+                          <option value="MD">Maryland</option>
+                          <option value="MA">Massachusetts</option>
+                          <option value="MI">Michigan</option>
+                          <option value="MN">Minnesota</option>
+                          <option value="MS">Mississippi</option>
+                          <option value="MO">Missouri</option>
+                          <option value="MT">Montana</option>
+                          <option value="NE">Nebraska</option>
+                          <option value="NV">Nevada</option>
+                          <option value="NH">New Hampshire</option>
+                          <option value="NJ">New Jersey</option>
+                          <option value="NM">New Mexico</option>
+                          <option value="NY">New York</option>
+                          <option value="NC">North Carolina</option>
+                          <option value="ND">North Dakota</option>
+                          <option value="OH">Ohio</option>
+                          <option value="OK">Oklahoma</option>
+                          <option value="OR">Oregon</option>
+                          <option value="PA">Pennsylvania</option>
+                          <option value="RI">Rhode Island</option>
+                          <option value="SC">South Carolina</option>
+                          <option value="SD">South Dakota</option>
+                          <option value="TN">Tennessee</option>
+                          <option value="TX">Texas</option>
+                          <option value="UT">Utah</option>
+                          <option value="VT">Vermont</option>
+                          <option value="VA">Virginia</option>
+                          <option value="WA">Washington</option>
+                          <option value="WV">West Virginia</option>
+                          <option value="WI">Wisconsin</option>
+                          <option value="WY">Wyoming</option>
+                        </select>
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          ZIP Code <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          value={businessZip}
+                          onChange={(e) => setBusinessZip(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          placeholder="78701"
+                          required
+                          maxLength={10}
                         />
                       </div>
 
@@ -1040,6 +1535,89 @@ export default function ProviderSettings() {
           </div>
         </div>
       </div>
+
+      {/* Image Crop Modal */}
+      {showCropModal && imageSrc && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/80 backdrop-blur-sm"
+            onClick={() => !uploading && setShowCropModal(false)}
+          />
+
+          {/* Modal */}
+          <div className="relative z-10 w-full max-w-2xl mx-4">
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
+                <h3 className="text-lg font-semibold text-zinc-100">Crop Profile Photo</h3>
+                <button
+                  onClick={() => !uploading && setShowCropModal(false)}
+                  disabled={uploading}
+                  className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors disabled:opacity-50"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Cropper Area */}
+              <div className="relative h-96 bg-black">
+                <Cropper
+                  image={imageSrc}
+                  crop={crop}
+                  zoom={zoom}
+                  aspect={1}
+                  onCropChange={setCrop}
+                  onZoomChange={setZoom}
+                  onCropComplete={onCropComplete}
+                />
+              </div>
+
+              {/* Controls */}
+              <div className="px-6 py-4 bg-zinc-900/50 border-t border-zinc-800">
+                <div className="mb-4">
+                  <label className="text-sm font-medium text-zinc-300 mb-2 block">
+                    Zoom: {zoom.toFixed(1)}x
+                  </label>
+                  <input
+                    type="range"
+                    min={1}
+                    max={3}
+                    step={0.1}
+                    value={zoom}
+                    onChange={(e) => setZoom(Number(e.target.value))}
+                    className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer slider"
+                    disabled={uploading}
+                  />
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 justify-end">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowCropModal(false);
+                      setSelectedImage(null);
+                      setImageSrc(null);
+                    }}
+                    disabled={uploading}
+                    className="border-zinc-700 text-zinc-300 hover:bg-zinc-800"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleCropComplete}
+                    disabled={uploading}
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white"
+                  >
+                    {uploading ? 'Uploading...' : 'Save Photo'}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </ProviderLayout>
   );
 }

@@ -122,7 +122,7 @@ export default function BookPackageModal({
         <div className="space-y-6">
           {/* Package Summary */}
           <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
-            <h3 className="font-semibold text-zinc-900 mb-3">What's Included</h3>
+            <h3 className="font-semibold text-zinc-900 mb-3">What&apos;s Included</h3>
             <div className="grid grid-cols-2 gap-2">
               {bundle.serviceTypes.map((service, idx) => (
                 <div key={idx} className="flex items-center gap-2 text-sm">
@@ -274,7 +274,7 @@ export default function BookPackageModal({
                 <span className="text-emerald-600">${calculateTotal()}</span>
               </div>
               <div className="text-xs text-center text-emerald-700 font-semibold">
-                You're saving ${bundle.savings}!
+                You&apos;re saving ${bundle.savings}!
               </div>
             </div>
 
