@@ -399,7 +399,7 @@ export default function OnboardingModal({
                     {/* Activity Preview */}
                     <div className="bg-zinc-800/30 rounded-lg p-4 border border-zinc-700/50">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-sm font-medium text-white">Today's Schedule</span>
+                        <span className="text-sm font-medium text-white">Today&apos;s Schedule</span>
                         <span className="text-xs text-emerald-400">3 jobs</span>
                       </div>
                       <div className="space-y-2">
