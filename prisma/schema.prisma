@@ -376,6 +376,10 @@ model Provider {
   serviceTypes               String[]                     @default([])
   serviceAreas               String[]                     @default([])
   yearsInBusiness            Int                          @default(0)
+  // Onboarding fields
+  primaryCategory            String?                      @map("primary_category")
+  insuranceProvider          String?                      @map("insurance_provider")
+  serviceRadiusType          String?                      @map("service_radius_type") // "10", "25", "50", "100", "statewide"
   status                     String                       @default("active")
   leadCapacity               Int                          @default(10)
   currentLeadCount           Int                          @default(0)

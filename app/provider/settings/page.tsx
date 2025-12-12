@@ -22,6 +22,12 @@ import {
   Check,
   X,
   AlertTriangle,
+  MapPin,
+  Award,
+  Sparkles,
+  Loader2,
+  Phone,
+  Building2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Cropper from 'react-easy-crop';
@@ -52,6 +58,105 @@ interface Service {
   maxPrice: number;
 }
 
+const SERVICE_CATEGORIES = [
+  'Landscaping & Lawn Care',
+  'Home Remodeling',
+  'HVAC',
+  'Plumbing',
+  'Electrical',
+  'Roofing',
+  'Fencing',
+  'Painting',
+  'Flooring',
+  'Cleaning Services',
+  'General Contracting',
+  'Other',
+];
+
+const SERVICES_BY_CATEGORY: Record<string, string[]> = {
+  'Landscaping & Lawn Care': [
+    'Lawn Mowing', 'Leaf Removal', 'Tree Trimming', 'Landscape Design', 'Irrigation',
+    'Fertilization', 'Mulching', 'Snow Removal', 'Hedge Trimming', 'Sod Installation',
+  ],
+  'Electrical': [
+    'Wiring & Rewiring', 'Panel Upgrades', 'Outlet Installation', 'Lighting Installation',
+    'Ceiling Fans', 'Generator Installation', 'EV Charger Install', 'Troubleshooting', 'Code Corrections',
+  ],
+  'Plumbing': [
+    'Drain Cleaning', 'Leak Repair', 'Water Heater', 'Fixture Installation', 'Pipe Repair',
+    'Sewer Line', 'Garbage Disposal', 'Bathroom Remodel', 'Water Filtration',
+  ],
+  'HVAC': [
+    'AC Installation', 'AC Repair', 'Heating Repair', 'Furnace Install', 'Duct Cleaning',
+    'Thermostat Install', 'Maintenance Plans', 'Air Quality', 'Heat Pump',
+  ],
+  'Roofing': [
+    'Shingle Repair', 'Roof Replacement', 'Gutter Install', 'Gutter Cleaning', 'Roof Inspection',
+    'Leak Repair', 'Flat Roof', 'Metal Roofing', 'Skylight Install',
+  ],
+  'Painting': [
+    'Interior Painting', 'Exterior Painting', 'Cabinet Painting', 'Deck Staining',
+    'Wallpaper', 'Pressure Washing', 'Drywall Repair', 'Color Consulting',
+  ],
+  'Home Remodeling': [
+    'Kitchen Remodel', 'Bathroom Remodel', 'Basement Finishing', 'Room Additions',
+    'Flooring', 'Tile Work', 'Custom Carpentry', 'Deck Building',
+  ],
+  'Fencing': [
+    'Wood Fence', 'Vinyl Fence', 'Chain Link', 'Iron/Metal Fence',
+    'Gate Installation', 'Fence Repair', 'Privacy Fence',
+  ],
+  'Flooring': [
+    'Hardwood Install', 'Laminate', 'Tile', 'Carpet', 'Vinyl/LVP',
+    'Floor Refinishing', 'Subfloor Repair',
+  ],
+  'Cleaning Services': [
+    'Regular Cleaning', 'Deep Cleaning', 'Move-in/Move-out', 'Window Cleaning',
+    'Carpet Cleaning', 'Pressure Washing', 'Post-Construction',
+  ],
+  'General Contracting': [
+    'Project Management', 'Permit Handling', 'Full Renovations',
+    'New Construction', 'Commercial Build-out',
+  ],
+};
+
+const BUSINESS_ENTITIES = [
+  { value: 'Sole Proprietorship', label: 'Sole Proprietorship' },
+  { value: 'LLC', label: 'LLC (Limited Liability Company)' },
+  { value: 'Corporation', label: 'Corporation' },
+  { value: 'Partnership', label: 'Partnership' },
+];
+
+const EMPLOYEE_COUNTS = ['1', '2-5', '6-10', '11-25', '26-50', '50+'];
+
+const US_STATES = [
+  { value: 'AL', label: 'Alabama' }, { value: 'AK', label: 'Alaska' }, { value: 'AZ', label: 'Arizona' },
+  { value: 'AR', label: 'Arkansas' }, { value: 'CA', label: 'California' }, { value: 'CO', label: 'Colorado' },
+  { value: 'CT', label: 'Connecticut' }, { value: 'DE', label: 'Delaware' }, { value: 'FL', label: 'Florida' },
+  { value: 'GA', label: 'Georgia' }, { value: 'HI', label: 'Hawaii' }, { value: 'ID', label: 'Idaho' },
+  { value: 'IL', label: 'Illinois' }, { value: 'IN', label: 'Indiana' }, { value: 'IA', label: 'Iowa' },
+  { value: 'KS', label: 'Kansas' }, { value: 'KY', label: 'Kentucky' }, { value: 'LA', label: 'Louisiana' },
+  { value: 'ME', label: 'Maine' }, { value: 'MD', label: 'Maryland' }, { value: 'MA', label: 'Massachusetts' },
+  { value: 'MI', label: 'Michigan' }, { value: 'MN', label: 'Minnesota' }, { value: 'MS', label: 'Mississippi' },
+  { value: 'MO', label: 'Missouri' }, { value: 'MT', label: 'Montana' }, { value: 'NE', label: 'Nebraska' },
+  { value: 'NV', label: 'Nevada' }, { value: 'NH', label: 'New Hampshire' }, { value: 'NJ', label: 'New Jersey' },
+  { value: 'NM', label: 'New Mexico' }, { value: 'NY', label: 'New York' }, { value: 'NC', label: 'North Carolina' },
+  { value: 'ND', label: 'North Dakota' }, { value: 'OH', label: 'Ohio' }, { value: 'OK', label: 'Oklahoma' },
+  { value: 'OR', label: 'Oregon' }, { value: 'PA', label: 'Pennsylvania' }, { value: 'RI', label: 'Rhode Island' },
+  { value: 'SC', label: 'South Carolina' }, { value: 'SD', label: 'South Dakota' }, { value: 'TN', label: 'Tennessee' },
+  { value: 'TX', label: 'Texas' }, { value: 'UT', label: 'Utah' }, { value: 'VT', label: 'Vermont' },
+  { value: 'VA', label: 'Virginia' }, { value: 'WA', label: 'Washington' }, { value: 'WV', label: 'West Virginia' },
+  { value: 'WI', label: 'Wisconsin' }, { value: 'WY', label: 'Wyoming' },
+];
+
+const SERVICE_RADIUS_OPTIONS = [
+  { value: '10', label: '10 miles' },
+  { value: '25', label: '25 miles' },
+  { value: '50', label: '50 miles' },
+  { value: '100', label: '100 miles' },
+  { value: 'statewide', label: 'Statewide' },
+];
+
 export default function ProviderSettings() {
   const router = useRouter();
   const [providerName, setProviderName] = useState('');
@@ -59,8 +164,9 @@ export default function ProviderSettings() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('profile');
+  const [enhancingDescription, setEnhancingDescription] = useState(false);
 
-  // Profile
+  // Profile / Business Info
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [phone, setPhone] = useState('');
@@ -71,6 +177,21 @@ export default function ProviderSettings() {
   const [newCertification, setNewCertification] = useState('');
   const [avatar, setAvatar] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [businessName, setBusinessName] = useState('');
+  const [primaryCategory, setPrimaryCategory] = useState('');
+  const [otherCategory, setOtherCategory] = useState('');
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [businessEntity, setBusinessEntity] = useState('');
+  const [employeeCount, setEmployeeCount] = useState('');
+
+  // Service Area
+  const [businessState, setBusinessState] = useState('');
+  const [serviceRadiusType, setServiceRadiusType] = useState('');
+  const [primaryCity, setPrimaryCity] = useState('');
+
+  // Credentials
+  const [licenseNumber, setLicenseNumber] = useState('');
+  const [insuranceProvider, setInsuranceProvider] = useState('');
 
   // Photo cropping
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
@@ -80,14 +201,10 @@ export default function ProviderSettings() {
   const [croppedAreaPixels, setCroppedAreaPixels] = useState<Area | null>(null);
   const [showCropModal, setShowCropModal] = useState(false);
 
-  // Business
-  const [businessName, setBusinessName] = useState('');
+  // Legacy fields for other tabs
   const [businessAddress, setBusinessAddress] = useState('');
-  const [businessCity, setBusinessCity] = useState('');
-  const [businessState, setBusinessState] = useState('');
   const [businessZip, setBusinessZip] = useState('');
   const [taxId, setTaxId] = useState('');
-  const [businessEntity, setBusinessEntity] = useState('');
   const [serviceRadius, setServiceRadius] = useState(25);
   const [website, setWebsite] = useState('');
   const [businessHours, setBusinessHours] = useState('Mon-Fri: 9 AM - 5 PM');
@@ -154,6 +271,13 @@ export default function ProviderSettings() {
     loadSettings(id);
   }, [router]);
 
+  const formatPhoneNumber = (value: string) => {
+    const numbers = value.replace(/\D/g, '');
+    if (numbers.length <= 3) return numbers;
+    if (numbers.length <= 6) return `(${numbers.slice(0, 3)}) ${numbers.slice(3)}`;
+    return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6, 10)}`;
+  };
+
   const loadSettings = async (id: string) => {
     setLoading(true);
     try {
@@ -170,6 +294,25 @@ export default function ProviderSettings() {
         setYearsInBusiness(provider.yearsInBusiness || 0);
         setCertifications(provider.certifications || []);
         setAvatar(provider.avatar || '');
+
+        // New onboarding fields
+        setPrimaryCategory(provider.primaryCategory || '');
+        setBusinessEntity(provider.businessEntity || '');
+        setBusinessState(provider.state || '');
+        setPrimaryCity(provider.city || '');
+        setServiceRadiusType(provider.serviceRadiusType || '');
+        setLicenseNumber(provider.taxId || '');
+        setInsuranceProvider(provider.insuranceProvider || '');
+        setSelectedServices(provider.serviceTypes || []);
+
+        // Map activeSeats back to employeeCount
+        const seats = provider.activeSeats || 1;
+        if (seats >= 50) setEmployeeCount('50+');
+        else if (seats >= 26) setEmployeeCount('26-50');
+        else if (seats >= 11) setEmployeeCount('11-25');
+        else if (seats >= 6) setEmployeeCount('6-10');
+        else if (seats >= 2) setEmployeeCount('2-5');
+        else setEmployeeCount('1');
 
         // Split ownerName into firstName and lastName
         if (provider.ownerName) {
@@ -190,13 +333,9 @@ export default function ProviderSettings() {
 
       if (businessData.provider) {
         const provider = businessData.provider;
-        setBusinessName(provider.businessName || '');
         setBusinessAddress(provider.businessAddress || '');
-        setBusinessCity(provider.city || '');
-        setBusinessState(provider.state || '');
         setBusinessZip(provider.zipCode || '');
         setTaxId(provider.taxId || '');
-        setBusinessEntity(provider.businessEntity || '');
         setServiceRadius(provider.serviceRadius || 25);
         setWebsite(provider.website || '');
         setBusinessHours(provider.businessHours || 'Mon-Fri: 9 AM - 5 PM');
@@ -217,11 +356,61 @@ export default function ProviderSettings() {
     }
   };
 
+  const handleEnhanceDescription = async () => {
+    if (!bio || bio.trim().length < 3) {
+      toast.error('Please enter a brief description first');
+      return;
+    }
+
+    setEnhancingDescription(true);
+    try {
+      const res = await fetch('/api/ai/enhance-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: bio,
+          businessName: businessName,
+          category: primaryCategory,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to enhance description');
+      }
+
+      setBio(data.enhancedDescription);
+      toast.success('Description enhanced!');
+    } catch (error) {
+      console.error('Error enhancing description:', error);
+      toast.error('Failed to enhance description');
+    } finally {
+      setEnhancingDescription(false);
+    }
+  };
+
+  const toggleService = (service: string) => {
+    setSelectedServices(prev =>
+      prev.includes(service)
+        ? prev.filter(s => s !== service)
+        : [...prev, service]
+    );
+  };
+
+  const getAvailableServices = () => {
+    if (primaryCategory === 'Other') return [];
+    return SERVICES_BY_CATEGORY[primaryCategory] || [];
+  };
+
   const saveProfileSettings = async () => {
     setSaving(true);
     try {
       // Combine firstName and lastName into ownerName
       const ownerName = `${firstName.trim()} ${lastName.trim()}`.trim();
+
+      // Determine actual category
+      const actualCategory = primaryCategory === 'Other' ? otherCategory : primaryCategory;
 
       const res = await fetch('/api/provider/profile', {
         method: 'POST',
@@ -231,9 +420,21 @@ export default function ProviderSettings() {
           businessName,
           ownerName,
           bio,
+          phone,
           yearsInBusiness,
           certifications,
           avatar,
+          primaryCategory: actualCategory,
+          serviceTypes: selectedServices,
+          businessEntity,
+          employeeCount,
+          // Service area
+          state: businessState,
+          serviceRadiusType,
+          primaryCity,
+          // Credentials
+          licenseNumber,
+          insuranceProvider,
         }),
       });
 
@@ -244,9 +445,10 @@ export default function ProviderSettings() {
       }
 
       toast.success('Profile settings saved');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save profile settings';
       console.error('Error saving profile:', error);
-      toast.error(error.message || 'Failed to save profile settings');
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -255,20 +457,17 @@ export default function ProviderSettings() {
   const handlePhotoUpload = async (file: File) => {
     if (!file) return;
 
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('File size must be less than 5MB');
       return;
     }
 
-    // Check file type
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!allowedTypes.includes(file.type)) {
       toast.error('Please upload a JPG, PNG, or WebP image');
       return;
     }
 
-    // Open crop modal instead of immediately uploading
     setSelectedImage(file);
     const reader = new FileReader();
     reader.onload = () => {
@@ -291,17 +490,12 @@ export default function ProviderSettings() {
       image.src = url;
     });
 
-  const getCroppedImg = async (
-    imageSrc: string,
-    pixelCrop: Area
-  ): Promise<Blob> => {
+  const getCroppedImg = async (imageSrc: string, pixelCrop: Area): Promise<Blob> => {
     const image = await createImage(imageSrc);
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
 
-    if (!ctx) {
-      throw new Error('No 2d context');
-    }
+    if (!ctx) throw new Error('No 2d context');
 
     canvas.width = pixelCrop.width;
     canvas.height = pixelCrop.height;
@@ -349,15 +543,12 @@ export default function ProviderSettings() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to upload photo');
-      }
+      if (!res.ok) throw new Error(data.error || 'Failed to upload photo');
 
       setAvatar(data.url);
       toast.dismiss();
       toast.success('Photo uploaded successfully!');
 
-      // Close modal and reset states
       setShowCropModal(false);
       setSelectedImage(null);
       setImageSrc(null);
@@ -365,12 +556,12 @@ export default function ProviderSettings() {
       setZoom(1);
       setCroppedAreaPixels(null);
 
-      // Reload page to refresh sidebar
       window.location.reload();
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload photo';
       console.error('Error uploading photo:', error);
       toast.dismiss();
-      toast.error(error.message || 'Failed to upload photo');
+      toast.error(errorMessage);
     } finally {
       setUploading(false);
     }
@@ -390,82 +581,16 @@ export default function ProviderSettings() {
 
       const data = await res.json();
 
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to delete photo');
-      }
+      if (!res.ok) throw new Error(data.error || 'Failed to delete photo');
 
       setAvatar('');
       toast.dismiss();
       toast.success('Photo deleted successfully!');
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete photo';
       console.error('Error deleting photo:', error);
       toast.dismiss();
-      toast.error(error.message || 'Failed to delete photo');
-    }
-  };
-
-  const saveBusinessSettings = async () => {
-    // Validate required fields
-    if (!businessName.trim()) {
-      toast.error('Business name is required');
-      return;
-    }
-    if (!taxId.trim()) {
-      toast.error('EIN/Tax ID is required');
-      return;
-    }
-    if (!businessAddress.trim()) {
-      toast.error('Business address is required');
-      return;
-    }
-    if (!businessCity.trim()) {
-      toast.error('City is required');
-      return;
-    }
-    if (!businessState.trim()) {
-      toast.error('State is required');
-      return;
-    }
-    if (!businessZip.trim()) {
-      toast.error('ZIP code is required');
-      return;
-    }
-    if (!businessEntity) {
-      toast.error('Business entity type is required');
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const res = await fetch('/api/provider/settings/business', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          providerId,
-          businessName,
-          businessAddress,
-          city: businessCity,
-          state: businessState,
-          zipCode: businessZip,
-          taxId,
-          businessEntity,
-          serviceRadius,
-          website,
-          businessHours,
-          timeZone,
-        }),
-      });
-
-      if (!res.ok) {
-        throw new Error('Failed to save business settings');
-      }
-
-      toast.success('Business settings saved');
-    } catch (error) {
-      console.error('Error saving business settings:', error);
-      toast.error('Failed to save business settings');
-    } finally {
-      setSaving(false);
+      toast.error(errorMessage);
     }
   };
 
@@ -495,7 +620,6 @@ export default function ProviderSettings() {
   const saveServicesSettings = async () => {
     setSaving(true);
     try {
-      // Convert services array to pricing object
       const servicePricing = services.reduce((acc, service) => {
         if (service.enabled) {
           acc[service.id] = {
@@ -519,9 +643,7 @@ export default function ProviderSettings() {
         }),
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to save services settings');
-      }
+      if (!res.ok) throw new Error('Failed to save services settings');
 
       toast.success('Services settings saved');
     } catch (error) {
@@ -563,9 +685,7 @@ export default function ProviderSettings() {
         }),
       });
 
-      if (!res.ok) {
-        throw new Error('Failed to save payment settings');
-      }
+      if (!res.ok) throw new Error('Failed to save payment settings');
 
       toast.success('Payment settings saved');
     } catch (error) {
@@ -652,264 +772,461 @@ export default function ProviderSettings() {
             <div className="flex-1 space-y-4 md:space-y-6">
               {/* Profile Tab */}
               {activeTab === 'profile' && (
-                <Card className="bg-zinc-900/50 border-zinc-800">
-                  <CardHeader>
-                    <CardTitle className="text-zinc-100">Profile Information</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {/* Photo Upload */}
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-300 mb-3">
-                        Business Logo / Avatar
-                      </label>
-                      <div className="flex items-center gap-6">
-                        {avatar ? (
-                          <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-emerald-500">
-                            <img
-                              src={avatar}
-                              alt="Profile"
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        ) : (
-                          <div className="w-24 h-24 rounded-lg border-2 border-dashed border-zinc-700 flex items-center justify-center bg-zinc-900">
-                            <Upload className="h-8 w-8 text-zinc-600" />
-                          </div>
-                        )}
-                        <div className="flex-1">
-                          <div className="flex gap-3">
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handlePhotoUpload(file);
-                              }}
-                              id="avatar-upload"
-                              className="hidden"
-                            />
-                            <label
-                              htmlFor="avatar-upload"
-                              className="inline-flex items-center px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg cursor-pointer hover:bg-zinc-700 transition-colors"
-                            >
-                              <Upload className="h-4 w-4 mr-2" />
-                              {uploading ? 'Uploading...' : avatar ? 'Change Photo' : 'Upload Photo'}
-                            </label>
-                            {avatar && !uploading && (
-                              <button
-                                onClick={handlePhotoDelete}
-                                className="inline-flex items-center px-4 py-2 bg-red-900/20 border border-red-800 text-red-400 rounded-lg hover:bg-red-900/40 transition-colors"
+                <div className="space-y-6">
+                  {/* Business Profile Section */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-emerald-400" />
+                        Business Profile
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Photo Upload */}
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-3">
+                          Business Logo / Avatar
+                        </label>
+                        <div className="flex items-center gap-6">
+                          {avatar ? (
+                            <div className="w-24 h-24 rounded-lg overflow-hidden border-2 border-emerald-500">
+                              <img src={avatar} alt="Profile" className="w-full h-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="w-24 h-24 rounded-lg border-2 border-dashed border-zinc-700 flex items-center justify-center bg-zinc-900">
+                              <Upload className="h-8 w-8 text-zinc-600" />
+                            </div>
+                          )}
+                          <div className="flex-1">
+                            <div className="flex gap-3">
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handlePhotoUpload(file);
+                                }}
+                                id="avatar-upload"
+                                className="hidden"
+                              />
+                              <label
+                                htmlFor="avatar-upload"
+                                className="inline-flex items-center px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg cursor-pointer hover:bg-zinc-700 transition-colors"
                               >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                              </button>
-                            )}
+                                <Upload className="h-4 w-4 mr-2" />
+                                {uploading ? 'Uploading...' : avatar ? 'Change Photo' : 'Upload Photo'}
+                              </label>
+                              {avatar && !uploading && (
+                                <button
+                                  onClick={handlePhotoDelete}
+                                  className="inline-flex items-center px-4 py-2 bg-red-900/20 border border-red-800 text-red-400 rounded-lg hover:bg-red-900/40 transition-colors"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Delete
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-xs text-zinc-500 mt-2">PNG, JPG up to 5MB</p>
                           </div>
-                          <p className="text-xs text-zinc-500 mt-2">
-                            PNG, JPG up to 5MB. Recommended: 400x400px
-                          </p>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Business Name */}
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Business Name <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={businessName}
+                            onChange={(e) => setBusinessName(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="Your Business Name"
+                          />
+                        </div>
+
+                        {/* Business Phone */}
+                        <div>
+                          <label className="flex items-center gap-2 text-sm font-medium text-zinc-300 mb-2">
+                            <Phone className="h-4 w-4 text-blue-400" />
+                            Business Phone <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="tel"
+                            value={phone}
+                            onChange={(e) => setPhone(formatPhoneNumber(e.target.value))}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="(555) 123-4567"
+                          />
+                        </div>
+
+                        {/* Email */}
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Email
+                          </label>
+                          <input
+                            type="email"
+                            value={email}
+                            disabled
+                            className="w-full px-3 py-2 bg-zinc-900/50 border border-zinc-800 rounded-lg text-zinc-400 cursor-not-allowed"
+                          />
+                        </div>
+
+                        {/* Owner Name */}
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            First Name
+                          </label>
+                          <input
+                            type="text"
+                            value={firstName}
+                            onChange={(e) => setFirstName(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="John"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Last Name
+                          </label>
+                          <input
+                            type="text"
+                            value={lastName}
+                            onChange={(e) => setLastName(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="Doe"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Business Description */}
                       <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          First Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={firstName}
-                          onChange={(e) => setFirstName(e.target.value)}
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-sm font-medium text-zinc-300">
+                            Business Description
+                          </label>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={handleEnhanceDescription}
+                            disabled={enhancingDescription || !bio.trim()}
+                            className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 text-xs h-7"
+                          >
+                            {enhancingDescription ? (
+                              <>
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                Enhancing...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-3 h-3 mr-1" />
+                                Enhance with AI
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                        <textarea
+                          value={bio}
+                          onChange={(e) => setBio(e.target.value)}
+                          rows={3}
                           className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="John"
+                          placeholder="Brief description of your business and services..."
                         />
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Last Name *
-                        </label>
-                        <input
-                          type="text"
-                          value={lastName}
-                          onChange={(e) => setLastName(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="Doe"
-                        />
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Primary Category */}
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Primary Service Category <span className="text-red-400">*</span>
+                          </label>
+                          <select
+                            value={primaryCategory}
+                            onChange={(e) => {
+                              setPrimaryCategory(e.target.value);
+                              setSelectedServices([]);
+                              setOtherCategory('');
+                            }}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="">Select a category</option>
+                            {SERVICE_CATEGORIES.map(cat => (
+                              <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                          </select>
+                          {primaryCategory === 'Other' && (
+                            <input
+                              type="text"
+                              value={otherCategory}
+                              onChange={(e) => setOtherCategory(e.target.value)}
+                              className="w-full px-3 py-2 mt-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                              placeholder="Specify your service type"
+                            />
+                          )}
+                        </div>
+
+                        {/* Business Entity */}
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Business Entity Type <span className="text-red-400">*</span>
+                          </label>
+                          <select
+                            value={businessEntity}
+                            onChange={(e) => setBusinessEntity(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="">Select entity type</option>
+                            {BUSINESS_ENTITIES.map(entity => (
+                              <option key={entity.value} value={entity.value}>{entity.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        {/* Years in Business */}
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Years in Business <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="number"
+                            value={yearsInBusiness}
+                            onChange={(e) => setYearsInBusiness(parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="5"
+                            min="0"
+                          />
+                        </div>
+
+                        {/* Employee Count */}
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Number of Employees <span className="text-red-400">*</span>
+                          </label>
+                          <select
+                            value={employeeCount}
+                            onChange={(e) => setEmployeeCount(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="">Select employee count</option>
+                            {EMPLOYEE_COUNTS.map(count => (
+                              <option key={count} value={count}>{count}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Phone *
-                        </label>
-                        <input
-                          type="tel"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="(555) 123-4567"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Email *
-                        </label>
-                        <input
-                          type="email"
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="john@example.com"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Years in Business
-                        </label>
-                        <input
-                          type="number"
-                          value={yearsInBusiness}
-                          onChange={(e) => setYearsInBusiness(parseInt(e.target.value) || 0)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="5"
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-300 mb-2">
-                        Bio (visible to customers)
-                      </label>
-                      <textarea
-                        value={bio}
-                        onChange={(e) => setBio(e.target.value)}
-                        rows={4}
-                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                        placeholder="Tell customers about your experience and what makes you stand out..."
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-300 mb-2">
-                        Certifications & Licenses
-                      </label>
-                      <div className="space-y-2 mb-3">
-                        {certifications.map((cert, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                            <span className="text-sm text-zinc-200">{cert}</span>
-                            <button
-                              onClick={() => setCertifications(certifications.filter((_, i) => i !== idx))}
-                              className="text-red-400 hover:text-red-300 p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                      {/* Services Multi-Select */}
+                      {primaryCategory && primaryCategory !== 'Other' && (
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-3">
+                            Services You Provide
+                            <span className="text-zinc-500 font-normal ml-2">
+                              ({selectedServices.length} selected)
+                            </span>
+                          </label>
+                          <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            {getAvailableServices().map(service => (
+                              <label
+                                key={service}
+                                className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${
+                                  selectedServices.includes(service)
+                                    ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                                    : 'bg-zinc-800/30 border-zinc-700 text-zinc-300 hover:border-zinc-600'
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={selectedServices.includes(service)}
+                                  onChange={() => toggleService(service)}
+                                  className="sr-only"
+                                />
+                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                                  selectedServices.includes(service)
+                                    ? 'bg-emerald-500 border-emerald-500'
+                                    : 'border-zinc-600'
+                                }`}>
+                                  {selectedServices.includes(service) && (
+                                    <Check className="w-3 h-3 text-white" />
+                                  )}
+                                </div>
+                                <span className="text-sm">{service}</span>
+                              </label>
+                            ))}
                           </div>
-                        ))}
-                      </div>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <input
-                          type="text"
-                          value={newCertification}
-                          onChange={(e) => setNewCertification(e.target.value)}
-                          className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="e.g., Licensed Landscaper, EPA Certified"
-                        />
-                        <Button
-                          onClick={() => {
-                            if (newCertification.trim()) {
-                              setCertifications([...certifications, newCertification]);
-                              setNewCertification('');
-                            }
-                          }}
-                          className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add
-                        </Button>
-                      </div>
-                    </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={saveProfileSettings}
-                        disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        {saving ? 'Saving...' : 'Save Profile'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  {/* Service Area Section */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <MapPin className="h-5 w-5 text-orange-400" />
+                        Service Area
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            State <span className="text-red-400">*</span>
+                          </label>
+                          <select
+                            value={businessState}
+                            onChange={(e) => setBusinessState(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="">Select state</option>
+                            {US_STATES.map(state => (
+                              <option key={state.value} value={state.value}>{state.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Service Radius <span className="text-red-400">*</span>
+                          </label>
+                          <select
+                            value={serviceRadiusType}
+                            onChange={(e) => setServiceRadiusType(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          >
+                            <option value="">Select radius</option>
+                            {SERVICE_RADIUS_OPTIONS.map(option => (
+                              <option key={option.value} value={option.value}>{option.label}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Primary City <span className="text-zinc-500 font-normal">(Optional)</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={primaryCity}
+                            onChange={(e) => setPrimaryCity(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="e.g., Austin"
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Credentials Section */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Shield className="h-5 w-5 text-cyan-400" />
+                        Credentials
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            License Number <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={licenseNumber}
+                            onChange={(e) => setLicenseNumber(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="e.g., LIC-123456"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Insurance Provider <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="text"
+                            value={insuranceProvider}
+                            onChange={(e) => setInsuranceProvider(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="e.g., State Farm"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Certifications & Licenses
+                        </label>
+                        <div className="space-y-2 mb-3">
+                          {certifications.map((cert, idx) => (
+                            <div key={idx} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                              <span className="text-sm text-zinc-200">{cert}</span>
+                              <button
+                                onClick={() => setCertifications(certifications.filter((_, i) => i !== idx))}
+                                className="text-red-400 hover:text-red-300 p-2"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="text"
+                            value={newCertification}
+                            onChange={(e) => setNewCertification(e.target.value)}
+                            className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="e.g., Licensed Contractor, EPA Certified"
+                          />
+                          <Button
+                            onClick={() => {
+                              if (newCertification.trim()) {
+                                setCertifications([...certifications, newCertification]);
+                                setNewCertification('');
+                              }
+                            }}
+                            className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Save Button */}
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={saveProfileSettings}
+                      disabled={saving}
+                      className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Saving...' : 'Save Profile'}
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {/* Business Tab */}
               {activeTab === 'business' && (
                 <Card className="bg-zinc-900/50 border-zinc-800">
                   <CardHeader>
-                    <CardTitle className="text-zinc-100">Business Information</CardTitle>
+                    <CardTitle className="text-zinc-100">Business Address</CardTitle>
                     <p className="text-sm text-zinc-400 mt-1">
-                      Required for invoicing and legal compliance
+                      Your business mailing address for invoicing
                     </p>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Business Legal Name <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={businessName}
-                          onChange={(e) => setBusinessName(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="Green Thumb Landscaping LLC"
-                          required
-                        />
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          EIN / Tax ID <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={taxId}
-                          onChange={(e) => setTaxId(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="XX-XXXXXXX"
-                          required
-                        />
-                        <p className="text-xs text-zinc-500 mt-1">
-                          Required for tax reporting and professional invoices
-                        </p>
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Business Entity Type <span className="text-red-400">*</span>
-                        </label>
-                        <select
-                          value={businessEntity}
-                          onChange={(e) => setBusinessEntity(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          required
-                        >
-                          <option value="">Select entity type...</option>
-                          <option value="llc">LLC (Limited Liability Company)</option>
-                          <option value="corporation">Corporation</option>
-                          <option value="s_corp">S Corporation</option>
-                          <option value="sole_proprietor">Sole Proprietor</option>
-                          <option value="partnership">Partnership</option>
-                        </select>
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Business Address <span className="text-red-400">*</span>
+                          Street Address
                         </label>
                         <input
                           type="text"
@@ -917,91 +1234,12 @@ export default function ProviderSettings() {
                           onChange={(e) => setBusinessAddress(e.target.value)}
                           className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
                           placeholder="123 Main Street"
-                          required
                         />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          City <span className="text-red-400">*</span>
-                        </label>
-                        <input
-                          type="text"
-                          value={businessCity}
-                          onChange={(e) => setBusinessCity(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="Austin"
-                          required
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          State <span className="text-red-400">*</span>
-                        </label>
-                        <select
-                          value={businessState}
-                          onChange={(e) => setBusinessState(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          required
-                        >
-                          <option value="">Select state...</option>
-                          <option value="AL">Alabama</option>
-                          <option value="AK">Alaska</option>
-                          <option value="AZ">Arizona</option>
-                          <option value="AR">Arkansas</option>
-                          <option value="CA">California</option>
-                          <option value="CO">Colorado</option>
-                          <option value="CT">Connecticut</option>
-                          <option value="DE">Delaware</option>
-                          <option value="FL">Florida</option>
-                          <option value="GA">Georgia</option>
-                          <option value="HI">Hawaii</option>
-                          <option value="ID">Idaho</option>
-                          <option value="IL">Illinois</option>
-                          <option value="IN">Indiana</option>
-                          <option value="IA">Iowa</option>
-                          <option value="KS">Kansas</option>
-                          <option value="KY">Kentucky</option>
-                          <option value="LA">Louisiana</option>
-                          <option value="ME">Maine</option>
-                          <option value="MD">Maryland</option>
-                          <option value="MA">Massachusetts</option>
-                          <option value="MI">Michigan</option>
-                          <option value="MN">Minnesota</option>
-                          <option value="MS">Mississippi</option>
-                          <option value="MO">Missouri</option>
-                          <option value="MT">Montana</option>
-                          <option value="NE">Nebraska</option>
-                          <option value="NV">Nevada</option>
-                          <option value="NH">New Hampshire</option>
-                          <option value="NJ">New Jersey</option>
-                          <option value="NM">New Mexico</option>
-                          <option value="NY">New York</option>
-                          <option value="NC">North Carolina</option>
-                          <option value="ND">North Dakota</option>
-                          <option value="OH">Ohio</option>
-                          <option value="OK">Oklahoma</option>
-                          <option value="OR">Oregon</option>
-                          <option value="PA">Pennsylvania</option>
-                          <option value="RI">Rhode Island</option>
-                          <option value="SC">South Carolina</option>
-                          <option value="SD">South Dakota</option>
-                          <option value="TN">Tennessee</option>
-                          <option value="TX">Texas</option>
-                          <option value="UT">Utah</option>
-                          <option value="VT">Vermont</option>
-                          <option value="VA">Virginia</option>
-                          <option value="WA">Washington</option>
-                          <option value="WV">West Virginia</option>
-                          <option value="WI">Wisconsin</option>
-                          <option value="WY">Wyoming</option>
-                        </select>
                       </div>
 
                       <div className="md:col-span-2">
                         <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          ZIP Code <span className="text-red-400">*</span>
+                          ZIP Code
                         </label>
                         <input
                           type="text"
@@ -1009,26 +1247,8 @@ export default function ProviderSettings() {
                           onChange={(e) => setBusinessZip(e.target.value)}
                           className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
                           placeholder="78701"
-                          required
                           maxLength={10}
                         />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Service Radius (miles)
-                        </label>
-                        <div className="flex items-center gap-4">
-                          <input
-                            type="range"
-                            min="5"
-                            max="50"
-                            value={serviceRadius}
-                            onChange={(e) => setServiceRadius(parseInt(e.target.value))}
-                            className="flex-1"
-                          />
-                          <span className="text-zinc-200 font-semibold min-w-[60px]">{serviceRadius} mi</span>
-                        </div>
                       </div>
 
                       <div>
@@ -1044,7 +1264,7 @@ export default function ProviderSettings() {
                         />
                       </div>
 
-                      <div className="md:col-span-2">
+                      <div>
                         <label className="block text-sm font-medium text-zinc-300 mb-2">
                           Time Zone
                         </label>
@@ -1059,31 +1279,14 @@ export default function ProviderSettings() {
                           <option value="America/Phoenix">Arizona (no DST)</option>
                           <option value="America/Los_Angeles">Pacific Time (PT)</option>
                           <option value="America/Anchorage">Alaska Time (AKT)</option>
-                          <option value="America/Adak">Hawaii-Aleutian Time (HAT)</option>
                           <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
                         </select>
-                        <p className="text-xs text-zinc-500 mt-1">
-                          All times in your calendar and schedules will display in this timezone
-                        </p>
-                      </div>
-
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Business Hours (when phone is answered)
-                        </label>
-                        <input
-                          type="text"
-                          value={businessHours}
-                          onChange={(e) => setBusinessHours(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="Mon-Fri: 9 AM - 5 PM"
-                        />
                       </div>
                     </div>
 
                     <div className="flex justify-end">
                       <Button
-                        onClick={saveBusinessSettings}
+                        onClick={saveProfileSettings}
                         disabled={saving}
                         className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
                       >
@@ -1566,16 +1769,13 @@ export default function ProviderSettings() {
       {/* Image Crop Modal */}
       {showCropModal && imageSrc && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          {/* Backdrop */}
           <div
             className="absolute inset-0 bg-black/80 backdrop-blur-sm"
             onClick={() => !uploading && setShowCropModal(false)}
           />
 
-          {/* Modal */}
           <div className="relative z-10 w-full max-w-2xl mx-4">
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden shadow-2xl">
-              {/* Header */}
               <div className="px-6 py-4 border-b border-zinc-800 flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-zinc-100">Crop Profile Photo</h3>
                 <button
@@ -1587,7 +1787,6 @@ export default function ProviderSettings() {
                 </button>
               </div>
 
-              {/* Cropper Area */}
               <div className="relative h-96 bg-black">
                 <Cropper
                   image={imageSrc}
@@ -1600,7 +1799,6 @@ export default function ProviderSettings() {
                 />
               </div>
 
-              {/* Controls */}
               <div className="px-6 py-4 bg-zinc-900/50 border-t border-zinc-800">
                 <div className="mb-4">
                   <label className="text-sm font-medium text-zinc-300 mb-2 block">
@@ -1613,12 +1811,11 @@ export default function ProviderSettings() {
                     step={0.1}
                     value={zoom}
                     onChange={(e) => setZoom(Number(e.target.value))}
-                    className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer slider"
+                    className="w-full h-2 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
                     disabled={uploading}
                   />
                 </div>
 
-                {/* Action Buttons */}
                 <div className="flex gap-3 justify-end">
                   <Button
                     variant="outline"

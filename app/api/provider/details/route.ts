@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         businessName: true,
+        ownerName: true,
         serviceTypes: true,
         serviceAreas: true,
         email: true,
@@ -27,6 +28,16 @@ export async function GET(request: NextRequest) {
         bio: true,
         certifications: true,
         yearsInBusiness: true,
+        // Onboarding fields
+        primaryCategory: true,
+        businessEntity: true,
+        activeSeats: true,
+        state: true,
+        city: true,
+        serviceRadius: true,
+        serviceRadiusType: true,
+        taxId: true, // Used for license number
+        insuranceProvider: true,
       },
     });
 

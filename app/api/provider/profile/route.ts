@@ -43,6 +43,16 @@ export async function GET(request: NextRequest) {
         leadsConverted: true,
         totalRevenue: true,
         createdAt: true,
+        // Onboarding fields
+        primaryCategory: true,
+        businessEntity: true,
+        activeSeats: true,
+        state: true,
+        city: true,
+        serviceRadius: true,
+        serviceRadiusType: true,
+        taxId: true,
+        insuranceProvider: true,
       },
     });
 
@@ -78,13 +88,17 @@ export async function POST(request: NextRequest) {
       certifications,
       avatar,
       onboardingCompleted,
-      // New onboarding fields
+      // Onboarding fields
       phone,
       primaryCategory,
       businessEntity,
       employeeCount,
       licenseNumber,
       insuranceProvider,
+      // Service area fields
+      state,
+      serviceRadiusType,
+      primaryCity,
     } = body;
 
     if (!providerId) {
@@ -95,24 +109,40 @@ export async function POST(request: NextRequest) {
     }
 
     // Build update data object
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
 
     if (businessName !== undefined) updateData.businessName = businessName;
     if (ownerName !== undefined) updateData.ownerName = ownerName;
     if (bio !== undefined) updateData.bio = bio;
     if (serviceTypes !== undefined) updateData.serviceTypes = serviceTypes;
     if (serviceAreas !== undefined) updateData.serviceAreas = serviceAreas;
-    if (yearsInBusiness !== undefined) updateData.yearsInBusiness = yearsInBusiness;
+    if (yearsInBusiness !== undefined) updateData.yearsInBusiness = typeof yearsInBusiness === 'string' ? parseInt(yearsInBusiness) || 0 : yearsInBusiness;
     if (certifications !== undefined) updateData.certifications = certifications;
     if (avatar !== undefined) updateData.avatar = avatar;
     if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted;
-    // New onboarding fields
+
+    // Onboarding fields
     if (phone !== undefined) updateData.phone = phone;
-    if (primaryCategory !== undefined) updateData.serviceTypes = [primaryCategory, ...(serviceTypes || [])];
+    if (primaryCategory !== undefined) updateData.primaryCategory = primaryCategory;
     if (businessEntity !== undefined) updateData.businessEntity = businessEntity;
-    if (employeeCount !== undefined) updateData.activeSeats = employeeCount === '50+' ? 50 : parseInt(employeeCount.split('-')[0]) || 1;
-    if (licenseNumber !== undefined) updateData.taxId = licenseNumber; // Store license in taxId field
-    if (insuranceProvider !== undefined) updateData.availabilityNotes = insuranceProvider ? `Insurance: ${insuranceProvider}` : null;
+    if (employeeCount !== undefined) {
+      updateData.activeSeats = employeeCount === '50+' ? 50 : parseInt(String(employeeCount).split('-')[0]) || 1;
+    }
+    if (licenseNumber !== undefined) updateData.taxId = licenseNumber;
+    if (insuranceProvider !== undefined) updateData.insuranceProvider = insuranceProvider;
+
+    // Service area fields
+    if (state !== undefined) updateData.state = state;
+    if (serviceRadiusType !== undefined) {
+      updateData.serviceRadiusType = serviceRadiusType;
+      // Also update numeric serviceRadius for backwards compatibility
+      if (serviceRadiusType === 'statewide') {
+        updateData.serviceRadius = 999;
+      } else {
+        updateData.serviceRadius = parseInt(serviceRadiusType) || 25;
+      }
+    }
+    if (primaryCity !== undefined) updateData.city = primaryCity;
 
     const updatedProvider = await prisma.provider.update({
       where: { id: providerId },
