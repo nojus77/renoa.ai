@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   X, ChevronRight, ChevronLeft, Check, Upload, Sparkles,
   Users, Calendar, FileText, TrendingUp, ArrowRight,
-  Building2, Phone, MapPin, Award, Camera, CheckCircle2, Briefcase, Shield, Clock
+  Building2, Phone, MapPin, Award, Camera, CheckCircle2, Briefcase, Shield, Clock,
+  Plus, Loader2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -31,6 +33,53 @@ const SERVICE_CATEGORIES = [
   'Other',
 ];
 
+const SERVICES_BY_CATEGORY: Record<string, string[]> = {
+  'Landscaping & Lawn Care': [
+    'Lawn Mowing', 'Leaf Removal', 'Tree Trimming', 'Landscape Design', 'Irrigation',
+    'Fertilization', 'Mulching', 'Snow Removal', 'Hedge Trimming', 'Sod Installation',
+  ],
+  'Electrical': [
+    'Wiring & Rewiring', 'Panel Upgrades', 'Outlet Installation', 'Lighting Installation',
+    'Ceiling Fans', 'Generator Installation', 'EV Charger Install', 'Troubleshooting', 'Code Corrections',
+  ],
+  'Plumbing': [
+    'Drain Cleaning', 'Leak Repair', 'Water Heater', 'Fixture Installation', 'Pipe Repair',
+    'Sewer Line', 'Garbage Disposal', 'Bathroom Remodel', 'Water Filtration',
+  ],
+  'HVAC': [
+    'AC Installation', 'AC Repair', 'Heating Repair', 'Furnace Install', 'Duct Cleaning',
+    'Thermostat Install', 'Maintenance Plans', 'Air Quality', 'Heat Pump',
+  ],
+  'Roofing': [
+    'Shingle Repair', 'Roof Replacement', 'Gutter Install', 'Gutter Cleaning', 'Roof Inspection',
+    'Leak Repair', 'Flat Roof', 'Metal Roofing', 'Skylight Install',
+  ],
+  'Painting': [
+    'Interior Painting', 'Exterior Painting', 'Cabinet Painting', 'Deck Staining',
+    'Wallpaper', 'Pressure Washing', 'Drywall Repair', 'Color Consulting',
+  ],
+  'Home Remodeling': [
+    'Kitchen Remodel', 'Bathroom Remodel', 'Basement Finishing', 'Room Additions',
+    'Flooring', 'Tile Work', 'Custom Carpentry', 'Deck Building',
+  ],
+  'Fencing': [
+    'Wood Fence', 'Vinyl Fence', 'Chain Link', 'Iron/Metal Fence',
+    'Gate Installation', 'Fence Repair', 'Privacy Fence',
+  ],
+  'Flooring': [
+    'Hardwood Install', 'Laminate', 'Tile', 'Carpet', 'Vinyl/LVP',
+    'Floor Refinishing', 'Subfloor Repair',
+  ],
+  'Cleaning Services': [
+    'Regular Cleaning', 'Deep Cleaning', 'Move-in/Move-out', 'Window Cleaning',
+    'Carpet Cleaning', 'Pressure Washing', 'Post-Construction',
+  ],
+  'General Contracting': [
+    'Project Management', 'Permit Handling', 'Full Renovations',
+    'New Construction', 'Commercial Build-out',
+  ],
+};
+
 const BUSINESS_ENTITIES = [
   'Sole Proprietorship',
   'LLC',
@@ -47,15 +96,45 @@ const EMPLOYEE_COUNTS = [
   '50+',
 ];
 
+const US_STATES = [
+  { value: 'AL', label: 'Alabama' }, { value: 'AK', label: 'Alaska' }, { value: 'AZ', label: 'Arizona' },
+  { value: 'AR', label: 'Arkansas' }, { value: 'CA', label: 'California' }, { value: 'CO', label: 'Colorado' },
+  { value: 'CT', label: 'Connecticut' }, { value: 'DE', label: 'Delaware' }, { value: 'FL', label: 'Florida' },
+  { value: 'GA', label: 'Georgia' }, { value: 'HI', label: 'Hawaii' }, { value: 'ID', label: 'Idaho' },
+  { value: 'IL', label: 'Illinois' }, { value: 'IN', label: 'Indiana' }, { value: 'IA', label: 'Iowa' },
+  { value: 'KS', label: 'Kansas' }, { value: 'KY', label: 'Kentucky' }, { value: 'LA', label: 'Louisiana' },
+  { value: 'ME', label: 'Maine' }, { value: 'MD', label: 'Maryland' }, { value: 'MA', label: 'Massachusetts' },
+  { value: 'MI', label: 'Michigan' }, { value: 'MN', label: 'Minnesota' }, { value: 'MS', label: 'Mississippi' },
+  { value: 'MO', label: 'Missouri' }, { value: 'MT', label: 'Montana' }, { value: 'NE', label: 'Nebraska' },
+  { value: 'NV', label: 'Nevada' }, { value: 'NH', label: 'New Hampshire' }, { value: 'NJ', label: 'New Jersey' },
+  { value: 'NM', label: 'New Mexico' }, { value: 'NY', label: 'New York' }, { value: 'NC', label: 'North Carolina' },
+  { value: 'ND', label: 'North Dakota' }, { value: 'OH', label: 'Ohio' }, { value: 'OK', label: 'Oklahoma' },
+  { value: 'OR', label: 'Oregon' }, { value: 'PA', label: 'Pennsylvania' }, { value: 'RI', label: 'Rhode Island' },
+  { value: 'SC', label: 'South Carolina' }, { value: 'SD', label: 'South Dakota' }, { value: 'TN', label: 'Tennessee' },
+  { value: 'TX', label: 'Texas' }, { value: 'UT', label: 'Utah' }, { value: 'VT', label: 'Vermont' },
+  { value: 'VA', label: 'Virginia' }, { value: 'WA', label: 'Washington' }, { value: 'WV', label: 'West Virginia' },
+  { value: 'WI', label: 'Wisconsin' }, { value: 'WY', label: 'Wyoming' },
+];
+
+const SERVICE_RADIUS_OPTIONS = [
+  { value: '10', label: '10 miles' },
+  { value: '25', label: '25 miles' },
+  { value: '50', label: '50 miles' },
+  { value: '100', label: '100 miles' },
+  { value: 'statewide', label: 'Statewide' },
+];
+
 export default function OnboardingModal({
   isOpen,
   onClose,
   providerId,
   onComplete,
 }: OnboardingModalProps) {
+  const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [enhancingDescription, setEnhancingDescription] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
@@ -63,13 +142,17 @@ export default function OnboardingModal({
     businessName: '',
     bio: '',
     primaryCategory: '',
-    services: '',
+    otherCategory: '', // For "Other" category
+    selectedServices: [] as string[],
+    customServices: '', // For "Other" or custom services
     phone: '',
     businessEntity: '',
     yearsInBusiness: '',
     employeeCount: '',
-    // Step 3: Service Areas
-    serviceAreas: [] as string[],
+    // Step 3: Service Areas & Credentials
+    state: '',
+    serviceRadius: '',
+    primaryCity: '',
     licenseNumber: '',
     insuranceProvider: '',
     certifications: '',
@@ -78,7 +161,6 @@ export default function OnboardingModal({
   });
 
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
-  const [serviceAreaInput, setServiceAreaInput] = useState('');
 
   const totalSteps = 5;
 
@@ -89,6 +171,40 @@ export default function OnboardingModal({
     { number: 4, label: 'Logo', icon: Camera },
     { number: 5, label: 'Review', icon: CheckCircle2 },
   ];
+
+  const handleEnhanceDescription = async () => {
+    if (!formData.bio || formData.bio.trim().length < 3) {
+      toast.error('Please enter a brief description first');
+      return;
+    }
+
+    setEnhancingDescription(true);
+    try {
+      const res = await fetch('/api/ai/enhance-description', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          description: formData.bio,
+          businessName: formData.businessName,
+          category: formData.primaryCategory,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to enhance description');
+      }
+
+      setFormData(prev => ({ ...prev, bio: data.enhancedDescription }));
+      toast.success('Description enhanced!');
+    } catch (error) {
+      console.error('Error enhancing description:', error);
+      toast.error('Failed to enhance description');
+    } finally {
+      setEnhancingDescription(false);
+    }
+  };
 
   const handlePhotoUpload = async (file: File) => {
     if (!file) return;
@@ -140,21 +256,24 @@ export default function OnboardingModal({
     }
   };
 
-  const addServiceArea = () => {
-    if (serviceAreaInput.trim()) {
-      setFormData(prev => ({
-        ...prev,
-        serviceAreas: [...prev.serviceAreas, serviceAreaInput.trim()],
-      }));
-      setServiceAreaInput('');
-    }
-  };
-
-  const removeServiceArea = (index: number) => {
+  const toggleService = (service: string) => {
     setFormData(prev => ({
       ...prev,
-      serviceAreas: prev.serviceAreas.filter((_, i) => i !== index),
+      selectedServices: prev.selectedServices.includes(service)
+        ? prev.selectedServices.filter(s => s !== service)
+        : [...prev.selectedServices, service],
     }));
+  };
+
+  const addCustomService = () => {
+    const customService = formData.customServices.trim();
+    if (customService && !formData.selectedServices.includes(customService)) {
+      setFormData(prev => ({
+        ...prev,
+        selectedServices: [...prev.selectedServices, customService],
+        customServices: '',
+      }));
+    }
   };
 
   const formatPhoneNumber = (value: string) => {
@@ -164,22 +283,44 @@ export default function OnboardingModal({
     return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6, 10)}`;
   };
 
+  const getAvailableServices = () => {
+    if (formData.primaryCategory === 'Other') {
+      return [];
+    }
+    return SERVICES_BY_CATEGORY[formData.primaryCategory] || [];
+  };
+
   const canProceedToStep = (step: number): boolean => {
     switch (step) {
       case 2:
         return true; // Welcome -> Business Info
       case 3:
-        // Required: businessName, primaryCategory, phone, businessEntity, yearsInBusiness, employeeCount
+        // Required: businessName, primaryCategory (and otherCategory if "Other"), phone, businessEntity, yearsInBusiness, employeeCount, at least 1 service
+        const categoryValid = formData.primaryCategory === 'Other'
+          ? formData.otherCategory.trim() !== ''
+          : formData.primaryCategory !== '';
+
+        const servicesValid = formData.primaryCategory === 'Other'
+          ? formData.customServices.trim() !== '' || formData.selectedServices.length > 0
+          : formData.selectedServices.length > 0;
+
         return (
           formData.businessName.trim() !== '' &&
-          formData.primaryCategory !== '' &&
+          categoryValid &&
           formData.phone.replace(/\D/g, '').length === 10 &&
           formData.businessEntity !== '' &&
           formData.yearsInBusiness !== '' &&
-          formData.employeeCount !== ''
+          formData.employeeCount !== '' &&
+          servicesValid
         );
       case 4:
-        return true; // Service areas are optional
+        // Required: state, serviceRadius, licenseNumber, insuranceProvider
+        return (
+          formData.state !== '' &&
+          formData.serviceRadius !== '' &&
+          formData.licenseNumber.trim() !== '' &&
+          formData.insuranceProvider.trim() !== ''
+        );
       case 5:
         return true; // Photo is optional
       default:
@@ -210,20 +351,46 @@ export default function OnboardingModal({
       return;
     }
 
+    if (!canProceedToStep(4)) {
+      toast.error('Please fill in all required service area and credential information');
+      setCurrentStep(3);
+      return;
+    }
+
     setSubmitting(true);
 
     try {
-      // Parse services from comma-separated string
-      const serviceTypes = formData.services
-        .split(',')
-        .map(s => s.trim())
-        .filter(s => s.length > 0);
+      // Build service types array
+      const serviceTypes = [...formData.selectedServices];
+
+      // Add custom services for "Other" category
+      if (formData.primaryCategory === 'Other' && formData.customServices.trim()) {
+        formData.customServices.split(',').forEach(s => {
+          const trimmed = s.trim();
+          if (trimmed && !serviceTypes.includes(trimmed)) {
+            serviceTypes.push(trimmed);
+          }
+        });
+      }
 
       // Parse certifications from comma-separated string
       const certifications = formData.certifications
         .split(',')
         .map(s => s.trim())
         .filter(s => s.length > 0);
+
+      // Build service areas array
+      const serviceAreas: string[] = [];
+      const stateName = US_STATES.find(s => s.value === formData.state)?.label || formData.state;
+      if (formData.primaryCity) {
+        serviceAreas.push(`${formData.primaryCity}, ${stateName}`);
+      }
+      serviceAreas.push(`${stateName} (${formData.serviceRadius === 'statewide' ? 'Statewide' : formData.serviceRadius + ' mile radius'})`);
+
+      // Determine the actual category to save
+      const actualCategory = formData.primaryCategory === 'Other'
+        ? formData.otherCategory
+        : formData.primaryCategory;
 
       const res = await fetch('/api/provider/profile', {
         method: 'POST',
@@ -233,14 +400,14 @@ export default function OnboardingModal({
           businessName: formData.businessName,
           bio: formData.bio || null,
           phone: formData.phone,
-          primaryCategory: formData.primaryCategory,
+          primaryCategory: actualCategory,
           serviceTypes,
-          serviceAreas: formData.serviceAreas,
+          serviceAreas,
           yearsInBusiness: parseInt(formData.yearsInBusiness) || 0,
           businessEntity: formData.businessEntity,
           employeeCount: formData.employeeCount,
-          licenseNumber: formData.licenseNumber || null,
-          insuranceProvider: formData.insuranceProvider || null,
+          licenseNumber: formData.licenseNumber,
+          insuranceProvider: formData.insuranceProvider,
           certifications,
           avatar: formData.avatar || null,
           onboardingCompleted: true,
@@ -256,6 +423,8 @@ export default function OnboardingModal({
       toast.success('Welcome to Renoa! Your profile is all set up.');
       onComplete();
       onClose();
+      // Redirect to /provider/home
+      router.push('/provider/home');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to save profile';
       console.error('Error saving profile:', error);
@@ -548,13 +717,35 @@ export default function OnboardingModal({
                 </div>
               </div>
 
-              {/* Business Description */}
+              {/* Business Description with AI Enhance */}
               <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-                  <Briefcase className="w-4 h-4 text-purple-400" />
-                  Business Description
-                  <span className="text-zinc-500 font-normal">(Optional)</span>
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                    <Briefcase className="w-4 h-4 text-purple-400" />
+                    Business Description
+                    <span className="text-zinc-500 font-normal">(Optional)</span>
+                  </label>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleEnhanceDescription}
+                    disabled={enhancingDescription || !formData.bio.trim()}
+                    className="text-purple-400 hover:text-purple-300 hover:bg-purple-500/10 text-xs h-7"
+                  >
+                    {enhancingDescription ? (
+                      <>
+                        <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                        Enhancing...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3 h-3 mr-1" />
+                        Enhance with AI
+                      </>
+                    )}
+                  </Button>
+                </div>
                 <textarea
                   value={formData.bio}
                   onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
@@ -574,7 +765,14 @@ export default function OnboardingModal({
                   </label>
                   <select
                     value={formData.primaryCategory}
-                    onChange={(e) => setFormData(prev => ({ ...prev, primaryCategory: e.target.value }))}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        primaryCategory: e.target.value,
+                        selectedServices: [], // Reset services when category changes
+                        otherCategory: '',
+                      }));
+                    }}
                     className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
                   >
                     <option value="">Select a category</option>
@@ -582,6 +780,19 @@ export default function OnboardingModal({
                       <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
+
+                  {/* Other category text input */}
+                  {formData.primaryCategory === 'Other' && (
+                    <div className="mt-2">
+                      <input
+                        type="text"
+                        value={formData.otherCategory}
+                        onChange={(e) => setFormData(prev => ({ ...prev, otherCategory: e.target.value }))}
+                        className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                        placeholder="Specify your service type *"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Business Entity */}
@@ -604,21 +815,127 @@ export default function OnboardingModal({
                 </div>
               </div>
 
-              {/* Services */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-                  <Sparkles className="w-4 h-4 text-yellow-400" />
-                  Services You Provide
-                  <span className="text-zinc-500 font-normal">(Comma-separated)</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.services}
-                  onChange={(e) => setFormData(prev => ({ ...prev, services: e.target.value }))}
-                  className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                  placeholder="e.g., Lawn mowing, Tree trimming, Landscape design"
-                />
-              </div>
+              {/* Services Multi-Select */}
+              {formData.primaryCategory && (
+                <div className="space-y-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                    <Sparkles className="w-4 h-4 text-yellow-400" />
+                    Services You Provide
+                    <span className="text-red-400">*</span>
+                    <span className="text-zinc-500 font-normal ml-2">
+                      ({formData.selectedServices.length} selected)
+                    </span>
+                  </label>
+
+                  {formData.primaryCategory === 'Other' ? (
+                    // For "Other" category, show text input for custom services
+                    <div className="space-y-3">
+                      <p className="text-xs text-zinc-500">Enter your services (comma-separated)</p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={formData.customServices}
+                          onChange={(e) => setFormData(prev => ({ ...prev, customServices: e.target.value }))}
+                          className="flex-1 px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                          placeholder="e.g., Window tinting, Car detailing, Mobile repair"
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addCustomService();
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          onClick={addCustomService}
+                          className="px-4 bg-zinc-700 hover:bg-zinc-600 text-white"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {formData.selectedServices.length > 0 && (
+                        <div className="flex flex-wrap gap-2">
+                          {formData.selectedServices.map((service, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-sm text-emerald-400"
+                            >
+                              {service}
+                              <button
+                                type="button"
+                                onClick={() => toggleService(service)}
+                                className="hover:text-emerald-300"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    // For other categories, show checkbox grid
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        {getAvailableServices().map(service => (
+                          <label
+                            key={service}
+                            className={`flex items-center gap-2 p-3 rounded-lg border cursor-pointer transition-all ${
+                              formData.selectedServices.includes(service)
+                                ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400'
+                                : 'bg-zinc-800/30 border-zinc-700 text-zinc-300 hover:border-zinc-600'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={formData.selectedServices.includes(service)}
+                              onChange={() => toggleService(service)}
+                              className="sr-only"
+                            />
+                            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+                              formData.selectedServices.includes(service)
+                                ? 'bg-emerald-500 border-emerald-500'
+                                : 'border-zinc-600'
+                            }`}>
+                              {formData.selectedServices.includes(service) && (
+                                <Check className="w-3 h-3 text-white" />
+                              )}
+                            </div>
+                            <span className="text-sm">{service}</span>
+                          </label>
+                        ))}
+                      </div>
+
+                      {/* Add Custom Service */}
+                      <div className="flex items-center gap-2 pt-2">
+                        <input
+                          type="text"
+                          value={formData.customServices}
+                          onChange={(e) => setFormData(prev => ({ ...prev, customServices: e.target.value }))}
+                          className="flex-1 px-3 py-2 bg-zinc-800/30 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 text-sm"
+                          placeholder="Add custom service..."
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              addCustomService();
+                            }
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          onClick={addCustomService}
+                          variant="ghost"
+                          size="sm"
+                          className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                        >
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
 
               <div className="grid md:grid-cols-2 gap-6">
                 {/* Years in Business */}
@@ -661,103 +978,126 @@ export default function OnboardingModal({
             </div>
           )}
 
-          {/* Step 3: Service Areas */}
+          {/* Step 3: Service Areas & Credentials */}
           {currentStep === 3 && (
             <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-              {/* Service Areas */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-                  <MapPin className="w-4 h-4 text-orange-400" />
-                  Service Areas
-                  <span className="text-zinc-500 font-normal">(Cities or ZIP codes)</span>
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={serviceAreaInput}
-                    onChange={(e) => setServiceAreaInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addServiceArea())}
-                    className="flex-1 px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                    placeholder="e.g., Austin, TX or 78701"
-                  />
-                  <Button
-                    type="button"
-                    onClick={addServiceArea}
-                    className="px-6 bg-zinc-700 hover:bg-zinc-600 text-white"
-                  >
-                    Add
-                  </Button>
-                </div>
-                {formData.serviceAreas.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-3">
-                    {formData.serviceAreas.map((area, index) => (
-                      <span
-                        key={index}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border border-orange-500/30 rounded-full text-sm text-orange-400"
-                      >
-                        <MapPin className="w-3 h-3" />
-                        {area}
-                        <button
-                          type="button"
-                          onClick={() => removeServiceArea(index)}
-                          className="hover:text-orange-300 transition-colors"
-                        >
-                          <X className="h-3.5 w-3.5" />
-                        </button>
-                      </span>
-                    ))}
+              {/* Service Area Section */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-orange-400" />
+                  Service Area
+                </h3>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  {/* State Dropdown */}
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                      State
+                      <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      value={formData.state}
+                      onChange={(e) => setFormData(prev => ({ ...prev, state: e.target.value }))}
+                      className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    >
+                      <option value="">Select state</option>
+                      {US_STATES.map(state => (
+                        <option key={state.value} value={state.value}>{state.label}</option>
+                      ))}
+                    </select>
                   </div>
-                )}
-              </div>
 
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* License Number */}
+                  {/* Service Radius Dropdown */}
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                      Service Radius
+                      <span className="text-red-400">*</span>
+                    </label>
+                    <select
+                      value={formData.serviceRadius}
+                      onChange={(e) => setFormData(prev => ({ ...prev, serviceRadius: e.target.value }))}
+                      className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    >
+                      <option value="">Select radius</option>
+                      {SERVICE_RADIUS_OPTIONS.map(option => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Primary City */}
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-                    <Shield className="w-4 h-4 text-cyan-400" />
-                    License Number
+                    Primary City
                     <span className="text-zinc-500 font-normal">(Optional)</span>
                   </label>
                   <input
                     type="text"
-                    value={formData.licenseNumber}
-                    onChange={(e) => setFormData(prev => ({ ...prev, licenseNumber: e.target.value }))}
+                    value={formData.primaryCity}
+                    onChange={(e) => setFormData(prev => ({ ...prev, primaryCity: e.target.value }))}
                     className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                    placeholder="e.g., LIC-123456"
-                  />
-                </div>
-
-                {/* Insurance Provider */}
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-                    <Shield className="w-4 h-4 text-purple-400" />
-                    Insurance Provider
-                    <span className="text-zinc-500 font-normal">(Optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={formData.insuranceProvider}
-                    onChange={(e) => setFormData(prev => ({ ...prev, insuranceProvider: e.target.value }))}
-                    className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                    placeholder="e.g., State Farm"
+                    placeholder="e.g., Austin"
                   />
                 </div>
               </div>
 
-              {/* Certifications */}
-              <div className="space-y-2">
-                <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
-                  <Award className="w-4 h-4 text-yellow-400" />
-                  Certifications
-                  <span className="text-zinc-500 font-normal">(Comma-separated, optional)</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.certifications}
-                  onChange={(e) => setFormData(prev => ({ ...prev, certifications: e.target.value }))}
-                  className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
-                  placeholder="e.g., Licensed Contractor, HVAC Certified"
-                />
+              {/* Credentials Section */}
+              <div className="space-y-4 pt-4 border-t border-zinc-800">
+                <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-cyan-400" />
+                  Credentials
+                </h3>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  {/* License Number */}
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                      <Shield className="w-4 h-4 text-cyan-400" />
+                      License Number
+                      <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.licenseNumber}
+                      onChange={(e) => setFormData(prev => ({ ...prev, licenseNumber: e.target.value }))}
+                      className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                      placeholder="e.g., LIC-123456"
+                    />
+                  </div>
+
+                  {/* Insurance Provider */}
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                      <Shield className="w-4 h-4 text-purple-400" />
+                      Insurance Provider
+                      <span className="text-red-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.insuranceProvider}
+                      onChange={(e) => setFormData(prev => ({ ...prev, insuranceProvider: e.target.value }))}
+                      className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                      placeholder="e.g., State Farm"
+                    />
+                  </div>
+                </div>
+
+                {/* Certifications */}
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                    <Award className="w-4 h-4 text-yellow-400" />
+                    Certifications
+                    <span className="text-zinc-500 font-normal">(Comma-separated, optional)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.certifications}
+                    onChange={(e) => setFormData(prev => ({ ...prev, certifications: e.target.value }))}
+                    className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                    placeholder="e.g., Licensed Contractor, HVAC Certified"
+                  />
+                </div>
               </div>
             </div>
           )}
@@ -865,7 +1205,9 @@ export default function OnboardingModal({
                     )}
                     <div>
                       <h4 className="text-xl font-bold text-white">{formData.businessName || 'Your Business'}</h4>
-                      <p className="text-sm text-zinc-400">{formData.primaryCategory}</p>
+                      <p className="text-sm text-zinc-400">
+                        {formData.primaryCategory === 'Other' ? formData.otherCategory : formData.primaryCategory}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -898,29 +1240,32 @@ export default function OnboardingModal({
                     </div>
                   )}
 
-                  {formData.services && (
+                  {formData.selectedServices.length > 0 && (
                     <div>
                       <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">Services</p>
                       <div className="flex flex-wrap gap-2">
-                        {formData.services.split(',').map((service, i) => (
+                        {formData.selectedServices.map((service, i) => (
                           <span key={i} className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-sm text-emerald-400">
-                            {service.trim()}
+                            {service}
                           </span>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {formData.serviceAreas.length > 0 && (
+                  {(formData.state || formData.primaryCity) && (
                     <div>
-                      <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">Service Areas</p>
+                      <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">Service Area</p>
                       <div className="flex flex-wrap gap-2">
-                        {formData.serviceAreas.map((area, index) => (
-                          <span key={index} className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-500/10 border border-orange-500/30 rounded-full text-sm text-orange-400">
+                        {formData.primaryCity && (
+                          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-orange-500/10 border border-orange-500/30 rounded-full text-sm text-orange-400">
                             <MapPin className="w-3 h-3" />
-                            {area}
+                            {formData.primaryCity}, {US_STATES.find(s => s.value === formData.state)?.label}
                           </span>
-                        ))}
+                        )}
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full text-sm text-blue-400">
+                          {formData.serviceRadius === 'statewide' ? 'Statewide' : `${formData.serviceRadius} mile radius`}
+                        </span>
                       </div>
                     </div>
                   )}
@@ -975,6 +1320,8 @@ export default function OnboardingModal({
               >
                 {currentStep === 2 && !canProceedToStep(3) ? (
                   'Fill required fields'
+                ) : currentStep === 3 && !canProceedToStep(4) ? (
+                  'Fill required fields'
                 ) : (
                   <>
                     Continue
@@ -990,7 +1337,7 @@ export default function OnboardingModal({
               >
                 {submitting ? (
                   <span className="flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 animate-spin" />
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     Finishing...
                   </span>
                 ) : (
