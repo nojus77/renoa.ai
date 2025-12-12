@@ -31,6 +31,7 @@ import { ThemeProvider } from 'next-themes';
 import ThemeToggle from './ThemeToggle';
 import NotificationsDropdown from './NotificationsDropdown';
 import AddJobModal from './AddJobModal';
+import SupportChat from './SupportChat';
 import { ClickToComponent } from 'click-to-react-component';
 
 interface ProviderLayoutProps {
@@ -598,6 +599,9 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
             }}
           />
         )}
+
+        {/* Support Chat */}
+        <SupportChat />
       </div>
     </ThemeProvider>
   );
