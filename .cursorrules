@@ -12,3 +12,8 @@
 ## Other JSX entities
 - Use &quot; for quotes in text
 - Use &amp; for ampersands in text
+
+## Before Pushing
+- ALWAYS run `npm run build` before committing
+- Fix any errors before pushing to GitHub
+- Never push code that fails the build
