@@ -131,14 +131,6 @@ export default function ProviderDashboard() {
     setProviderId(id);
     setProviderName(name);
 
-    // Check if onboarding was dismissed before fetching provider details
-    // This prevents the modal from showing even for a moment
-    const onboardingDismissed = localStorage.getItem('onboarding_dismissed');
-    if (onboardingDismissed) {
-      // Don't show onboarding modal if user has dismissed it
-      setShowOnboardingModal(false);
-    }
-
     fetchProviderDetails(id);
     fetchLeads(id);
     fetchTodaysJobs(id);
@@ -147,10 +139,6 @@ export default function ProviderDashboard() {
 
   const fetchProviderDetails = async (id: string) => {
     try {
-      // IMPORTANT: Check localStorage FIRST before making any API call
-      // This ensures the modal never shows if user dismissed it
-      const onboardingDismissed = localStorage.getItem('onboarding_dismissed');
-
       const res = await fetch(`/api/provider/details?providerId=${id}`);
       const data = await res.json();
 
@@ -159,15 +147,8 @@ export default function ProviderDashboard() {
           setProviderServiceTypes(data.provider.serviceTypes);
         }
 
-        // Only show onboarding modal if:
-        // 1. User hasn't dismissed it before (localStorage check - PRIMARY)
-        // 2. Database says onboarding is not completed (SECONDARY)
-        if (!onboardingDismissed && !data.provider.onboardingCompleted) {
-          setShowOnboardingModal(true);
-        } else {
-          // Explicitly set to false if conditions aren't met
-          setShowOnboardingModal(false);
-        }
+        // Show onboarding modal based purely on database field
+        setShowOnboardingModal(!data.provider.onboardingCompleted);
       }
     } catch (error) {
       console.error('Failed to load provider details:', error);
@@ -1300,12 +1281,10 @@ export default function ProviderDashboard() {
       <OnboardingModal
         isOpen={showOnboardingModal}
         onClose={() => {
-          localStorage.setItem('onboarding_dismissed', 'true');
           setShowOnboardingModal(false);
         }}
         providerId={providerId}
         onComplete={() => {
-          localStorage.setItem('onboarding_dismissed', 'true');
           setShowOnboardingModal(false);
           fetchProviderDetails(providerId);
         }}
