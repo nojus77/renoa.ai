@@ -28,6 +28,8 @@ interface TeamMember {
   skills: string[];
   color?: string | null;
   hourlyRate?: number | null;
+  payType?: string | null;
+  commissionRate?: number | null;
   workingHours?: Record<string, { start: string; end: string }> | null;
   profilePhotoUrl?: string | null;
   createdAt: string;
@@ -70,6 +72,8 @@ export default function EditTeamMemberModal({
     skills: [] as string[],
     color: '',
     hourlyRate: '',
+    payType: 'hourly',
+    commissionRate: '',
   });
 
   // Populate form when member changes
@@ -84,6 +88,8 @@ export default function EditTeamMemberModal({
         skills: member.skills || [],
         color: member.color || '',
         hourlyRate: member.hourlyRate ? String(member.hourlyRate) : '',
+        payType: member.payType || 'hourly',
+        commissionRate: member.commissionRate ? String(member.commissionRate) : '',
       });
     }
   }, [member]);
@@ -166,6 +172,8 @@ export default function EditTeamMemberModal({
           skills: formData.skills,
           color: formData.color || null,
           hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
+          payType: formData.payType || null,
+          commissionRate: formData.commissionRate ? parseFloat(formData.commissionRate) : null,
         }),
       });
 
@@ -360,24 +368,92 @@ export default function EditTeamMemberModal({
               <p className="text-xs text-zinc-500">Used to identify this person on the calendar</p>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="hourlyRate" className="text-zinc-200">Hourly Rate</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
-                <Input
-                  id="hourlyRate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.hourlyRate}
-                  onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
-                  placeholder="0.00"
-                  className="bg-zinc-900 border-zinc-800 text-zinc-100 pl-7"
-                  disabled={saving}
-                />
+            {/* Pay Settings - Only show for field workers */}
+            {formData.role === 'field' && (
+              <div className="space-y-4 p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
+                <h4 className="text-sm font-medium text-zinc-300">Pay Settings</h4>
+
+                <div className="space-y-2">
+                  <Label htmlFor="payType" className="text-zinc-200">Pay Type</Label>
+                  <Select
+                    value={formData.payType}
+                    onValueChange={(value) => setFormData({ ...formData, payType: value })}
+                    disabled={saving}
+                  >
+                    <SelectTrigger className="bg-zinc-900 border-zinc-800 text-zinc-100">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-900 border-zinc-800">
+                      <SelectItem value="hourly">Hourly Rate</SelectItem>
+                      <SelectItem value="commission">Commission Per Job</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {formData.payType === 'hourly' ? (
+                  <div className="space-y-2">
+                    <Label htmlFor="hourlyRate" className="text-zinc-200">Hourly Rate</Label>
+                    <div className="relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
+                      <Input
+                        id="hourlyRate"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={formData.hourlyRate}
+                        onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                        placeholder="0.00"
+                        className="bg-zinc-900 border-zinc-800 text-zinc-100 pl-7"
+                        disabled={saving}
+                      />
+                    </div>
+                    <p className="text-xs text-zinc-500">Worker earns this per hour worked</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="commissionRate" className="text-zinc-200">Commission Rate</Label>
+                    <div className="relative">
+                      <Input
+                        id="commissionRate"
+                        type="number"
+                        step="1"
+                        min="0"
+                        max="100"
+                        value={formData.commissionRate}
+                        onChange={(e) => setFormData({ ...formData, commissionRate: e.target.value })}
+                        placeholder="50"
+                        className="bg-zinc-900 border-zinc-800 text-zinc-100 pr-7"
+                        disabled={saving}
+                      />
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500">%</span>
+                    </div>
+                    <p className="text-xs text-zinc-500">Worker earns this percentage of job value</p>
+                  </div>
+                )}
               </div>
-              <p className="text-xs text-zinc-500">Used for job costing estimates</p>
-            </div>
+            )}
+
+            {/* Non-field worker hourly rate */}
+            {formData.role !== 'field' && (
+              <div className="space-y-2">
+                <Label htmlFor="hourlyRate" className="text-zinc-200">Hourly Rate</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
+                  <Input
+                    id="hourlyRate"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={formData.hourlyRate}
+                    onChange={(e) => setFormData({ ...formData, hourlyRate: e.target.value })}
+                    placeholder="0.00"
+                    className="bg-zinc-900 border-zinc-800 text-zinc-100 pl-7"
+                    disabled={saving}
+                  />
+                </div>
+                <p className="text-xs text-zinc-500">Used for job costing estimates</p>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

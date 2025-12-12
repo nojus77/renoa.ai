@@ -49,6 +49,13 @@ export default function ProviderLoginPage() {
         localStorage.setItem('userEmail', data.user.email);
         localStorage.setItem('userRole', data.user.role);
         localStorage.setItem('userName', `${data.user.firstName} ${data.user.lastName}`);
+
+        // Store worker-specific data for field workers
+        if (data.user.role === 'field') {
+          localStorage.setItem('workerUserId', data.user.id);
+          localStorage.setItem('workerProviderId', data.provider.id);
+          localStorage.setItem('workerFirstName', data.user.firstName);
+        }
       }
 
       // If needs password setup (legacy provider auto-migrated)
@@ -62,7 +69,7 @@ export default function ProviderLoginPage() {
 
       // Route based on user role
       if (data.user && data.user.role === 'field') {
-        router.push('/field/today');
+        router.push('/worker/dashboard');
       } else {
         router.push('/provider/dashboard');
       }

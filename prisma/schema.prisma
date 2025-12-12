@@ -446,6 +446,7 @@ model Provider {
   crews                      Crew[]                       @relation("ProviderCrews")
   skills                     Skill[]                      @relation("ProviderSkills")
   notifications              Notification[]               @relation("ProviderNotifications")
+  workLogs                   WorkLog[]                    @relation("ProviderWorkLogs")
 }
 
 model Notification {
@@ -477,6 +478,8 @@ model ProviderUser {
   skills            String[]            @default([]) // DEPRECATED: Use workerSkills relation instead
   color             String?             // Hex color for calendar display
   hourlyRate        Float?              @map("hourly_rate")
+  payType           String?             @map("pay_type") // "hourly" or "commission"
+  commissionRate    Float?              @map("commission_rate") // percentage like 50.0 for 50%
   workingHours      Json?               @map("working_hours") // {"monday": {"start": "08:00", "end": "17:00"}}
   profilePhotoUrl   String?             @map("profile_photo_url")
   // Smart Scheduler fields
@@ -487,6 +490,7 @@ model ProviderUser {
   updatedAt         DateTime            @updatedAt @map("updated_at")
   provider          Provider            @relation("ProviderUsers", fields: [providerId], references: [id], onDelete: Cascade)
   workerSkills      ProviderUserSkill[] @relation("UserSkills")
+  workLogs          WorkLog[]           @relation("UserWorkLogs")
 
   @@index([providerId])
   @@index([email])
@@ -598,6 +602,7 @@ model Job {
   assignedCrew          Crew?                  @relation("AssignedCrewJobs", fields: [assignedCrewId], references: [id])
   loyalty_transactions  loyalty_transactions[]
   reviews               reviews?
+  workLogs              WorkLog[]              @relation("JobWorkLogs")
 
   @@index([providerId])
   @@index([assignedCrewId])
@@ -1334,11 +1339,12 @@ model WorkerTimeOff {
   endDate    DateTime @map("end_date")
   reason     String? // "vacation", "sick", "appointment", "other"
   notes      String?
-  approved   Boolean  @default(true)
+  status     String   @default("pending") // "pending", "approved", "denied"
   createdAt  DateTime @default(now()) @map("created_at")
 
   @@index([userId])
   @@index([startDate, endDate])
+  @@index([status])
   @@map("worker_time_off")
 }
 
@@ -1469,4 +1475,30 @@ model PasswordResetToken {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("password_reset_tokens")
+}
+
+// Work logs - track time and earnings per job
+model WorkLog {
+  id          String       @id @default(cuid())
+  jobId       String       @map("job_id")
+  userId      String       @map("user_id")
+  providerId  String       @map("provider_id")
+  clockIn     DateTime     @map("clock_in")
+  clockOut    DateTime?    @map("clock_out")
+  hoursWorked Float?       @map("hours_worked")
+  earnings    Float?
+  isPaid      Boolean      @default(false) @map("is_paid")
+  paidAt      DateTime?    @map("paid_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+  job         Job          @relation("JobWorkLogs", fields: [jobId], references: [id], onDelete: Cascade)
+  user        ProviderUser @relation("UserWorkLogs", fields: [userId], references: [id], onDelete: Cascade)
+  provider    Provider     @relation("ProviderWorkLogs", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@index([userId])
+  @@index([providerId])
+  @@index([isPaid])
+  @@index([clockIn])
+  @@map("work_logs")
 }

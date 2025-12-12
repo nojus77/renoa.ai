@@ -180,7 +180,7 @@ async function checkTimeOff(
   const timeOff = await prisma.workerTimeOff.findMany({
     where: {
       userId: check.userId,
-      approved: true,
+      status: 'approved',
       AND: [
         { startDate: { lte: dayEnd } },
         { endDate: { gte: dayStart } },

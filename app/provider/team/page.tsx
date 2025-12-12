@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { UserPlus, Mail, User, Shield, Eye, EyeOff, Loader2, Users, Edit2, Trash2, X, RefreshCw, Pencil, Award, Star, Wrench, Monitor, Crown, DollarSign, Plus, Search, Library, ChevronDown, CalendarPlus, Calendar, Settings, Lightbulb } from 'lucide-react';
+import { UserPlus, Mail, User, Shield, Eye, EyeOff, Loader2, Users, Edit2, Trash2, X, RefreshCw, Pencil, Award, Star, Wrench, Monitor, Crown, DollarSign, Plus, Search, Library, ChevronDown, CalendarPlus, Calendar, Settings, Lightbulb, Clock } from 'lucide-react';
 import EditTeamMemberModal from '@/components/provider/EditTeamMemberModal';
 import DeleteMemberDialog from '@/components/provider/DeleteMemberDialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -103,7 +103,7 @@ export default function TeamManagementPage() {
   const [crews, setCrews] = useState<Crew[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingCrews, setLoadingCrews] = useState(false);
-  const [activeTab, setActiveTab] = useState<'members' | 'crews'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'crews' | 'time-off' | 'payroll'>('members');
 
   // Invite dialog state
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -155,6 +155,17 @@ export default function TeamManagementPage() {
   const [skillSearchFor, setSkillSearchFor] = useState<Record<string, string>>({});
   const [skillsPopoverOpenFor, setSkillsPopoverOpenFor] = useState<Record<string, boolean>>({});
 
+  // Time-off requests state
+  const [timeOffRequests, setTimeOffRequests] = useState<any[]>([]);
+  const [loadingTimeOff, setLoadingTimeOff] = useState(false);
+  const [processingTimeOff, setProcessingTimeOff] = useState<string | null>(null);
+
+  // Payroll state
+  const [workLogs, setWorkLogs] = useState<any[]>([]);
+  const [loadingPayroll, setLoadingPayroll] = useState(false);
+  const [payrollDateRange, setPayrollDateRange] = useState<'this-week' | 'last-week' | 'this-month'>('this-week');
+  const [processingPay, setProcessingPay] = useState<string | null>(null);
+
   // Filtered team members based on search and filter
   const filteredTeamMembers = useMemo(() => {
     return teamMembers
@@ -179,6 +190,20 @@ export default function TeamManagementPage() {
     fetchTeamMembers();
     fetchCrews();
   }, []);
+
+  // Fetch time-off when tab changes to time-off
+  useEffect(() => {
+    if (activeTab === 'time-off') {
+      fetchTimeOffRequests();
+    }
+  }, [activeTab]);
+
+  // Fetch payroll when tab changes to payroll or date range changes
+  useEffect(() => {
+    if (activeTab === 'payroll') {
+      fetchPayroll();
+    }
+  }, [activeTab, payrollDateRange]);
 
   const fetchTeamMembers = async () => {
     setLoading(true);
@@ -221,6 +246,86 @@ export default function TeamManagementPage() {
       console.error('Error fetching crews:', error);
     } finally {
       setLoadingCrews(false);
+    }
+  };
+
+  const fetchTimeOffRequests = async () => {
+    setLoadingTimeOff(true);
+    try {
+      const providerId = localStorage.getItem('providerId');
+      if (!providerId) return;
+
+      const res = await fetch(`/api/provider/time-off?providerId=${providerId}`);
+      const data = await res.json();
+
+      if (res.ok) {
+        setTimeOffRequests(data.requests || []);
+      }
+    } catch (error) {
+      console.error('Error fetching time-off requests:', error);
+    } finally {
+      setLoadingTimeOff(false);
+    }
+  };
+
+  const fetchPayroll = async () => {
+    setLoadingPayroll(true);
+    try {
+      const providerId = localStorage.getItem('providerId');
+      if (!providerId) return;
+
+      const res = await fetch(`/api/provider/payroll?providerId=${providerId}&range=${payrollDateRange}`);
+      const data = await res.json();
+
+      if (res.ok) {
+        setWorkLogs(data.workLogs || []);
+      }
+    } catch (error) {
+      console.error('Error fetching payroll:', error);
+    } finally {
+      setLoadingPayroll(false);
+    }
+  };
+
+  const handleTimeOffAction = async (requestId: string, action: 'approved' | 'denied') => {
+    setProcessingTimeOff(requestId);
+    try {
+      const res = await fetch(`/api/provider/time-off/${requestId}/approve`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: action }),
+      });
+
+      if (res.ok) {
+        toast.success(`Request ${action}`);
+        fetchTimeOffRequests();
+      } else {
+        toast.error('Failed to process request');
+      }
+    } catch (error) {
+      toast.error('Failed to process request');
+    } finally {
+      setProcessingTimeOff(null);
+    }
+  };
+
+  const handleMarkPaid = async (workLogId: string) => {
+    setProcessingPay(workLogId);
+    try {
+      const res = await fetch(`/api/provider/payroll/${workLogId}/pay`, {
+        method: 'PATCH',
+      });
+
+      if (res.ok) {
+        toast.success('Marked as paid');
+        fetchPayroll();
+      } else {
+        toast.error('Failed to mark as paid');
+      }
+    } catch (error) {
+      toast.error('Failed to mark as paid');
+    } finally {
+      setProcessingPay(null);
     }
   };
 
@@ -1262,6 +1367,26 @@ export default function TeamManagementPage() {
             >
               Crews
             </button>
+            <button
+              onClick={() => setActiveTab('time-off')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'time-off'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-zinc-400 hover:text-zinc-100'
+              }`}
+            >
+              Time Off
+            </button>
+            <button
+              onClick={() => setActiveTab('payroll')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'payroll'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-zinc-400 hover:text-zinc-100'
+              }`}
+            >
+              Payroll
+            </button>
           </div>
         </div>
 
@@ -2066,6 +2191,310 @@ export default function TeamManagementPage() {
                       </div>
                     );
                   })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Time Off Tab */}
+          {activeTab === 'time-off' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-zinc-100">Time Off Requests</h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={fetchTimeOffRequests}
+                  disabled={loadingTimeOff}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loadingTimeOff ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+              </div>
+
+              {loadingTimeOff ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                </div>
+              ) : timeOffRequests.length === 0 ? (
+                <Card className="bg-zinc-800 border-zinc-700">
+                  <CardContent className="p-8 text-center">
+                    <Calendar className="h-12 w-12 mx-auto mb-4 text-zinc-500" />
+                    <h3 className="text-lg font-medium text-zinc-200 mb-2">No Time Off Requests</h3>
+                    <p className="text-sm text-zinc-400">
+                      When team members request time off, they&apos;ll appear here for your approval.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {/* Pending requests first */}
+                  {timeOffRequests.filter(r => r.status === 'pending').length > 0 && (
+                    <div className="mb-6">
+                      <h3 className="text-sm font-medium text-amber-400 mb-3 flex items-center gap-2">
+                        <Clock className="h-4 w-4" />
+                        Pending Approval ({timeOffRequests.filter(r => r.status === 'pending').length})
+                      </h3>
+                      <div className="space-y-2">
+                        {timeOffRequests
+                          .filter(r => r.status === 'pending')
+                          .map(request => (
+                            <Card key={request.id} className="bg-zinc-800 border-amber-600/30">
+                              <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <Avatar className="h-10 w-10">
+                                      <AvatarFallback style={{ backgroundColor: request.user?.color || '#10b981' }}>
+                                        {request.user?.firstName?.[0]}{request.user?.lastName?.[0]}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <div className="font-medium text-zinc-100">
+                                        {request.user?.firstName} {request.user?.lastName}
+                                      </div>
+                                      <div className="text-sm text-zinc-400">
+                                        {format(new Date(request.startDate), 'MMM d')} - {format(new Date(request.endDate), 'MMM d, yyyy')}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="outline" className="border-zinc-600 text-zinc-300 capitalize">
+                                      {request.reason || 'Time off'}
+                                    </Badge>
+                                    <div className="flex gap-1">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-green-600 text-green-400 hover:bg-green-600/20"
+                                        onClick={() => handleTimeOffAction(request.id, 'approved')}
+                                        disabled={processingTimeOff === request.id}
+                                      >
+                                        {processingTimeOff === request.id ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          'Approve'
+                                        )}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-red-600 text-red-400 hover:bg-red-600/20"
+                                        onClick={() => handleTimeOffAction(request.id, 'denied')}
+                                        disabled={processingTimeOff === request.id}
+                                      >
+                                        Deny
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </div>
+                                {request.notes && (
+                                  <p className="mt-2 text-sm text-zinc-400 pl-13">
+                                    Note: {request.notes}
+                                  </p>
+                                )}
+                              </CardContent>
+                            </Card>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recent processed requests */}
+                  {timeOffRequests.filter(r => r.status !== 'pending').length > 0 && (
+                    <div>
+                      <h3 className="text-sm font-medium text-zinc-400 mb-3">Recent Requests</h3>
+                      <div className="space-y-2">
+                        {timeOffRequests
+                          .filter(r => r.status !== 'pending')
+                          .slice(0, 10)
+                          .map(request => (
+                            <Card key={request.id} className="bg-zinc-800/50 border-zinc-700">
+                              <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <Avatar className="h-10 w-10">
+                                      <AvatarFallback style={{ backgroundColor: request.user?.color || '#10b981' }}>
+                                        {request.user?.firstName?.[0]}{request.user?.lastName?.[0]}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div>
+                                      <div className="font-medium text-zinc-100">
+                                        {request.user?.firstName} {request.user?.lastName}
+                                      </div>
+                                      <div className="text-sm text-zinc-400">
+                                        {format(new Date(request.startDate), 'MMM d')} - {format(new Date(request.endDate), 'MMM d, yyyy')}
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <Badge
+                                    className={
+                                      request.status === 'approved'
+                                        ? 'bg-green-600/20 text-green-400 border-green-600/30'
+                                        : 'bg-red-600/20 text-red-400 border-red-600/30'
+                                    }
+                                  >
+                                    {request.status}
+                                  </Badge>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Payroll Tab */}
+          {activeTab === 'payroll' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-zinc-100">Payroll</h2>
+                <div className="flex items-center gap-2">
+                  <Select value={payrollDateRange} onValueChange={(v: any) => setPayrollDateRange(v)}>
+                    <SelectTrigger className="w-40 bg-zinc-800 border-zinc-700">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="this-week">This Week</SelectItem>
+                      <SelectItem value="last-week">Last Week</SelectItem>
+                      <SelectItem value="this-month">This Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={fetchPayroll}
+                    disabled={loadingPayroll}
+                  >
+                    <RefreshCw className={`h-4 w-4 mr-2 ${loadingPayroll ? 'animate-spin' : ''}`} />
+                    Refresh
+                  </Button>
+                </div>
+              </div>
+
+              {loadingPayroll ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
+                </div>
+              ) : workLogs.length === 0 ? (
+                <Card className="bg-zinc-800 border-zinc-700">
+                  <CardContent className="p-8 text-center">
+                    <DollarSign className="h-12 w-12 mx-auto mb-4 text-zinc-500" />
+                    <h3 className="text-lg font-medium text-zinc-200 mb-2">No Work Logs</h3>
+                    <p className="text-sm text-zinc-400">
+                      When workers clock in and out of jobs, their hours and earnings will appear here.
+                    </p>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="bg-zinc-800 border-zinc-700">
+                      <CardContent className="p-4">
+                        <div className="text-sm text-zinc-400">Total Hours</div>
+                        <div className="text-2xl font-bold text-zinc-100">
+                          {workLogs.reduce((sum, log) => sum + (log.hoursWorked || 0), 0).toFixed(1)}h
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-zinc-800 border-zinc-700">
+                      <CardContent className="p-4">
+                        <div className="text-sm text-zinc-400">Total Earnings</div>
+                        <div className="text-2xl font-bold text-emerald-400">
+                          ${workLogs.reduce((sum, log) => sum + (log.earnings || 0), 0).toFixed(2)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-zinc-800 border-zinc-700">
+                      <CardContent className="p-4">
+                        <div className="text-sm text-zinc-400">Unpaid</div>
+                        <div className="text-2xl font-bold text-amber-400">
+                          ${workLogs.filter(l => !l.isPaid).reduce((sum, log) => sum + (log.earnings || 0), 0).toFixed(2)}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Work Logs Table */}
+                  <Card className="bg-zinc-800 border-zinc-700">
+                    <CardContent className="p-0">
+                      <table className="w-full">
+                        <thead className="bg-zinc-900/50">
+                          <tr>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Worker</th>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Job</th>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Date</th>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Hours</th>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Earnings</th>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Status</th>
+                            <th className="text-right p-4 text-sm font-medium text-zinc-400">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-700">
+                          {workLogs.map(log => (
+                            <tr key={log.id} className="hover:bg-zinc-700/30">
+                              <td className="p-4">
+                                <div className="flex items-center gap-2">
+                                  <Avatar className="h-8 w-8">
+                                    <AvatarFallback style={{ backgroundColor: log.user?.color || '#10b981' }}>
+                                      {log.user?.firstName?.[0]}{log.user?.lastName?.[0]}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <span className="text-sm text-zinc-200">
+                                    {log.user?.firstName} {log.user?.lastName}
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="p-4 text-sm text-zinc-300">
+                                {log.job?.serviceType || 'Unknown'}
+                              </td>
+                              <td className="p-4 text-sm text-zinc-400">
+                                {format(new Date(log.clockIn), 'MMM d, h:mm a')}
+                              </td>
+                              <td className="p-4 text-sm text-zinc-300">
+                                {log.hoursWorked?.toFixed(1) || '-'}h
+                              </td>
+                              <td className="p-4 text-sm font-medium text-emerald-400">
+                                ${log.earnings?.toFixed(2) || '0.00'}
+                              </td>
+                              <td className="p-4">
+                                <Badge
+                                  className={
+                                    log.isPaid
+                                      ? 'bg-green-600/20 text-green-400 border-green-600/30'
+                                      : 'bg-amber-600/20 text-amber-400 border-amber-600/30'
+                                  }
+                                >
+                                  {log.isPaid ? 'Paid' : 'Unpaid'}
+                                </Badge>
+                              </td>
+                              <td className="p-4 text-right">
+                                {!log.isPaid && (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-emerald-600 text-emerald-400 hover:bg-emerald-600/20"
+                                    onClick={() => handleMarkPaid(log.id)}
+                                    disabled={processingPay === log.id}
+                                  >
+                                    {processingPay === log.id ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      'Mark Paid'
+                                    )}
+                                  </Button>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
             </div>

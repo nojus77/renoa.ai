@@ -13,13 +13,20 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { status, role, hourlyRate } = body;
+    const { status, role, hourlyRate, payType, commissionRate, firstName, lastName, phone, skills, color } = body;
 
     // Build update data object
-    const updateData: any = {};
+    const updateData: Record<string, unknown> = {};
     if (status !== undefined) updateData.status = status;
     if (role !== undefined) updateData.role = role;
     if (hourlyRate !== undefined) updateData.hourlyRate = hourlyRate;
+    if (payType !== undefined) updateData.payType = payType;
+    if (commissionRate !== undefined) updateData.commissionRate = commissionRate;
+    if (firstName !== undefined) updateData.firstName = firstName;
+    if (lastName !== undefined) updateData.lastName = lastName;
+    if (phone !== undefined) updateData.phone = phone;
+    if (skills !== undefined) updateData.skills = skills;
+    if (color !== undefined) updateData.color = color;
 
     const updated = await prisma.providerUser.update({
       where: { id: params.id },

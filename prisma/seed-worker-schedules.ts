@@ -214,7 +214,7 @@ async function seedSampleTimeOff() {
         endDate: new Date(nextWeek.getTime() + 3 * 24 * 60 * 60 * 1000), // 3 days
         reason: 'vacation',
         notes: 'Family trip to Florida',
-        approved: true,
+        status: 'approved',
       },
     });
     console.log(`✓ ${workers[0].firstName} - Vacation next week (3 days)`);
@@ -230,7 +230,7 @@ async function seedSampleTimeOff() {
         endDate: twoWeeks, // Same day
         reason: 'appointment',
         notes: 'Doctor appointment - morning only',
-        approved: true,
+        status: 'approved',
       },
     });
     console.log(`✓ ${workers[1].firstName} - Doctor appointment (1 day)`);
@@ -246,7 +246,7 @@ async function seedSampleTimeOff() {
         endDate: new Date(threeWeeks.getTime() + 4 * 24 * 60 * 60 * 1000), // 5 days
         reason: 'vacation',
         notes: 'Wedding out of state',
-        approved: true,
+        status: 'approved',
       },
     });
     console.log(`✓ ${workers[2].firstName} - Vacation in 3 weeks (5 days)`);

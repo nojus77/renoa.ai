@@ -1,0 +1,454 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import WorkerLayout from '@/components/worker/WorkerLayout';
+import {
+  MapPin,
+  Phone,
+  Clock,
+  ChevronRight,
+  Navigation,
+  CheckCircle2,
+  Loader2,
+  RefreshCw,
+  DollarSign,
+  Briefcase,
+} from 'lucide-react';
+import { toast } from 'sonner';
+
+interface Job {
+  id: string;
+  serviceType: string;
+  address: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  onTheWayAt: string | null;
+  arrivedAt: string | null;
+  completedAt: string | null;
+  customerNotes: string | null;
+  internalNotes: string | null;
+  customer: {
+    id: string;
+    name: string;
+    phone: string | null;
+    email: string | null;
+  };
+  workLogs: {
+    id: string;
+    clockIn: string;
+    clockOut: string | null;
+    hoursWorked: number | null;
+    earnings: number | null;
+  }[];
+}
+
+interface DayStats {
+  jobsCount: number;
+  hoursWorked: number;
+  earnings: number;
+}
+
+export default function WorkerDashboard() {
+  const router = useRouter();
+  const [userId, setUserId] = useState<string>('');
+  const [providerId, setProviderId] = useState<string>('');
+  const [firstName, setFirstName] = useState<string>('');
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [stats, setStats] = useState<DayStats>({ jobsCount: 0, hoursWorked: 0, earnings: 0 });
+
+  const fetchJobs = useCallback(async (uid: string) => {
+    try {
+      const res = await fetch(`/api/worker/jobs/today?userId=${uid}`);
+      const data = await res.json();
+
+      if (data.jobs) {
+        setJobs(data.jobs);
+        // Calculate stats
+        const completed = data.jobs.filter((j: Job) => j.status === 'completed');
+        const hours = completed.reduce((sum: number, j: Job) => {
+          const log = j.workLogs?.[0];
+          return sum + (log?.hoursWorked || 0);
+        }, 0);
+        const earnings = completed.reduce((sum: number, j: Job) => {
+          const log = j.workLogs?.[0];
+          return sum + (log?.earnings || 0);
+        }, 0);
+        setStats({
+          jobsCount: data.jobs.length,
+          hoursWorked: Math.round(hours * 100) / 100,
+          earnings: Math.round(earnings * 100) / 100,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      toast.error('Failed to load jobs');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const uid = localStorage.getItem('workerUserId');
+    const pid = localStorage.getItem('workerProviderId');
+    const name = localStorage.getItem('workerFirstName');
+
+    if (!uid || !pid) {
+      router.push('/provider/login');
+      return;
+    }
+
+    setUserId(uid);
+    setProviderId(pid);
+    setFirstName(name || 'Worker');
+    fetchJobs(uid);
+  }, [router, fetchJobs]);
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
+  const formatTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  const getJobStatus = (job: Job) => {
+    if (job.completedAt) return 'completed';
+    if (job.workLogs?.some((l) => l.clockIn && !l.clockOut)) return 'working';
+    if (job.arrivedAt) return 'arrived';
+    if (job.onTheWayAt) return 'on_the_way';
+    return 'scheduled';
+  };
+
+  const handleAction = async (job: Job, action: string) => {
+    setActionLoading(`${job.id}-${action}`);
+
+    try {
+      let endpoint = '';
+      let body: Record<string, unknown> = {};
+
+      switch (action) {
+        case 'on_the_way':
+        case 'arrived':
+          endpoint = '/api/worker/jobs/status';
+          body = { jobId: job.id, userId, action };
+          break;
+        case 'start':
+          endpoint = '/api/worker/clock-in';
+          body = { jobId: job.id, userId, providerId };
+          break;
+        case 'complete':
+          endpoint = '/api/worker/clock-out';
+          body = { jobId: job.id, userId };
+          break;
+      }
+
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(
+          action === 'on_the_way'
+            ? 'Marked as on the way!'
+            : action === 'arrived'
+            ? 'Marked as arrived!'
+            : action === 'start'
+            ? 'Job started!'
+            : `Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`
+        );
+        fetchJobs(userId);
+      } else {
+        toast.error(data.error || 'Action failed');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const openMaps = (address: string) => {
+    const encoded = encodeURIComponent(address);
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`, '_blank');
+  };
+
+  const callPhone = (phone: string) => {
+    window.location.href = `tel:${phone}`;
+  };
+
+  const renderActionButton = (job: Job) => {
+    const status = getJobStatus(job);
+    const isLoading = (action: string) => actionLoading === `${job.id}-${action}`;
+
+    switch (status) {
+      case 'scheduled':
+        return (
+          <button
+            onClick={() => handleAction(job, 'on_the_way')}
+            disabled={!!actionLoading}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+          >
+            {isLoading('on_the_way') ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <Navigation className="w-5 h-5" />
+                On My Way
+              </>
+            )}
+          </button>
+        );
+      case 'on_the_way':
+        return (
+          <button
+            onClick={() => handleAction(job, 'arrived')}
+            disabled={!!actionLoading}
+            className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+          >
+            {isLoading('arrived') ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <MapPin className="w-5 h-5" />
+                I&apos;ve Arrived
+              </>
+            )}
+          </button>
+        );
+      case 'arrived':
+        return (
+          <button
+            onClick={() => handleAction(job, 'start')}
+            disabled={!!actionLoading}
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+          >
+            {isLoading('start') ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <Clock className="w-5 h-5" />
+                Start Job
+              </>
+            )}
+          </button>
+        );
+      case 'working':
+        return (
+          <button
+            onClick={() => handleAction(job, 'complete')}
+            disabled={!!actionLoading}
+            className="w-full py-4 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+          >
+            {isLoading('complete') ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                <CheckCircle2 className="w-5 h-5" />
+                Complete Job
+              </>
+            )}
+          </button>
+        );
+      case 'completed':
+        return (
+          <div className="w-full py-3 bg-zinc-800 text-emerald-400 font-semibold rounded-xl flex items-center justify-center gap-2">
+            <CheckCircle2 className="w-5 h-5" />
+            Completed
+          </div>
+        );
+    }
+  };
+
+  const getStatusBadge = (job: Job) => {
+    const status = getJobStatus(job);
+    const styles: Record<string, string> = {
+      scheduled: 'bg-zinc-700 text-zinc-300',
+      on_the_way: 'bg-blue-500/20 text-blue-400',
+      arrived: 'bg-orange-500/20 text-orange-400',
+      working: 'bg-emerald-500/20 text-emerald-400',
+      completed: 'bg-purple-500/20 text-purple-400',
+    };
+    const labels: Record<string, string> = {
+      scheduled: 'Scheduled',
+      on_the_way: 'On the way',
+      arrived: 'Arrived',
+      working: 'In Progress',
+      completed: 'Completed',
+    };
+
+    return (
+      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status]}`}>
+        {labels[status]}
+      </span>
+    );
+  };
+
+  if (loading) {
+    return (
+      <WorkerLayout>
+        <div className="flex items-center justify-center min-h-screen">
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+        </div>
+      </WorkerLayout>
+    );
+  }
+
+  return (
+    <WorkerLayout>
+      <div className="p-4 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-white">
+              {getGreeting()}, {firstName}!
+            </h1>
+            <p className="text-zinc-400 text-sm">
+              {new Date().toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </p>
+          </div>
+          <button
+            onClick={() => fetchJobs(userId)}
+            className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"
+          >
+            <RefreshCw className="w-5 h-5 text-zinc-400" />
+          </button>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+            <Briefcase className="w-5 h-5 text-blue-400 mb-1" />
+            <p className="text-xl font-bold">{stats.jobsCount}</p>
+            <p className="text-xs text-zinc-500">Jobs Today</p>
+          </div>
+          <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+            <Clock className="w-5 h-5 text-emerald-400 mb-1" />
+            <p className="text-xl font-bold">{stats.hoursWorked}h</p>
+            <p className="text-xs text-zinc-500">Hours</p>
+          </div>
+          <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
+            <DollarSign className="w-5 h-5 text-yellow-400 mb-1" />
+            <p className="text-xl font-bold">${stats.earnings}</p>
+            <p className="text-xs text-zinc-500">Earned</p>
+          </div>
+        </div>
+
+        {/* Jobs List */}
+        <div className="space-y-3">
+          <h2 className="text-lg font-semibold text-white">Today&apos;s Jobs</h2>
+
+          {jobs.length === 0 ? (
+            <div className="bg-zinc-900 rounded-xl p-8 text-center border border-zinc-800">
+              <Briefcase className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
+              <p className="text-zinc-400">No jobs scheduled for today</p>
+              <p className="text-zinc-500 text-sm mt-1">Enjoy your day off!</p>
+            </div>
+          ) : (
+            jobs.map((job) => (
+              <div
+                key={job.id}
+                className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden"
+              >
+                {/* Job Header - Always visible */}
+                <button
+                  onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
+                  className="w-full p-4 text-left flex items-center justify-between"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-white">{job.serviceType}</span>
+                      {getStatusBadge(job)}
+                    </div>
+                    <p className="text-zinc-400 text-sm">{job.customer.name}</p>
+                    <p className="text-zinc-500 text-xs mt-1">
+                      {formatTime(job.startTime)} - {formatTime(job.endTime)}
+                    </p>
+                  </div>
+                  <ChevronRight
+                    className={`w-5 h-5 text-zinc-500 transition-transform ${
+                      expandedJobId === job.id ? 'rotate-90' : ''
+                    }`}
+                  />
+                </button>
+
+                {/* Expanded Content */}
+                {expandedJobId === job.id && (
+                  <div className="px-4 pb-4 space-y-4 border-t border-zinc-800 pt-4">
+                    {/* Address */}
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-5 h-5 text-zinc-400 mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-zinc-300 text-sm">{job.address}</p>
+                        <button
+                          onClick={() => openMaps(job.address)}
+                          className="text-emerald-400 text-sm mt-1 hover:underline"
+                        >
+                          Open in Maps
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Phone */}
+                    {job.customer.phone && (
+                      <div className="flex items-center gap-3">
+                        <Phone className="w-5 h-5 text-zinc-400" />
+                        <button
+                          onClick={() => callPhone(job.customer.phone!)}
+                          className="text-emerald-400 text-sm hover:underline"
+                        >
+                          {job.customer.phone}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Notes */}
+                    {(job.customerNotes || job.internalNotes) && (
+                      <div className="bg-zinc-800/50 rounded-lg p-3 text-sm">
+                        {job.customerNotes && (
+                          <p className="text-zinc-300">
+                            <span className="text-zinc-500">Customer: </span>
+                            {job.customerNotes}
+                          </p>
+                        )}
+                        {job.internalNotes && (
+                          <p className="text-zinc-300 mt-1">
+                            <span className="text-zinc-500">Notes: </span>
+                            {job.internalNotes}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action Button */}
+                    {renderActionButton(job)}
+                  </div>
+                )}
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+    </WorkerLayout>
+  );
+}
