@@ -50,14 +50,6 @@ interface WorkingHours {
   sunday: TimeSlot[];
 }
 
-interface Service {
-  id: string;
-  name: string;
-  enabled: boolean;
-  minPrice: number;
-  maxPrice: number;
-}
-
 const SERVICE_CATEGORIES = [
   'Landscaping & Lawn Care',
   'Home Remodeling',
@@ -149,12 +141,29 @@ const US_STATES = [
   { value: 'WI', label: 'Wisconsin' }, { value: 'WY', label: 'Wyoming' },
 ];
 
-const SERVICE_RADIUS_OPTIONS = [
-  { value: '10', label: '10 miles' },
-  { value: '25', label: '25 miles' },
-  { value: '50', label: '50 miles' },
-  { value: '100', label: '100 miles' },
-  { value: 'statewide', label: 'Statewide' },
+const TRAVEL_DISTANCE_OPTIONS = [
+  { value: '10', label: 'Within 10 miles' },
+  { value: '25', label: 'Within 25 miles' },
+  { value: '50', label: 'Within 50 miles' },
+  { value: 'city', label: 'Within my city only' },
+  { value: 'statewide', label: 'Anywhere in my state' },
+];
+
+const DURATION_OPTIONS = [
+  { value: '30', label: '30 minutes' },
+  { value: '60', label: '1 hour' },
+  { value: '120', label: '2 hours' },
+  { value: '180', label: '3 hours' },
+  { value: '240', label: '4 hours' },
+  { value: '360', label: 'Half day' },
+  { value: '480', label: 'Full day' },
+];
+
+const PAYMENT_TERMS_OPTIONS = [
+  { value: 'due_on_receipt', label: 'Due on Receipt' },
+  { value: 'net_7', label: 'Net 7' },
+  { value: 'net_14', label: 'Net 14' },
+  { value: 'net_30', label: 'Net 30' },
 ];
 
 export default function ProviderSettings() {
@@ -184,9 +193,9 @@ export default function ProviderSettings() {
   const [businessEntity, setBusinessEntity] = useState('');
   const [employeeCount, setEmployeeCount] = useState('');
 
-  // Service Area
-  const [businessState, setBusinessState] = useState('');
-  const [serviceRadiusType, setServiceRadiusType] = useState('');
+  // Service Area (ZIP-based - matching onboarding)
+  const [businessZipCode, setBusinessZipCode] = useState('');
+  const [travelDistance, setTravelDistance] = useState('');
   const [primaryCity, setPrimaryCity] = useState('');
 
   // Credentials
@@ -224,16 +233,24 @@ export default function ProviderSettings() {
   const [maxJobsPerDay, setMaxJobsPerDay] = useState(8);
   const [advanceBooking, setAdvanceBooking] = useState(14);
 
-  // Services
-  const [services, setServices] = useState<Service[]>([
-    { id: '1', name: 'Lawn Mowing', enabled: true, minPrice: 50, maxPrice: 150 },
-    { id: '2', name: 'Landscaping', enabled: true, minPrice: 200, maxPrice: 2000 },
-    { id: '3', name: 'Spring Cleanup', enabled: true, minPrice: 150, maxPrice: 500 },
-    { id: '4', name: 'Mulching', enabled: false, minPrice: 100, maxPrice: 400 },
-  ]);
-  const [minimumJobValue, setMinimumJobValue] = useState(75);
+  // Services (loaded from provider's actual services)
+  interface ServicePricing {
+    name: string;
+    enabled: boolean;
+    startingPrice: number;
+    duration: string;
+  }
+  const [servicePricing, setServicePricing] = useState<ServicePricing[]>([]);
+  const [newServiceName, setNewServiceName] = useState('');
   const [depositRequired, setDepositRequired] = useState(false);
   const [depositPercentage, setDepositPercentage] = useState(25);
+
+  // Payment settings
+  const [lateFeeEnabled, setLateFeeEnabled] = useState(false);
+  const [lateFeePercentage, setLateFeePercentage] = useState(5);
+  const [acceptBankTransfer, setAcceptBankTransfer] = useState(false);
+  const [stripeConnected, setStripeConnected] = useState(false);
+  const [stripeAccountEmail, setStripeAccountEmail] = useState('');
 
   // Notifications
   const [emailNotifications, setEmailNotifications] = useState({
@@ -298,12 +315,23 @@ export default function ProviderSettings() {
         // New onboarding fields
         setPrimaryCategory(provider.primaryCategory || '');
         setBusinessEntity(provider.businessEntity || '');
-        setBusinessState(provider.state || '');
+        setBusinessZipCode(provider.businessZipCode || '');
+        setTravelDistance(provider.travelDistance || '');
         setPrimaryCity(provider.city || '');
-        setServiceRadiusType(provider.serviceRadiusType || '');
         setLicenseNumber(provider.taxId || '');
         setInsuranceProvider(provider.insuranceProvider || '');
         setSelectedServices(provider.serviceTypes || []);
+
+        // Build servicePricing from provider's selected services
+        const providerServices = provider.serviceTypes || [];
+        if (providerServices.length > 0) {
+          setServicePricing(providerServices.map((svc: string) => ({
+            name: svc,
+            enabled: true,
+            startingPrice: 0,
+            duration: '60',
+          })));
+        }
 
         // Map activeSeats back to employeeCount
         const seats = provider.activeSeats || 1;
@@ -428,9 +456,9 @@ export default function ProviderSettings() {
           serviceTypes: selectedServices,
           businessEntity,
           employeeCount,
-          // Service area
-          state: businessState,
-          serviceRadiusType,
+          // Service area (ZIP-based)
+          businessZipCode,
+          travelDistance,
           primaryCity,
           // Credentials
           licenseNumber,
@@ -620,24 +648,22 @@ export default function ProviderSettings() {
   const saveServicesSettings = async () => {
     setSaving(true);
     try {
-      const servicePricing = services.reduce((acc, service) => {
-        if (service.enabled) {
-          acc[service.id] = {
-            enabled: true,
-            minPrice: service.minPrice,
-            maxPrice: service.maxPrice,
-          };
-        }
+      // Build services data from servicePricing state
+      const servicesData = servicePricing.reduce((acc, service) => {
+        acc[service.name] = {
+          enabled: service.enabled,
+          startingPrice: service.startingPrice,
+          duration: service.duration,
+        };
         return acc;
-      }, {} as Record<string, { enabled: boolean; minPrice: number; maxPrice: number }>);
+      }, {} as Record<string, { enabled: boolean; startingPrice: number; duration: string }>);
 
       const res = await fetch('/api/provider/settings/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           providerId,
-          servicePricing,
-          minimumJobValue,
+          servicePricing: servicesData,
           depositRequired,
           depositPercentage,
         }),
@@ -1074,31 +1100,39 @@ export default function ProviderSettings() {
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-zinc-300 mb-2">
-                            State <span className="text-red-400">*</span>
+                            Business Location ZIP Code <span className="text-red-400">*</span>
                           </label>
-                          <select
-                            value={businessState}
-                            onChange={(e) => setBusinessState(e.target.value)}
-                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          >
-                            <option value="">Select state</option>
-                            {US_STATES.map(state => (
-                              <option key={state.value} value={state.value}>{state.label}</option>
-                            ))}
-                          </select>
+                          <input
+                            type="text"
+                            value={businessZipCode}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/\D/g, '').slice(0, 5);
+                              setBusinessZipCode(value);
+                            }}
+                            className={`w-full px-3 py-2 bg-zinc-900 border rounded-lg text-zinc-200 focus:outline-none transition-all ${
+                              businessZipCode && !/^\d{5}$/.test(businessZipCode)
+                                ? 'border-red-500 focus:border-red-500'
+                                : 'border-zinc-800 focus:border-emerald-500'
+                            }`}
+                            placeholder="e.g., 78701"
+                            maxLength={5}
+                          />
+                          {businessZipCode && !/^\d{5}$/.test(businessZipCode) && (
+                            <p className="text-xs text-red-400 mt-1">Please enter a valid 5-digit ZIP code</p>
+                          )}
                         </div>
 
                         <div>
                           <label className="block text-sm font-medium text-zinc-300 mb-2">
-                            Service Radius <span className="text-red-400">*</span>
+                            How far do you travel for jobs? <span className="text-red-400">*</span>
                           </label>
                           <select
-                            value={serviceRadiusType}
-                            onChange={(e) => setServiceRadiusType(e.target.value)}
+                            value={travelDistance}
+                            onChange={(e) => setTravelDistance(e.target.value)}
                             className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
                           >
-                            <option value="">Select radius</option>
-                            {SERVICE_RADIUS_OPTIONS.map(option => (
+                            <option value="">Select travel distance</option>
+                            {TRAVEL_DISTANCE_OPTIONS.map(option => (
                               <option key={option.value} value={option.value}>{option.label}</option>
                             ))}
                           </select>
@@ -1106,7 +1140,7 @@ export default function ProviderSettings() {
 
                         <div className="md:col-span-2">
                           <label className="block text-sm font-medium text-zinc-300 mb-2">
-                            Primary City <span className="text-zinc-500 font-normal">(Optional)</span>
+                            Primary City <span className="text-zinc-500 font-normal">(Optional - for display purposes)</span>
                           </label>
                           <input
                             type="text"
@@ -1362,86 +1396,161 @@ export default function ProviderSettings() {
 
               {/* Services Tab */}
               {activeTab === 'services' && (
-                <Card className="bg-zinc-900/50 border-zinc-800">
-                  <CardHeader>
-                    <CardTitle className="text-zinc-100">Services & Pricing</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-3">
-                      {services.map((service) => (
-                        <div key={service.id} className="p-3 md:p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <button
-                                onClick={() => {
-                                  setServices(services.map(s =>
-                                    s.id === service.id ? { ...s, enabled: !s.enabled } : s
-                                  ));
-                                }}
-                                className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-                                  service.enabled ? 'bg-emerald-600' : 'bg-zinc-700'
-                                }`}
-                              >
-                                <div
-                                  className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                                    service.enabled ? 'translate-x-6' : 'translate-x-1'
-                                  }`}
-                                />
-                              </button>
-                              <span className="text-sm md:text-base text-zinc-200 font-medium">{service.name}</span>
-                            </div>
-                          </div>
-                          {service.enabled && (
-                            <div className="grid grid-cols-2 gap-3 md:gap-4">
-                              <div>
-                                <label className="block text-xs text-zinc-400 mb-1">Min Price</label>
-                                <input
-                                  type="number"
-                                  value={service.minPrice}
-                                  onChange={(e) => {
-                                    setServices(services.map(s =>
-                                      s.id === service.id ? { ...s, minPrice: parseInt(e.target.value) || 0 } : s
-                                    ));
-                                  }}
-                                  className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500 text-sm"
-                                />
-                              </div>
-                              <div>
-                                <label className="block text-xs text-zinc-400 mb-1">Max Price</label>
-                                <input
-                                  type="number"
-                                  value={service.maxPrice}
-                                  onChange={(e) => {
-                                    setServices(services.map(s =>
-                                      s.id === service.id ? { ...s, maxPrice: parseInt(e.target.value) || 0 } : s
-                                    ));
-                                  }}
-                                  className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500 text-sm"
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-zinc-800">
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Minimum Job Value
-                        </label>
-                        <input
-                          type="number"
-                          value={minimumJobValue}
-                          onChange={(e) => setMinimumJobValue(parseInt(e.target.value) || 0)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                        />
+                <div className="space-y-6">
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-zinc-100">Your Services</CardTitle>
+                        <span className="text-sm text-zinc-400">
+                          {servicePricing.filter(s => s.enabled).length} active services
+                        </span>
                       </div>
+                      <p className="text-sm text-zinc-400 mt-1">
+                        Configure pricing and duration for services you selected during onboarding
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {servicePricing.length === 0 ? (
+                        <div className="text-center py-8">
+                          <DollarSign className="h-12 w-12 text-zinc-600 mx-auto mb-3" />
+                          <p className="text-zinc-400 mb-4">No services configured yet</p>
+                          <p className="text-sm text-zinc-500">
+                            Add services in your Profile settings, or add them below
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="space-y-3">
+                          {servicePricing.map((service, index) => (
+                            <div key={index} className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                              <div className="flex items-center justify-between mb-3">
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => {
+                                      setServicePricing(servicePricing.map((s, i) =>
+                                        i === index ? { ...s, enabled: !s.enabled } : s
+                                      ));
+                                    }}
+                                    className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                                      service.enabled ? 'bg-emerald-600' : 'bg-zinc-700'
+                                    }`}
+                                  >
+                                    <div
+                                      className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                        service.enabled ? 'translate-x-6' : 'translate-x-1'
+                                      }`}
+                                    />
+                                  </button>
+                                  <span className="text-sm md:text-base text-zinc-200 font-medium">{service.name}</span>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setServicePricing(servicePricing.filter((_, i) => i !== index));
+                                  }}
+                                  className="text-zinc-500 hover:text-red-400 p-2"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                              {service.enabled && (
+                                <div className="grid grid-cols-2 gap-4">
+                                  <div>
+                                    <label className="block text-xs text-zinc-400 mb-1">Starting Price</label>
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">$</span>
+                                      <input
+                                        type="number"
+                                        value={service.startingPrice || ''}
+                                        onChange={(e) => {
+                                          setServicePricing(servicePricing.map((s, i) =>
+                                            i === index ? { ...s, startingPrice: parseInt(e.target.value) || 0 } : s
+                                          ));
+                                        }}
+                                        className="w-full pl-7 pr-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500 text-sm"
+                                        placeholder="0"
+                                      />
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs text-zinc-400 mb-1">Estimated Duration</label>
+                                    <select
+                                      value={service.duration}
+                                      onChange={(e) => {
+                                        setServicePricing(servicePricing.map((s, i) =>
+                                          i === index ? { ...s, duration: e.target.value } : s
+                                        ));
+                                      }}
+                                      className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500 text-sm"
+                                    >
+                                      {DURATION_OPTIONS.map(opt => (
+                                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                      ))}
+                                    </select>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-                      <div>
+                      {/* Add Service */}
+                      <div className="pt-4 border-t border-zinc-800">
                         <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Deposit Required
+                          Add New Service
                         </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={newServiceName}
+                            onChange={(e) => setNewServiceName(e.target.value)}
+                            className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="e.g., Gutter Cleaning"
+                            onKeyPress={(e) => {
+                              if (e.key === 'Enter' && newServiceName.trim()) {
+                                setServicePricing([...servicePricing, {
+                                  name: newServiceName.trim(),
+                                  enabled: true,
+                                  startingPrice: 0,
+                                  duration: '60',
+                                }]);
+                                setNewServiceName('');
+                              }
+                            }}
+                          />
+                          <Button
+                            onClick={() => {
+                              if (newServiceName.trim()) {
+                                setServicePricing([...servicePricing, {
+                                  name: newServiceName.trim(),
+                                  enabled: true,
+                                  startingPrice: 0,
+                                  duration: '60',
+                                }]);
+                                setNewServiceName('');
+                              }
+                            }}
+                            disabled={!newServiceName.trim()}
+                            className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50"
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Deposit Settings */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Deposit Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div>
+                          <p className="text-sm font-medium text-zinc-200">Require Deposit</p>
+                          <p className="text-xs text-zinc-500 mt-1">Require upfront payment before starting jobs</p>
+                        </div>
                         <div className="flex items-center gap-4">
                           <button
                             onClick={() => setDepositRequired(!depositRequired)}
@@ -1456,30 +1565,34 @@ export default function ProviderSettings() {
                             />
                           </button>
                           {depositRequired && (
-                            <input
-                              type="number"
-                              value={depositPercentage}
-                              onChange={(e) => setDepositPercentage(parseInt(e.target.value) || 0)}
-                              className="w-24 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                              placeholder="%"
-                            />
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                value={depositPercentage}
+                                onChange={(e) => setDepositPercentage(parseInt(e.target.value) || 0)}
+                                className="w-20 px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500 text-sm"
+                                min="1"
+                                max="100"
+                              />
+                              <span className="text-zinc-400 text-sm">%</span>
+                            </div>
                           )}
                         </div>
                       </div>
-                    </div>
+                    </CardContent>
+                  </Card>
 
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={saveServicesSettings}
-                        disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        {saving ? 'Saving...' : 'Save Services'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={saveServicesSettings}
+                      disabled={saving}
+                      className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Saving...' : 'Save Services'}
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {/* Notifications Tab */}
@@ -1579,145 +1692,402 @@ export default function ProviderSettings() {
 
               {/* Payments Tab */}
               {activeTab === 'payments' && (
-                <Card className="bg-zinc-900/50 border-zinc-800">
-                  <CardHeader>
-                    <CardTitle className="text-zinc-100">Payment Settings</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div>
-                      <label className="block text-sm font-medium text-zinc-300 mb-2">
-                        Payment Terms
-                      </label>
-                      <select
-                        value={paymentTerms}
-                        onChange={(e) => setPaymentTerms(e.target.value)}
-                        className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                      >
-                        <option value="due_on_receipt">Due on Receipt</option>
-                        <option value="net_7">Net 7</option>
-                        <option value="net_15">Net 15</option>
-                        <option value="net_30">Net 30</option>
-                      </select>
-                    </div>
+                <div className="space-y-6">
+                  {/* Payment Processing Section */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <CreditCard className="h-5 w-5 text-purple-400" />
+                        Payment Processing
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      {stripeConnected ? (
+                        <div className="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
+                              <svg viewBox="0 0 24 24" className="w-6 h-6">
+                                <path fill="#635BFF" d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/>
+                              </svg>
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <Check className="h-4 w-4 text-emerald-400" />
+                                <span className="text-sm font-medium text-emerald-400">Stripe Connected</span>
+                              </div>
+                              {stripeAccountEmail && (
+                                <p className="text-xs text-zinc-400 mt-0.5">{stripeAccountEmail}</p>
+                              )}
+                            </div>
+                          </div>
+                          <a
+                            href="https://dashboard.stripe.com"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 text-sm text-purple-400 hover:text-purple-300"
+                          >
+                            <Link2 className="h-4 w-4" />
+                            Manage in Stripe Dashboard
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center">
+                              <svg viewBox="0 0 24 24" className="w-7 h-7">
+                                <path fill="#635BFF" d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/>
+                              </svg>
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-zinc-200">Connect Stripe to accept online payments</p>
+                              <p className="text-xs text-zinc-500 mt-1">Accept credit cards and bank transfers securely</p>
+                            </div>
+                            <Button className="bg-[#635BFF] hover:bg-[#5851ea] text-white">
+                              Connect Stripe
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                    <div>
-                      <h3 className="text-sm font-semibold text-zinc-200 mb-3 md:mb-4">Accept Payment Methods</h3>
-                      <div className="space-y-2 md:space-y-3">
-                        <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                          <span className="text-xs md:text-sm text-zinc-300">Credit Cards</span>
-                          <button
-                            onClick={() => setAcceptCreditCard(!acceptCreditCard)}
-                            className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-                              acceptCreditCard ? 'bg-emerald-600' : 'bg-zinc-700'
-                            }`}
-                          >
-                            <div
-                              className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                                acceptCreditCard ? 'translate-x-6' : 'translate-x-1'
-                              }`}
-                            />
-                          </button>
+                  {/* Payment Methods Section */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Payment Methods You Accept</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <span className="text-sm text-zinc-200">Credit/Debit Cards</span>
+                          {!stripeConnected && (
+                            <p className="text-xs text-amber-400 mt-0.5">Requires Stripe connection</p>
+                          )}
                         </div>
-                        <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                          <span className="text-xs md:text-sm text-zinc-300">Cash</span>
-                          <button
-                            onClick={() => setAcceptCash(!acceptCash)}
-                            className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-                              acceptCash ? 'bg-emerald-600' : 'bg-zinc-700'
+                        <button
+                          onClick={() => stripeConnected && setAcceptCreditCard(!acceptCreditCard)}
+                          disabled={!stripeConnected}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            acceptCreditCard && stripeConnected ? 'bg-emerald-600' : 'bg-zinc-700'
+                          } ${!stripeConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              acceptCreditCard && stripeConnected ? 'translate-x-6' : 'translate-x-1'
                             }`}
-                          >
-                            <div
-                              className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                                acceptCash ? 'translate-x-6' : 'translate-x-1'
-                              }`}
-                            />
-                          </button>
-                        </div>
-                        <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                          <span className="text-xs md:text-sm text-zinc-300">Check</span>
-                          <button
-                            onClick={() => setAcceptCheck(!acceptCheck)}
-                            className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-                              acceptCheck ? 'bg-emerald-600' : 'bg-zinc-700'
-                            }`}
-                          >
-                            <div
-                              className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                                acceptCheck ? 'translate-x-6' : 'translate-x-1'
-                              }`}
-                            />
-                          </button>
-                        </div>
+                          />
+                        </button>
                       </div>
-                    </div>
 
-                    <div className="flex items-center justify-between gap-3 p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs md:text-sm font-medium text-zinc-300">Auto-Invoice on Job Completion</p>
-                        <p className="text-xs text-zinc-500 mt-1">Automatically create invoice when job is marked complete</p>
-                      </div>
-                      <button
-                        onClick={() => setAutoInvoice(!autoInvoice)}
-                        className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-                          autoInvoice ? 'bg-emerald-600' : 'bg-zinc-700'
-                        }`}
-                      >
-                        <div
-                          className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                            autoInvoice ? 'translate-x-6' : 'translate-x-1'
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <span className="text-sm text-zinc-200">Cash</span>
+                        <button
+                          onClick={() => setAcceptCash(!acceptCash)}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            acceptCash ? 'bg-emerald-600' : 'bg-zinc-700'
                           }`}
-                        />
-                      </button>
-                    </div>
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              acceptCash ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
 
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={savePaymentSettings}
-                        disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        {saving ? 'Saving...' : 'Save Payment Settings'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <span className="text-sm text-zinc-200">Check</span>
+                        <button
+                          onClick={() => setAcceptCheck(!acceptCheck)}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            acceptCheck ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              acceptCheck ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <span className="text-sm text-zinc-200">Bank Transfer / ACH</span>
+                          {!stripeConnected && (
+                            <p className="text-xs text-amber-400 mt-0.5">Requires Stripe connection</p>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => stripeConnected && setAcceptBankTransfer(!acceptBankTransfer)}
+                          disabled={!stripeConnected}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            acceptBankTransfer && stripeConnected ? 'bg-emerald-600' : 'bg-zinc-700'
+                          } ${!stripeConnected ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              acceptBankTransfer && stripeConnected ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Invoice Settings Section */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Invoice Settings</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Payment Terms
+                        </label>
+                        <select
+                          value={paymentTerms}
+                          onChange={(e) => setPaymentTerms(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                        >
+                          {PAYMENT_TERMS_OPTIONS.map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-200">Late Fee</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">Charge a fee on overdue invoices</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <button
+                            onClick={() => setLateFeeEnabled(!lateFeeEnabled)}
+                            className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                              lateFeeEnabled ? 'bg-emerald-600' : 'bg-zinc-700'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                lateFeeEnabled ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                          {lateFeeEnabled && (
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="number"
+                                value={lateFeePercentage}
+                                onChange={(e) => setLateFeePercentage(parseInt(e.target.value) || 0)}
+                                className="w-16 px-2 py-1 bg-zinc-950 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500 text-sm"
+                                min="1"
+                                max="25"
+                              />
+                              <span className="text-zinc-400 text-sm">%</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-200">Auto-Invoice on Job Completion</p>
+                          <p className="text-xs text-zinc-500 mt-0.5">Automatically create invoice when job is marked complete</p>
+                        </div>
+                        <button
+                          onClick={() => setAutoInvoice(!autoInvoice)}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            autoInvoice ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              autoInvoice ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={savePaymentSettings}
+                      disabled={saving}
+                      className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Saving...' : 'Save Payment Settings'}
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {/* Integrations Tab */}
               {activeTab === 'integrations' && (
-                <Card className="bg-zinc-900/50 border-zinc-800">
-                  <CardHeader>
-                    <CardTitle className="text-zinc-100">Integrations</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3 md:space-y-4">
-                    {[
-                      { name: 'QuickBooks', description: 'Sync invoices and payments', connected: false },
-                      { name: 'Google Calendar', description: 'Sync appointments', connected: true },
-                      { name: 'Stripe', description: 'Payment processing', connected: true },
-                      { name: 'Twilio', description: 'SMS messaging', connected: true },
-                    ].map((integration) => (
-                      <div key={integration.name} className="flex items-center justify-between gap-3 p-3 md:p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs md:text-sm font-medium text-zinc-200">{integration.name}</p>
-                          <p className="text-xs text-zinc-500 mt-1">{integration.description}</p>
+                <div className="space-y-6">
+                  {/* Payment Integration */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Payment Integration</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center justify-between gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center">
+                            <svg viewBox="0 0 24 24" className="w-7 h-7">
+                              <path fill="#635BFF" d="M13.976 9.15c-2.172-.806-3.356-1.426-3.356-2.409 0-.831.683-1.305 1.901-1.305 2.227 0 4.515.858 6.09 1.631l.89-5.494C18.252.975 15.697 0 12.165 0 9.667 0 7.589.654 6.104 1.872 4.56 3.147 3.757 4.992 3.757 7.218c0 4.039 2.467 5.76 6.476 7.219 2.585.92 3.445 1.574 3.445 2.583 0 .98-.84 1.545-2.354 1.545-1.875 0-4.965-.921-6.99-2.109l-.9 5.555C5.175 22.99 8.385 24 11.714 24c2.641 0 4.843-.624 6.328-1.813 1.664-1.305 2.525-3.236 2.525-5.732 0-4.128-2.524-5.851-6.591-7.305z"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-zinc-200">Stripe</p>
+                            <p className="text-xs text-zinc-500 mt-0.5">Accept credit cards and online payments</p>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          {integration.connected ? (
-                            <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
-                              <Check className="h-3 w-3 mr-1" />
-                              Connected
-                            </Badge>
-                          ) : (
-                            <Button variant="outline" size="sm" className="border-zinc-700 text-xs">
-                              Connect
-                            </Button>
-                          )}
-                        </div>
+                        {stripeConnected ? (
+                          <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
+                            <Check className="h-3 w-3 mr-1" />
+                            Connected
+                          </Badge>
+                        ) : (
+                          <Button className="bg-[#635BFF] hover:bg-[#5851ea] text-white text-sm">
+                            Connect
+                          </Button>
+                        )}
                       </div>
-                    ))}
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+
+                  {/* Calendar Integrations */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Calendar & Scheduling</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center">
+                            <svg viewBox="0 0 24 24" className="w-6 h-6">
+                              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-zinc-200">Google Calendar</p>
+                            <p className="text-xs text-zinc-500 mt-0.5">Sync your job schedule with Google Calendar</p>
+                          </div>
+                        </div>
+                        <Button variant="outline" size="sm" className="border-zinc-700 text-sm">
+                          Connect
+                        </Button>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center">
+                            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="#0078D4">
+                              <path d="M21.557 7.185h-8.114v4.63h4.629c-.183 1.103-.79 2.04-1.677 2.673v2.226h2.713c1.583-1.458 2.499-3.608 2.499-6.15 0-.59-.05-1.163-.15-1.72l.1-.659z"/>
+                              <path d="M12.443 21.243c2.27 0 4.175-.752 5.57-2.04l-2.713-2.226c-.79.53-1.79.843-2.857.843-2.2 0-4.063-1.486-4.73-3.487H4.93v2.3c1.463 2.91 4.47 4.61 7.513 4.61z"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-zinc-200">Microsoft Outlook</p>
+                            <p className="text-xs text-zinc-500 mt-0.5">Sync with Outlook calendar</p>
+                          </div>
+                        </div>
+                        <Button variant="outline" size="sm" className="border-zinc-700 text-sm">
+                          Connect
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Accounting Integrations */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Accounting & Invoicing</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center">
+                            <svg viewBox="0 0 24 24" className="w-7 h-7">
+                              <path fill="#2CA01C" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-zinc-200">QuickBooks</p>
+                            <p className="text-xs text-zinc-500 mt-0.5">Sync invoices and payments</p>
+                          </div>
+                        </div>
+                        <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                          Coming Soon
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center">
+                            <span className="text-xl font-bold text-[#00A1E0]">X</span>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-zinc-200">Xero</p>
+                            <p className="text-xs text-zinc-500 mt-0.5">Accounting and bookkeeping</p>
+                          </div>
+                        </div>
+                        <Badge className="bg-amber-500/20 text-amber-400 border-amber-500/30 text-xs">
+                          Coming Soon
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Communication */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Communication</CardTitle>
+                      <p className="text-xs text-zinc-500 mt-1">These integrations are managed by Renoa</p>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between gap-4 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center">
+                            <svg viewBox="0 0 24 24" className="w-6 h-6" fill="#F22F46">
+                              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-2-11h4v6h-4z"/>
+                            </svg>
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-zinc-200">SMS Notifications</p>
+                            <p className="text-xs text-zinc-500 mt-0.5">Automated text messages to customers</p>
+                          </div>
+                        </div>
+                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
+                          <Check className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-4 p-4 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center">
+                            <Bell className="w-6 h-6 text-blue-400" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-zinc-200">Email Notifications</p>
+                            <p className="text-xs text-zinc-500 mt-0.5">Job updates and reminders via email</p>
+                          </div>
+                        </div>
+                        <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
+                          <Check className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               )}
 
               {/* Security Tab */}
