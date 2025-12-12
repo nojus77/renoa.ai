@@ -52,3 +52,6 @@
 - If a change might break other features, warn the user
 - If unsure about something, ask before implementing
 - Explain what you're changing and why
+
+## Support Chat Knowledge
+When adding or changing provider dashboard features, update the SYSTEM_PROMPT in app/api/support/chat/route.ts with the new feature name and how to access it.
