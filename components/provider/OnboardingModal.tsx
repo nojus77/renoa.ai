@@ -3,10 +3,10 @@
 import { useState, useRef } from 'react';
 import {
   X, ChevronRight, ChevronLeft, Check, Upload, Play, Sparkles,
-  Users, Calendar, FileText, MessageSquare, TrendingUp, BarChart3, ArrowRight
+  Users, Calendar, FileText, MessageSquare, TrendingUp, BarChart3, ArrowRight,
+  Building2, Briefcase, MapPin, Award, Camera, CheckCircle2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
 
 interface OnboardingModalProps {
@@ -43,28 +43,33 @@ export default function OnboardingModal({
 
   const totalSteps = 4;
 
+  const steps = [
+    { number: 1, label: 'Welcome', icon: Sparkles },
+    { number: 2, label: 'Business Info', icon: Building2 },
+    { number: 3, label: 'Photo', icon: Camera },
+    { number: 4, label: 'Review', icon: CheckCircle2 },
+  ];
+
   const allServiceTypes = [
-    { id: 'lawn-mowing', name: 'Lawn Mowing', icon: '🌱' },
-    { id: 'landscaping', name: 'Landscaping', icon: '🌳' },
-    { id: 'cleanup', name: 'Cleanup', icon: '🧹' },
-    { id: 'tree-service', name: 'Tree Service', icon: '🪓' },
-    { id: 'snow-removal', name: 'Snow Removal', icon: '❄️' },
-    { id: 'hardscaping', name: 'Hardscaping', icon: '🪨' },
-    { id: 'irrigation', name: 'Irrigation', icon: '💧' },
-    { id: 'fertilization', name: 'Fertilization', icon: '🌿' },
-    { id: 'pest-control', name: 'Pest Control', icon: '🐛' },
+    { id: 'lawn-mowing', name: 'Lawn Mowing', icon: '🌱', description: 'Regular lawn maintenance' },
+    { id: 'landscaping', name: 'Landscaping', icon: '🌳', description: 'Design & installation' },
+    { id: 'cleanup', name: 'Cleanup', icon: '🧹', description: 'Yard & debris cleanup' },
+    { id: 'tree-service', name: 'Tree Service', icon: '🪓', description: 'Trimming & removal' },
+    { id: 'snow-removal', name: 'Snow Removal', icon: '❄️', description: 'Winter services' },
+    { id: 'hardscaping', name: 'Hardscaping', icon: '🪨', description: 'Patios & walkways' },
+    { id: 'irrigation', name: 'Irrigation', icon: '💧', description: 'Sprinkler systems' },
+    { id: 'fertilization', name: 'Fertilization', icon: '🌿', description: 'Lawn treatments' },
+    { id: 'pest-control', name: 'Pest Control', icon: '🐛', description: 'Insect management' },
   ];
 
   const handlePhotoUpload = async (file: File) => {
     if (!file) return;
 
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('File size must be less than 5MB');
       return;
     }
 
-    // Check file type
     if (!file.type.startsWith('image/')) {
       toast.error('Please upload an image file');
       return;
@@ -152,11 +157,11 @@ export default function OnboardingModal({
   const canProceedToStep = (step: number): boolean => {
     switch (step) {
       case 2:
-        return true; // Welcome screen -> Profile setup (always allowed)
+        return true;
       case 3:
-        return formData.businessName.trim() !== '' && formData.serviceTypes.length > 0; // Need business name & services to proceed
+        return formData.businessName.trim() !== '' && formData.serviceTypes.length > 0;
       case 4:
-        return true; // Photo is optional
+        return true;
       default:
         return true;
     }
@@ -222,307 +227,373 @@ export default function OnboardingModal({
 
   if (!isOpen) return null;
 
-  // Step 1 is full page, others are modal
+  // Step 1: Welcome Screen (Full Page)
   if (currentStep === 1) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-[#e8f5e9] to-[#c8e6c9] z-50 overflow-y-auto">
+      <div className="fixed inset-0 bg-gradient-to-br from-emerald-950 via-zinc-950 to-zinc-950 z-50 overflow-y-auto">
+        {/* Animated background elements */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-500/10 rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+          <div className="absolute top-1/2 left-1/2 w-64 h-64 bg-purple-500/5 rounded-full blur-3xl animate-pulse delay-500" />
+        </div>
+
         {/* Progress bar - top */}
-        <div className="bg-white border-b sticky top-0 z-10">
+        <div className="relative bg-zinc-900/80 backdrop-blur-xl border-b border-zinc-800/50 sticky top-0 z-10">
           <div className="container mx-auto px-6 py-4 flex items-center justify-between">
-            <div className="flex-1 max-w-md">
-              <div className="flex items-center gap-2 mb-2">
-                {Array.from({ length: totalSteps }).map((_, index) => (
-                  <div
-                    key={index}
-                    className={`h-2 flex-1 rounded-full transition-all ${
-                      index + 1 <= currentStep ? 'bg-emerald-600' : 'bg-gray-300'
-                    }`}
-                  />
-                ))}
-              </div>
-              <p className="text-sm text-gray-600">Step {currentStep} of {totalSteps}</p>
+            <div className="flex items-center gap-6">
+              {steps.map((step, index) => {
+                const Icon = step.icon;
+                const isActive = step.number === currentStep;
+                const isCompleted = step.number < currentStep;
+                return (
+                  <div key={step.number} className="flex items-center gap-2">
+                    {index > 0 && (
+                      <div className={`w-8 h-px ${isCompleted ? 'bg-emerald-500' : 'bg-zinc-700'} transition-colors duration-300`} />
+                    )}
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-all duration-300 ${
+                      isActive ? 'bg-emerald-500/20 border border-emerald-500/50' :
+                      isCompleted ? 'bg-emerald-500/10' : 'bg-zinc-800/50'
+                    }`}>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center transition-all duration-300 ${
+                        isActive ? 'bg-emerald-500 text-white' :
+                        isCompleted ? 'bg-emerald-500/50 text-emerald-200' : 'bg-zinc-700 text-zinc-400'
+                      }`}>
+                        {isCompleted ? <Check className="w-3.5 h-3.5" /> : <Icon className="w-3.5 h-3.5" />}
+                      </div>
+                      <span className={`text-sm font-medium hidden sm:block ${
+                        isActive ? 'text-emerald-400' : isCompleted ? 'text-emerald-400/70' : 'text-zinc-500'
+                      }`}>
+                        {step.label}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
             <Button
               onClick={handleSkip}
               variant="ghost"
-              className="text-gray-600 hover:text-gray-900"
+              className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/50"
             >
               Skip for now
             </Button>
           </div>
         </div>
 
-        {/* Main content - side by side */}
-        <div className="container mx-auto px-6 py-12">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-
+        {/* Main content */}
+        <div className="relative container mx-auto px-6 py-12 min-h-[calc(100vh-80px)] flex items-center">
+          <div className="grid lg:grid-cols-2 gap-16 items-center w-full">
             {/* LEFT SIDE - Content */}
-            <div className="space-y-8">
-              <div>
-                <h1 className="text-4xl md:text-5xl font-bold text-[#1f3810] mb-4">
-                  Welcome to Renoa! 🌱
+            <div className="space-y-10">
+              <div className="space-y-4">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                  <Sparkles className="w-4 h-4 text-emerald-400" />
+                  <span className="text-sm font-medium text-emerald-400">Welcome to the platform</span>
+                </div>
+                <h1 className="text-5xl md:text-6xl font-bold text-white leading-tight">
+                  Grow your business with{' '}
+                  <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
+                    Renoa
+                  </span>
                 </h1>
-                <p className="text-xl text-[#2d5016]">
-                  The complete platform for landscaping & home improvement professionals
+                <p className="text-xl text-zinc-400 max-w-lg">
+                  The complete platform for landscaping & home improvement professionals. Free forever.
                 </p>
               </div>
 
-              {/* Value props - stacked list */}
-              <div className="space-y-6">
-                <div className="flex items-start gap-3 bg-white/80 p-6 rounded-lg backdrop-blur shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Users className="h-5 w-5 text-emerald-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[#1f3810]">Free Forever CRM</h3>
-                    <p className="text-sm text-[#2d5016]">Track all your customers in one place. No credit card required.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 bg-white/80 p-6 rounded-lg backdrop-blur shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <Calendar className="h-5 w-5 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[#1f3810]">Smart Scheduling</h3>
-                    <p className="text-sm text-[#2d5016]">Never double-book. Block time off. Stay organized.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 bg-white/80 p-6 rounded-lg backdrop-blur shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <FileText className="h-5 w-5 text-purple-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[#1f3810]">Pro Invoicing</h3>
-                    <p className="text-sm text-[#2d5016]">Send invoices, track payments, get paid faster.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 bg-white/80 p-6 rounded-lg backdrop-blur shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <MessageSquare className="h-5 w-5 text-orange-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[#1f3810]">Customer Messaging</h3>
-                    <p className="text-sm text-[#2d5016]">Chat with clients directly. No more phone tag.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 bg-white/80 p-6 rounded-lg backdrop-blur shadow-sm hover:shadow-md transition-shadow">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <TrendingUp className="h-5 w-5 text-green-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-[#1f3810]">Lead Management & Analytics</h3>
-                    <p className="text-sm text-[#2d5016]">Convert quotes to jobs. Track revenue and growth.</p>
-                  </div>
-                </div>
+              {/* Value props */}
+              <div className="grid gap-4">
+                {[
+                  { icon: Users, title: 'Smart CRM', desc: 'Track customers, leads, and jobs in one place', color: 'emerald' },
+                  { icon: Calendar, title: 'Smart Scheduling', desc: 'Never double-book. Optimize your routes.', color: 'blue' },
+                  { icon: FileText, title: 'Pro Invoicing', desc: 'Send invoices, track payments, get paid faster.', color: 'purple' },
+                  { icon: TrendingUp, title: 'Growth Analytics', desc: 'Track revenue, conversions, and team performance.', color: 'orange' },
+                ].map((item, index) => {
+                  const Icon = item.icon;
+                  const colorClasses = {
+                    emerald: 'bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20',
+                    blue: 'bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/20',
+                    purple: 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-500/20',
+                    orange: 'bg-orange-500/10 text-orange-400 group-hover:bg-orange-500/20',
+                  }[item.color];
+                  return (
+                    <div
+                      key={index}
+                      className="group flex items-start gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700 hover:bg-zinc-900/80 transition-all duration-300 cursor-default"
+                    >
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors duration-300 ${colorClasses}`}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-white group-hover:text-emerald-400 transition-colors">
+                          {item.title}
+                        </h3>
+                        <p className="text-sm text-zinc-500">{item.desc}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* CTA */}
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <Button
                   size="lg"
-                  className="bg-[#2d5016] hover:bg-[#1f3810] text-white w-full py-4 text-base font-semibold shadow-md hover:shadow-lg transition-shadow"
+                  className="w-full py-6 text-lg font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-lg shadow-emerald-500/25 hover:shadow-emerald-500/40 transition-all duration-300 group"
                   onClick={handleNext}
                 >
                   Complete My Profile
-                  <ArrowRight className="ml-2 h-5 w-5" />
+                  <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
                 </Button>
-                <p className="text-sm text-[#2d5016] text-center">
-                  Takes less than 5 minutes • No credit card required
+                <p className="text-sm text-zinc-500 text-center flex items-center justify-center gap-2">
+                  <Check className="w-4 h-4 text-emerald-500" />
+                  Takes less than 5 minutes
+                  <span className="text-zinc-700">•</span>
+                  No credit card required
                 </p>
               </div>
             </div>
 
-            {/* RIGHT SIDE - Mockup & Video */}
-            <div className="space-y-6">
-              {/* Dashboard Mockup */}
+            {/* RIGHT SIDE - Visual */}
+            <div className="hidden lg:block">
               <div className="relative">
-                <div className="absolute -top-4 -right-4 w-24 h-24 bg-emerald-200 rounded-full blur-3xl opacity-50"></div>
-                <div className="absolute -bottom-4 -left-4 w-32 h-32 bg-blue-200 rounded-full blur-3xl opacity-50"></div>
+                {/* Glow effects */}
+                <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-blue-500/20 rounded-3xl blur-2xl" />
 
-                <div className="relative bg-white rounded-2xl shadow-2xl p-4 transform hover:scale-105 transition-transform duration-300">
+                {/* Dashboard Preview Card */}
+                <div className="relative bg-zinc-900 rounded-2xl border border-zinc-800 p-6 shadow-2xl">
                   {/* Browser Chrome */}
-                  <div className="flex items-center gap-2 mb-3 pb-3 border-b">
+                  <div className="flex items-center gap-2 mb-6 pb-4 border-b border-zinc-800">
                     <div className="flex gap-1.5">
-                      <div className="w-3 h-3 rounded-full bg-red-400"></div>
-                      <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-                      <div className="w-3 h-3 rounded-full bg-green-400"></div>
+                      <div className="w-3 h-3 rounded-full bg-red-500/80"></div>
+                      <div className="w-3 h-3 rounded-full bg-yellow-500/80"></div>
+                      <div className="w-3 h-3 rounded-full bg-green-500/80"></div>
                     </div>
-                    <div className="flex-1 bg-gray-100 rounded px-3 py-1 text-xs text-gray-500">
+                    <div className="flex-1 ml-4 bg-zinc-800 rounded-lg px-4 py-2 text-xs text-zinc-400 flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-emerald-500/50" />
                       renoa.ai/dashboard
                     </div>
                   </div>
 
-                  {/* Mockup Content */}
-                  <div className="space-y-2">
-                    <div className="bg-emerald-50 rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="h-3 bg-emerald-600 rounded w-24"></div>
-                        <div className="h-3 bg-emerald-200 rounded w-16"></div>
-                      </div>
-                      <div className="h-2 bg-emerald-200 rounded w-full mb-1"></div>
-                      <div className="h-2 bg-emerald-200 rounded w-3/4"></div>
+                  {/* Mock Dashboard Content */}
+                  <div className="space-y-4">
+                    {/* Stats Row */}
+                    <div className="grid grid-cols-3 gap-3">
+                      {[
+                        { label: 'Revenue', value: '$12,450', trend: '+18%', color: 'emerald' },
+                        { label: 'Jobs', value: '24', trend: '+5', color: 'blue' },
+                        { label: 'Rating', value: '4.9', trend: '128 reviews', color: 'yellow' },
+                      ].map((stat, i) => (
+                        <div key={i} className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700/50">
+                          <p className="text-xs text-zinc-500 mb-1">{stat.label}</p>
+                          <p className="text-lg font-bold text-white">{stat.value}</p>
+                          <p className={`text-xs ${
+                            stat.color === 'emerald' ? 'text-emerald-400' :
+                            stat.color === 'blue' ? 'text-blue-400' : 'text-yellow-400'
+                          }`}>{stat.trend}</p>
+                        </div>
+                      ))}
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <div className="bg-blue-50 rounded p-2">
-                        <div className="h-2 bg-blue-400 rounded w-12 mb-1"></div>
-                        <div className="h-3 bg-blue-600 rounded w-8"></div>
+
+                    {/* Activity Preview */}
+                    <div className="bg-zinc-800/30 rounded-lg p-4 border border-zinc-700/50">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-white">Today's Schedule</span>
+                        <span className="text-xs text-emerald-400">3 jobs</span>
                       </div>
-                      <div className="bg-purple-50 rounded p-2">
-                        <div className="h-2 bg-purple-400 rounded w-12 mb-1"></div>
-                        <div className="h-3 bg-purple-600 rounded w-8"></div>
+                      <div className="space-y-2">
+                        {['9:00 AM - Lawn Mowing', '11:30 AM - Landscaping', '2:00 PM - Tree Service'].map((job, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span className="text-zinc-400">{job}</span>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <div className="bg-gray-50 rounded p-2 space-y-1">
-                      <div className="h-2 bg-gray-300 rounded w-full"></div>
-                      <div className="h-2 bg-gray-300 rounded w-5/6"></div>
-                      <div className="h-2 bg-gray-300 rounded w-4/6"></div>
+
+                    {/* Chart Placeholder */}
+                    <div className="bg-zinc-800/30 rounded-lg p-4 border border-zinc-700/50">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm font-medium text-white">Revenue Trend</span>
+                        <span className="text-xs text-zinc-500">Last 7 days</span>
+                      </div>
+                      <div className="flex items-end gap-1 h-16">
+                        {[40, 65, 45, 80, 55, 90, 75].map((h, i) => (
+                          <div
+                            key={i}
+                            className="flex-1 bg-gradient-to-t from-emerald-500/50 to-emerald-500/20 rounded-t"
+                            style={{ height: `${h}%` }}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Video Section */}
-              <div className="text-center space-y-3">
-                <h2 className="text-xl font-bold text-[#1f3810]">
-                  Watch This 2-Minute Tour
-                </h2>
-
-                {/* Video placeholder */}
-                <div className="relative aspect-video rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center cursor-pointer group shadow-2xl">
-                  <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition rounded-xl" />
-
-                  <div className="relative text-center text-white">
-                    <div className="w-20 h-20 bg-white/20 backdrop-blur rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition">
-                      <Play className="h-10 w-10 text-white ml-1" />
-                    </div>
-                    <p className="text-sm font-medium">Click to watch the tour</p>
-                    <p className="text-xs text-white/80">(Video coming soon)</p>
-                  </div>
-                </div>
-
-                <p className="text-sm text-[#2d5016]">
-                  Don&apos;t have time right now?{' '}
-                  <button className="underline font-medium hover:text-[#1f3810]" onClick={handleNext}>
-                    Skip to setup →
-                  </button>
-                </p>
               </div>
             </div>
-
           </div>
         </div>
       </div>
     );
   }
 
-  // Steps 2-4 remain as modal
+  // Steps 2-4: Modal
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 w-full max-w-3xl rounded-2xl shadow-2xl border border-zinc-800 overflow-hidden max-h-[90vh] flex flex-col">
-        {/* Header */}
-        <div className="border-b border-zinc-800 p-6">
-          <div className="flex items-center justify-between mb-4">
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div
+        className="bg-zinc-900 w-full max-w-3xl rounded-2xl shadow-2xl border border-zinc-800 overflow-hidden max-h-[90vh] flex flex-col"
+        style={{ animation: 'fadeInUp 0.3s ease-out' }}
+      >
+        {/* Header with Progress */}
+        <div className="border-b border-zinc-800 p-6 bg-gradient-to-r from-zinc-900 to-zinc-900/95">
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-zinc-100">Welcome to Renoa!</h2>
-              <p className="text-sm text-zinc-400 mt-1">Let&apos;s get your profile set up</p>
+              <h2 className="text-2xl font-bold text-white">
+                {currentStep === 2 && 'Tell us about your business'}
+                {currentStep === 3 && 'Add your business photo'}
+                {currentStep === 4 && 'Review your profile'}
+              </h2>
+              <p className="text-sm text-zinc-400 mt-1">
+                {currentStep === 2 && 'This helps customers find and trust you'}
+                {currentStep === 3 && 'A professional photo builds trust with customers'}
+                {currentStep === 4 && 'Make sure everything looks good'}
+              </p>
             </div>
             <Button
               onClick={handleSkip}
               variant="ghost"
               size="sm"
-              className="text-zinc-400 hover:text-zinc-100"
+              className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
             >
-              Skip for now
+              <X className="w-4 h-4" />
             </Button>
           </div>
 
-          {/* Progress bar */}
-          <div className="flex items-center gap-2">
-            {Array.from({ length: totalSteps }).map((_, index) => (
-              <div
-                key={index}
-                className={`h-2 flex-1 rounded-full transition-all ${
-                  index + 1 <= currentStep ? 'bg-emerald-500' : 'bg-zinc-700'
-                }`}
-              />
-            ))}
+          {/* Progress Steps */}
+          <div className="flex items-center gap-3">
+            {steps.map((step, index) => {
+              const Icon = step.icon;
+              const isActive = step.number === currentStep;
+              const isCompleted = step.number < currentStep;
+              return (
+                <div key={step.number} className="flex items-center gap-3 flex-1">
+                  {index > 0 && (
+                    <div className={`flex-1 h-0.5 rounded-full transition-all duration-500 ${
+                      isCompleted ? 'bg-emerald-500' : 'bg-zinc-700'
+                    }`} />
+                  )}
+                  <div className={`flex items-center gap-2 transition-all duration-300 ${
+                    isActive ? 'scale-105' : ''
+                  }`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 ${
+                      isActive ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/30' :
+                      isCompleted ? 'bg-emerald-500/20 text-emerald-400' : 'bg-zinc-800 text-zinc-500'
+                    }`}>
+                      {isCompleted ? <Check className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
+                    </div>
+                    <span className={`text-sm font-medium hidden md:block ${
+                      isActive ? 'text-white' : isCompleted ? 'text-emerald-400' : 'text-zinc-500'
+                    }`}>
+                      {step.label}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <p className="text-xs text-zinc-500 mt-2">
-            Step {currentStep} of {totalSteps}
-          </p>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {/* Step 2: Profile Setup */}
           {currentStep === 2 && (
-            <div className="space-y-6">
-              <div className="text-center mb-6">
-                <h3 className="text-xl font-semibold text-zinc-100 mb-2">Tell us about your business</h3>
-                <p className="text-zinc-400">This helps customers find and trust you</p>
-              </div>
-
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
               {/* Business Name */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Business Name <span className="text-red-400">*</span>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                  <Building2 className="w-4 h-4 text-emerald-400" />
+                  Business Name
+                  <span className="text-red-400">*</span>
                 </label>
                 <input
                   type="text"
                   value={formData.businessName}
                   onChange={(e) => setFormData(prev => ({ ...prev, businessName: e.target.value }))}
-                  className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full px-4 py-3.5 bg-zinc-800/50 border-2 border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200"
                   placeholder="e.g., Green Thumb Landscaping"
                 />
               </div>
 
               {/* Bio */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  About Your Business (Optional)
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                  <Briefcase className="w-4 h-4 text-blue-400" />
+                  About Your Business
+                  <span className="text-zinc-500 font-normal">(Optional)</span>
                 </label>
                 <textarea
                   value={formData.bio}
                   onChange={(e) => setFormData(prev => ({ ...prev, bio: e.target.value }))}
-                  className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[100px] resize-none"
+                  className="w-full px-4 py-3.5 bg-zinc-800/50 border-2 border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200 min-h-[100px] resize-none"
                   placeholder="Tell customers what makes your business special..."
                   maxLength={500}
                 />
-                <p className="text-xs text-zinc-500 mt-1">{formData.bio.length}/500 characters</p>
-              </div>
-
-              {/* Services Offered */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-3">
-                  Services You Offer <span className="text-red-400">*</span>
-                </label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {allServiceTypes.map(service => (
-                    <button
-                      key={service.id}
-                      type="button"
-                      onClick={() => toggleServiceType(service.id)}
-                      className={`p-3 rounded-lg border-2 transition-all ${
-                        formData.serviceTypes.includes(service.id)
-                          ? 'border-emerald-500 bg-emerald-500/10'
-                          : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600'
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">{service.icon}</div>
-                      <div className="text-xs font-medium text-zinc-200">{service.name}</div>
-                    </button>
-                  ))}
+                <div className="flex justify-end">
+                  <span className={`text-xs ${formData.bio.length > 450 ? 'text-yellow-400' : 'text-zinc-500'}`}>
+                    {formData.bio.length}/500
+                  </span>
                 </div>
               </div>
 
+              {/* Services */}
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  Services You Offer
+                  <span className="text-red-400">*</span>
+                </label>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {allServiceTypes.map(service => {
+                    const isSelected = formData.serviceTypes.includes(service.id);
+                    return (
+                      <button
+                        key={service.id}
+                        type="button"
+                        onClick={() => toggleServiceType(service.id)}
+                        className={`relative p-4 rounded-xl border-2 transition-all duration-200 text-left group ${
+                          isSelected
+                            ? 'border-emerald-500 bg-emerald-500/10 shadow-lg shadow-emerald-500/10'
+                            : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600 hover:bg-zinc-800/50'
+                        }`}
+                      >
+                        {isSelected && (
+                          <div className="absolute top-2 right-2 w-5 h-5 bg-emerald-500 rounded-full flex items-center justify-center">
+                            <Check className="w-3 h-3 text-white" />
+                          </div>
+                        )}
+                        <div className="text-2xl mb-2 group-hover:scale-110 transition-transform duration-200">
+                          {service.icon}
+                        </div>
+                        <div className="text-sm font-medium text-white">{service.name}</div>
+                        <div className="text-xs text-zinc-500 mt-0.5">{service.description}</div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {formData.serviceTypes.length > 0 && (
+                  <p className="text-sm text-emerald-400">
+                    {formData.serviceTypes.length} service{formData.serviceTypes.length !== 1 ? 's' : ''} selected
+                  </p>
+                )}
+              </div>
+
               {/* Service Areas */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Service Areas (Cities/Zip Codes)
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                  <MapPin className="w-4 h-4 text-orange-400" />
+                  Service Areas
+                  <span className="text-zinc-500 font-normal">(Cities or Zip Codes)</span>
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -530,31 +601,32 @@ export default function OnboardingModal({
                     value={serviceAreaInput}
                     onChange={(e) => setServiceAreaInput(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addServiceArea())}
-                    className="flex-1 px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="flex-1 px-4 py-3 bg-zinc-800/50 border-2 border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200"
                     placeholder="e.g., Austin, 78701"
                   />
                   <Button
                     type="button"
                     onClick={addServiceArea}
-                    className="bg-emerald-600 hover:bg-emerald-500"
+                    className="px-6 bg-zinc-700 hover:bg-zinc-600 text-white rounded-xl transition-colors"
                   >
                     Add
                   </Button>
                 </div>
                 {formData.serviceAreas.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
+                  <div className="flex flex-wrap gap-2 mt-3">
                     {formData.serviceAreas.map((area, index) => (
                       <span
                         key={index}
-                        className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-sm text-emerald-400 flex items-center gap-2"
+                        className="inline-flex items-center gap-2 px-3 py-1.5 bg-orange-500/10 border border-orange-500/30 rounded-full text-sm text-orange-400 group"
                       >
+                        <MapPin className="w-3 h-3" />
                         {area}
                         <button
                           type="button"
                           onClick={() => removeServiceArea(index)}
-                          className="hover:text-emerald-300"
+                          className="hover:text-orange-300 transition-colors"
                         >
-                          <X className="h-3 w-3" />
+                          <X className="h-3.5 w-3.5" />
                         </button>
                       </span>
                     ))}
@@ -562,77 +634,84 @@ export default function OnboardingModal({
                 )}
               </div>
 
-              {/* Years in Business */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Years in Business
-                </label>
-                <input
-                  type="number"
-                  value={formData.yearsInBusiness}
-                  onChange={(e) => setFormData(prev => ({ ...prev, yearsInBusiness: e.target.value }))}
-                  className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  placeholder="e.g., 5"
-                  min="0"
-                  max="100"
-                />
-              </div>
-
-              {/* Certifications */}
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Certifications & Licenses
-                </label>
-                <div className="flex gap-2">
+              {/* Years & Certifications Row */}
+              <div className="grid md:grid-cols-2 gap-6">
+                {/* Years in Business */}
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                    <TrendingUp className="w-4 h-4 text-cyan-400" />
+                    Years in Business
+                  </label>
                   <input
-                    type="text"
-                    value={certificationInput}
-                    onChange={(e) => setCertificationInput(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCertification())}
-                    className="flex-1 px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                    placeholder="e.g., Licensed Arborist"
+                    type="number"
+                    value={formData.yearsInBusiness}
+                    onChange={(e) => setFormData(prev => ({ ...prev, yearsInBusiness: e.target.value }))}
+                    className="w-full px-4 py-3 bg-zinc-800/50 border-2 border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200"
+                    placeholder="e.g., 5"
+                    min="0"
+                    max="100"
                   />
-                  <Button
-                    type="button"
-                    onClick={addCertification}
-                    className="bg-emerald-600 hover:bg-emerald-500"
-                  >
-                    Add
-                  </Button>
                 </div>
-                {formData.certifications.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {formData.certifications.map((cert, index) => (
-                      <span
-                        key={index}
-                        className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full text-sm text-blue-400 flex items-center gap-2"
-                      >
-                        {cert}
-                        <button
-                          type="button"
-                          onClick={() => removeCertification(index)}
-                          className="hover:text-blue-300"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
+
+                {/* Certifications */}
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                    <Award className="w-4 h-4 text-yellow-400" />
+                    Certifications
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={certificationInput}
+                      onChange={(e) => setCertificationInput(e.target.value)}
+                      onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addCertification())}
+                      className="flex-1 px-4 py-3 bg-zinc-800/50 border-2 border-zinc-700 rounded-xl text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all duration-200"
+                      placeholder="e.g., Licensed Arborist"
+                    />
+                    <Button
+                      type="button"
+                      onClick={addCertification}
+                      className="px-4 bg-zinc-700 hover:bg-zinc-600 text-white rounded-xl transition-colors"
+                    >
+                      Add
+                    </Button>
                   </div>
-                )}
+                </div>
               </div>
+
+              {formData.certifications.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {formData.certifications.map((cert, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-full text-sm text-yellow-400"
+                    >
+                      <Award className="w-3 h-3" />
+                      {cert}
+                      <button
+                        type="button"
+                        onClick={() => removeCertification(index)}
+                        className="hover:text-yellow-300 transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
           {/* Step 3: Photo Upload */}
           {currentStep === 3 && (
-            <div className="space-y-6">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Upload className="h-8 w-8 text-emerald-400" />
+            <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="text-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
+                  <Camera className="h-10 w-10 text-emerald-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-zinc-100 mb-2">Add Your Business Logo</h3>
-                <p className="text-zinc-400">
-                  A professional photo helps build trust with customers
+                <h3 className="text-xl font-semibold text-white mb-2">Upload Your Business Logo</h3>
+                <p className="text-zinc-400 max-w-md mx-auto">
+                  This will appear on your profile, invoices, and customer communications
                 </p>
               </div>
 
@@ -647,20 +726,27 @@ export default function OnboardingModal({
                 />
 
                 {photoPreview ? (
-                  <div className="text-center">
-                    <div className="w-48 h-48 mx-auto rounded-lg overflow-hidden border-2 border-emerald-500 mb-4">
-                      <img
-                        src={photoPreview}
-                        alt="Profile"
-                        className="w-full h-full object-cover"
-                      />
+                  <div className="text-center space-y-4">
+                    <div className="relative w-48 h-48 mx-auto">
+                      <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-2xl blur-lg opacity-30" />
+                      <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-emerald-500">
+                        <img
+                          src={photoPreview}
+                          alt="Profile"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                        <Check className="w-5 h-5 text-white" />
+                      </div>
                     </div>
                     <Button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
                       variant="outline"
-                      className="border-zinc-700"
+                      className="border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800"
                     >
+                      <Upload className="w-4 h-4 mr-2" />
                       Change Photo
                     </Button>
                   </div>
@@ -669,104 +755,132 @@ export default function OnboardingModal({
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
-                    className="w-full border-2 border-dashed border-zinc-700 rounded-lg p-12 hover:border-emerald-500 hover:bg-emerald-500/5 transition-all"
+                    className="w-full border-2 border-dashed border-zinc-700 rounded-2xl p-12 hover:border-emerald-500/50 hover:bg-emerald-500/5 transition-all duration-300 group"
                   >
-                    <Upload className="h-12 w-12 text-zinc-500 mx-auto mb-4" />
-                    <p className="text-zinc-400 mb-2">
-                      {uploading ? 'Uploading...' : 'Click to upload or drag and drop'}
+                    <div className="w-16 h-16 bg-zinc-800 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:bg-emerald-500/10 group-hover:scale-110 transition-all duration-300">
+                      <Upload className="h-8 w-8 text-zinc-500 group-hover:text-emerald-400 transition-colors" />
+                    </div>
+                    <p className="text-zinc-300 mb-2 font-medium">
+                      {uploading ? 'Uploading...' : 'Click to upload'}
                     </p>
                     <p className="text-xs text-zinc-600">PNG, JPG up to 5MB</p>
                   </button>
                 )}
+
+                <p className="text-center text-sm text-zinc-500 mt-6">
+                  You can skip this step and add a photo later from settings
+                </p>
               </div>
             </div>
           )}
 
-          {/* Step 4: Availability Setup */}
+          {/* Step 4: Review */}
           {currentStep === 4 && (
-            <div className="space-y-6">
-              <div className="text-center mb-6">
-                <div className="w-16 h-16 bg-emerald-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Check className="h-8 w-8 text-emerald-400" />
+            <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
+              <div className="text-center mb-8">
+                <div className="w-20 h-20 bg-gradient-to-br from-emerald-500/20 to-teal-500/20 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-emerald-500/20">
+                  <CheckCircle2 className="h-10 w-10 text-emerald-400" />
                 </div>
-                <h3 className="text-xl font-semibold text-zinc-100 mb-2">You&apos;re All Set!</h3>
+                <h3 className="text-xl font-semibold text-white mb-2">Looking good!</h3>
                 <p className="text-zinc-400">
-                  Your profile is ready. You can always edit it later from settings.
+                  Review your profile below. You can always edit it later.
                 </p>
               </div>
 
-              {/* Summary */}
-              <div className="bg-zinc-800/30 border border-zinc-700 rounded-lg p-6 space-y-4">
-                <div>
-                  <p className="text-sm text-zinc-500">Business Name</p>
-                  <p className="text-zinc-100 font-medium">{formData.businessName}</p>
-                </div>
-
-                {formData.bio && (
-                  <div>
-                    <p className="text-sm text-zinc-500">About</p>
-                    <p className="text-zinc-100">{formData.bio}</p>
-                  </div>
-                )}
-
-                <div>
-                  <p className="text-sm text-zinc-500 mb-2">Services</p>
-                  <div className="flex flex-wrap gap-2">
-                    {formData.serviceTypes.map(serviceId => {
-                      const service = allServiceTypes.find(s => s.id === serviceId);
-                      return (
-                        <span
-                          key={serviceId}
-                          className="px-3 py-1 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-sm text-emerald-400"
-                        >
-                          {service?.icon} {service?.name}
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {formData.serviceAreas.length > 0 && (
-                  <div>
-                    <p className="text-sm text-zinc-500 mb-2">Service Areas</p>
-                    <p className="text-zinc-100">{formData.serviceAreas.join(', ')}</p>
-                  </div>
-                )}
-
-                {formData.yearsInBusiness && (
-                  <div>
-                    <p className="text-sm text-zinc-500">Experience</p>
-                    <p className="text-zinc-100">{formData.yearsInBusiness} years in business</p>
-                  </div>
-                )}
-
-                {formData.certifications.length > 0 && (
-                  <div>
-                    <p className="text-sm text-zinc-500 mb-2">Certifications</p>
-                    <div className="flex flex-wrap gap-2">
-                      {formData.certifications.map((cert, index) => (
-                        <span
-                          key={index}
-                          className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full text-sm text-blue-400"
-                        >
-                          {cert}
-                        </span>
-                      ))}
+              {/* Profile Preview Card */}
+              <div className="bg-zinc-800/30 border border-zinc-700 rounded-2xl overflow-hidden">
+                {/* Header */}
+                <div className="p-6 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border-b border-zinc-700/50">
+                  <div className="flex items-center gap-4">
+                    {photoPreview ? (
+                      <img src={photoPreview} alt="Profile" className="w-16 h-16 rounded-xl object-cover border-2 border-emerald-500/50" />
+                    ) : (
+                      <div className="w-16 h-16 rounded-xl bg-emerald-500/20 flex items-center justify-center border-2 border-emerald-500/30">
+                        <Building2 className="w-8 h-8 text-emerald-400" />
+                      </div>
+                    )}
+                    <div>
+                      <h4 className="text-xl font-bold text-white">{formData.businessName || 'Your Business'}</h4>
+                      {formData.yearsInBusiness && (
+                        <p className="text-sm text-zinc-400">{formData.yearsInBusiness} years in business</p>
+                      )}
                     </div>
                   </div>
-                )}
+                </div>
+
+                {/* Details */}
+                <div className="p-6 space-y-5">
+                  {formData.bio && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-zinc-500 mb-2">About</p>
+                      <p className="text-zinc-300">{formData.bio}</p>
+                    </div>
+                  )}
+
+                  <div>
+                    <p className="text-xs uppercase tracking-wider text-zinc-500 mb-3">Services</p>
+                    <div className="flex flex-wrap gap-2">
+                      {formData.serviceTypes.map(serviceId => {
+                        const service = allServiceTypes.find(s => s.id === serviceId);
+                        return (
+                          <span
+                            key={serviceId}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 border border-emerald-500/30 rounded-full text-sm text-emerald-400"
+                          >
+                            <span>{service?.icon}</span>
+                            {service?.name}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {formData.serviceAreas.length > 0 && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-zinc-500 mb-3">Service Areas</p>
+                      <div className="flex flex-wrap gap-2">
+                        {formData.serviceAreas.map((area, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 border border-orange-500/30 rounded-full text-sm text-orange-400"
+                          >
+                            <MapPin className="w-3 h-3" />
+                            {area}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {formData.certifications.length > 0 && (
+                    <div>
+                      <p className="text-xs uppercase tracking-wider text-zinc-500 mb-3">Certifications</p>
+                      <div className="flex flex-wrap gap-2">
+                        {formData.certifications.map((cert, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-yellow-500/10 border border-yellow-500/30 rounded-full text-sm text-yellow-400"
+                          >
+                            <Award className="w-3 h-3" />
+                            {cert}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-zinc-800 p-6 flex items-center justify-between">
+        <div className="border-t border-zinc-800 p-6 bg-zinc-900/50 flex items-center justify-between">
           <Button
             onClick={handleBack}
             variant="ghost"
             disabled={currentStep === 1}
-            className="text-zinc-400 hover:text-zinc-100"
+            className="text-zinc-400 hover:text-white hover:bg-zinc-800"
           >
             <ChevronLeft className="h-4 w-4 mr-1" />
             Back
@@ -777,16 +891,22 @@ export default function OnboardingModal({
               <Button
                 onClick={handleNext}
                 disabled={!canProceedToStep(currentStep + 1)}
-                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-8 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200 group"
               >
-                Next
-                <ChevronRight className="h-4 w-4 ml-1" />
+                {currentStep === 2 && !canProceedToStep(3) ? (
+                  'Fill required fields'
+                ) : (
+                  <>
+                    Continue
+                    <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
+                  </>
+                )}
               </Button>
             ) : (
               <Button
                 onClick={handleComplete}
                 disabled={submitting || !formData.businessName || formData.serviceTypes.length === 0}
-                className="bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-8 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-white shadow-lg shadow-emerald-500/20 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transition-all duration-200"
               >
                 {submitting ? (
                   <span className="flex items-center gap-2">
@@ -804,6 +924,19 @@ export default function OnboardingModal({
           </div>
         </div>
       </div>
+
+      <style jsx global>{`
+        @keyframes fadeInUp {
+          from {
+            opacity: 0;
+            transform: translateY(10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
     </div>
   );
 }
