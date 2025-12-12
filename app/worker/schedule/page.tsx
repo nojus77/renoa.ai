@@ -202,28 +202,32 @@ export default function WorkerSchedule() {
             </div>
           ) : (
             selectedJobs.map((job) => (
-              <div
+              <button
                 key={job.id}
-                className={`bg-zinc-900 rounded-xl border border-zinc-800 border-l-4 ${getStatusColor(
+                onClick={() => router.push(`/worker/job/${job.id}`)}
+                className={`w-full text-left bg-zinc-900 rounded-xl border border-zinc-800 border-l-4 ${getStatusColor(
                   job.status
-                )} p-4`}
+                )} p-4 hover:bg-zinc-800/50 transition-colors active:scale-[0.98]`}
               >
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="font-medium text-white">{job.serviceType}</p>
                     <p className="text-zinc-400 text-sm">{job.customer.name}</p>
                   </div>
-                  <span
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${
-                      job.status === 'completed'
-                        ? 'bg-purple-500/20 text-purple-400'
-                        : job.status === 'in_progress'
-                        ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-blue-500/20 text-blue-400'
-                    }`}
-                  >
-                    {job.status === 'in_progress' ? 'In Progress' : job.status}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        job.status === 'completed'
+                          ? 'bg-purple-500/20 text-purple-400'
+                          : job.status === 'in_progress'
+                          ? 'bg-emerald-500/20 text-emerald-400'
+                          : 'bg-blue-500/20 text-blue-400'
+                      }`}
+                    >
+                      {job.status === 'in_progress' ? 'In Progress' : job.status}
+                    </span>
+                    <ChevronRight className="w-4 h-4 text-zinc-500" />
+                  </div>
                 </div>
 
                 <div className="mt-3 flex items-center gap-4 text-sm">
@@ -237,7 +241,7 @@ export default function WorkerSchedule() {
                   <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <span>{job.address}</span>
                 </div>
-              </div>
+              </button>
             ))
           )}
         </div>
