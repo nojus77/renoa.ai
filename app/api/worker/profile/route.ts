@@ -31,6 +31,8 @@ export async function GET(request: NextRequest) {
         workingHours: true,
         homeAddress: true,
         createdAt: true,
+        canCreateJobs: true,
+        jobsNeedApproval: true,
         workerSkills: {
           include: {
             skill: {

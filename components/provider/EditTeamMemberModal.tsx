@@ -22,8 +22,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Save, Trash2, User, AlertTriangle } from 'lucide-react';
+import { Loader2, Save, Trash2, User, AlertTriangle, Briefcase, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
+import { Switch } from '@/components/ui/switch';
 import SkillsCheckboxPicker from './SkillsCheckboxPicker';
 import ColorPicker from './ColorPicker';
 
@@ -55,6 +56,8 @@ interface TeamMember {
   workingHours?: Record<string, { start: string; end: string }> | null;
   profilePhotoUrl?: string | null;
   createdAt: string;
+  canCreateJobs?: boolean;
+  jobsNeedApproval?: boolean;
 }
 
 interface EditTeamMemberModalProps {
@@ -98,6 +101,8 @@ export default function EditTeamMemberModal({
     hourlyRate: '',
     payType: 'hourly',
     commissionRate: '',
+    canCreateJobs: false,
+    jobsNeedApproval: true,
   });
 
   // Populate form when member changes
@@ -113,6 +118,8 @@ export default function EditTeamMemberModal({
         hourlyRate: member.hourlyRate ? String(member.hourlyRate) : '',
         payType: member.payType || 'hourly',
         commissionRate: member.commissionRate ? String(member.commissionRate) : '',
+        canCreateJobs: member.canCreateJobs ?? false,
+        jobsNeedApproval: member.jobsNeedApproval ?? true,
       });
       setWorkerSkills(member.workerSkills || []);
     }
@@ -198,6 +205,8 @@ export default function EditTeamMemberModal({
           hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
           payType: formData.payType || null,
           commissionRate: formData.commissionRate ? parseFloat(formData.commissionRate) : null,
+          canCreateJobs: formData.role === 'field' ? formData.canCreateJobs : false,
+          jobsNeedApproval: formData.role === 'field' ? formData.jobsNeedApproval : true,
         }),
       });
 
@@ -465,6 +474,57 @@ export default function EditTeamMemberModal({
                     <p className="text-xs text-zinc-500">Worker earns this percentage of job value</p>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Worker Permissions - Only show for field workers */}
+            {formData.role === 'field' && (
+              <div className="space-y-4 p-4 bg-zinc-900/50 rounded-lg border border-zinc-800">
+                <h4 className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                  <Briefcase className="h-4 w-4 text-emerald-400" />
+                  Job Permissions
+                </h4>
+
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="canCreateJobs" className="text-zinc-200">
+                        Allow worker to create jobs
+                      </Label>
+                      <p className="text-xs text-zinc-500">
+                        Worker can add new jobs from their dashboard
+                      </p>
+                    </div>
+                    <Switch
+                      id="canCreateJobs"
+                      checked={formData.canCreateJobs}
+                      onCheckedChange={(checked) => setFormData({ ...formData, canCreateJobs: checked })}
+                      disabled={saving}
+                    />
+                  </div>
+
+                  {formData.canCreateJobs && (
+                    <div className="flex items-center justify-between pl-4 border-l-2 border-emerald-500/30">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="jobsNeedApproval" className="text-zinc-200 flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4 text-amber-400" />
+                          Jobs need approval
+                        </Label>
+                        <p className="text-xs text-zinc-500">
+                          {formData.jobsNeedApproval
+                            ? 'Jobs will be pending until you approve them'
+                            : 'Jobs will be scheduled immediately'}
+                        </p>
+                      </div>
+                      <Switch
+                        id="jobsNeedApproval"
+                        checked={formData.jobsNeedApproval}
+                        onCheckedChange={(checked) => setFormData({ ...formData, jobsNeedApproval: checked })}
+                        disabled={saving}
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 

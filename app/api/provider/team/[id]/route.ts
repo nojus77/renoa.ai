@@ -13,7 +13,7 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { status, role, hourlyRate, payType, commissionRate, firstName, lastName, phone, skills, color, changedBy } = body;
+    const { status, role, hourlyRate, payType, commissionRate, firstName, lastName, phone, skills, color, changedBy, canCreateJobs, jobsNeedApproval } = body;
 
     // Get current user data before update (for status change logging)
     const currentUser = await prisma.providerUser.findUnique({
@@ -40,6 +40,8 @@ export async function PATCH(
     if (phone !== undefined) updateData.phone = phone;
     if (skills !== undefined) updateData.skills = skills;
     if (color !== undefined) updateData.color = color;
+    if (canCreateJobs !== undefined) updateData.canCreateJobs = canCreateJobs;
+    if (jobsNeedApproval !== undefined) updateData.jobsNeedApproval = jobsNeedApproval;
 
     const updated = await prisma.providerUser.update({
       where: { id: params.id },

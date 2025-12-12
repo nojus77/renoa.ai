@@ -487,6 +487,9 @@ model ProviderUser {
   homeAddress       String?             @map("home_address") // For travel distance calculations
   homeLatitude      Float?              @map("home_latitude")
   homeLongitude     Float?              @map("home_longitude")
+  // Worker permissions
+  canCreateJobs     Boolean             @default(false) @map("can_create_jobs")
+  jobsNeedApproval  Boolean             @default(true) @map("jobs_need_approval")
   // Login tracking for billing fraud prevention
   lastLoginAt       DateTime?           @map("last_login_at")
   createdAt         DateTime            @default(now()) @map("created_at")

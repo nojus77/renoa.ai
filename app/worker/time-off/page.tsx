@@ -195,8 +195,8 @@ export default function WorkerTimeOff() {
         {/* Request Form Modal */}
         {showForm && (
           <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center sm:items-center">
-            <div className="bg-zinc-900 w-full max-w-md rounded-t-2xl sm:rounded-2xl border border-zinc-800">
-              <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+            <div className="bg-zinc-900 w-full max-w-md max-h-[90vh] rounded-t-2xl sm:rounded-2xl border border-zinc-800 flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
                 <h2 className="text-lg font-semibold text-white">Request Time Off</h2>
                 <button
                   onClick={() => setShowForm(false)}
@@ -206,10 +206,10 @@ export default function WorkerTimeOff() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-4 space-y-4">
+              <form onSubmit={handleSubmit} className="p-4 pb-8 space-y-4 overflow-y-auto flex-1">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    <label className="block text-base font-medium text-zinc-300 mb-2">
                       Start Date
                     </label>
                     <input
@@ -218,12 +218,12 @@ export default function WorkerTimeOff() {
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, startDate: e.target.value }))
                       }
-                      className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-1">
+                    <label className="block text-base font-medium text-zinc-300 mb-2">
                       End Date
                     </label>
                     <input
@@ -232,14 +232,14 @@ export default function WorkerTimeOff() {
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, endDate: e.target.value }))
                       }
-                      className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
                       required
                     />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                  <label className="block text-base font-medium text-zinc-300 mb-2">
                     Reason
                   </label>
                   <select
@@ -247,10 +247,11 @@ export default function WorkerTimeOff() {
                     onChange={(e) =>
                       setFormData((prev) => ({ ...prev, reason: e.target.value }))
                     }
-                    className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500 appearance-none cursor-pointer"
+                    style={{ fontSize: '16px' }}
                   >
                     {REASONS.map((reason) => (
-                      <option key={reason.value} value={reason.value}>
+                      <option key={reason.value} value={reason.value} className="py-3 text-base">
                         {reason.label}
                       </option>
                     ))}
@@ -258,7 +259,7 @@ export default function WorkerTimeOff() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-1">
+                  <label className="block text-base font-medium text-zinc-300 mb-2">
                     Notes (Optional)
                   </label>
                   <textarea
@@ -268,14 +269,14 @@ export default function WorkerTimeOff() {
                     }
                     placeholder="Any additional details..."
                     rows={3}
-                    className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
+                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={submitting}
-                  className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"
+                  className="w-full py-4 mt-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-colors"
                 >
                   {submitting ? (
                     <>

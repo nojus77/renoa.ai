@@ -36,6 +36,8 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         updatedAt: true,
         profilePhotoUrl: true,
+        canCreateJobs: true,
+        jobsNeedApproval: true,
         workerSkills: {
           include: {
             skill: {

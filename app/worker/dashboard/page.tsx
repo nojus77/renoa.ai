@@ -14,6 +14,11 @@ import {
   RefreshCw,
   DollarSign,
   Briefcase,
+  Plus,
+  X,
+  Search,
+  User,
+  Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -50,6 +55,13 @@ interface DayStats {
   earnings: number;
 }
 
+interface Customer {
+  id: string;
+  name: string;
+  phone: string | null;
+  address: string;
+}
+
 export default function WorkerDashboard() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>('');
@@ -60,6 +72,21 @@ export default function WorkerDashboard() {
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [stats, setStats] = useState<DayStats>({ jobsCount: 0, hoursWorked: 0, earnings: 0 });
+  const [canCreateJobs, setCanCreateJobs] = useState(false);
+
+  // Job creation modal state
+  const [showCreateJob, setShowCreateJob] = useState(false);
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [creatingJob, setCreatingJob] = useState(false);
+  const [newJob, setNewJob] = useState({
+    serviceType: '',
+    date: new Date().toISOString().split('T')[0],
+    startTime: '09:00',
+    endTime: '10:00',
+    notes: '',
+  });
 
   const fetchJobs = useCallback(async (uid: string) => {
     try {
@@ -92,6 +119,30 @@ export default function WorkerDashboard() {
     }
   }, []);
 
+  const fetchWorkerPermissions = useCallback(async (uid: string) => {
+    try {
+      const res = await fetch(`/api/worker/profile?userId=${uid}`);
+      const data = await res.json();
+      if (data.user?.canCreateJobs) {
+        setCanCreateJobs(true);
+      }
+    } catch (error) {
+      console.error('Error fetching worker permissions:', error);
+    }
+  }, []);
+
+  const fetchCustomers = useCallback(async (pid: string, search: string = '') => {
+    try {
+      const res = await fetch(`/api/provider/customers?providerId=${pid}&search=${encodeURIComponent(search)}`);
+      const data = await res.json();
+      if (data.customers) {
+        setCustomers(data.customers.slice(0, 10)); // Limit to 10 results
+      }
+    } catch (error) {
+      console.error('Error fetching customers:', error);
+    }
+  }, []);
+
   useEffect(() => {
     const uid = localStorage.getItem('workerUserId');
     const pid = localStorage.getItem('workerProviderId');
@@ -106,7 +157,74 @@ export default function WorkerDashboard() {
     setProviderId(pid);
     setFirstName(name || 'Worker');
     fetchJobs(uid);
-  }, [router, fetchJobs]);
+    fetchWorkerPermissions(uid);
+  }, [router, fetchJobs, fetchWorkerPermissions]);
+
+  // Customer search with debounce
+  useEffect(() => {
+    if (showCreateJob && providerId) {
+      const timer = setTimeout(() => {
+        fetchCustomers(providerId, customerSearch);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [customerSearch, showCreateJob, providerId, fetchCustomers]);
+
+  const handleCreateJob = async () => {
+    if (!selectedCustomer) {
+      toast.error('Please select a customer');
+      return;
+    }
+    if (!newJob.serviceType.trim()) {
+      toast.error('Please enter a service type');
+      return;
+    }
+
+    setCreatingJob(true);
+    try {
+      const startDateTime = new Date(`${newJob.date}T${newJob.startTime}`);
+      const endDateTime = new Date(`${newJob.date}T${newJob.endTime}`);
+
+      const res = await fetch('/api/worker/jobs/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          providerId,
+          customerId: selectedCustomer.id,
+          serviceType: newJob.serviceType.trim(),
+          address: selectedCustomer.address,
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+          notes: newJob.notes.trim() || null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        toast.success(data.message);
+        setShowCreateJob(false);
+        setSelectedCustomer(null);
+        setCustomerSearch('');
+        setNewJob({
+          serviceType: '',
+          date: new Date().toISOString().split('T')[0],
+          startTime: '09:00',
+          endTime: '10:00',
+          notes: '',
+        });
+        fetchJobs(userId);
+      } else {
+        toast.error(data.error || 'Failed to create job');
+      }
+    } catch (error) {
+      console.error('Error creating job:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setCreatingJob(false);
+    }
+  };
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -327,12 +445,22 @@ export default function WorkerDashboard() {
               })}
             </p>
           </div>
-          <button
-            onClick={() => fetchJobs(userId)}
-            className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"
-          >
-            <RefreshCw className="w-5 h-5 text-zinc-400" />
-          </button>
+          <div className="flex items-center gap-2">
+            {canCreateJobs && (
+              <button
+                onClick={() => setShowCreateJob(true)}
+                className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors"
+              >
+                <Plus className="w-5 h-5 text-white" />
+              </button>
+            )}
+            <button
+              onClick={() => fetchJobs(userId)}
+              className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"
+            >
+              <RefreshCw className="w-5 h-5 text-zinc-400" />
+            </button>
+          </div>
         </div>
 
         {/* Quick Stats */}
@@ -449,6 +577,176 @@ export default function WorkerDashboard() {
           )}
         </div>
       </div>
+
+      {/* Create Job Modal */}
+      {showCreateJob && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center">
+          <div className="bg-zinc-900 w-full max-w-md max-h-[90vh] rounded-t-2xl sm:rounded-2xl border border-zinc-800 flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
+              <h2 className="text-lg font-semibold text-white">Add New Job</h2>
+              <button
+                onClick={() => {
+                  setShowCreateJob(false);
+                  setSelectedCustomer(null);
+                  setCustomerSearch('');
+                }}
+                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4 pb-8 space-y-4 overflow-y-auto flex-1">
+              {/* Customer Selection */}
+              <div className="space-y-2">
+                <label className="text-base font-medium text-zinc-300">Customer</label>
+                {selectedCustomer ? (
+                  <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-emerald-500/30">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                        <User className="w-5 h-5 text-emerald-400" />
+                      </div>
+                      <div>
+                        <p className="text-white font-medium">{selectedCustomer.name}</p>
+                        <p className="text-zinc-400 text-sm">{selectedCustomer.address}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedCustomer(null)}
+                      className="p-1 hover:bg-zinc-700 rounded"
+                    >
+                      <X className="w-4 h-4 text-zinc-400" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                      <input
+                        type="text"
+                        value={customerSearch}
+                        onChange={(e) => setCustomerSearch(e.target.value)}
+                        placeholder="Search customers..."
+                        className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                        style={{ fontSize: '16px' }}
+                      />
+                    </div>
+                    {customers.length > 0 && (
+                      <div className="bg-zinc-800 rounded-lg border border-zinc-700 max-h-48 overflow-y-auto">
+                        {customers.map((customer) => (
+                          <button
+                            key={customer.id}
+                            onClick={() => {
+                              setSelectedCustomer(customer);
+                              setCustomerSearch('');
+                            }}
+                            className="w-full p-3 text-left hover:bg-zinc-700 border-b border-zinc-700 last:border-b-0 transition-colors"
+                          >
+                            <p className="text-white font-medium">{customer.name}</p>
+                            <p className="text-zinc-400 text-sm truncate">{customer.address}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Service Type */}
+              <div className="space-y-2">
+                <label className="text-base font-medium text-zinc-300">Service Type</label>
+                <input
+                  type="text"
+                  value={newJob.serviceType}
+                  onChange={(e) => setNewJob({ ...newJob, serviceType: e.target.value })}
+                  placeholder="e.g. Window Cleaning, Lawn Care"
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                  style={{ fontSize: '16px' }}
+                />
+              </div>
+
+              {/* Date */}
+              <div className="space-y-2">
+                <label className="text-base font-medium text-zinc-300">Date</label>
+                <div className="relative">
+                  <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                  <input
+                    type="date"
+                    value={newJob.date}
+                    onChange={(e) => setNewJob({ ...newJob, date: e.target.value })}
+                    className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+              </div>
+
+              {/* Time Range */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <label className="text-base font-medium text-zinc-300">Start Time</label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                    <input
+                      type="time"
+                      value={newJob.startTime}
+                      onChange={(e) => setNewJob({ ...newJob, startTime: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                      style={{ fontSize: '16px' }}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-base font-medium text-zinc-300">End Time</label>
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                    <input
+                      type="time"
+                      value={newJob.endTime}
+                      onChange={(e) => setNewJob({ ...newJob, endTime: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                      style={{ fontSize: '16px' }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Notes */}
+              <div className="space-y-2">
+                <label className="text-base font-medium text-zinc-300">Notes (optional)</label>
+                <textarea
+                  value={newJob.notes}
+                  onChange={(e) => setNewJob({ ...newJob, notes: e.target.value })}
+                  placeholder="Any additional notes..."
+                  rows={3}
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
+                  style={{ fontSize: '16px' }}
+                />
+              </div>
+
+              {/* Submit Button */}
+              <button
+                onClick={handleCreateJob}
+                disabled={creatingJob || !selectedCustomer || !newJob.serviceType.trim()}
+                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+              >
+                {creatingJob ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Creating...
+                  </>
+                ) : (
+                  <>
+                    <Plus className="w-5 h-5" />
+                    Create Job
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </WorkerLayout>
   );
 }
