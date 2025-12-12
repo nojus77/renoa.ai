@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -50,9 +51,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Also include customers with no messages but who have jobs (potential conversations)
-    const customersWithJobs = await prisma.customers.findMany({
+    const customersWithJobs = await prisma.customer.findMany({
       where: {
-        provider_id: providerId,
+        providerId: providerId,
         NOT: {
           id: {
             in: Array.from(conversationMap.keys()),
@@ -61,7 +62,7 @@ export async function GET(request: NextRequest) {
       },
       include: {
         jobs: {
-          orderBy: { start_time: 'desc' },
+          orderBy: { startTime: 'desc' },
           take: 1,
         },
       },
@@ -77,11 +78,11 @@ export async function GET(request: NextRequest) {
           customerPhone: customer.phone,
           customerEmail: customer.email,
           lastMessage: null,
-          lastMessageTime: customer.jobs[0]?.start_time?.toISOString() || customer.created_at.toISOString(),
+          lastMessageTime: customer.jobs[0]?.startTime?.toISOString() || customer.createdAt.toISOString(),
           unread: false,
           unreadCount: 0,
           source: customer.source,
-          jobReference: `${customer.jobs[0]?.service_type} - ${new Date(customer.jobs[0]?.start_time).toLocaleDateString()}`,
+          jobReference: `${customer.jobs[0]?.serviceType} - ${new Date(customer.jobs[0]?.startTime).toLocaleDateString()}`,
         });
       }
     });
@@ -113,10 +114,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the customer belongs to this provider
-    const customer = await prisma.customers.findFirst({
+    const customer = await prisma.customer.findFirst({
       where: {
         id: customerId,
-        provider_id: providerId,
+        providerId: providerId,
       },
     });
 
@@ -127,12 +128,14 @@ export async function POST(request: NextRequest) {
     // Create the message
     const message = await prisma.provider_customer_messages.create({
       data: {
+        id: crypto.randomUUID(),
         provider_id: providerId,
         customer_id: customerId,
         content,
         direction: 'sent',
         type,
         status: 'sent',
+        updated_at: new Date(),
       },
       include: {
         customers: true,

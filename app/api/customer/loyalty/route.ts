@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getCustomerSession } from '@/lib/auth-helpers';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -13,11 +14,11 @@ export async function GET(request: NextRequest) {
     }
 
     // Get or create loyalty points for customer
-    let loyalty = await prisma.loyaltyPoints.findUnique({
-      where: { customerId: session.customerId },
+    let loyalty = await prisma.loyalty_points.findUnique({
+      where: { customer_id: session.customerId },
       include: {
-        transactions: {
-          orderBy: { createdAt: 'desc' },
+        loyalty_transactions: {
+          orderBy: { created_at: 'desc' },
           take: 10,
         },
       },
@@ -25,24 +26,26 @@ export async function GET(request: NextRequest) {
 
     // Create if doesn't exist
     if (!loyalty) {
-      loyalty = await prisma.loyaltyPoints.create({
+      loyalty = await prisma.loyalty_points.create({
         data: {
-          customerId: session.customerId,
+          id: crypto.randomUUID(),
+          customer_id: session.customerId,
           points: 0,
-          lifetimePoints: 0,
+          lifetime_points: 0,
           tier: 'bronze',
+          updated_at: new Date(),
         },
         include: {
-          transactions: true,
+          loyalty_transactions: true,
         },
       });
     }
 
     return NextResponse.json(loyalty);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching loyalty points:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch loyalty points', details: error.message },
+      { error: 'Failed to fetch loyalty points', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

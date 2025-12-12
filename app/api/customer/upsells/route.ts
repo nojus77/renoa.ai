@@ -12,19 +12,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Base service is required' }, { status: 400 });
     }
 
-    const upsells = await prisma.serviceUpsell.findMany({
+    const upsells = await prisma.service_upsells.findMany({
       where: {
-        baseService,
+        base_service: baseService,
       },
-      orderBy: [{ displayOrder: 'asc' }, { conversionRate: 'desc' }],
+      orderBy: [{ display_order: 'asc' }, { conversion_rate: 'desc' }],
       take: 4, // Limit to top 4 upsells
     });
 
     // Convert Decimal fields to numbers
     const formattedUpsells = upsells.map((upsell) => ({
       ...upsell,
-      upsellPrice: Number(upsell.upsellPrice),
-      conversionRate: Number(upsell.conversionRate),
+      upsell_price: Number(upsell.upsell_price),
+      conversion_rate: Number(upsell.conversion_rate),
     }));
 
     return NextResponse.json({ upsells: formattedUpsells });

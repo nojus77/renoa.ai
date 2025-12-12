@@ -12,10 +12,10 @@ export async function GET(
     const { code } = params;
 
     // Find any referral with this code
-    const referral = await prisma.referral.findFirst({
-      where: { referralCode: code },
+    const referral = await prisma.referrals.findFirst({
+      where: { referral_code: code },
       include: {
-        referrer: {
+        customers_referrals_referrer_idTocustomers: {
           select: {
             name: true
           }
@@ -31,9 +31,9 @@ export async function GET(
     }
 
     return NextResponse.json({
-      referrerName: referral.referrer.name,
-      code: referral.referralCode,
-      creditAmount: referral.creditAmount
+      referrerName: referral.customers_referrals_referrer_idTocustomers.name,
+      code: referral.referral_code,
+      creditAmount: Number(referral.credit_amount)
     });
   } catch (error) {
     console.error('Error fetching referral code:', error);

@@ -15,7 +15,8 @@ async function main() {
       data: {
         name: 'Planting (Shrubs)',
         category: 'Landscaping',
-        description: 'Ability to plant and care for shrubs'
+        description: 'Ability to plant and care for shrubs',
+        providerId: providerId,
       }
     });
     console.log('✅ Created skill: Planting (Shrubs)');

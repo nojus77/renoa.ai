@@ -522,7 +522,7 @@ export default function TeamManagementPage() {
     } catch (error) {
       // Revert on error
       setTeamMembers(prev => prev.map(m =>
-        m.id === memberId ? { ...m, role: oldRole } : m
+        m.id === memberId ? { ...m, role: oldRole || 'field' } : m
       ));
       toast.error('Failed to update role');
     }
@@ -553,7 +553,7 @@ export default function TeamManagementPage() {
     } catch (error) {
       // Revert on error
       setTeamMembers(prev => prev.map(m =>
-        m.id === memberId ? { ...m, status: oldStatus } : m
+        m.id === memberId ? { ...m, status: oldStatus || 'active' } : m
       ));
       toast.error('Failed to update status');
     }
@@ -1704,7 +1704,7 @@ export default function TeamManagementPage() {
                       <>
                         <div className="flex gap-3 justify-center mb-8">
                           <Button
-                            onClick={handleOpenCrewDialog}
+                            onClick={() => handleOpenCrewDialog()}
                             className="bg-emerald-600 hover:bg-emerald-700"
                           >
                             <Users className="w-4 h-4 mr-2" />
@@ -1897,7 +1897,7 @@ export default function TeamManagementPage() {
                   {crews.map((crew) => {
                     const isExpanded = expandedCrews[crew.id];
                     const totalHoursThisWeek = crew.users.reduce((sum, m) => sum + (m.hoursThisWeek || 0), 0);
-                    const crewSkills = [...new Set(crew.users.flatMap(m => m.workerSkills?.map(ws => ws.skill.name) || []))];
+                    const crewSkills = Array.from(new Set(crew.users.flatMap(m => m.workerSkills?.map(ws => ws.skill.name) || [])));
                     const leader = crew.users.find(m => m.id === crew.leaderId);
 
                     return (

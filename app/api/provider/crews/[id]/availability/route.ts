@@ -35,16 +35,9 @@ export async function GET(
     const start = new Date(startTime);
     const end = new Date(endTime);
 
-    // Get crew with members
+    // Get crew
     const crew = await prisma.crew.findUnique({
       where: { id: crewId },
-      include: {
-        members: {
-          include: {
-            user: true,
-          },
-        },
-      },
     });
 
     if (!crew) {
@@ -61,8 +54,11 @@ export async function GET(
       );
     }
 
-    // Get member IDs
-    const memberIds = crew.members.map((m) => m.userId);
+    // Get member users
+    const memberIds = crew.userIds || [];
+    const members = await prisma.providerUser.findMany({
+      where: { id: { in: memberIds } },
+    });
 
     // Find conflicting jobs for each member
     const conflictingJobs = await prisma.job.findMany({
@@ -108,21 +104,21 @@ export async function GET(
       };
     }> = [];
 
-    for (const member of crew.members) {
+    for (const member of members) {
       const memberJobs = conflictingJobs.filter((job) =>
-        job.assignedUserIds?.includes(member.userId)
+        job.assignedUserIds?.includes(member.id)
       );
 
       if (memberJobs.length === 0) {
-        available.push(member.userId);
+        available.push(member.id);
       } else {
-        busy.push(member.userId);
+        busy.push(member.id);
 
         // Add conflict details
         for (const job of memberJobs) {
           conflicts.push({
-            userId: member.userId,
-            userName: `${member.user.firstName} ${member.user.lastName}`,
+            userId: member.id,
+            userName: `${member.firstName} ${member.lastName}`,
             job: {
               id: job.id,
               serviceType: job.serviceType,
@@ -138,11 +134,11 @@ export async function GET(
     return NextResponse.json({
       crewId,
       crewName: crew.name,
-      totalMembers: crew.members.length,
+      totalMembers: members.length,
       available,
       busy,
       conflicts,
-      allAvailable: available.length === crew.members.length,
+      allAvailable: available.length === members.length,
       hasConflicts: busy.length > 0,
     });
   } catch (error) {

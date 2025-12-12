@@ -2,6 +2,7 @@
 
 import { format } from 'date-fns';
 import { Clock, MapPin, User } from 'lucide-react';
+import { formatInProviderTz } from '@/lib/utils/timezone';
 import type { CalendarJob, UnassignedJob } from './DailyTeamCalendar';
 
 interface JobDragPreviewProps {
@@ -30,7 +31,7 @@ export default function JobDragPreview({ job }: JobDragPreviewProps) {
       <div className="flex items-center gap-1.5 mt-1">
         <Clock className="h-3 w-3 text-zinc-400" />
         <span className="text-xs text-zinc-400">
-          {format(startTime, 'h:mm a')} • {duration.toFixed(1)}h
+          {formatInProviderTz(job.startTime, 'h:mm a', 'America/Chicago')} • {duration.toFixed(1)}h
         </span>
       </div>
 

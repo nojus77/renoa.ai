@@ -1,12 +1,16 @@
-import { formatInTimeZone, utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
+import { formatInTimeZone, toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { format as formatDate } from 'date-fns';
 
 /**
- * Format a date in the provider's timezone
+ * Format a date that's already stored in the provider's timezone
+ * NOTE: Our DB stores timestamps WITHOUT timezone (naive timestamps in Chicago time)
+ * Prisma reads them as UTC, but they're actually Chicago local times
+ * This function extracts the UTC time components and formats them as-is
+ *
  * @param date - The date to format (Date object or ISO string)
  * @param formatStr - The format string (e.g., 'h:mm a', 'MMM d, yyyy')
- * @param timezone - IANA timezone (e.g., 'America/Chicago')
- * @returns Formatted date string in the specified timezone
+ * @param timezone - IANA timezone (e.g., 'America/Chicago') - currently ignored
+ * @returns Formatted date string treating the UTC components as local time
  */
 export function formatInProviderTz(
   date: Date | string,
@@ -14,7 +18,22 @@ export function formatInProviderTz(
   timezone: string = 'America/Chicago'
 ): string {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return formatInTimeZone(dateObj, timezone, formatStr);
+
+  // Create a new Date by treating UTC components as local time
+  // If DB has 17:00 (Chicago local stored as naive timestamp)
+  // Prisma gives us 2025-12-12T17:00:00.000Z
+  // We want to display "17:00" or "5:00 PM" (the UTC components as-is)
+  const localDate = new Date(
+    dateObj.getUTCFullYear(),
+    dateObj.getUTCMonth(),
+    dateObj.getUTCDate(),
+    dateObj.getUTCHours(),
+    dateObj.getUTCMinutes(),
+    dateObj.getUTCSeconds(),
+    dateObj.getUTCMilliseconds()
+  );
+
+  return formatDate(localDate, formatStr);
 }
 
 /**
@@ -28,7 +47,7 @@ export function toProviderTz(
   timezone: string = 'America/Chicago'
 ): Date {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return utcToZonedTime(dateObj, timezone);
+  return toZonedTime(dateObj, timezone);
 }
 
 /**
@@ -41,7 +60,7 @@ export function fromProviderTz(
   date: Date,
   timezone: string = 'America/Chicago'
 ): Date {
-  return zonedTimeToUtc(date, timezone);
+  return fromZonedTime(date, timezone);
 }
 
 /**
@@ -50,7 +69,7 @@ export function fromProviderTz(
  * @returns Current date/time in provider's timezone
  */
 export function nowInProviderTz(timezone: string = 'America/Chicago'): Date {
-  return utcToZonedTime(new Date(), timezone);
+  return toZonedTime(new Date(), timezone);
 }
 
 /**

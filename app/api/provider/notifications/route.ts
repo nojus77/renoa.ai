@@ -140,9 +140,9 @@ export async function GET(request: NextRequest) {
         notifications.push({
           id: `invoice-${invoice.id}`,
           type: 'payment_received',
-          message: `Payment of $${invoice.totalAmount} received from ${invoice.customer?.name || 'customer'}`,
+          message: `Payment of $${Number(invoice.total)} received from ${invoice.customer?.name || 'customer'}`,
           icon: 'DollarSign',
-          timestamp: invoice.paidAt || invoice.updatedAt,
+          timestamp: invoice.paidDate || invoice.updatedAt,
           link: `/provider/invoices/${invoice.id}`,
         });
       }

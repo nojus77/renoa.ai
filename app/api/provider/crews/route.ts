@@ -127,9 +127,9 @@ export async function GET(request: NextRequest) {
         });
 
         // Get all unique skills from crew members
-        const crewSkills = [...new Set(usersWithStats.flatMap(m =>
+        const crewSkills = Array.from(new Set(usersWithStats.flatMap(m =>
           m.workerSkills?.map(ws => ws.skill.name) || []
-        ))];
+        )));
 
         return {
           ...crew,

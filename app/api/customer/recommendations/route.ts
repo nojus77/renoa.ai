@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const session = cookieStore.get('customer-session');
 
     if (!session) {
@@ -39,29 +39,29 @@ export async function GET(request: NextRequest) {
     const serviceTypes = completedJobs.map(job => job.serviceType);
 
     // Fetch recommendations based on completed services
-    const recommendations = await prisma.serviceRecommendation.findMany({
+    const recommendations = await prisma.service_recommendations.findMany({
       where: {
-        baseService: {
+        base_service: {
           in: serviceTypes,
         },
-        isActive: true,
+        is_active: true,
       },
       orderBy: [
-        { displayOrder: 'asc' },
-        { conversionRate: 'desc' },
+        { display_order: 'asc' },
+        { conversion_rate: 'desc' },
       ],
     });
 
     // Group recommendations by base service and limit to top 3 per service
-    const groupedRecommendations: Record<string, any[]> = {};
+    const groupedRecommendations: Record<string, typeof recommendations> = {};
 
     for (const rec of recommendations) {
-      if (!groupedRecommendations[rec.baseService]) {
-        groupedRecommendations[rec.baseService] = [];
+      if (!groupedRecommendations[rec.base_service]) {
+        groupedRecommendations[rec.base_service] = [];
       }
 
-      if (groupedRecommendations[rec.baseService].length < 3) {
-        groupedRecommendations[rec.baseService].push(rec);
+      if (groupedRecommendations[rec.base_service].length < 3) {
+        groupedRecommendations[rec.base_service].push(rec);
       }
     }
 
@@ -70,8 +70,8 @@ export async function GET(request: NextRequest) {
       ([baseService, recs]) =>
         recs.map(rec => ({
           ...rec,
-          recommendedPrice: Number(rec.recommendedPrice), // Convert Decimal to number
-          conversionRate: Number(rec.conversionRate), // Convert Decimal to number
+          recommended_price: Number(rec.recommended_price), // Convert Decimal to number
+          conversion_rate: Number(rec.conversion_rate), // Convert Decimal to number
           baseServiceContext: baseService,
         }))
     );
@@ -102,14 +102,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch recommendations for the specific service
-    const recommendations = await prisma.serviceRecommendation.findMany({
+    const recommendations = await prisma.service_recommendations.findMany({
       where: {
-        baseService: serviceType,
-        isActive: true,
+        base_service: serviceType,
+        is_active: true,
       },
       orderBy: [
-        { displayOrder: 'asc' },
-        { conversionRate: 'desc' },
+        { display_order: 'asc' },
+        { conversion_rate: 'desc' },
       ],
       take: 3,
     });
@@ -117,8 +117,8 @@ export async function POST(request: NextRequest) {
     // Convert Decimal fields to numbers
     const formattedRecommendations = recommendations.map(rec => ({
       ...rec,
-      recommendedPrice: Number(rec.recommendedPrice),
-      conversionRate: Number(rec.conversionRate),
+      recommended_price: Number(rec.recommended_price),
+      conversion_rate: Number(rec.conversion_rate),
     }));
 
     return NextResponse.json({ recommendations: formattedRecommendations });

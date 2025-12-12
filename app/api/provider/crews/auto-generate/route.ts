@@ -47,9 +47,9 @@ export async function POST(request: NextRequest) {
 
     workers.forEach(worker => {
       // Get all categories for this worker
-      const categories = worker.workerSkills
+      const categories = (worker.workerSkills
         ?.map(ws => ws.skill.category)
-        .filter(Boolean) || [];
+        .filter((c): c is string => c !== null) || []) as string[];
 
       if (categories.length === 0) {
         // Workers without skills go to "general"

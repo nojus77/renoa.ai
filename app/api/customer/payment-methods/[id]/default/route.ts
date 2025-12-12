@@ -28,7 +28,7 @@ export async function PATCH(
     }
 
     // Find payment method
-    const paymentMethod = await prisma.customerPaymentMethod.findUnique({
+    const paymentMethod = await prisma.customer_payment_methods.findUnique({
       where: { id: paymentMethodId },
     });
 
@@ -37,30 +37,30 @@ export async function PATCH(
     }
 
     // Verify ownership
-    if (paymentMethod.customerId !== customer.id) {
+    if (paymentMethod.customer_id !== customer.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Unset all existing defaults for this customer
-    await prisma.customerPaymentMethod.updateMany({
-      where: { customerId: customer.id },
-      data: { isDefault: false },
+    await prisma.customer_payment_methods.updateMany({
+      where: { customer_id: customer.id },
+      data: { is_default: false },
     });
 
     // Set this payment method as default
-    const updatedPaymentMethod = await prisma.customerPaymentMethod.update({
+    const updatedPaymentMethod = await prisma.customer_payment_methods.update({
       where: { id: paymentMethodId },
-      data: { isDefault: true },
+      data: { is_default: true },
     });
 
     return NextResponse.json({
       success: true,
       paymentMethod: updatedPaymentMethod,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error setting default payment method:', error);
     return NextResponse.json(
-      { error: 'Failed to set default payment method', details: error.message },
+      { error: 'Failed to set default payment method', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

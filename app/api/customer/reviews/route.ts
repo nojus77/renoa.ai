@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -8,7 +9,7 @@ const prisma = new PrismaClient();
 export async function POST(request: NextRequest) {
   try {
     // Get customer session
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('customer-session');
 
     if (!sessionCookie?.value) {
@@ -52,8 +53,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if review already exists
-    const existingReview = await prisma.review.findUnique({
-      where: { jobId },
+    const existingReview = await prisma.reviews.findUnique({
+      where: { job_id: jobId },
     });
 
     if (existingReview) {
@@ -64,22 +65,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the review
-    const review = await prisma.review.create({
+    const review = await prisma.reviews.create({
       data: {
-        jobId,
-        providerId: job.providerId,
-        customerId,
+        id: crypto.randomUUID(),
+        job_id: jobId,
+        provider_id: job.providerId,
+        customer_id: customerId,
         rating,
-        qualityRating,
-        timelinessRating,
-        communicationRating,
+        quality_rating: qualityRating,
+        timeliness_rating: timelinessRating,
+        communication_rating: communicationRating,
         comment,
+        updated_at: new Date(),
       },
     });
 
     // Update provider's average rating
-    const providerReviews = await prisma.review.findMany({
-      where: { providerId: job.providerId },
+    const providerReviews = await prisma.reviews.findMany({
+      where: { provider_id: job.providerId },
       select: { rating: true },
     });
 

@@ -52,7 +52,6 @@ export async function GET(
           select: {
             id: true,
             name: true,
-            profilePictureUrl: true,
           },
         },
         jobs: {
@@ -86,7 +85,6 @@ export async function GET(
       helpfulCount: review.helpful_count,
       customer: {
         name: review.customers.name,
-        profilePictureUrl: review.customers.profilePictureUrl,
       },
       userVote: Array.isArray(review.helpfulness) && review.helpfulness.length > 0
         ? review.helpfulness[0].helpful

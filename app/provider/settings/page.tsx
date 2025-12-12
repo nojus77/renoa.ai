@@ -91,6 +91,7 @@ export default function ProviderSettings() {
   const [serviceRadius, setServiceRadius] = useState(25);
   const [website, setWebsite] = useState('');
   const [businessHours, setBusinessHours] = useState('Mon-Fri: 9 AM - 5 PM');
+  const [timeZone, setTimeZone] = useState('America/Chicago');
 
   // Availability
   const [workingHours, setWorkingHours] = useState<WorkingHours>({
@@ -199,6 +200,7 @@ export default function ProviderSettings() {
         setServiceRadius(provider.serviceRadius || 25);
         setWebsite(provider.website || '');
         setBusinessHours(provider.businessHours || 'Mon-Fri: 9 AM - 5 PM');
+        setTimeZone(provider.timeZone || 'America/Chicago');
       }
 
       // Load availability settings
@@ -450,6 +452,7 @@ export default function ProviderSettings() {
           serviceRadius,
           website,
           businessHours,
+          timeZone,
         }),
       });
 
@@ -544,9 +547,10 @@ export default function ProviderSettings() {
   const savePaymentSettings = async () => {
     setSaving(true);
     try {
-      const acceptedMethods = paymentMethods
-        .filter(m => m.enabled)
-        .map(m => m.id);
+      const acceptedMethods: string[] = [];
+      if (acceptCreditCard) acceptedMethods.push('credit_card');
+      if (acceptCash) acceptedMethods.push('cash');
+      if (acceptCheck) acceptedMethods.push('check');
 
       const res = await fetch('/api/provider/settings/payments', {
         method: 'POST',
@@ -1038,6 +1042,29 @@ export default function ProviderSettings() {
                           className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
                           placeholder="https://example.com"
                         />
+                      </div>
+
+                      <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Time Zone
+                        </label>
+                        <select
+                          value={timeZone}
+                          onChange={(e) => setTimeZone(e.target.value)}
+                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                        >
+                          <option value="America/New_York">Eastern Time (ET)</option>
+                          <option value="America/Chicago">Central Time (CT)</option>
+                          <option value="America/Denver">Mountain Time (MT)</option>
+                          <option value="America/Phoenix">Arizona (no DST)</option>
+                          <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                          <option value="America/Anchorage">Alaska Time (AKT)</option>
+                          <option value="America/Adak">Hawaii-Aleutian Time (HAT)</option>
+                          <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
+                        </select>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          All times in your calendar and schedules will display in this timezone
+                        </p>
                       </div>
 
                       <div className="md:col-span-2">

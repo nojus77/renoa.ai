@@ -4,6 +4,7 @@ import { useMemo, useEffect, useState } from 'react';
 import { format } from 'date-fns';
 import { User, AlertTriangle, CheckCircle, Clock, MapPin, GripVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatInProviderTz } from '@/lib/utils/timezone';
 import DroppableTimeslot from './DroppableTimeslot';
 import DraggableJob from './DraggableJob';
 import type { CalendarWorker, CalendarJob } from './DailyTeamCalendar';
@@ -293,7 +294,7 @@ function JobBlock({ job, top, height, color, hasConflict, onClick, isDraggable =
           <div className="flex items-center gap-1 text-xs text-zinc-500 mt-0.5">
             <Clock className="h-3 w-3" />
             <span>
-              {format(job.startTime, 'h:mm a')} - {format(job.endTime, 'h:mm a')}
+              {formatInProviderTz(job.startTime, 'h:mm a', 'America/Chicago')} - {formatInProviderTz(job.endTime, 'h:mm a', 'America/Chicago')}
             </span>
           </div>
         )}

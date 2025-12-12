@@ -29,7 +29,7 @@ export async function DELETE(
     }
 
     // Find payment method
-    const paymentMethod = await prisma.customerPaymentMethod.findUnique({
+    const paymentMethod = await prisma.customer_payment_methods.findUnique({
       where: { id: paymentMethodId },
     });
 
@@ -38,28 +38,28 @@ export async function DELETE(
     }
 
     // Verify ownership
-    if (paymentMethod.customerId !== customer.id) {
+    if (paymentMethod.customer_id !== customer.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
     // Detach from Stripe
     try {
-      await stripe.paymentMethods.detach(paymentMethod.stripePaymentMethodId);
-    } catch (stripeError: any) {
+      await stripe.paymentMethods.detach(paymentMethod.stripe_payment_method_id);
+    } catch (stripeError: unknown) {
       console.error('Error detaching payment method from Stripe:', stripeError);
       // Continue with database deletion even if Stripe detach fails
     }
 
     // Delete from database
-    await prisma.customerPaymentMethod.delete({
+    await prisma.customer_payment_methods.delete({
       where: { id: paymentMethodId },
     });
 
     return NextResponse.json({ success: true, message: 'Payment method removed' });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting payment method:', error);
     return NextResponse.json(
-      { error: 'Failed to delete payment method', details: error.message },
+      { error: 'Failed to delete payment method', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

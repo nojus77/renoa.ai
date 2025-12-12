@@ -48,6 +48,7 @@ interface GanttJob {
   status: string;
   estimatedValue: number | null;
   priority?: string;
+  assignedUserIds?: string[];
 }
 
 interface GanttWorker {

@@ -5,7 +5,8 @@
  */
 
 import { PrismaClient } from '@prisma/client';
-import { startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay, format } from 'date-fns';
+import { formatInProviderTz } from '@/lib/utils/timezone';
 import {
   calculateAssignmentScore,
   getServiceWeights,
@@ -329,6 +330,14 @@ async function assignJobToWorker(
   const jobDuration = (jobEnd.getTime() - jobStart.getTime()) / (1000 * 60);
   const crewSize = job.crewSizeRequired || 1;
 
+  // Enhanced logging for job details
+  console.log(`\n🎯 Scheduling: ${job.serviceType} at ${formatInProviderTz(job.startTime, 'h:mm a', 'America/Chicago')} - ${formatInProviderTz(job.endTime, 'h:mm a', 'America/Chicago')} Chicago time`);
+  console.log(`   (UTC: ${format(jobStart, 'HH:mm')} - ${format(jobEnd, 'HH:mm')})`);
+  console.log(`   Job ID: ${job.id}`);
+  console.log(`   Customer: ${job.customer?.name}`);
+  console.log(`   Duration: ${jobDuration} minutes`);
+  console.log(`   Crew size: ${crewSize}`);
+
   // Get service weights for this job type
   const weights = getServiceWeights(job, context.serviceWeights);
 
@@ -344,8 +353,8 @@ async function assignJobToWorker(
       const availability = await checkAvailability({
         userId: worker.id,
         date: jobStart,
-        startTime: jobStart.toTimeString().substring(0, 5),
-        endTime: jobEnd.toTimeString().substring(0, 5),
+        startTime: formatInProviderTz(job.startTime, 'HH:mm', 'America/Chicago'),
+        endTime: formatInProviderTz(job.endTime, 'HH:mm', 'America/Chicago'),
         durationHours: jobDuration / 60
       });
       return { worker, available: availability.available };

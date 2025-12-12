@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const session = cookieStore.get('customer-session');
 
     if (!session) {
@@ -36,17 +36,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let appliedPromo = null;
+    let appliedPromo: { promo_code: string; discount_percent: unknown; discount_amount: unknown } | null = null;
     let discountAmount = 0;
 
     // If promo code provided, validate and apply it
     if (promoCode) {
-      const promotion = await prisma.customerPromotion.findFirst({
+      const promotion = await prisma.customer_promotions.findFirst({
         where: {
-          customerId,
-          promoCode,
+          customer_id: customerId,
+          promo_code: promoCode,
           status: 'active',
-          expiresAt: { gt: new Date() },
+          expires_at: { gt: new Date() },
         },
       });
 
@@ -58,18 +58,18 @@ export async function POST(request: NextRequest) {
       }
 
       // Calculate discount
-      if (promotion.discountPercent) {
-        discountAmount = (estimatedValue * Number(promotion.discountPercent)) / 100;
-      } else if (promotion.discountAmount) {
-        discountAmount = Number(promotion.discountAmount);
+      if (promotion.discount_percent) {
+        discountAmount = (estimatedValue * Number(promotion.discount_percent)) / 100;
+      } else if (promotion.discount_amount) {
+        discountAmount = Number(promotion.discount_amount);
       }
 
       // Mark promotion as used
-      await prisma.customerPromotion.update({
+      await prisma.customer_promotions.update({
         where: { id: promotion.id },
         data: {
           status: 'used',
-          usedAt: new Date(),
+          used_at: new Date(),
         },
       });
 
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
         endTime: new Date(endTime),
         status: 'scheduled',
         source: 'own',
-        bookingSource: bookingSource || 'rebook_customer',
+        booking_source: bookingSource || 'rebook_customer',
         estimatedValue: estimatedValue ? parseFloat(estimatedValue) : null,
         customerNotes,
       },
@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
       job,
       appliedPromo: appliedPromo
         ? {
-            code: appliedPromo.promoCode,
+            code: appliedPromo.promo_code,
             discountAmount,
             finalPrice: Math.max(0, estimatedValue - discountAmount),
           }

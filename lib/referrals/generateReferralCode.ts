@@ -19,8 +19,8 @@ export async function generateReferralCode(customerName: string): Promise<string
   // Check if code already exists, if so, generate a new one
   let attempts = 0;
   while (attempts < 10) {
-    const existing = await prisma.referral.findUnique({
-      where: { referralCode: code }
+    const existing = await prisma.referrals.findFirst({
+      where: { referral_code: code }
     });
 
     if (!existing) {
@@ -43,13 +43,13 @@ export async function generateReferralCode(customerName: string): Promise<string
  */
 export async function getOrCreateReferralCode(customerId: string, customerName: string): Promise<string> {
   // Check if customer already has a referral
-  const existingReferral = await prisma.referral.findFirst({
-    where: { referrerId: customerId },
-    orderBy: { createdAt: 'desc' }
+  const existingReferral = await prisma.referrals.findFirst({
+    where: { referrer_id: customerId },
+    orderBy: { created_at: 'desc' }
   });
 
   if (existingReferral) {
-    return existingReferral.referralCode;
+    return existingReferral.referral_code;
   }
 
   // Generate new code

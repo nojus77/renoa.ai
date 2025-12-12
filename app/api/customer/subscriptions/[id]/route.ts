@@ -10,7 +10,7 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const session = cookieStore.get('customer-session');
 
     if (!session) {
@@ -26,10 +26,10 @@ export async function PATCH(
     const { action, pausedUntil } = body;
 
     // Verify subscription belongs to customer
-    const subscription = await prisma.customerSubscription.findFirst({
+    const subscription = await prisma.customer_subscriptions.findFirst({
       where: {
         id: subscriptionId,
-        customerId,
+        customer_id: customerId,
       },
     });
 
@@ -40,7 +40,9 @@ export async function PATCH(
       );
     }
 
-    let updateData: any = {};
+    let updateData: Record<string, unknown> = {
+      updated_at: new Date(),
+    };
 
     switch (action) {
       case 'pause':
@@ -51,8 +53,9 @@ export async function PATCH(
           );
         }
         updateData = {
+          ...updateData,
           status: 'paused',
-          pausedUntil: new Date(pausedUntil),
+          paused_until: new Date(pausedUntil),
         };
         break;
 
@@ -74,21 +77,23 @@ export async function PATCH(
         }
 
         updateData = {
+          ...updateData,
           status: 'active',
-          pausedUntil: null,
-          nextScheduledDate,
+          paused_until: null,
+          next_scheduled_date: nextScheduledDate,
         };
         break;
 
       case 'cancel':
         updateData = {
+          ...updateData,
           status: 'cancelled',
         };
         break;
 
       case 'skip':
         // Skip next scheduled date and move to following one
-        let skippedDate = new Date(subscription.nextScheduledDate);
+        let skippedDate = new Date(subscription.next_scheduled_date);
 
         switch (subscription.frequency) {
           case 'weekly':
@@ -103,7 +108,8 @@ export async function PATCH(
         }
 
         updateData = {
-          nextScheduledDate: skippedDate,
+          ...updateData,
+          next_scheduled_date: skippedDate,
         };
         break;
 
@@ -114,11 +120,11 @@ export async function PATCH(
         );
     }
 
-    const updatedSubscription = await prisma.customerSubscription.update({
+    const updatedSubscription = await prisma.customer_subscriptions.update({
       where: { id: subscriptionId },
       data: updateData,
       include: {
-        provider: {
+        Provider: {
           select: {
             id: true,
             businessName: true,
@@ -145,7 +151,7 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const session = cookieStore.get('customer-session');
 
     if (!session) {
@@ -159,10 +165,10 @@ export async function DELETE(
     const subscriptionId = params.id;
 
     // Verify subscription belongs to customer
-    const subscription = await prisma.customerSubscription.findFirst({
+    const subscription = await prisma.customer_subscriptions.findFirst({
       where: {
         id: subscriptionId,
-        customerId,
+        customer_id: customerId,
       },
     });
 
@@ -173,7 +179,7 @@ export async function DELETE(
       );
     }
 
-    await prisma.customerSubscription.delete({
+    await prisma.customer_subscriptions.delete({
       where: { id: subscriptionId },
     });
 

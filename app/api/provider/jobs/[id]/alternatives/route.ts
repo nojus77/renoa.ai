@@ -28,9 +28,7 @@ export async function GET(
     const job = (await prisma.job.findUnique({
       where: { id: params.id },
       include: {
-        customer: {
-          include: { preferences: true },
-        },
+        customer: true,
       },
     })) as JobWithDetails | null;
 
@@ -56,7 +54,7 @@ export async function GET(
     }
 
     // Get all workers
-    const workers = (await prisma.providerUser.findMany({
+    const workersData = await prisma.providerUser.findMany({
       where: {
         providerId: job.providerId,
         role: 'field',
@@ -66,9 +64,24 @@ export async function GET(
         workerSkills: {
           include: { skill: true },
         },
-        metrics: true,
-        settings: true,
       },
+    });
+
+    // Fetch metrics and settings separately (they're not Prisma relations)
+    const workerIds = workersData.map(w => w.id);
+    const [metricsData, settingsData] = await Promise.all([
+      prisma.workerMetrics.findMany({ where: { userId: { in: workerIds } } }),
+      prisma.workerSettings.findMany({ where: { userId: { in: workerIds } } }),
+    ]);
+
+    const metricsMap = new Map(metricsData.map(m => [m.userId, m]));
+    const settingsMap = new Map(settingsData.map(s => [s.userId, s]));
+
+    // Combine into WorkerWithDetails
+    const workers = workersData.map(w => ({
+      ...w,
+      metrics: metricsMap.get(w.id) || null,
+      settings: settingsMap.get(w.id) || null,
     })) as WorkerWithDetails[];
 
     // Get service configs
@@ -76,14 +89,15 @@ export async function GET(
       where: { providerId: job.providerId },
     });
 
+    // Map the actual schema fields to the expected ServiceWeights interface
     const serviceWeights = new Map(
       serviceConfigs.map((c) => [
         c.serviceType,
         {
-          weightSLA: c.weightSLA,
-          weightRoute: c.weightRoute,
-          weightContinuity: c.weightContinuity,
-          weightBalance: c.weightBalance,
+          weightSLA: c.skillWeight,           // Map skillWeight to weightSLA
+          weightRoute: c.availabilityWeight,  // Map availabilityWeight to weightRoute
+          weightContinuity: c.workloadWeight, // Map workloadWeight to weightContinuity
+          weightBalance: c.historyWeight,     // Map historyWeight to weightBalance
         },
       ])
     );

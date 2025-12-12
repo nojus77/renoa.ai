@@ -15,14 +15,14 @@ export async function GET(
       where: { id: providerId },
       select: {
         id: true,
-        name: true,
+        ownerName: true,
         email: true,
         phone: true,
         businessName: true,
         bio: true,
-        profilePictureUrl: true,
-        yearsExperience: true,
-        servicesOffered: true,
+        profilePhotoUrl: true,
+        yearsInBusiness: true,
+        serviceTypes: true,
         createdAt: true,
       },
     });

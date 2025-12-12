@@ -30,31 +30,32 @@ export async function GET(
     }
 
     // Fetch all messages for this conversation
-    const messages = await prisma.providerCustomerMessage.findMany({
+    const messages = await prisma.provider_customer_messages.findMany({
       where: {
-        providerId,
-        customerId,
+        provider_id: providerId,
+        customer_id: customerId,
       },
-      orderBy: { createdAt: 'asc' }, // Chronological order for conversation thread
+      orderBy: { created_at: 'asc' }, // Chronological order for conversation thread
     });
 
     // Mark all received messages as read
-    await prisma.providerCustomerMessage.updateMany({
+    await prisma.provider_customer_messages.updateMany({
       where: {
-        providerId,
-        customerId,
+        provider_id: providerId,
+        customer_id: customerId,
         direction: 'received',
         status: { not: 'read' },
       },
       data: {
         status: 'read',
+        updated_at: new Date(),
       },
     });
 
     // Format messages for frontend
     const formattedMessages = messages.map(msg => ({
       id: msg.id,
-      customerId: msg.customerId,
+      customerId: msg.customer_id,
       customerName: customer.name,
       senderId: msg.direction === 'sent' ? providerId : customerId,
       senderType: msg.direction === 'sent' ? 'provider' : 'customer',
@@ -62,7 +63,7 @@ export async function GET(
       direction: msg.direction,
       type: msg.type,
       status: msg.status,
-      timestamp: msg.createdAt.toISOString(),
+      timestamp: msg.created_at.toISOString(),
       read: msg.status === 'read',
     }));
 

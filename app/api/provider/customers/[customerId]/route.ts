@@ -233,26 +233,26 @@ export async function DELETE(
     }
 
     // Step 7: Delete loyalty points
-    await prisma.loyaltyPoints.deleteMany({
-      where: { customerId: params.customerId },
+    await prisma.loyalty_points.deleteMany({
+      where: { customer_id: params.customerId },
     });
     console.log(`✅ Deleted loyalty points`);
 
     // Step 8: Delete loyalty transactions
-    await prisma.loyaltyTransaction.deleteMany({
-      where: { customerId: params.customerId },
+    await prisma.loyalty_transactions.deleteMany({
+      where: { customer_id: params.customerId },
     });
     console.log(`✅ Deleted loyalty transactions`);
 
     // Step 9: Delete customer notifications
-    await prisma.customerNotification.deleteMany({
-      where: { customerId: params.customerId },
+    await prisma.customer_notifications.deleteMany({
+      where: { customer_id: params.customerId },
     });
     console.log(`✅ Deleted customer notifications`);
 
     // Step 10: Delete messages
-    await prisma.providerCustomerMessage.deleteMany({
-      where: { customerId: params.customerId },
+    await prisma.provider_customer_messages.deleteMany({
+      where: { customer_id: params.customerId },
     });
     console.log(`✅ Deleted messages`);
 

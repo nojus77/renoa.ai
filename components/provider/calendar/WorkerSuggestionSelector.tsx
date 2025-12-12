@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Sparkles, Users, Clock, MapPin } from 'lucide-react';
+import { formatInProviderTz } from '@/lib/utils/timezone';
 import SuggestionCard from './SuggestionCard';
 import type { WorkerScore } from '@/lib/assignment-scoring';
 
@@ -107,8 +108,8 @@ export default function WorkerSuggestionSelector({
                 <div className="flex items-center gap-1">
                   <Clock className="h-3.5 w-3.5" />
                   <span>
-                    {format(new Date(jobDetails.startTime), 'MMM d, h:mm a')} -{' '}
-                    {format(new Date(jobDetails.endTime), 'h:mm a')}
+                    {format(new Date(jobDetails.startTime), 'MMM d')}, {formatInProviderTz(jobDetails.startTime, 'h:mm a', 'America/Chicago')} -{' '}
+                    {formatInProviderTz(jobDetails.endTime, 'h:mm a', 'America/Chicago')}
                   </span>
                   <span className="text-zinc-500">({jobDetails.duration}h)</span>
                 </div>

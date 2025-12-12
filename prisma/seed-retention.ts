@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -13,60 +14,68 @@ async function main() {
 
   const campaigns = [
     {
+      id: crypto.randomUUID(),
       season: 'spring',
-      campaignName: 'Spring Refresh Package',
-      serviceTypes: ['Lawn Care', 'Landscaping', 'Mulching', 'Fertilization'],
-      discountPercent: 15,
-      emailSubject: '🌸 Spring Refresh: Get Your Yard Ready!',
-      emailBody:
+      campaign_name: 'Spring Refresh Package',
+      service_types: ['Lawn Care', 'Landscaping', 'Mulching', 'Fertilization'],
+      discount_percent: 15,
+      email_subject: '🌸 Spring Refresh: Get Your Yard Ready!',
+      email_body:
         "Spring is here! Time to refresh your lawn with professional care. Book now and save 15% on our Spring Refresh Package. Let's make your yard the envy of the neighborhood!",
-      startMonth: 3, // March
-      endMonth: 5, // May
+      start_month: 3, // March
+      end_month: 5, // May
       active: true,
+      updated_at: new Date(),
     },
     {
+      id: crypto.randomUUID(),
       season: 'summer',
-      campaignName: 'Summer Lawn Care Special',
-      serviceTypes: ['Lawn Care', 'Irrigation', 'Tree Trimming', 'Landscaping'],
-      discountPercent: 10,
-      emailSubject: "☀️ Keep Your Lawn Green All Summer",
-      emailBody:
+      campaign_name: 'Summer Lawn Care Special',
+      service_types: ['Lawn Care', 'Irrigation', 'Tree Trimming', 'Landscaping'],
+      discount_percent: 10,
+      email_subject: "☀️ Keep Your Lawn Green All Summer",
+      email_body:
         "Don't let the heat damage your lawn. Schedule regular maintenance and save 10%. Our summer package includes lawn care, irrigation checks, and more!",
-      startMonth: 6, // June
-      endMonth: 8, // August
+      start_month: 6, // June
+      end_month: 8, // August
       active: true,
+      updated_at: new Date(),
     },
     {
+      id: crypto.randomUUID(),
       season: 'fall',
-      campaignName: 'Fall Cleanup Bundle',
-      serviceTypes: ['Leaf Removal', 'Gutter Cleaning', 'Winterization', 'Lawn Care'],
-      discountPercent: 20,
-      emailSubject: '🍂 Fall Cleanup Checklist for Your Home',
-      emailBody:
+      campaign_name: 'Fall Cleanup Bundle',
+      service_types: ['Leaf Removal', 'Gutter Cleaning', 'Winterization', 'Lawn Care'],
+      discount_percent: 20,
+      email_subject: '🍂 Fall Cleanup Checklist for Your Home',
+      email_body:
         'Prepare your home for winter! Bundle leaf removal, gutter cleaning, and winterization services. Save 20% on our comprehensive fall cleanup package.',
-      startMonth: 9, // September
-      endMonth: 11, // November
+      start_month: 9, // September
+      end_month: 11, // November
       active: true,
+      updated_at: new Date(),
     },
     {
+      id: crypto.randomUUID(),
       season: 'winter',
-      campaignName: 'Winter Home Maintenance',
-      serviceTypes: ['HVAC', 'Snow Removal', 'Winter Prep', 'Gutter Cleaning'],
-      discountPercent: 15,
-      emailSubject: '❄️ Winter Home Maintenance Essentials',
-      emailBody:
+      campaign_name: 'Winter Home Maintenance',
+      service_types: ['HVAC', 'Snow Removal', 'Winter Prep', 'Gutter Cleaning'],
+      discount_percent: 15,
+      email_subject: '❄️ Winter Home Maintenance Essentials',
+      email_body:
         'Keep your home safe and warm this winter. Schedule HVAC maintenance, prepare your gutters, and be ready for snow. Save 15% on winter services!',
-      startMonth: 12, // December
-      endMonth: 2, // February
+      start_month: 12, // December
+      end_month: 2, // February
       active: true,
+      updated_at: new Date(),
     },
   ];
 
   // Delete existing campaigns first
-  await prisma.seasonalCampaign.deleteMany({});
+  await prisma.seasonal_campaigns.deleteMany({});
 
   for (const campaign of campaigns) {
-    await prisma.seasonalCampaign.create({
+    await prisma.seasonal_campaigns.create({
       data: campaign,
     });
     console.log(`  ✓ ${campaign.season} campaign`);
@@ -76,69 +85,81 @@ async function main() {
 
   const rewards = [
     {
+      id: crypto.randomUUID(),
       name: '$25 Service Credit',
       description:
         'Redeem for $25 off any service. Perfect for small jobs or to supplement a larger booking!',
-      pointsCost: 250,
-      rewardValue: 25,
-      rewardType: 'discount_fixed',
+      points_cost: 250,
+      reward_value: 25,
+      reward_type: 'discount_fixed',
       active: true,
+      updated_at: new Date(),
     },
     {
+      id: crypto.randomUUID(),
       name: '$50 Service Credit',
       description:
         'Save $50 on your next service! Great value for regular maintenance or one-time projects.',
-      pointsCost: 500,
-      rewardValue: 50,
-      rewardType: 'discount_fixed',
+      points_cost: 500,
+      reward_value: 50,
+      reward_type: 'discount_fixed',
       active: true,
+      updated_at: new Date(),
     },
     {
+      id: crypto.randomUUID(),
       name: '$100 Service Credit',
       description:
         'Our most popular reward! Use $100 towards any service and maximize your savings.',
-      pointsCost: 1000,
-      rewardValue: 100,
-      rewardType: 'discount_fixed',
+      points_cost: 1000,
+      reward_value: 100,
+      reward_type: 'discount_fixed',
       active: true,
+      updated_at: new Date(),
     },
     {
+      id: crypto.randomUUID(),
       name: 'Free Basic Service (up to $150)',
       description:
         'Get a complete service on us! Perfect for lawn mowing, basic landscaping, or house cleaning.',
-      pointsCost: 1500,
-      rewardValue: 150,
-      rewardType: 'free_service',
+      points_cost: 1500,
+      reward_value: 150,
+      reward_type: 'free_service',
       active: true,
+      updated_at: new Date(),
     },
     {
+      id: crypto.randomUUID(),
       name: 'Priority Scheduling',
       description:
         'Jump the queue! Get priority booking for the next 90 days and choose your preferred time slots.',
-      pointsCost: 2000,
-      rewardValue: 0,
-      rewardType: 'priority',
+      points_cost: 2000,
+      reward_value: 0,
+      reward_type: 'priority',
       active: true,
+      updated_at: new Date(),
     },
     {
+      id: crypto.randomUUID(),
       name: 'VIP Service Package (up to $300)',
       description:
         'Our ultimate reward! Get a comprehensive service package or multiple services worth up to $300.',
-      pointsCost: 3000,
-      rewardValue: 300,
-      rewardType: 'free_service',
+      points_cost: 3000,
+      reward_value: 300,
+      reward_type: 'free_service',
       active: true,
+      updated_at: new Date(),
     },
   ];
 
   // Delete existing rewards first
-  await prisma.loyaltyReward.deleteMany({});
+  await prisma.loyalty_rewards.deleteMany({});
 
   for (const reward of rewards) {
-    await prisma.loyaltyReward.create({
+    await prisma.loyalty_rewards.create({
       data: reward,
     });
-    console.log(`  ✓ ${reward.name} (${reward.pointsCost} points)`);
+    console.log(`  ✓ ${reward.name} (${reward.points_cost} points)`);
   }
 
   console.log('\n✅ Retention features seeded successfully!\n');

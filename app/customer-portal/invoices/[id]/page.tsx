@@ -402,7 +402,7 @@ export default function CustomerInvoiceDetailPage() {
             <span className="font-medium">Invoice Paid in Full</span>
           </div>
         )}
-        {isPaid && invoice.job && (
+        {isPaid && job && (
           <Button
             onClick={() => setShowBookAgainModal(true)}
             className="bg-emerald-600 hover:bg-emerald-500 flex items-center gap-2"
@@ -422,19 +422,19 @@ export default function CustomerInvoiceDetailPage() {
       </div>
 
       {/* Review Modal */}
-      {showReviewModal && invoice.job && (
+      {showReviewModal && job && (
         <QuickReviewModal
           isOpen={showReviewModal}
           onClose={() => setShowReviewModal(false)}
-          jobId={invoice.job.id}
+          jobId={job.id}
           providerId={invoice.provider.id}
           providerName={invoice.provider.businessName}
-          serviceType={invoice.job.serviceType}
+          serviceType={job.serviceType}
         />
       )}
 
       {/* Book Again Modal */}
-      {showBookAgainModal && invoice.job && (
+      {showBookAgainModal && job && (
         <BookAgainModal
           isOpen={showBookAgainModal}
           onClose={() => setShowBookAgainModal(false)}
@@ -443,7 +443,7 @@ export default function CustomerInvoiceDetailPage() {
             toast.success('Service booked successfully!');
             router.push('/customer-portal/jobs');
           }}
-          serviceType={invoice.job.serviceType}
+          serviceType={job.serviceType}
           providerId={invoice.provider.id}
           providerName={invoice.provider.businessName}
           address={invoice.customer.address}
@@ -462,7 +462,7 @@ export default function CustomerInvoiceDetailPage() {
             await fetchInvoiceDetails();
 
             // Show review modal if this invoice is linked to a job
-            if (invoice.job) {
+            if (invoice.jobs) {
               setTimeout(() => setShowReviewModal(true), 500);
             }
           }}

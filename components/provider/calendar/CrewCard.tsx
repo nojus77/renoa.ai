@@ -8,6 +8,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Users, AlertCircle, Check, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatInProviderTz } from '@/lib/utils/timezone';
 
 interface CrewMember {
   id: string;
@@ -214,7 +215,7 @@ export default function CrewCard({
           <AlertDescription className="text-red-300/80">
             {availability.conflicts.map((c) => (
               <div key={c.userId} className="text-sm">
-                • {c.userName} has {c.job.serviceType} at {format(new Date(c.job.startTime), 'h:mm a')}
+                • {c.userName} has {c.job.serviceType} at {formatInProviderTz(c.job.startTime, 'h:mm a', 'America/Chicago')}
               </div>
             ))}
           </AlertDescription>

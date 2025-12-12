@@ -28,7 +28,7 @@ export async function GET(
     }
 
     // Fetch assigned user details if there are any
-    let assignedUsers = [];
+    let assignedUsers: Array<{ id: string; firstName: string; lastName: string; role: string; profilePhotoUrl: string | null }> = [];
     if (job.assignedUserIds && job.assignedUserIds.length > 0) {
       assignedUsers = await prisma.providerUser.findMany({
         where: {

@@ -95,21 +95,35 @@ export function applyHardFilters(
   const acceptableSkills = getRequiredSkillsForJob(job);
   const workerSkillNames = worker.workerSkills?.map(ws => ws.skill.name) || [];
 
+  // DEBUG: Log skill matching details for first few workers
+  const debugSkillMatching = false; // Set to true to enable detailed skill logging
+  if (debugSkillMatching && context.workers.indexOf(worker) < 3) {
+    console.log(`      🔍 [${worker.firstName} ${worker.lastName}]`);
+    console.log(`         Service: ${job.serviceType}`);
+    console.log(`         Required (ANY): ${acceptableSkills.slice(0, 5).join(', ')}...`);
+    console.log(`         Worker has: ${workerSkillNames.join(', ')}`);
+  }
+
   if (acceptableSkills.length > 0) {
     // Check if worker has ANY of the acceptable skills (with fuzzy matching)
     const hasAnyAcceptableSkill = acceptableSkills.some(acceptableSkill =>
-      workerSkillNames.some(workerSkill =>
-        // Exact match OR partial match (case-insensitive)
-        workerSkill.toLowerCase() === acceptableSkill.toLowerCase() ||
-        workerSkill.toLowerCase().includes(acceptableSkill.toLowerCase()) ||
-        acceptableSkill.toLowerCase().includes(workerSkill.toLowerCase())
-      )
+      workerSkillNames.some(workerSkill => {
+        const match =
+          workerSkill.toLowerCase() === acceptableSkill.toLowerCase() ||
+          workerSkill.toLowerCase().includes(acceptableSkill.toLowerCase()) ||
+          acceptableSkill.toLowerCase().includes(workerSkill.toLowerCase());
+
+        if (match && debugSkillMatching && context.workers.indexOf(worker) < 3) {
+          console.log(`         ✅ MATCH: "${workerSkill}" matches "${acceptableSkill}"`);
+        }
+        return match;
+      })
     );
 
     if (!hasAnyAcceptableSkill) {
       // Show first 3 acceptable skills in error message
       const skillsToShow = acceptableSkills.slice(0, 3).join(' OR ');
-      reasons.push(`Needs one of: ${skillsToShow}${acceptableSkills.length > 3 ? '...' : ''}`);
+      reasons.push(`Needs one of: ${skillsToShow}${acceptableSkills.length > 3 ? '...' : ''} (has: ${workerSkillNames.join(', ')})`);
     }
   }
 
@@ -135,11 +149,11 @@ export function applyHardFilters(
     }
   }
 
-  // 4. CUSTOMER BLOCKS
-  const blockedWorkers = job.customer?.preferences?.blockedWorkers || [];
-  if (blockedWorkers.includes(worker.id)) {
-    reasons.push('Customer has blocked this worker');
-  }
+  // 4. CUSTOMER BLOCKS (disabled until CustomerPreferences model added)
+  // const blockedWorkers = job.customer?.preferences?.blockedWorkers || [];
+  // if (blockedWorkers.includes(worker.id)) {
+  //   reasons.push('Customer has blocked this worker');
+  // }
 
   return {
     passed: reasons.length === 0,
@@ -330,11 +344,11 @@ function calculateContinuityScore(
   maxPoints: number
 ): number {
 
-  // Check customer preferences
-  const preferences = job.customer?.preferences;
-  if (preferences?.preferredWorkers?.includes(worker.id)) {
-    return maxPoints;
-  }
+  // Check customer preferences (disabled until CustomerPreferences model added)
+  // const preferences = job.customer?.preferences;
+  // if (preferences?.preferredWorkers?.includes(worker.id)) {
+  //   return maxPoints;
+  // }
 
   // For recurring jobs, prefer workers who've worked in this zone
   if (job.jobCategory === 'recurring' || job.jobCategory === 'maintenance') {

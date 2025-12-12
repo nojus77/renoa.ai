@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
 // GET - List all subscriptions for logged-in customer
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const session = cookieStore.get('customer-session');
 
     if (!session) {
@@ -19,10 +20,10 @@ export async function GET(request: NextRequest) {
 
     const { customerId } = JSON.parse(session.value);
 
-    const subscriptions = await prisma.customerSubscription.findMany({
-      where: { customerId },
+    const subscriptions = await prisma.customer_subscriptions.findMany({
+      where: { customer_id: customerId },
       include: {
-        provider: {
+        Provider: {
           select: {
             id: true,
             businessName: true,
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { created_at: 'desc' },
     });
 
     return NextResponse.json({ subscriptions });
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 // POST - Create new subscription
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const session = cookieStore.get('customer-session');
 
     if (!session) {
@@ -84,20 +85,22 @@ export async function POST(request: NextRequest) {
         break;
     }
 
-    const subscription = await prisma.customerSubscription.create({
+    const subscription = await prisma.customer_subscriptions.create({
       data: {
-        customerId,
-        providerId,
-        serviceType,
+        id: crypto.randomUUID(),
+        customer_id: customerId,
+        provider_id: providerId,
+        service_type: serviceType,
         frequency,
         price: parseFloat(price),
-        discountPercent: 10, // 10% discount for subscriptions
+        discount_percent: 10, // 10% discount for subscriptions
         status: 'active',
-        startDate: start,
-        nextScheduledDate,
+        start_date: start,
+        next_scheduled_date: nextScheduledDate,
+        updated_at: new Date(),
       },
       include: {
-        provider: {
+        Provider: {
           select: {
             id: true,
             businessName: true,

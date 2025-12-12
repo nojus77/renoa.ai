@@ -177,13 +177,16 @@ export default function EnhancedJobCard({
               {formatTime(scheduledTime)}
             </span>
             {priority === 'urgent' && (
-              <AlertCircle className="h-3.5 w-3.5 text-red-400" title="Urgent" />
+              <span title="Urgent">
+                <AlertCircle className="h-3.5 w-3.5 text-red-400" />
+              </span>
             )}
             {skillWarning && (
-              <AlertTriangle
-                className={`h-3.5 w-3.5 ${skillWarning.type === 'missing' ? 'text-red-400' : 'text-yellow-400'}`}
-                title={skillWarning.message}
-              />
+              <span title={skillWarning.message}>
+                <AlertTriangle
+                  className={`h-3.5 w-3.5 ${skillWarning.type === 'missing' ? 'text-red-400' : 'text-yellow-400'}`}
+                />
+              </span>
             )}
           </div>
           <span className={`px-2 py-0.5 ${statusConfig.bgLight} ${statusConfig.textColor} text-[10px] font-semibold rounded uppercase`}>

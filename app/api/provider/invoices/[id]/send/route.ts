@@ -41,7 +41,7 @@ export async function POST(
         'invoice_sent',
         {
           customerName: invoice.customer.name,
-          customerEmail: invoice.customer.email,
+          customerEmail: invoice.customer.email || '',
           customerPhone: invoice.customer.phone || '',
           providerName: invoice.provider.businessName,
           providerCompany: invoice.provider.businessName,

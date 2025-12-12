@@ -1,4 +1,5 @@
 import { PrismaClient } from '@prisma/client';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -20,8 +21,8 @@ export async function generatePromoCode(prefix: string = 'SAVE'): Promise<string
     const code = `${prefix}${randomPart}`;
 
     // Check if code already exists
-    const existing = await prisma.customerPromotion.findUnique({
-      where: { promoCode: code }
+    const existing = await prisma.customer_promotions.findUnique({
+      where: { promo_code: code }
     });
 
     if (!existing) {
@@ -77,15 +78,17 @@ export async function createInactivityPromotion(
   expiresAt.setHours(expiresAt.getHours() + expiresInHours);
 
   // Create the promotion
-  await prisma.customerPromotion.create({
+  await prisma.customer_promotions.create({
     data: {
-      customerId,
-      promoCode,
-      discountPercent,
-      expiresAt,
-      triggerType,
+      id: crypto.randomUUID(),
+      customer_id: customerId,
+      promo_code: promoCode,
+      discount_percent: discountPercent,
+      expires_at: expiresAt,
+      trigger_type: triggerType,
       message,
-      status: 'active'
+      status: 'active',
+      updated_at: new Date(),
     }
   });
 

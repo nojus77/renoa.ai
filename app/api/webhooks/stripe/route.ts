@@ -150,7 +150,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     });
 
     // Determine new invoice status
-    let newStatus: 'sent' | 'partial' | 'paid' = invoice.status;
+    let newStatus: 'sent' | 'partial' | 'paid' = invoice.status === 'draft' ? 'sent' : (invoice.status as 'sent' | 'partial' | 'paid');
     let paidDate: Date | null = invoice.paidDate;
 
     if (remainingBalance <= 0.01) {
@@ -191,7 +191,7 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
         'payment_received',
         {
           customerName: invoice.customer.name,
-          customerEmail: invoice.customer.email,
+          customerEmail: invoice.customer.email || '',
           customerPhone: invoice.customer.phone || '',
           providerName: invoice.provider.businessName,
           providerCompany: invoice.provider.businessName,
@@ -262,12 +262,12 @@ async function handlePaymentFailed(paymentIntent: Stripe.PaymentIntent) {
         'payment_failed',
         {
           customerName: invoice.customer.name,
-          customerEmail: invoice.customer.email,
+          customerEmail: invoice.customer.email || '',
           customerPhone: invoice.customer.phone || '',
           providerName: invoice.provider.businessName,
           providerCompany: invoice.provider.businessName,
           serviceType: 'service',
-          amount: errorMessage, // Using amount field for error message in template
+          amount: Number(invoice.total), // Send the invoice total
           invoiceLink: `${process.env.NEXT_PUBLIC_APP_URL}/customer-portal/invoices/${invoice.id}`,
         },
         {
@@ -304,7 +304,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
       data: {
         stripeSubscriptionId: subscription.id,
         subscriptionStatus: subscription.status,
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        currentPeriodEnd: new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000),
         activeSeats: subscription.items.data[0]?.quantity || 1,
       },
     });
@@ -349,8 +349,9 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
     console.log('Processing invoice.payment_succeeded:', invoice.id);
 
     // This is for subscription invoices, not customer job invoices
-    if (invoice.subscription) {
-      const providerId = invoice.subscription_details?.metadata?.providerId;
+    const stripeInvoice = invoice as unknown as { subscription?: string | null; subscription_details?: { metadata?: { providerId?: string } } };
+    if (stripeInvoice.subscription) {
+      const providerId = stripeInvoice.subscription_details?.metadata?.providerId;
 
       if (providerId) {
         console.log(`Subscription invoice paid for provider: ${providerId}`);
@@ -368,8 +369,9 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     console.log('Processing invoice.payment_failed:', invoice.id);
 
     // This is for subscription invoices
-    if (invoice.subscription) {
-      const subscription = await stripe.subscriptions.retrieve(invoice.subscription as string);
+    const stripeInvoice = invoice as unknown as { subscription?: string | null };
+    if (stripeInvoice.subscription) {
+      const subscription = await stripe.subscriptions.retrieve(stripeInvoice.subscription as string);
       const providerId = subscription.metadata.providerId;
 
       if (providerId) {

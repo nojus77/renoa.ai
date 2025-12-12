@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { stripe } from '@/lib/stripe-server';
 import { getCustomerSession } from '@/lib/auth-helpers';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -18,8 +19,8 @@ export async function GET(request: NextRequest) {
     const customer = await prisma.customer.findUnique({
       where: { id: session.customerId },
       include: {
-        paymentMethods: {
-          orderBy: [{ isDefault: 'desc' }, { createdAt: 'desc' }],
+        customer_payment_methods: {
+          orderBy: [{ is_default: 'desc' }, { created_at: 'desc' }],
         },
       },
     });
@@ -28,11 +29,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ paymentMethods: customer.paymentMethods });
-  } catch (error: any) {
+    return NextResponse.json({ paymentMethods: customer.customer_payment_methods });
+  } catch (error: unknown) {
     console.error('Error fetching payment methods:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch payment methods', details: error.message },
+      { error: 'Failed to fetch payment methods', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }
@@ -72,30 +73,32 @@ export async function POST(request: NextRequest) {
 
     // If setting as default, unset all existing defaults
     if (setAsDefault) {
-      await prisma.customerPaymentMethod.updateMany({
-        where: { customerId: customer.id },
-        data: { isDefault: false },
+      await prisma.customer_payment_methods.updateMany({
+        where: { customer_id: customer.id },
+        data: { is_default: false },
       });
     }
 
     // Save payment method to database
-    const savedPaymentMethod = await prisma.customerPaymentMethod.create({
+    const savedPaymentMethod = await prisma.customer_payment_methods.create({
       data: {
-        customerId: customer.id,
-        stripePaymentMethodId: paymentMethod.id,
-        cardBrand: paymentMethod.card.brand,
-        cardLast4: paymentMethod.card.last4,
-        expiryMonth: paymentMethod.card.exp_month,
-        expiryYear: paymentMethod.card.exp_year,
-        isDefault: setAsDefault,
+        id: crypto.randomUUID(),
+        customer_id: customer.id,
+        stripe_payment_method_id: paymentMethod.id,
+        card_brand: paymentMethod.card.brand,
+        card_last4: paymentMethod.card.last4,
+        expiry_month: paymentMethod.card.exp_month,
+        expiry_year: paymentMethod.card.exp_year,
+        is_default: setAsDefault,
+        updated_at: new Date(),
       },
     });
 
     return NextResponse.json({ paymentMethod: savedPaymentMethod }, { status: 201 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error saving payment method:', error);
     return NextResponse.json(
-      { error: 'Failed to save payment method', details: error.message },
+      { error: 'Failed to save payment method', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

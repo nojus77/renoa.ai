@@ -8,20 +8,20 @@ export async function GET(request: NextRequest) {
     const currentMonth = new Date().getMonth() + 1; // 1-12
 
     // Find active seasonal campaign for current month
-    const campaign = await prisma.seasonalCampaign.findFirst({
+    const campaign = await prisma.seasonal_campaigns.findFirst({
       where: {
         active: true,
         OR: [
           {
-            startMonth: { lte: currentMonth },
-            endMonth: { gte: currentMonth },
+            start_month: { lte: currentMonth },
+            end_month: { gte: currentMonth },
           },
           // Handle December-February wrap (winter)
           {
             AND: [
-              { startMonth: 12 },
-              { endMonth: 2 },
-              { OR: [{ startMonth: { lte: currentMonth } }, { endMonth: { gte: currentMonth } }] },
+              { start_month: 12 },
+              { end_month: 2 },
+              { OR: [{ start_month: { lte: currentMonth } }, { end_month: { gte: currentMonth } }] },
             ],
           },
         ],
@@ -34,12 +34,12 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       ...campaign,
-      discountPercent: Number(campaign.discountPercent),
+      discount_percent: campaign.discount_percent ? Number(campaign.discount_percent) : null,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching seasonal campaign:', error);
     return NextResponse.json(
-      { error: 'Failed to fetch campaign', details: error.message },
+      { error: 'Failed to fetch campaign', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     );
   }

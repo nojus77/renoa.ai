@@ -1224,7 +1224,7 @@ export default function AddJobModal({
             </Button>
             <Button
               type="submit"
-              disabled={submitting || conflict || !(selectedCustomer || (showNewCustomerForm && newCustomer.name && newCustomer.phone)) || !jobDetails.serviceType}
+              disabled={submitting || !!conflict || !(selectedCustomer || (showNewCustomerForm && !!newCustomer.name && !!newCustomer.phone)) || !jobDetails.serviceType}
               className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 flex-1 md:flex-none disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 min-h-[44px]"
             >
               {submitting ? (

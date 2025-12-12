@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { useDraggable } from '@dnd-kit/core';
 import { cn } from '@/lib/utils';
+import { formatInProviderTz } from '@/lib/utils/timezone';
 
 export interface UnassignedJob {
   id: string;
@@ -261,7 +262,7 @@ function DraggableJobCard({ job, urgency, onClick }: DraggableJobCardProps) {
         </div>
         <div className="flex items-center gap-1">
           <Clock className="h-3 w-3" />
-          <span>{format(startDate, 'h:mm a')}</span>
+          <span>{formatInProviderTz(job.startTime, 'h:mm a', 'America/Chicago')}</span>
         </div>
       </div>
     </div>

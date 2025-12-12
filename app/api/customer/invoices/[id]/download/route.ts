@@ -91,11 +91,11 @@ export async function GET(
 
     // Generate PDF
     const pdfBuffer = await renderToBuffer(
-      React.createElement(InvoicePDF, { invoice: invoiceData })
+      React.createElement(InvoicePDF, { invoice: invoiceData }) as React.ReactElement
     );
 
     // Return PDF as downloadable file
-    return new NextResponse(pdfBuffer, {
+    return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="invoice-${invoice.invoiceNumber}.pdf"`,

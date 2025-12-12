@@ -2,7 +2,7 @@ import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2024-12-18.acacia',
+  apiVersion: '2025-10-29.clover',
 });
 
 const prisma = new PrismaClient();
@@ -58,7 +58,7 @@ export async function updateSubscriptionSeats(
       where: { id: providerId },
       data: {
         activeSeats: newSeatCount,
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        currentPeriodEnd: new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000),
       },
     });
 
@@ -188,7 +188,6 @@ export async function createSubscription(
       recurring: { interval: interval as 'month' | 'year' },
       product_data: {
         name: `Renoa ${planType === 'monthly' ? 'Monthly' : 'Annual'} Plan`,
-        description: `Per seat ${planType === 'monthly' ? 'monthly' : 'annual'} subscription`,
       },
     });
 
@@ -215,7 +214,7 @@ export async function createSubscription(
         planType,
         pricePerSeat: priceAmount,
         activeSeats: seatCount,
-        currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+        currentPeriodEnd: new Date((subscription as unknown as { current_period_end: number }).current_period_end * 1000),
       },
     });
 

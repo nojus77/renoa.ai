@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
       where: {
         customerId: session.customerId,
         status: 'completed',
-        nextDueDate: {
+        next_due_date: {
           lte: sevenDaysFromNow,
         },
       },
@@ -36,16 +36,16 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: {
-        nextDueDate: 'asc',
+        next_due_date: 'asc',
       },
     });
 
     // Categorize jobs by urgency
     const overdueJobs = dueJobs.filter(
-      (job) => job.nextDueDate && new Date(job.nextDueDate) < today
+      (job) => job.next_due_date && new Date(job.next_due_date) < today
     );
     const upcomingJobs = dueJobs.filter(
-      (job) => job.nextDueDate && new Date(job.nextDueDate) >= today
+      (job) => job.next_due_date && new Date(job.next_due_date) >= today
     );
 
     // Serialize the response

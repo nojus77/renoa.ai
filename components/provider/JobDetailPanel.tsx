@@ -304,8 +304,8 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
     return `${mins}m`;
   };
 
-  const statusSteps = ['scheduled', 'in_progress', 'completed', 'paid'];
-  const currentStepIndex = statusSteps.indexOf(job.status === 'on-the-way' ? 'in_progress' : job.status);
+  const statusSteps = ['scheduled', 'in-progress', 'completed', 'paid'];
+  const currentStepIndex = statusSteps.indexOf(job.status === 'on-the-way' ? 'in-progress' : job.status);
 
   return (
     <>
@@ -354,7 +354,7 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
                     onClick={() => setShowStatusMenu(!showStatusMenu)}
                     className={`text-sm font-semibold flex items-center gap-1 ${
                       job.status === 'scheduled' ? 'text-blue-400' :
-                      job.status === 'in_progress' ? 'text-orange-400' :
+                      job.status === 'in-progress' ? 'text-orange-400' :
                       job.status === 'completed' ? 'text-emerald-400' :
                       'text-red-400'
                     }`}
@@ -386,7 +386,7 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
             </div>
 
             {/* Timer Banner - Only when in progress */}
-            {job.status === 'in_progress' && (
+            {job.status === 'in-progress' && (
               <div className="bg-amber-900/20 border-2 border-amber-600 rounded-lg p-2.5 mb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
@@ -871,7 +871,7 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
               </Button>
             )}
 
-            {job.status === 'in_progress' && (
+            {job.status === 'in-progress' && (
               <Button
                 onClick={() => handleStatusChange('completed')}
                 className="bg-emerald-600 hover:bg-emerald-500 text-white"
@@ -907,7 +907,7 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
             estimatedValue: job.estimatedValue,
             internalNotes: job.notes,
             customerNotes: job.customerNotes,
-            status: job.status,
+            status: job.status as 'scheduled' | 'completed' | 'in_progress' | 'cancelled',
           }}
           onJobUpdated={() => {
             onJobUpdated();

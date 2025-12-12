@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
@@ -8,7 +9,7 @@ const prisma = new PrismaClient();
 export async function GET(request: NextRequest) {
   try {
     // Get customer session
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('customer-session');
 
     if (!sessionCookie?.value) {
@@ -19,12 +20,12 @@ export async function GET(request: NextRequest) {
     const customerId = session.customerId;
 
     // Get all messages for this customer (grouped by provider)
-    const messages = await prisma.providerCustomerMessage.findMany({
+    const messages = await prisma.provider_customer_messages.findMany({
       where: {
-        customerId,
+        customer_id: customerId,
       },
       include: {
-        provider: {
+        Provider: {
           select: {
             id: true,
             businessName: true,
@@ -32,19 +33,19 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: {
-        createdAt: 'asc',
+        created_at: 'asc',
       },
     });
 
     // Group messages by provider
-    const groupedMessages: Record<string, any> = {};
+    const groupedMessages: Record<string, { providerId: string; providerName: string; messages: Array<{ id: string; content: string; direction: string; type: string; status: string; createdAt: Date }> }> = {};
 
     messages.forEach(msg => {
-      const providerId = msg.providerId;
+      const providerId = msg.provider_id;
       if (!groupedMessages[providerId]) {
         groupedMessages[providerId] = {
           providerId,
-          providerName: msg.provider.businessName,
+          providerName: msg.Provider.businessName,
           messages: [],
         };
       }
@@ -54,7 +55,7 @@ export async function GET(request: NextRequest) {
         direction: msg.direction,
         type: msg.type,
         status: msg.status,
-        createdAt: msg.createdAt,
+        createdAt: msg.created_at,
       });
     });
 
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Get customer session
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionCookie = cookieStore.get('customer-session');
 
     if (!sessionCookie?.value) {
@@ -95,17 +96,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the message
-    const message = await prisma.providerCustomerMessage.create({
+    const message = await prisma.provider_customer_messages.create({
       data: {
-        providerId,
-        customerId,
+        id: crypto.randomUUID(),
+        provider_id: providerId,
+        customer_id: customerId,
         content,
         direction: 'received', // From customer's perspective, they are sending but provider receives
         type: 'sms',
         status: 'sent',
+        updated_at: new Date(),
       },
       include: {
-        provider: {
+        Provider: {
           select: {
             businessName: true,
           },

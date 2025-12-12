@@ -16,6 +16,7 @@ export async function POST(request: NextRequest) {
       serviceRadius,
       website,
       businessHours,
+      timeZone,
     } = body;
 
     if (!providerId) {
@@ -83,6 +84,7 @@ export async function POST(request: NextRequest) {
         serviceRadius: serviceRadius !== undefined ? parseInt(serviceRadius) : undefined,
         website: website || undefined,
         businessHours: businessHours || undefined,
+        timeZone: timeZone || undefined,
         updatedAt: new Date(),
       },
       select: {
@@ -97,6 +99,7 @@ export async function POST(request: NextRequest) {
         serviceRadius: true,
         website: true,
         businessHours: true,
+        timeZone: true,
       },
     });
 
@@ -139,6 +142,7 @@ export async function GET(request: NextRequest) {
         serviceRadius: true,
         website: true,
         businessHours: true,
+        timeZone: true,
       },
     });
 

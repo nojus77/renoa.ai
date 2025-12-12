@@ -6,7 +6,7 @@ const prisma = new PrismaClient();
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const session = cookieStore.get('customer-session');
 
     if (!session) {
@@ -23,7 +23,6 @@ export async function POST(request: NextRequest) {
       serviceType,
       address,
       customerNotes,
-      sameProvider = true,
     } = body;
 
     if (!recommendationId || !serviceType || !address) {
@@ -33,36 +32,35 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create a lead with recommendation tracking
-    const lead = await prisma.lead.create({
+    // Create a job request from the recommendation
+    const job = await prisma.job.create({
       data: {
-        providerId: sameProvider ? providerId : providerId, // For now, always use same provider
-        name: '', // Will be filled from customer data
-        phone: '', // Will be filled from customer data
-        email: '', // Will be filled from customer data
+        providerId,
+        customerId,
         serviceType,
         address,
-        preferredDate: null,
-        customerNotes,
+        startTime: new Date(), // Placeholder - will be scheduled later
+        endTime: new Date(Date.now() + 2 * 60 * 60 * 1000), // 2 hours later
+        status: 'pending',
         source: 'own',
-        recommendationSource: `recommendation_${recommendationId}`,
-        status: 'new',
+        booking_source: `recommendation_${recommendationId}`,
+        customerNotes,
       },
     });
 
     // Update conversion tracking for the recommendation
-    await prisma.serviceRecommendation.update({
+    await prisma.service_recommendations.update({
       where: { id: recommendationId },
       data: {
-        conversionRate: {
-          increment: 1, // Simple increment - could be made more sophisticated
+        conversion_rate: {
+          increment: 1,
         },
       },
     });
 
-    return NextResponse.json({ lead }, { status: 201 });
+    return NextResponse.json({ job }, { status: 201 });
   } catch (error) {
-    console.error('Error creating recommendation lead:', error);
+    console.error('Error creating recommendation job:', error);
     return NextResponse.json(
       { error: 'Failed to request service' },
       { status: 500 }

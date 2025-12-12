@@ -482,13 +482,20 @@ export default function WeeklyTeamCalendar({
     try {
       const currentUserId = localStorage.getItem('userId');
 
+      // Get the earliest job date from unassigned jobs
+      // (API requires date but will use jobIds to fetch the actual jobs)
+      const earliestJobDate = unassignedJobs.reduce((earliest, job) => {
+        const jobDate = new Date(job.startTime);
+        return jobDate < earliest ? jobDate : earliest;
+      }, new Date(unassignedJobs[0].startTime));
+
       // Use the smart scheduler API to generate a proposal
       const response = await fetch('/api/provider/schedule/auto', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           providerId,
-          date: selectedWeekStart.toISOString(),
+          date: earliestJobDate.toISOString(),
           jobIds: unassignedJobs.map(j => j.id),
           createdBy: currentUserId || 'system',
         }),

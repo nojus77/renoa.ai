@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { cookies } from 'next/headers';
 import { generateReferralCode } from '@/lib/referrals/generateReferralCode';
+import crypto from 'crypto';
 
 const prisma = new PrismaClient();
 
 // GET - Fetch customer's referral data and stats
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const session = cookieStore.get('customer-session');
 
     if (!session) {
@@ -35,35 +36,35 @@ export async function GET(request: NextRequest) {
 
     // Get or generate referral code
     let referralCode = '';
-    const existingCode = await prisma.referral.findFirst({
-      where: { referrerId: customerId },
-      select: { referralCode: true }
+    const existingCode = await prisma.referrals.findFirst({
+      where: { referrer_id: customerId },
+      select: { referral_code: true }
     });
 
     if (existingCode) {
-      referralCode = existingCode.referralCode;
+      referralCode = existingCode.referral_code;
     } else {
       referralCode = await generateReferralCode(customer.name);
     }
 
     // Get all referrals made by this customer
-    const referrals = await prisma.referral.findMany({
-      where: { referrerId: customerId },
+    const referrals = await prisma.referrals.findMany({
+      where: { referrer_id: customerId },
       include: {
-        referredCustomer: {
+        customers_referrals_referred_customer_idTocustomers: {
           select: {
             name: true,
             email: true
           }
         }
       },
-      orderBy: { createdAt: 'desc' }
+      orderBy: { created_at: 'desc' }
     });
 
     // Get customer credits
-    const credits = await prisma.customerCredit.findMany({
-      where: { customerId },
-      orderBy: { createdAt: 'desc' }
+    const credits = await prisma.customer_credits.findMany({
+      where: { customer_id: customerId },
+      orderBy: { created_at: 'desc' }
     });
 
     // Calculate stats
@@ -72,12 +73,12 @@ export async function GET(request: NextRequest) {
       .reduce((sum, c) => sum + Number(c.amount), 0);
 
     const availableCredit = credits.reduce(
-      (sum, c) => sum + (Number(c.amount) - Number(c.usedAmount)),
+      (sum, c) => sum + (Number(c.amount) - Number(c.used_amount)),
       0
     );
 
     const thisMonthReferrals = referrals.filter(r => {
-      const createdDate = new Date(r.createdAt);
+      const createdDate = new Date(r.created_at);
       const now = new Date();
       return (
         createdDate.getMonth() === now.getMonth() &&
@@ -109,7 +110,7 @@ export async function GET(request: NextRequest) {
 // POST - Create a new referral
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const session = cookieStore.get('customer-session');
 
     if (!session) {
@@ -145,24 +146,24 @@ export async function POST(request: NextRequest) {
 
     // Generate or get existing referral code
     let referralCode = '';
-    const existingCode = await prisma.referral.findFirst({
-      where: { referrerId: customerId },
-      select: { referralCode: true }
+    const existingCode = await prisma.referrals.findFirst({
+      where: { referrer_id: customerId },
+      select: { referral_code: true }
     });
 
     if (existingCode) {
-      referralCode = existingCode.referralCode;
+      referralCode = existingCode.referral_code;
     } else {
       referralCode = await generateReferralCode(customer.name);
     }
 
     // Check if this person was already referred
-    const existingReferral = await prisma.referral.findFirst({
+    const existingReferral = await prisma.referrals.findFirst({
       where: {
-        referrerId: customerId,
+        referrer_id: customerId,
         OR: [
-          { referredEmail: referredEmail || '' },
-          { referredPhone: referredPhone || '' }
+          { referred_email: referredEmail || '' },
+          { referred_phone: referredPhone || '' }
         ]
       }
     });
@@ -175,13 +176,15 @@ export async function POST(request: NextRequest) {
     }
 
     // Create referral
-    const referral = await prisma.referral.create({
+    const referral = await prisma.referrals.create({
       data: {
-        referrerId: customerId,
-        referredEmail: referredEmail || '',
-        referredPhone: referredPhone || '',
-        referralCode,
-        status: 'pending'
+        id: crypto.randomUUID(),
+        referrer_id: customerId,
+        referred_email: referredEmail || '',
+        referred_phone: referredPhone || '',
+        referral_code: referralCode,
+        status: 'pending',
+        updated_at: new Date(),
       }
     });
 

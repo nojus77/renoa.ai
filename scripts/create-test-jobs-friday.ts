@@ -113,7 +113,7 @@ async function main() {
 
     const customer = customers.find(c => c.id === job.customerId);
     console.log(`✅ Created ${job.serviceType} job`);
-    console.log(`   Customer: ${customer?.firstName} ${customer?.lastName}`);
+    console.log(`   Customer: ${customer?.name}`);
     console.log(`   Address: ${job.address}`);
     console.log(`   Time: ${job.startTime.toLocaleString('en-US', { timeZone: 'America/New_York' })}`);
     console.log(`   Duration: ${job.estimatedDuration} hours`);
