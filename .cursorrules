@@ -1,19 +1,54 @@
-# Code Rules for this project
+# Renoa.ai Project Rules for Claude Code
+
+## CRITICAL: Before Any Git Push
+- ALWAYS run `npm run build` before committing
+- Fix ALL errors before pushing to GitHub
+- Never push code that fails the build
+- Run `npm run dev` and test the feature locally first
 
 ## JSX Text Rules
 - NEVER use apostrophes (') in JSX text content
 - Always use &apos; instead of '
-- Examples:
-  - Bad: <p>Don't do this</p>
-  - Good: <p>Don&apos;t do this</p>
-  - Bad: <p>It's working</p>
-  - Good: <p>It&apos;s working</p>
+- Use &quot; for quotes, &amp; for ampersands
 
-## Other JSX entities
-- Use &quot; for quotes in text
-- Use &amp; for ampersands in text
+## Prisma/Database Rules
+- Models use snake_case: customer_promotions, loyalty_points, service_recommendations
+- Fields use snake_case: customer_id, promo_code, created_at
+- Always check schema.prisma for correct model/field names before writing queries
+- Never assume camelCase - verify first
 
-## Before Pushing
-- ALWAYS run `npm run build` before committing
-- Fix any errors before pushing to GitHub
-- Never push code that fails the build
+## File Safety
+- NEVER delete files without explicitly asking the user first
+- NEVER modify these shared files without asking:
+  - lib/prisma.ts
+  - middleware.ts
+  - app/layout.tsx
+  - prisma/schema.prisma
+- When editing components used in multiple places, check all usages first
+
+## Git Workflow
+- Always pull latest before starting work: git pull origin main
+- Use clear commit messages describing what changed
+- If build fails, fix it before pushing - don't leave broken code
+
+## Code Patterns
+- Use TypeScript strict types - no `any` unless absolutely necessary
+- Handle null/undefined: use optional chaining (?.) and nullish coalescing (??)
+- API routes: always wrap in try/catch with proper error responses
+- Use existing components from /components before creating new ones
+
+## Testing Changes
+- After database changes: run `npx prisma generate`
+- After schema changes: run `npx prisma db push`
+- Always test the specific feature you changed in the browser
+
+## When Stuck
+- Read error messages carefully - they usually say exactly what's wrong
+- Check the Prisma schema for correct model/field names
+- Look at similar working code in the project for patterns
+- Don't keep trying random fixes - understand the error first
+
+## Communication
+- If a change might break other features, warn the user
+- If unsure about something, ask before implementing
+- Explain what you're changing and why
