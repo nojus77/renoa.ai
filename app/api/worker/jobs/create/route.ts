@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Please set the date and time' }, { status: 400 });
     }
 
-    // Get the worker to check permissions
+    // Get the worker and provider to check permissions
     const worker = await prisma.providerUser.findUnique({
       where: { id: userId },
       select: {
@@ -43,10 +43,14 @@ export async function POST(request: NextRequest) {
         firstName: true,
         lastName: true,
         providerId: true,
-        canCreateJobs: true,
-        jobsNeedApproval: true,
         role: true,
         status: true,
+        provider: {
+          select: {
+            workersCanCreateJobs: true,
+            workerJobsNeedApproval: true,
+          },
+        },
       },
     });
 
@@ -62,7 +66,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Your account is not active' }, { status: 403 });
     }
 
-    if (!worker.canCreateJobs) {
+    // Check provider-level permission (applies to all workers)
+    if (!worker.provider.workersCanCreateJobs) {
       return NextResponse.json(
         { error: 'You do not have permission to create jobs' },
         { status: 403 }
@@ -84,8 +89,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
-    // Determine job status based on approval settings
-    const jobStatus = worker.jobsNeedApproval ? 'pending_approval' : 'scheduled';
+    // Determine job status based on provider-level approval settings
+    const jobStatus = worker.provider.workerJobsNeedApproval ? 'pending_approval' : 'scheduled';
 
     // Create the job
     const job = await prisma.job.create({
@@ -117,8 +122,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       job,
-      needsApproval: worker.jobsNeedApproval,
-      message: worker.jobsNeedApproval
+      needsApproval: worker.provider.workerJobsNeedApproval,
+      message: worker.provider.workerJobsNeedApproval
         ? 'Job created and pending approval from your manager'
         : 'Job created and scheduled successfully',
     });

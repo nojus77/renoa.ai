@@ -39,12 +39,13 @@ import {
   Facebook,
   Send,
   LogOut,
+  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Cropper from 'react-easy-crop';
 import type { Area } from 'react-easy-crop';
 
-type TabType = 'profile' | 'availability' | 'services' | 'notifications' | 'payments' | 'integrations' | 'security';
+type TabType = 'profile' | 'availability' | 'services' | 'team' | 'notifications' | 'payments' | 'integrations' | 'security';
 
 interface BlockedDate {
   date: string;
@@ -322,6 +323,13 @@ export default function ProviderSettings() {
   const [acceptCheck, setAcceptCheck] = useState(false);
   const [autoInvoice, setAutoInvoice] = useState(true);
 
+  // Team / Worker Permissions
+  const [workersCanCreateJobs, setWorkersCanCreateJobs] = useState(false);
+  const [workerJobsNeedApproval, setWorkerJobsNeedApproval] = useState(true);
+  const [workersCanEditSkills, setWorkersCanEditSkills] = useState(false);
+  const [workersCanEditAvailability, setWorkersCanEditAvailability] = useState(true);
+  const [workersCanViewTeamSchedule, setWorkersCanViewTeamSchedule] = useState(false);
+
   useEffect(() => {
     const id = localStorage.getItem('providerId');
     const name = localStorage.getItem('providerName');
@@ -425,6 +433,19 @@ export default function ProviderSettings() {
       if (data.workingHours) setWorkingHours(data.workingHours);
       if (data.bufferTime) setBufferTime(data.bufferTime);
       if (data.advanceBooking) setAdvanceBooking(data.advanceBooking);
+
+      // Load team/worker permissions
+      const teamRes = await fetch(`/api/provider/settings/team?providerId=${id}`);
+      const teamData = await teamRes.json();
+
+      if (teamData.provider) {
+        const p = teamData.provider;
+        setWorkersCanCreateJobs(p.workersCanCreateJobs ?? false);
+        setWorkerJobsNeedApproval(p.workerJobsNeedApproval ?? true);
+        setWorkersCanEditSkills(p.workersCanEditSkills ?? false);
+        setWorkersCanEditAvailability(p.workersCanEditAvailability ?? true);
+        setWorkersCanViewTeamSchedule(p.workersCanViewTeamSchedule ?? false);
+      }
     } catch (error) {
       console.error('Error loading settings:', error);
     } finally {
@@ -770,10 +791,38 @@ export default function ProviderSettings() {
     }
   };
 
+  const saveTeamSettings = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/provider/settings/team', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId,
+          workersCanCreateJobs,
+          workerJobsNeedApproval,
+          workersCanEditSkills,
+          workersCanEditAvailability,
+          workersCanViewTeamSchedule,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to save team settings');
+
+      toast.success('Team settings saved');
+    } catch (error) {
+      console.error('Error saving team settings:', error);
+      toast.error('Failed to save team settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const tabs = [
     { id: 'profile' as TabType, name: 'Profile', icon: User },
     { id: 'availability' as TabType, name: 'Availability', icon: Clock },
     { id: 'services' as TabType, name: 'Services & Pricing', icon: DollarSign },
+    { id: 'team' as TabType, name: 'Team', icon: Users },
     { id: 'notifications' as TabType, name: 'Notifications', icon: Bell },
     { id: 'payments' as TabType, name: 'Payments', icon: CreditCard },
     { id: 'integrations' as TabType, name: 'Integrations', icon: Link2 },
@@ -1897,6 +1946,149 @@ export default function ProviderSettings() {
                     >
                       <Save className="h-4 w-4 mr-2" />
                       {saving ? 'Saving...' : 'Save Services'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Team Tab */}
+              {activeTab === 'team' && (
+                <div className="space-y-6">
+                  {/* Worker Permissions */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Users className="h-5 w-5 text-blue-400" />
+                        Worker Permissions
+                      </CardTitle>
+                      <p className="text-sm text-zinc-400 mt-1">
+                        Control what your field workers can do in the app
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Workers Can Create Jobs */}
+                      <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-200">Workers can create jobs</p>
+                          <p className="text-xs text-zinc-500 mt-1">
+                            Allow field workers to create new jobs from their mobile app
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setWorkersCanCreateJobs(!workersCanCreateJobs)}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            workersCanCreateJobs ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              workersCanCreateJobs ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Worker Jobs Need Approval - only show if workers can create jobs */}
+                      {workersCanCreateJobs && (
+                        <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg ml-4 border-l-2 border-l-emerald-600">
+                          <div className="flex-1">
+                            <p className="text-sm font-medium text-zinc-200">Worker-created jobs need approval</p>
+                            <p className="text-xs text-zinc-500 mt-1">
+                              Jobs created by workers will be marked as &quot;Pending Approval&quot; until you approve them
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => setWorkerJobsNeedApproval(!workerJobsNeedApproval)}
+                            className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                              workerJobsNeedApproval ? 'bg-emerald-600' : 'bg-zinc-700'
+                            }`}
+                          >
+                            <div
+                              className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                                workerJobsNeedApproval ? 'translate-x-6' : 'translate-x-1'
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Workers Can Edit Skills */}
+                      <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-200">Workers can update their skills & equipment</p>
+                          <p className="text-xs text-zinc-500 mt-1">
+                            Allow workers to edit their own skill and equipment certifications
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setWorkersCanEditSkills(!workersCanEditSkills)}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            workersCanEditSkills ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              workersCanEditSkills ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Workers Can Edit Availability */}
+                      <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-200">Workers can update their availability</p>
+                          <p className="text-xs text-zinc-500 mt-1">
+                            Allow workers to set their own working hours and time off
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setWorkersCanEditAvailability(!workersCanEditAvailability)}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            workersCanEditAvailability ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              workersCanEditAvailability ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Workers Can View Team Schedule */}
+                      <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-200">Workers can view other team members&apos; schedules</p>
+                          <p className="text-xs text-zinc-500 mt-1">
+                            Allow workers to see when other team members are scheduled
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setWorkersCanViewTeamSchedule(!workersCanViewTeamSchedule)}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            workersCanViewTeamSchedule ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              workersCanViewTeamSchedule ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Save Button */}
+                  <div className="flex justify-end pt-4">
+                    <Button
+                      onClick={saveTeamSettings}
+                      disabled={saving}
+                      className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Saving...' : 'Save Team Settings'}
                     </Button>
                   </div>
                 </div>

@@ -47,6 +47,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import SkillsCheckboxPicker, { WorkerSkill } from '@/components/provider/SkillsCheckboxPicker';
 
 interface Skill {
   skill: {
@@ -76,6 +77,9 @@ interface UserProfile {
     phone: string;
     email: string;
     logoUrl?: string | null;
+    primaryCategory?: string | null;
+    workersCanEditSkills?: boolean;
+    workersCanEditAvailability?: boolean;
   };
 }
 
@@ -114,6 +118,9 @@ export default function WorkerProfile() {
     confirmPassword: '',
   });
 
+  // Skills state
+  const [workerSkills, setWorkerSkills] = useState<WorkerSkill[]>([]);
+
   // UI states
   const [savingProfile, setSavingProfile] = useState(false);
   const [savingSchedule, setSavingSchedule] = useState(false);
@@ -147,6 +154,15 @@ export default function WorkerProfile() {
           };
         });
         setScheduleForm(schedule);
+
+        // Initialize worker skills
+        if (data.user.workerSkills) {
+          setWorkerSkills(data.user.workerSkills.map((ws: Skill) => ({
+            id: ws.skill.id,
+            skillId: ws.skill.id,
+            skill: ws.skill,
+          })));
+        }
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -505,28 +521,41 @@ export default function WorkerProfile() {
               {/* Skills Card */}
               <div className="bg-zinc-900 rounded-xl border border-zinc-800">
                 <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-white">My Skills</h2>
-                  <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded">Set by admin</span>
+                  <h2 className="text-lg font-semibold text-white">My Skills & Equipment</h2>
+                  {!profile.provider.workersCanEditSkills && (
+                    <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded">Set by admin</span>
+                  )}
                 </div>
                 <div className="p-6">
-                  {profile.workerSkills.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
-                      {profile.workerSkills.map((ws) => (
-                        <span
-                          key={ws.skill.id}
-                          className="px-3 py-1.5 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-full text-sm text-emerald-300 font-medium"
-                        >
-                          {ws.skill.name}
-                        </span>
-                      ))}
-                    </div>
+                  {profile.provider.workersCanEditSkills ? (
+                    <SkillsCheckboxPicker
+                      workerId={profile.id}
+                      workerSkills={workerSkills}
+                      onSkillsChange={setWorkerSkills}
+                      providerCategory={profile.provider.primaryCategory || undefined}
+                      providerId={profile.provider.id}
+                    />
                   ) : (
-                    <div className="text-center py-6">
-                      <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Award className="w-6 h-6 text-zinc-600" />
+                    // Read-only view
+                    profile.workerSkills.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {profile.workerSkills.map((ws) => (
+                          <span
+                            key={ws.skill.id}
+                            className="px-3 py-1.5 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-full text-sm text-emerald-300 font-medium"
+                          >
+                            {ws.skill.name}
+                          </span>
+                        ))}
                       </div>
-                      <p className="text-zinc-500 text-sm">Your admin will assign skills to you</p>
-                    </div>
+                    ) : (
+                      <div className="text-center py-6">
+                        <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                          <Award className="w-6 h-6 text-zinc-600" />
+                        </div>
+                        <p className="text-zinc-500 text-sm">Your admin will assign skills to you</p>
+                      </div>
+                    )
                   )}
                 </div>
               </div>

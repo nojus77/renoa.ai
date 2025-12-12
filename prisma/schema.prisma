@@ -423,6 +423,12 @@ model Provider {
   paymentTerms               String                       @default("net_30")
   acceptedPaymentMethods     String[]                     @default(["cash", "check", "credit_card"])
   autoInvoiceOnCompletion    Boolean                      @default(true)
+  // Worker Permission Settings
+  workersCanCreateJobs       Boolean                      @default(false) @map("workers_can_create_jobs")
+  workerJobsNeedApproval     Boolean                      @default(true) @map("worker_jobs_need_approval")
+  workersCanEditSkills       Boolean                      @default(false) @map("workers_can_edit_skills")
+  workersCanEditAvailability Boolean                      @default(true) @map("workers_can_edit_availability")
+  workersCanViewTeamSchedule Boolean                      @default(false) @map("workers_can_view_team_schedule")
   ownerId                    String?                      @map("owner_id")
   activeSeats                Int                          @default(1) @map("active_seats")
   stripeCustomerId           String?                      @map("stripe_customer_id")
@@ -1294,6 +1300,7 @@ model Skill {
   category    String?                   // "landscaping", "hardscaping", "equipment", "certification"
   description String?
   providerId  String                    @map("provider_id")
+  isCustom    Boolean                   @default(false) @map("is_custom") // Custom skills created by provider
   provider    Provider                  @relation("ProviderSkills", fields: [providerId], references: [id], onDelete: Cascade)
   createdAt   DateTime                  @default(now()) @map("created_at")
   workers     ProviderUserSkill[]       @relation("SkillWorkers")

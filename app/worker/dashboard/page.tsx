@@ -123,7 +123,8 @@ export default function WorkerDashboard() {
     try {
       const res = await fetch(`/api/worker/profile?userId=${uid}`);
       const data = await res.json();
-      if (data.user?.canCreateJobs) {
+      // Check provider-level permission (applies to ALL workers)
+      if (data.user?.provider?.workersCanCreateJobs) {
         setCanCreateJobs(true);
       }
     } catch (error) {

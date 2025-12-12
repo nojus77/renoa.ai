@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
         name,
         category,
         description,
+        isCustom: body.isCustom || false,
       },
     });
 

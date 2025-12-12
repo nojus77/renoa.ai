@@ -39,7 +39,7 @@ import {
 interface WorkerSkill {
   id: string;
   skillId: string;
-  level: string;
+  level?: string;
   skill: {
     id: string;
     name: string;
