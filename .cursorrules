@@ -1,0 +1,14 @@
+# Code Rules for this project
+
+## JSX Text Rules
+- NEVER use apostrophes (') in JSX text content
+- Always use &apos; instead of '
+- Examples:
+  - Bad: <p>Don't do this</p>
+  - Good: <p>Don&apos;t do this</p>
+  - Bad: <p>It's working</p>
+  - Good: <p>It&apos;s working</p>
+
+## Other JSX entities
+- Use &quot; for quotes in text
+- Use &amp; for ampersands in text
