@@ -8,76 +8,80 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Shield, Key, Search, Eye, EyeOff } from 'lucide-react';
 
-interface Provider {
+interface ProviderUser {
   id: string;
-  businessName: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  ownerName: string;
+  role: string;
+  provider: {
+    businessName: string;
+  };
 }
 
 export default function AdminResetPasswordPage() {
-  const [providers, setProviders] = useState<Provider[]>([]);
-  const [filteredProviders, setFilteredProviders] = useState<Provider[]>([]);
+  const [providerUsers, setProviderUsers] = useState<ProviderUser[]>([]);
+  const [filteredUsers, setFilteredUsers] = useState<ProviderUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [resetting, setResetting] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedProviderId, setSelectedProviderId] = useState('');
+  const [selectedUserId, setSelectedUserId] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
 
   useEffect(() => {
-    fetchProviders();
+    fetchProviderUsers();
   }, []);
 
   useEffect(() => {
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      const filtered = providers.filter(
-        (p) =>
-          p.businessName.toLowerCase().includes(query) ||
-          p.email.toLowerCase().includes(query) ||
-          p.ownerName.toLowerCase().includes(query)
+      const filtered = providerUsers.filter(
+        (u) =>
+          u.provider.businessName.toLowerCase().includes(query) ||
+          u.email.toLowerCase().includes(query) ||
+          `${u.firstName} ${u.lastName}`.toLowerCase().includes(query)
       );
-      setFilteredProviders(filtered);
+      setFilteredUsers(filtered);
       setShowDropdown(true);
     } else {
-      setFilteredProviders(providers);
+      setFilteredUsers(providerUsers);
       setShowDropdown(false);
     }
-  }, [searchQuery, providers]);
+  }, [searchQuery, providerUsers]);
 
-  const fetchProviders = async () => {
+  const fetchProviderUsers = async () => {
     try {
       const res = await fetch('/api/admin/reset-password');
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Failed to fetch providers');
+        toast.error(data.error || 'Failed to fetch provider users');
         return;
       }
 
-      setProviders(data.providers);
-      setFilteredProviders(data.providers);
+      setProviderUsers(data.providerUsers);
+      setFilteredUsers(data.providerUsers);
     } catch (error) {
-      toast.error('Failed to fetch providers');
+      toast.error('Failed to fetch provider users');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSelectProvider = (provider: Provider) => {
-    setSelectedProviderId(provider.id);
-    setSearchQuery(`${provider.businessName} (${provider.email})`);
+  const handleSelectUser = (user: ProviderUser) => {
+    setSelectedUserId(user.id);
+    setSearchQuery(`${user.firstName} ${user.lastName} (${user.provider.businessName})`);
     setShowDropdown(false);
   };
 
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!selectedProviderId) {
-      toast.error('Please select a provider');
+    if (!selectedUserId) {
+      toast.error('Please select a user');
       return;
     }
 
@@ -97,7 +101,7 @@ export default function AdminResetPasswordPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          providerId: selectedProviderId,
+          providerUserId: selectedUserId,
           newPassword,
         }),
       });
@@ -112,7 +116,7 @@ export default function AdminResetPasswordPage() {
       toast.success(data.message || 'Password reset successfully');
 
       // Clear form
-      setSelectedProviderId('');
+      setSelectedUserId('');
       setSearchQuery('');
       setNewPassword('');
       setShowPassword(false);
@@ -123,7 +127,7 @@ export default function AdminResetPasswordPage() {
     }
   };
 
-  const selectedProvider = providers.find((p) => p.id === selectedProviderId);
+  const selectedUser = providerUsers.find((u) => u.id === selectedUserId);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-zinc-900 to-blue-900 p-8">
@@ -136,7 +140,7 @@ export default function AdminResetPasswordPage() {
             <h1 className="text-3xl font-bold text-zinc-100">Admin Password Reset</h1>
           </div>
           <p className="text-zinc-400">
-            Reset provider passwords without requiring email verification
+            Reset provider user passwords without requiring email verification
           </p>
         </div>
 
@@ -144,49 +148,52 @@ export default function AdminResetPasswordPage() {
           <CardHeader>
             <CardTitle className="text-zinc-100 flex items-center gap-2">
               <Key className="h-5 w-5 text-blue-400" />
-              Reset Provider Password
+              Reset User Password
             </CardTitle>
             <CardDescription className="text-zinc-400">
-              Select a provider and enter a new password to reset their account
+              Select a user and enter a new password to reset their account
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleResetPassword} className="space-y-6">
-              {/* Provider Search/Select */}
+              {/* User Search/Select */}
               <div className="space-y-2">
-                <Label htmlFor="provider" className="text-zinc-200">
-                  Select Provider
+                <Label htmlFor="user" className="text-zinc-200">
+                  Select User
                 </Label>
                 <div className="relative">
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
                     <Input
-                      id="provider"
+                      id="user"
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onFocus={() => searchQuery && setShowDropdown(true)}
-                      placeholder="Search by company name or email..."
+                      placeholder="Search by name, company, or email..."
                       className="bg-zinc-900 border-zinc-800 text-zinc-100 pl-10"
                       disabled={loading}
                     />
                   </div>
 
                   {/* Dropdown */}
-                  {showDropdown && filteredProviders.length > 0 && (
+                  {showDropdown && filteredUsers.length > 0 && (
                     <div className="absolute z-10 w-full mt-1 bg-zinc-900 border border-zinc-800 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                      {filteredProviders.map((provider) => (
+                      {filteredUsers.map((user) => (
                         <button
-                          key={provider.id}
+                          key={user.id}
                           type="button"
-                          onClick={() => handleSelectProvider(provider)}
+                          onClick={() => handleSelectUser(user)}
                           className="w-full text-left px-4 py-3 hover:bg-zinc-800 transition-colors border-b border-zinc-800 last:border-b-0"
                         >
                           <div className="font-medium text-zinc-100">
-                            {provider.businessName}
+                            {user.firstName} {user.lastName}
+                            <span className="ml-2 text-xs px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">
+                              {user.role}
+                            </span>
                           </div>
                           <div className="text-sm text-zinc-400">
-                            {provider.email} • {provider.ownerName}
+                            {user.email} • {user.provider.businessName}
                           </div>
                         </button>
                       ))}
@@ -194,15 +201,18 @@ export default function AdminResetPasswordPage() {
                   )}
                 </div>
 
-                {/* Selected Provider Display */}
-                {selectedProvider && (
+                {/* Selected User Display */}
+                {selectedUser && (
                   <div className="mt-2 p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
                     <div className="text-sm text-zinc-400">Selected:</div>
                     <div className="font-medium text-zinc-100">
-                      {selectedProvider.businessName}
+                      {selectedUser.firstName} {selectedUser.lastName}
+                      <span className="ml-2 text-xs px-2 py-0.5 bg-zinc-800 rounded text-zinc-400">
+                        {selectedUser.role}
+                      </span>
                     </div>
                     <div className="text-sm text-zinc-400">
-                      {selectedProvider.email}
+                      {selectedUser.email} • {selectedUser.provider.businessName}
                     </div>
                   </div>
                 )}
@@ -221,7 +231,7 @@ export default function AdminResetPasswordPage() {
                     onChange={(e) => setNewPassword(e.target.value)}
                     placeholder="Enter new password"
                     className="bg-zinc-900 border-zinc-800 text-zinc-100 pr-10"
-                    disabled={resetting || !selectedProviderId}
+                    disabled={resetting || !selectedUserId}
                   />
                   <button
                     type="button"
@@ -245,7 +255,7 @@ export default function AdminResetPasswordPage() {
               <Button
                 type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-500"
-                disabled={resetting || !selectedProviderId || !newPassword}
+                disabled={resetting || !selectedUserId || !newPassword}
               >
                 {resetting ? 'Resetting Password...' : 'Reset Password'}
               </Button>
@@ -258,9 +268,9 @@ export default function AdminResetPasswordPage() {
           <Card className="bg-zinc-950 border-zinc-800">
             <CardContent className="pt-6">
               <div className="text-2xl font-bold text-zinc-100">
-                {providers.length}
+                {providerUsers.length}
               </div>
-              <div className="text-sm text-zinc-400">Total Providers</div>
+              <div className="text-sm text-zinc-400">Total Users</div>
             </CardContent>
           </Card>
           <Card className="bg-zinc-950 border-zinc-800">

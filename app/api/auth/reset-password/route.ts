@@ -53,12 +53,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find the provider
-    const provider = await prisma.provider.findUnique({
+    // Find the provider user (team members with passwords)
+    const providerUser = await prisma.providerUser.findUnique({
       where: { email: resetToken.email },
     });
 
-    if (!provider) {
+    if (!providerUser) {
       return NextResponse.json(
         { error: 'User not found' },
         { status: 404 }
@@ -68,9 +68,9 @@ export async function POST(request: NextRequest) {
     // Hash the new password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Update the provider's password
-    await prisma.provider.update({
-      where: { id: provider.id },
+    // Update the provider user's password
+    await prisma.providerUser.update({
+      where: { id: providerUser.id },
       data: {
         passwordHash,
         updatedAt: new Date(),

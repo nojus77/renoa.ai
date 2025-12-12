@@ -23,13 +23,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Find provider user by email
-    const provider = await prisma.provider.findUnique({
+    // Find provider user by email (ProviderUser table has passwords)
+    const providerUser = await prisma.providerUser.findUnique({
       where: { email: email.toLowerCase().trim() },
     });
 
     // Always return success to prevent email enumeration
-    if (!provider) {
+    if (!providerUser) {
       return NextResponse.json({
         success: true,
         message: 'If an account exists with this email, a password reset link has been sent.',

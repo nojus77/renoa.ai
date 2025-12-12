@@ -60,7 +60,7 @@ export default function ForgotPasswordPage() {
             </div>
             <CardTitle className="text-2xl text-zinc-100">Check Your Email</CardTitle>
             <CardDescription className="text-zinc-400">
-              We've sent password reset instructions to your email
+              We&apos;ve sent password reset instructions to your email
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -69,7 +69,7 @@ export default function ForgotPasswordPage() {
                 If an account exists with <strong className="text-zinc-100">{email}</strong>, you will receive a password reset link shortly.
               </p>
               <p className="text-zinc-400">
-                The link will expire in 1 hour. Please check your spam folder if you don't see it in your inbox.
+                The link will expire in 1 hour. Please check your spam folder if you don&apos;t see it in your inbox.
               </p>
             </div>
 
@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
           </div>
           <CardTitle className="text-2xl text-zinc-100">Reset Your Password</CardTitle>
           <CardDescription className="text-zinc-400">
-            Enter your email address and we'll send you a password reset link
+            Enter your email address and we&apos;ll send you a password reset link
           </CardDescription>
         </CardHeader>
         <CardContent>
