@@ -51,6 +51,8 @@ export async function GET(request: NextRequest) {
         city: true,
         serviceRadius: true,
         serviceRadiusType: true,
+        businessZipCode: true,
+        travelDistance: true,
         taxId: true,
         insuranceProvider: true,
       },
@@ -95,10 +97,13 @@ export async function POST(request: NextRequest) {
       employeeCount,
       licenseNumber,
       insuranceProvider,
-      // Service area fields
+      // Service area fields (legacy)
       state,
       serviceRadiusType,
       primaryCity,
+      // New ZIP-based service area fields
+      businessZipCode,
+      travelDistance,
     } = body;
 
     if (!providerId) {
@@ -131,7 +136,7 @@ export async function POST(request: NextRequest) {
     if (licenseNumber !== undefined) updateData.taxId = licenseNumber;
     if (insuranceProvider !== undefined) updateData.insuranceProvider = insuranceProvider;
 
-    // Service area fields
+    // Service area fields (legacy)
     if (state !== undefined) updateData.state = state;
     if (serviceRadiusType !== undefined) {
       updateData.serviceRadiusType = serviceRadiusType;
@@ -143,6 +148,22 @@ export async function POST(request: NextRequest) {
       }
     }
     if (primaryCity !== undefined) updateData.city = primaryCity;
+
+    // New ZIP-based service area fields
+    if (businessZipCode !== undefined) updateData.businessZipCode = businessZipCode;
+    if (travelDistance !== undefined) {
+      updateData.travelDistance = travelDistance;
+      // Also update serviceRadiusType for backwards compatibility
+      updateData.serviceRadiusType = travelDistance;
+      // Map travel distance to numeric serviceRadius
+      if (travelDistance === 'statewide') {
+        updateData.serviceRadius = 999;
+      } else if (travelDistance === 'city') {
+        updateData.serviceRadius = 5;
+      } else {
+        updateData.serviceRadius = parseInt(travelDistance) || 25;
+      }
+    }
 
     const updatedProvider = await prisma.provider.update({
       where: { id: providerId },

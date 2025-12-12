@@ -380,6 +380,8 @@ model Provider {
   primaryCategory            String?                      @map("primary_category")
   insuranceProvider          String?                      @map("insurance_provider")
   serviceRadiusType          String?                      @map("service_radius_type") // "10", "25", "50", "100", "statewide"
+  businessZipCode            String?                      @map("business_zip_code")
+  travelDistance             String?                      @map("travel_distance") // "10", "25", "50", "city", "statewide"
   status                     String                       @default("active")
   leadCapacity               Int                          @default(10)
   currentLeadCount           Int                          @default(0)
