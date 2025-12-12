@@ -28,12 +28,38 @@ import {
   Loader2,
   Phone,
   Building2,
+  Calendar,
+  CalendarX,
+  Monitor,
+  Smartphone,
+  Mail,
+  MessageSquare,
+  Globe,
+  Instagram,
+  Facebook,
+  Send,
+  LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Cropper from 'react-easy-crop';
 import type { Area } from 'react-easy-crop';
 
-type TabType = 'profile' | 'business' | 'availability' | 'services' | 'notifications' | 'payments' | 'integrations' | 'security';
+type TabType = 'profile' | 'availability' | 'services' | 'notifications' | 'payments' | 'integrations' | 'security';
+
+interface BlockedDate {
+  date: string;
+  reason: string;
+}
+
+const DAYS_OF_WEEK = [
+  { key: 'mon', label: 'Mon' },
+  { key: 'tue', label: 'Tue' },
+  { key: 'wed', label: 'Wed' },
+  { key: 'thu', label: 'Thu' },
+  { key: 'fri', label: 'Fri' },
+  { key: 'sat', label: 'Sat' },
+  { key: 'sun', label: 'Sun' },
+];
 
 interface TimeSlot {
   start: string;
@@ -229,9 +255,23 @@ export default function ProviderSettings() {
     saturday: [],
     sunday: [],
   });
+  const [workingDays, setWorkingDays] = useState<Record<string, boolean>>({
+    mon: true,
+    tue: true,
+    wed: true,
+    thu: true,
+    fri: true,
+    sat: false,
+    sun: false,
+  });
+  const [workingHoursStart, setWorkingHoursStart] = useState('08:00');
+  const [workingHoursEnd, setWorkingHoursEnd] = useState('17:00');
   const [bufferTime, setBufferTime] = useState(30);
   const [maxJobsPerDay, setMaxJobsPerDay] = useState(8);
   const [advanceBooking, setAdvanceBooking] = useState(14);
+  const [blockedDates, setBlockedDates] = useState<BlockedDate[]>([]);
+  const [newBlockedDate, setNewBlockedDate] = useState('');
+  const [newBlockedReason, setNewBlockedReason] = useState('');
 
   // Services (loaded from provider's actual services)
   interface ServicePricing {
@@ -252,6 +292,11 @@ export default function ProviderSettings() {
   const [stripeConnected, setStripeConnected] = useState(false);
   const [stripeAccountEmail, setStripeAccountEmail] = useState('');
 
+  // Online Presence (for merged Business into Profile)
+  const [facebookUrl, setFacebookUrl] = useState('');
+  const [instagramUrl, setInstagramUrl] = useState('');
+  const [googleBusinessUrl, setGoogleBusinessUrl] = useState('');
+
   // Notifications
   const [emailNotifications, setEmailNotifications] = useState({
     newLead: true,
@@ -261,11 +306,14 @@ export default function ProviderSettings() {
     weeklySummary: true,
   });
   const [smsNotifications, setSmsNotifications] = useState({
-    newLead: true,
-    urgentMessages: true,
+    newLeadAlert: true,
+    sameDayReminders: false,
+    urgentMessagesOnly: true,
   });
+  const [quietHoursEnabled, setQuietHoursEnabled] = useState(true);
   const [quietHoursStart, setQuietHoursStart] = useState('21:00');
   const [quietHoursEnd, setQuietHoursEnd] = useState('07:00');
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
 
   // Payments
   const [paymentTerms, setPaymentTerms] = useState('net_7');
@@ -724,7 +772,6 @@ export default function ProviderSettings() {
 
   const tabs = [
     { id: 'profile' as TabType, name: 'Profile', icon: User },
-    { id: 'business' as TabType, name: 'Business', icon: Briefcase },
     { id: 'availability' as TabType, name: 'Availability', icon: Clock },
     { id: 'services' as TabType, name: 'Services & Pricing', icon: DollarSign },
     { id: 'notifications' as TabType, name: 'Notifications', icon: Bell },
@@ -732,6 +779,45 @@ export default function ProviderSettings() {
     { id: 'integrations' as TabType, name: 'Integrations', icon: Link2 },
     { id: 'security' as TabType, name: 'Security', icon: Shield },
   ];
+
+  const addBlockedDate = () => {
+    if (!newBlockedDate) {
+      toast.error('Please select a date');
+      return;
+    }
+    const dateExists = blockedDates.some(bd => bd.date === newBlockedDate);
+    if (dateExists) {
+      toast.error('This date is already blocked');
+      return;
+    }
+    setBlockedDates([...blockedDates, { date: newBlockedDate, reason: newBlockedReason || 'Unavailable' }]);
+    setNewBlockedDate('');
+    setNewBlockedReason('');
+    toast.success('Date blocked successfully');
+  };
+
+  const removeBlockedDate = (date: string) => {
+    setBlockedDates(blockedDates.filter(bd => bd.date !== date));
+    toast.success('Blocked date removed');
+  };
+
+  const formatBlockedDate = (dateStr: string) => {
+    const date = new Date(dateStr + 'T00:00:00');
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const handleSendTestEmail = async () => {
+    setSendingTestEmail(true);
+    try {
+      // Mock sending test email
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      toast.success(`Test email sent to ${email}`);
+    } catch {
+      toast.error('Failed to send test email');
+    } finally {
+      setSendingTestEmail(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -1233,69 +1319,75 @@ export default function ProviderSettings() {
                     </CardContent>
                   </Card>
 
-                  {/* Save Button */}
-                  <div className="flex justify-end">
-                    <Button
-                      onClick={saveProfileSettings}
-                      disabled={saving}
-                      className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      {saving ? 'Saving...' : 'Save Profile'}
-                    </Button>
-                  </div>
-                </div>
-              )}
+                  {/* Business Address */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Building2 className="h-5 w-5 text-blue-400" />
+                        Business Address
+                      </CardTitle>
+                      <p className="text-sm text-zinc-400 mt-1">
+                        Your business mailing address for invoicing
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="md:col-span-2">
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Street Address
+                          </label>
+                          <input
+                            type="text"
+                            value={businessAddress}
+                            onChange={(e) => setBusinessAddress(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="123 Main Street"
+                          />
+                        </div>
 
-              {/* Business Tab */}
-              {activeTab === 'business' && (
-                <Card className="bg-zinc-900/50 border-zinc-800">
-                  <CardHeader>
-                    <CardTitle className="text-zinc-100">Business Address</CardTitle>
-                    <p className="text-sm text-zinc-400 mt-1">
-                      Your business mailing address for invoicing
-                    </p>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Street Address
-                        </label>
-                        <input
-                          type="text"
-                          value={businessAddress}
-                          onChange={(e) => setBusinessAddress(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="123 Main Street"
-                        />
-                      </div>
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            City
+                          </label>
+                          <input
+                            type="text"
+                            value={primaryCity}
+                            onChange={(e) => setPrimaryCity(e.target.value)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="Austin"
+                          />
+                        </div>
 
-                      <div className="md:col-span-2">
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          ZIP Code
-                        </label>
-                        <input
-                          type="text"
-                          value={businessZip}
-                          onChange={(e) => setBusinessZip(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="78701"
-                          maxLength={10}
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Website
-                        </label>
-                        <input
-                          type="url"
-                          value={website}
-                          onChange={(e) => setWebsite(e.target.value)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          placeholder="https://example.com"
-                        />
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-300 mb-2">
+                              State
+                            </label>
+                            <select
+                              value=""
+                              onChange={() => {}}
+                              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            >
+                              <option value="">Select</option>
+                              {US_STATES.map(state => (
+                                <option key={state.value} value={state.value}>{state.value}</option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="block text-sm font-medium text-zinc-300 mb-2">
+                              ZIP Code
+                            </label>
+                            <input
+                              type="text"
+                              value={businessZip}
+                              onChange={(e) => setBusinessZip(e.target.value)}
+                              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                              placeholder="78701"
+                              maxLength={5}
+                            />
+                          </div>
+                        </div>
                       </div>
 
                       <div>
@@ -1316,82 +1408,297 @@ export default function ProviderSettings() {
                           <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
                         </select>
                       </div>
-                    </div>
+                    </CardContent>
+                  </Card>
 
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={saveProfileSettings}
-                        disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        {saving ? 'Saving...' : 'Save Business Info'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  {/* Online Presence */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Globe className="h-5 w-5 text-purple-400" />
+                        Online Presence
+                      </CardTitle>
+                      <p className="text-sm text-zinc-400 mt-1">
+                        Help customers find you online
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Website
+                        </label>
+                        <div className="relative">
+                          <Globe className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                          <input
+                            type="url"
+                            value={website}
+                            onChange={(e) => setWebsite(e.target.value)}
+                            className="w-full pl-10 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="https://example.com"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Facebook Page
+                          <span className="text-zinc-500 font-normal ml-2">(Optional)</span>
+                        </label>
+                        <div className="relative">
+                          <Facebook className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                          <input
+                            type="url"
+                            value={facebookUrl}
+                            onChange={(e) => setFacebookUrl(e.target.value)}
+                            className="w-full pl-10 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="https://facebook.com/yourbusiness"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Instagram
+                          <span className="text-zinc-500 font-normal ml-2">(Optional)</span>
+                        </label>
+                        <div className="relative">
+                          <Instagram className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-500" />
+                          <input
+                            type="url"
+                            value={instagramUrl}
+                            onChange={(e) => setInstagramUrl(e.target.value)}
+                            className="w-full pl-10 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="https://instagram.com/yourbusiness"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Google Business Profile
+                          <span className="text-zinc-500 font-normal ml-2">(Optional)</span>
+                        </label>
+                        <div className="relative">
+                          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" viewBox="0 0 24 24">
+                            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                          </svg>
+                          <input
+                            type="url"
+                            value={googleBusinessUrl}
+                            onChange={(e) => setGoogleBusinessUrl(e.target.value)}
+                            className="w-full pl-10 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            placeholder="https://g.page/yourbusiness"
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Save Button */}
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={saveProfileSettings}
+                      disabled={saving}
+                      className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Saving...' : 'Save Profile'}
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {/* Availability Tab */}
               {activeTab === 'availability' && (
-                <Card className="bg-zinc-900/50 border-zinc-800">
-                  <CardHeader>
-                    <CardTitle className="text-zinc-100">Availability Settings</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-6">
+                  {/* Working Schedule */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-blue-400" />
+                        Working Schedule
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {/* Working Days */}
                       <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Buffer Time (minutes)
+                        <label className="block text-sm font-medium text-zinc-300 mb-3">
+                          Working Days
                         </label>
-                        <input
-                          type="number"
-                          value={bufferTime}
-                          onChange={(e) => setBufferTime(parseInt(e.target.value) || 0)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                        />
-                        <p className="text-xs text-zinc-500 mt-1">Time between jobs for travel</p>
+                        <div className="flex flex-wrap gap-2">
+                          {DAYS_OF_WEEK.map(day => (
+                            <button
+                              key={day.key}
+                              onClick={() => setWorkingDays(prev => ({ ...prev, [day.key]: !prev[day.key] }))}
+                              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                workingDays[day.key]
+                                  ? 'bg-emerald-600 text-white'
+                                  : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                              }`}
+                            >
+                              {day.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
 
+                      {/* Working Hours */}
                       <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Max Jobs Per Day
+                        <label className="block text-sm font-medium text-zinc-300 mb-3">
+                          Working Hours
                         </label>
+                        <div className="grid grid-cols-2 gap-4 max-w-md">
+                          <div>
+                            <label className="block text-xs text-zinc-400 mb-1">Start Time</label>
+                            <input
+                              type="time"
+                              value={workingHoursStart}
+                              onChange={(e) => setWorkingHoursStart(e.target.value)}
+                              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-zinc-400 mb-1">End Time</label>
+                            <input
+                              type="time"
+                              value={workingHoursEnd}
+                              onChange={(e) => setWorkingHoursEnd(e.target.value)}
+                              className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Scheduling Rules */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Scheduling Rules</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Buffer Time (minutes)
+                          </label>
+                          <input
+                            type="number"
+                            value={bufferTime}
+                            onChange={(e) => setBufferTime(parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          />
+                          <p className="text-xs text-zinc-500 mt-1">Time between jobs for travel</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Max Jobs Per Day
+                          </label>
+                          <input
+                            type="number"
+                            value={maxJobsPerDay}
+                            onChange={(e) => setMaxJobsPerDay(parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          />
+                          <p className="text-xs text-zinc-500 mt-1">Prevent overbooking</p>
+                        </div>
+
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Advance Booking (days)
+                          </label>
+                          <input
+                            type="number"
+                            value={advanceBooking}
+                            onChange={(e) => setAdvanceBooking(parseInt(e.target.value) || 0)}
+                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          />
+                          <p className="text-xs text-zinc-500 mt-1">Max days ahead for booking</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Blocked Dates */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <CalendarX className="h-5 w-5 text-red-400" />
+                        Blocked Dates
+                      </CardTitle>
+                      <p className="text-sm text-zinc-400 mt-1">
+                        Block specific dates when you&apos;re unavailable
+                      </p>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Add Blocked Date */}
+                      <div className="flex flex-col sm:flex-row gap-3">
                         <input
-                          type="number"
-                          value={maxJobsPerDay}
-                          onChange={(e) => setMaxJobsPerDay(parseInt(e.target.value) || 0)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                          type="date"
+                          value={newBlockedDate}
+                          onChange={(e) => setNewBlockedDate(e.target.value)}
+                          min={new Date().toISOString().split('T')[0]}
+                          className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
                         />
-                        <p className="text-xs text-zinc-500 mt-1">Prevent overbooking</p>
+                        <input
+                          type="text"
+                          value={newBlockedReason}
+                          onChange={(e) => setNewBlockedReason(e.target.value)}
+                          placeholder="Reason (optional)"
+                          className="flex-1 px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                        />
+                        <Button
+                          onClick={addBlockedDate}
+                          disabled={!newBlockedDate}
+                          className="bg-red-600 hover:bg-red-500 disabled:opacity-50"
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Block Date
+                        </Button>
                       </div>
 
-                      <div>
-                        <label className="block text-sm font-medium text-zinc-300 mb-2">
-                          Advance Booking (days)
-                        </label>
-                        <input
-                          type="number"
-                          value={advanceBooking}
-                          onChange={(e) => setAdvanceBooking(parseInt(e.target.value) || 0)}
-                          className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                        />
-                        <p className="text-xs text-zinc-500 mt-1">Max days ahead for booking</p>
-                      </div>
-                    </div>
+                      {/* Blocked Dates List */}
+                      {blockedDates.length > 0 ? (
+                        <div className="flex flex-wrap gap-2 p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                          {blockedDates.map((bd, i) => (
+                            <span
+                              key={i}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 bg-red-500/20 border border-red-500/40 rounded-full text-sm text-red-400"
+                            >
+                              <CalendarX className="w-3 h-3" />
+                              {formatBlockedDate(bd.date)} - {bd.reason}
+                              <button
+                                onClick={() => removeBlockedDate(bd.date)}
+                                className="hover:text-red-300 ml-1"
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-sm text-zinc-500 text-center py-4">
+                          No blocked dates. Add dates when you&apos;re unavailable.
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
 
-                    <div className="flex justify-end">
-                      <Button
-                        onClick={saveAvailabilitySettings}
-                        disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        {saving ? 'Saving...' : 'Save Availability'}
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={saveAvailabilitySettings}
+                      disabled={saving}
+                      className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Saving...' : 'Save Availability'}
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {/* Services Tab */}
@@ -1597,97 +1904,285 @@ export default function ProviderSettings() {
 
               {/* Notifications Tab */}
               {activeTab === 'notifications' && (
-                <Card className="bg-zinc-900/50 border-zinc-800">
-                  <CardHeader>
-                    <CardTitle className="text-zinc-100">Notification Preferences</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div>
-                      <h3 className="text-sm font-semibold text-zinc-200 mb-3 md:mb-4">Email Notifications</h3>
-                      <div className="space-y-2 md:space-y-3">
-                        {Object.entries(emailNotifications).map(([key, value]) => (
-                          <div key={key} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                            <span className="text-xs md:text-sm text-zinc-300 capitalize">
-                              {key.replace(/([A-Z])/g, ' $1').trim()}
-                            </span>
-                            <button
-                              onClick={() => setEmailNotifications({ ...emailNotifications, [key]: !value })}
-                              className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-                                value ? 'bg-emerald-600' : 'bg-zinc-700'
-                              }`}
-                            >
-                              <div
-                                className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                                  value ? 'translate-x-6' : 'translate-x-1'
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-semibold text-zinc-200 mb-3 md:mb-4">SMS Notifications</h3>
-                      <div className="space-y-2 md:space-y-3">
-                        {Object.entries(smsNotifications).map(([key, value]) => (
-                          <div key={key} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
-                            <span className="text-xs md:text-sm text-zinc-300 capitalize">
-                              {key.replace(/([A-Z])/g, ' $1').trim()}
-                            </span>
-                            <button
-                              onClick={() => setSmsNotifications({ ...smsNotifications, [key]: !value })}
-                              className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
-                                value ? 'bg-emerald-600' : 'bg-zinc-700'
-                              }`}
-                            >
-                              <div
-                                className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                                  value ? 'translate-x-6' : 'translate-x-1'
-                                }`}
-                              />
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div>
-                      <h3 className="text-sm font-semibold text-zinc-200 mb-4">Quiet Hours</h3>
-                      <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-6">
+                  {/* Email Notifications */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Mail className="h-5 w-5 text-blue-400" />
+                        Email Notifications
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
                         <div>
-                          <label className="block text-xs text-zinc-400 mb-1">Start</label>
-                          <input
-                            type="time"
-                            value={quietHoursStart}
-                            onChange={(e) => setQuietHoursStart(e.target.value)}
-                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          />
+                          <span className="text-sm text-zinc-200">New Lead</span>
+                          <p className="text-xs text-zinc-500 mt-0.5">Get notified when you receive a new lead</p>
                         </div>
+                        <button
+                          onClick={() => setEmailNotifications({ ...emailNotifications, newLead: !emailNotifications.newLead })}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            emailNotifications.newLead ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                            emailNotifications.newLead ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
                         <div>
-                          <label className="block text-xs text-zinc-400 mb-1">End</label>
-                          <input
-                            type="time"
-                            value={quietHoursEnd}
-                            onChange={(e) => setQuietHoursEnd(e.target.value)}
-                            className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
-                          />
+                          <span className="text-sm text-zinc-200">Job Reminders</span>
+                          <p className="text-xs text-zinc-500 mt-0.5">24 hours before scheduled jobs</p>
+                        </div>
+                        <button
+                          onClick={() => setEmailNotifications({ ...emailNotifications, jobReminders: !emailNotifications.jobReminders })}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            emailNotifications.jobReminders ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                            emailNotifications.jobReminders ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div>
+                          <span className="text-sm text-zinc-200">Payment Received</span>
+                          <p className="text-xs text-zinc-500 mt-0.5">When a customer pays an invoice</p>
+                        </div>
+                        <button
+                          onClick={() => setEmailNotifications({ ...emailNotifications, paymentReceived: !emailNotifications.paymentReceived })}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            emailNotifications.paymentReceived ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                            emailNotifications.paymentReceived ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div>
+                          <span className="text-sm text-zinc-200">Customer Messages</span>
+                          <p className="text-xs text-zinc-500 mt-0.5">When customers send you a message</p>
+                        </div>
+                        <button
+                          onClick={() => setEmailNotifications({ ...emailNotifications, customerMessages: !emailNotifications.customerMessages })}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            emailNotifications.customerMessages ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                            emailNotifications.customerMessages ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div>
+                          <span className="text-sm text-zinc-200">Weekly Summary</span>
+                          <p className="text-xs text-zinc-500 mt-0.5">Performance and earnings overview</p>
+                        </div>
+                        <button
+                          onClick={() => setEmailNotifications({ ...emailNotifications, weeklySummary: !emailNotifications.weeklySummary })}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            emailNotifications.weeklySummary ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                            emailNotifications.weeklySummary ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* SMS Notifications */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Smartphone className="h-5 w-5 text-green-400" />
+                        SMS Notifications
+                      </CardTitle>
+                      {!phone && (
+                        <p className="text-xs text-amber-400 mt-1">
+                          Requires phone verification. Add your phone number in Profile settings.
+                        </p>
+                      )}
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div className={`flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg ${!phone ? 'opacity-50' : ''}`}>
+                        <div>
+                          <span className="text-sm text-zinc-200">New Lead Alert</span>
+                          <p className="text-xs text-zinc-500 mt-0.5">Instant SMS when new leads come in</p>
+                        </div>
+                        <button
+                          onClick={() => phone && setSmsNotifications({ ...smsNotifications, newLeadAlert: !smsNotifications.newLeadAlert })}
+                          disabled={!phone}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            smsNotifications.newLeadAlert && phone ? 'bg-emerald-600' : 'bg-zinc-700'
+                          } ${!phone ? 'cursor-not-allowed' : ''}`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                            smsNotifications.newLeadAlert && phone ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+
+                      <div className={`flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg ${!phone ? 'opacity-50' : ''}`}>
+                        <div>
+                          <span className="text-sm text-zinc-200">Same-day Job Reminders</span>
+                          <p className="text-xs text-zinc-500 mt-0.5">Morning reminder for jobs scheduled today</p>
+                        </div>
+                        <button
+                          onClick={() => phone && setSmsNotifications({ ...smsNotifications, sameDayReminders: !smsNotifications.sameDayReminders })}
+                          disabled={!phone}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            smsNotifications.sameDayReminders && phone ? 'bg-emerald-600' : 'bg-zinc-700'
+                          } ${!phone ? 'cursor-not-allowed' : ''}`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                            smsNotifications.sameDayReminders && phone ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+
+                      <div className={`flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg ${!phone ? 'opacity-50' : ''}`}>
+                        <div>
+                          <span className="text-sm text-zinc-200">Urgent Messages Only</span>
+                          <p className="text-xs text-zinc-500 mt-0.5">Only receive SMS for urgent communications</p>
+                        </div>
+                        <button
+                          onClick={() => phone && setSmsNotifications({ ...smsNotifications, urgentMessagesOnly: !smsNotifications.urgentMessagesOnly })}
+                          disabled={!phone}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            smsNotifications.urgentMessagesOnly && phone ? 'bg-emerald-600' : 'bg-zinc-700'
+                          } ${!phone ? 'cursor-not-allowed' : ''}`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                            smsNotifications.urgentMessagesOnly && phone ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Quiet Hours */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Clock className="h-5 w-5 text-purple-400" />
+                        Quiet Hours
+                      </CardTitle>
+                      <p className="text-sm text-zinc-400 mt-1">
+                        Don&apos;t send notifications during these hours
+                      </p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-6">
+                        <button
+                          onClick={() => setQuietHoursEnabled(!quietHoursEnabled)}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            quietHoursEnabled ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                            quietHoursEnabled ? 'translate-x-6' : 'translate-x-1'
+                          }`} />
+                        </button>
+                        {quietHoursEnabled && (
+                          <div className="flex items-center gap-4">
+                            <div>
+                              <label className="block text-xs text-zinc-400 mb-1">Start</label>
+                              <input
+                                type="time"
+                                value={quietHoursStart}
+                                onChange={(e) => setQuietHoursStart(e.target.value)}
+                                className="px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                            <span className="text-zinc-500 mt-4">to</span>
+                            <div>
+                              <label className="block text-xs text-zinc-400 mb-1">End</label>
+                              <input
+                                type="time"
+                                value={quietHoursEnd}
+                                onChange={(e) => setQuietHoursEnd(e.target.value)}
+                                className="px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Test Notification */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Test Your Notifications</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {/* Preview Card */}
+                      <div className="p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Preview</p>
+                        <div className="p-3 bg-zinc-950 border border-zinc-800 rounded-lg">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center text-white text-sm font-bold">
+                              R
+                            </div>
+                            <div>
+                              <p className="text-sm font-medium text-zinc-200">New Lead from Renoa</p>
+                              <p className="text-xs text-zinc-400 mt-0.5">
+                                John Smith is looking for &quot;Lawn Mowing&quot; in Austin, TX
+                              </p>
+                              <p className="text-xs text-zinc-500 mt-1">Just now</p>
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex justify-end">
                       <Button
-                        onClick={saveNotificationSettings}
-                        disabled={saving}
-                        className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
+                        onClick={handleSendTestEmail}
+                        disabled={sendingTestEmail || !email}
+                        variant="outline"
+                        className="border-zinc-700"
                       >
-                        <Save className="h-4 w-4 mr-2" />
-                        {saving ? 'Saving...' : 'Save Notifications'}
+                        {sendingTestEmail ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Sending...
+                          </>
+                        ) : (
+                          <>
+                            <Send className="h-4 w-4 mr-2" />
+                            Send Test Email
+                          </>
+                        )}
                       </Button>
-                    </div>
-                  </CardContent>
-                </Card>
+                      {email && (
+                        <p className="text-xs text-zinc-500">
+                          A test notification will be sent to {email}
+                        </p>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  <div className="flex justify-end">
+                    <Button
+                      onClick={saveNotificationSettings}
+                      disabled={saving}
+                      className="bg-emerald-600 hover:bg-emerald-500 w-full sm:w-auto"
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {saving ? 'Saving...' : 'Save Notifications'}
+                    </Button>
+                  </div>
+                </div>
               )}
 
               {/* Payments Tab */}
@@ -2092,39 +2587,109 @@ export default function ProviderSettings() {
 
               {/* Security Tab */}
               {activeTab === 'security' && (
-                <div className="space-y-4 md:space-y-6">
+                <div className="space-y-6">
+                  {/* Password & 2FA */}
                   <Card className="bg-zinc-900/50 border-zinc-800">
                     <CardHeader>
-                      <CardTitle className="text-zinc-100">Password & Security</CardTitle>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Shield className="h-5 w-5 text-blue-400" />
+                        Password & Security
+                      </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <Button variant="outline" className="border-zinc-700 w-full sm:w-auto">
                         Change Password
                       </Button>
-                      <div className="flex items-center justify-between gap-3 p-3 md:p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
-                        <div className="flex-1 min-w-0">
-                          <p className="text-xs md:text-sm font-medium text-zinc-200">Two-Factor Authentication</p>
-                          <p className="text-xs text-zinc-500 mt-1">Add an extra layer of security</p>
+                      <div className="flex items-center justify-between gap-3 p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-200">Two-Factor Authentication</p>
+                          <p className="text-xs text-zinc-500 mt-1">Add an extra layer of security to your account</p>
                         </div>
-                        <Button variant="outline" size="sm" className="border-zinc-700 text-xs flex-shrink-0">
+                        <Button variant="outline" size="sm" className="border-zinc-700">
                           Enable
                         </Button>
                       </div>
                     </CardContent>
                   </Card>
 
+                  {/* Active Sessions */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100 flex items-center gap-2">
+                        <Monitor className="h-5 w-5 text-green-400" />
+                        Active Sessions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      {/* Current Session */}
+                      <div className="flex items-center justify-between p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-zinc-800 rounded-lg flex items-center justify-center">
+                            <Monitor className="h-5 w-5 text-zinc-400" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-zinc-200">This device</p>
+                              <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 text-xs">
+                                Active now
+                              </Badge>
+                            </div>
+                            <p className="text-xs text-zinc-400 mt-0.5">Chrome on macOS</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Button variant="outline" className="border-zinc-700 w-full sm:w-auto">
+                        <LogOut className="h-4 w-4 mr-2" />
+                        Sign out all other devices
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  {/* Recent Login Activity */}
+                  <Card className="bg-zinc-900/50 border-zinc-800">
+                    <CardHeader>
+                      <CardTitle className="text-zinc-100">Recent Login Activity</CardTitle>
+                      <p className="text-sm text-zinc-400 mt-1">Last 5 logins to your account</p>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {[
+                          { time: 'Today 2:34 PM', device: 'Chrome', location: 'Chicago, IL', current: true },
+                          { time: 'Yesterday 9:15 AM', device: 'Safari', location: 'Chicago, IL', current: false },
+                          { time: 'Dec 10, 8:42 PM', device: 'Chrome', location: 'Chicago, IL', current: false },
+                          { time: 'Dec 9, 11:20 AM', device: 'Mobile App', location: 'Chicago, IL', current: false },
+                          { time: 'Dec 8, 3:15 PM', device: 'Chrome', location: 'Evanston, IL', current: false },
+                        ].map((login, i) => (
+                          <div key={i} className="flex items-center justify-between p-3 bg-zinc-900 border border-zinc-800 rounded-lg">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-2 h-2 rounded-full ${login.current ? 'bg-emerald-400' : 'bg-zinc-600'}`} />
+                              <span className="text-sm text-zinc-300">{login.time}</span>
+                              <span className="text-sm text-zinc-500">-</span>
+                              <span className="text-sm text-zinc-400">{login.device}, {login.location}</span>
+                            </div>
+                            {login.current && (
+                              <span className="text-xs text-emerald-400">Current</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Danger Zone */}
                   <Card className="bg-red-900/20 border-red-500/30">
                     <CardHeader>
-                      <CardTitle className="text-red-400 flex items-center gap-2 text-base md:text-lg">
-                        <AlertTriangle className="h-4 w-4 md:h-5 md:w-5" />
+                      <CardTitle className="text-red-400 flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5" />
                         Danger Zone
                       </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <p className="text-xs md:text-sm text-zinc-400 mb-4">
+                      <p className="text-sm text-zinc-400 mb-4">
                         Once you delete your account, there is no going back. Please be certain.
                       </p>
-                      <Button variant="outline" className="border-red-700 text-red-400 hover:bg-red-900/20 w-full sm:w-auto text-xs md:text-sm">
+                      <Button variant="outline" className="border-red-700 text-red-400 hover:bg-red-900/20">
                         Delete Account
                       </Button>
                     </CardContent>
