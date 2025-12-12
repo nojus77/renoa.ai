@@ -78,6 +78,13 @@ export async function POST(request: NextRequest) {
       certifications,
       avatar,
       onboardingCompleted,
+      // New onboarding fields
+      phone,
+      primaryCategory,
+      businessEntity,
+      employeeCount,
+      licenseNumber,
+      insuranceProvider,
     } = body;
 
     if (!providerId) {
@@ -99,6 +106,13 @@ export async function POST(request: NextRequest) {
     if (certifications !== undefined) updateData.certifications = certifications;
     if (avatar !== undefined) updateData.avatar = avatar;
     if (onboardingCompleted !== undefined) updateData.onboardingCompleted = onboardingCompleted;
+    // New onboarding fields
+    if (phone !== undefined) updateData.phone = phone;
+    if (primaryCategory !== undefined) updateData.serviceTypes = [primaryCategory, ...(serviceTypes || [])];
+    if (businessEntity !== undefined) updateData.businessEntity = businessEntity;
+    if (employeeCount !== undefined) updateData.activeSeats = employeeCount === '50+' ? 50 : parseInt(employeeCount.split('-')[0]) || 1;
+    if (licenseNumber !== undefined) updateData.taxId = licenseNumber; // Store license in taxId field
+    if (insuranceProvider !== undefined) updateData.availabilityNotes = insuranceProvider ? `Insurance: ${insuranceProvider}` : null;
 
     const updatedProvider = await prisma.provider.update({
       where: { id: providerId },
