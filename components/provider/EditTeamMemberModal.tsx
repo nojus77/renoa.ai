@@ -376,14 +376,13 @@ export default function EditTeamMemberModal({
             </div>
           </div>
 
-          {/* Skills & Preferences Section */}
+          {/* Skills, Equipment & Certifications Section */}
           <div className="space-y-4">
             <h3 className="text-sm font-medium text-zinc-300 border-b border-zinc-800 pb-2">
-              Skills & Preferences
+              Skills, Equipment & Certifications
             </h3>
 
-            <div className="space-y-2">
-              <Label className="text-zinc-200">Skills</Label>
+            <div>
               {member && (
                 <SkillsCheckboxPicker
                   workerId={member.id}

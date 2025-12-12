@@ -35,7 +35,7 @@ interface SkillsCheckboxPickerProps {
 
 // Map provider categories to relevant skill categories
 const CATEGORY_SKILL_MAP: Record<string, string[]> = {
-  'Landscaping & Lawn Care': ['Landscaping', 'Irrigation', 'Equipment', 'Certifications'],
+  'Landscaping & Lawn Care': ['Landscaping', 'Irrigation', 'Hardscaping', 'Equipment', 'Certifications'],
   'Tree Service': ['Tree Work', 'Equipment', 'Safety', 'Certifications'],
   'Roofing': ['Roofing', 'Safety', 'Equipment', 'Certifications'],
   'Plumbing': ['Plumbing', 'Equipment', 'Certifications'],
@@ -43,13 +43,25 @@ const CATEGORY_SKILL_MAP: Record<string, string[]> = {
   'HVAC': ['HVAC', 'Equipment', 'Certifications'],
   'Painting': ['Painting', 'Equipment', 'Certifications'],
   'Cleaning': ['Cleaning', 'Equipment', 'Certifications'],
-  'General Contracting': ['General', 'Equipment', 'Safety', 'Certifications'],
+  'General Contracting': ['General', 'Hardscaping', 'Equipment', 'Safety', 'Certifications'],
   'Pest Control': ['Pest Control', 'Equipment', 'Certifications'],
   'Pool Service': ['Pool Service', 'Equipment', 'Certifications'],
   'Window Cleaning': ['Window Cleaning', 'Equipment', 'Safety', 'Certifications'],
   'Pressure Washing': ['Pressure Washing', 'Equipment', 'Certifications'],
   'Moving': ['Moving', 'Equipment', 'Certifications'],
-  'Handyman': ['Handyman', 'Equipment', 'Certifications'],
+  'Handyman': ['Handyman', 'General', 'Equipment', 'Certifications'],
+};
+
+// Group categories into main sections for clear UI organization
+const SECTION_GROUPS = {
+  skills: [
+    'Landscaping', 'Irrigation', 'Hardscaping', 'Tree Work', 'Roofing',
+    'Plumbing', 'Electrical', 'HVAC', 'Painting', 'Cleaning', 'General',
+    'Pest Control', 'Pool Service', 'Window Cleaning', 'Pressure Washing',
+    'Moving', 'Handyman'
+  ],
+  equipment: ['Equipment', 'Safety'],
+  certifications: ['Certifications'],
 };
 
 // Default skills by category
@@ -427,35 +439,13 @@ export default function SkillsCheckboxPicker({
 
   const relevantCategories = getRelevantCategories();
 
-  return (
-    <div className="space-y-3">
-      {/* Assigned Skills Preview */}
-      {workerSkills.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 pb-2 border-b border-zinc-800">
-          {workerSkills.map((ws) => (
-            <Badge
-              key={ws.id}
-              variant="secondary"
-              className="bg-emerald-500/20 text-emerald-300 border-emerald-500/30 flex items-center gap-1"
-            >
-              {ws.skill.name}
-              {ws.skill.isCustom && <span className="text-[10px] text-emerald-400/60">Custom</span>}
-              {!disabled && (
-                <button
-                  onClick={() => handleToggleSkill(ws.skill, false)}
-                  className="ml-1 hover:text-red-400 transition-colors"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </Badge>
-          ))}
-        </div>
-      )}
+  // Group categories into sections
+  const skillCategories = relevantCategories.filter(c => SECTION_GROUPS.skills.includes(c));
+  const equipmentCategories = relevantCategories.filter(c => SECTION_GROUPS.equipment.includes(c));
+  const certificationCategories = relevantCategories.filter(c => SECTION_GROUPS.certifications.includes(c));
 
-      {/* Collapsible Categories */}
-      <div className="space-y-2 max-h-[400px] overflow-y-auto">
-        {relevantCategories.map((category) => {
+  // Helper function to render a category section
+  const renderCategory = (category: string) => {
           const skills = getSkillsForCategory(category);
           const isExpanded = expandedCategories.has(category);
           const assignedInCategory = skills.filter(
@@ -637,8 +627,54 @@ export default function SkillsCheckboxPicker({
               )}
             </div>
           );
-        })}
-      </div>
+  };
+
+  return (
+    <div className="space-y-5">
+      {/* Skills Section */}
+      {skillCategories.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h4 className="text-xs font-semibold text-blue-400 uppercase tracking-wide">
+              Skills
+            </h4>
+            <span className="text-xs text-zinc-500">— What they can do</span>
+          </div>
+          <div className="space-y-2">
+            {skillCategories.map((category) => renderCategory(category))}
+          </div>
+        </div>
+      )}
+
+      {/* Equipment Section */}
+      {equipmentCategories.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h4 className="text-xs font-semibold text-amber-400 uppercase tracking-wide">
+              Equipment
+            </h4>
+            <span className="text-xs text-zinc-500">— Tools & vehicles they can operate</span>
+          </div>
+          <div className="space-y-2">
+            {equipmentCategories.map((category) => renderCategory(category))}
+          </div>
+        </div>
+      )}
+
+      {/* Certifications Section */}
+      {certificationCategories.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-wide">
+              Certifications
+            </h4>
+            <span className="text-xs text-zinc-500">— Licenses & training they have</span>
+          </div>
+          <div className="space-y-2">
+            {certificationCategories.map((category) => renderCategory(category))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

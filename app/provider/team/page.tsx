@@ -1228,84 +1228,10 @@ export default function TeamManagementPage() {
                           </div>
 
                           {inviteRole === 'field' && (
-                            <div className="space-y-2">
-                              <Label className="text-zinc-200">Skills</Label>
-
-                              {/* Selected skills as badges */}
-                              {inviteSelectedSkills.length > 0 && (
-                                <div className="flex flex-wrap gap-2 mb-2">
-                                  {inviteSelectedSkills.map(skillId => {
-                                    const skill = availableSkills.find(s => s.id === skillId);
-                                    return (
-                                      <Badge key={skillId} variant="secondary" className="flex items-center gap-1 bg-zinc-800 text-zinc-300">
-                                        {skill?.name}
-                                        <X
-                                          className="w-3 h-3 cursor-pointer hover:text-red-400"
-                                          onClick={() => setInviteSelectedSkills(prev => prev.filter(id => id !== skillId))}
-                                        />
-                                      </Badge>
-                                    );
-                                  })}
-                                </div>
-                              )}
-
-                              {/* Searchable dropdown */}
-                              <Popover open={inviteSkillsPopoverOpen} onOpenChange={setInviteSkillsPopoverOpen}>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="w-full justify-start text-zinc-400 border-zinc-700 hover:bg-zinc-800"
-                                  >
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add skills...
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-72 p-0 bg-zinc-900 border-zinc-700">
-                                  <div className="p-2 border-b border-zinc-700">
-                                    <div className="relative">
-                                      <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                                      <Input
-                                        placeholder="Search skills..."
-                                        value={inviteSkillSearch}
-                                        onChange={(e) => setInviteSkillSearch(e.target.value)}
-                                        className="pl-8 h-8 text-sm bg-zinc-800 border-zinc-700 text-zinc-100"
-                                        autoFocus
-                                      />
-                                    </div>
-                                  </div>
-                                  <div
-                                    className="max-h-48 overflow-y-auto overscroll-contain p-1"
-                                    onWheel={(e) => e.stopPropagation()}
-                                  >
-                                    {availableSkills
-                                      .filter(s => !inviteSelectedSkills.includes(s.id))
-                                      .filter(s => s.name.toLowerCase().includes(inviteSkillSearch.toLowerCase()))
-                                      .map(skill => (
-                                        <button
-                                          key={skill.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setInviteSelectedSkills(prev => [...prev, skill.id]);
-                                            setInviteSkillSearch('');
-                                          }}
-                                          className="w-full text-left px-2 py-1.5 text-sm text-zinc-300 rounded hover:bg-zinc-700"
-                                        >
-                                          {skill.name}
-                                        </button>
-                                      ))
-                                    }
-                                    {availableSkills
-                                      .filter(s => !inviteSelectedSkills.includes(s.id))
-                                      .filter(s => s.name.toLowerCase().includes(inviteSkillSearch.toLowerCase()))
-                                      .length === 0 && (
-                                      <div className="p-3 text-center text-sm text-zinc-500">
-                                        No skills found
-                                      </div>
-                                    )}
-                                  </div>
-                                </PopoverContent>
-                              </Popover>
+                            <div className="p-3 bg-zinc-900/50 border border-zinc-800 rounded-lg">
+                              <p className="text-xs text-zinc-400">
+                                You can assign skills, equipment, and certifications after the team member is added.
+                              </p>
                             </div>
                           )}
 
