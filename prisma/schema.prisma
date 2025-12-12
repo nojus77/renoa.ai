@@ -447,6 +447,7 @@ model Provider {
   skills                     Skill[]                      @relation("ProviderSkills")
   notifications              Notification[]               @relation("ProviderNotifications")
   workLogs                   WorkLog[]                    @relation("ProviderWorkLogs")
+  statusLogs                 UserStatusLog[]              @relation("ProviderStatusLogs")
 }
 
 model Notification {
@@ -486,16 +487,37 @@ model ProviderUser {
   homeAddress       String?             @map("home_address") // For travel distance calculations
   homeLatitude      Float?              @map("home_latitude")
   homeLongitude     Float?              @map("home_longitude")
+  // Login tracking for billing fraud prevention
+  lastLoginAt       DateTime?           @map("last_login_at")
   createdAt         DateTime            @default(now()) @map("created_at")
   updatedAt         DateTime            @updatedAt @map("updated_at")
   provider          Provider            @relation("ProviderUsers", fields: [providerId], references: [id], onDelete: Cascade)
   workerSkills      ProviderUserSkill[] @relation("UserSkills")
   workLogs          WorkLog[]           @relation("UserWorkLogs")
+  statusLogs        UserStatusLog[]     @relation("UserStatusLogs")
 
   @@index([providerId])
   @@index([email])
   @@index([role])
   @@map("provider_users")
+}
+
+// Audit log for user status changes - prevents billing fraud
+model UserStatusLog {
+  id         String       @id @default(cuid())
+  userId     String       @map("user_id")
+  providerId String       @map("provider_id")
+  oldStatus  String       @map("old_status")
+  newStatus  String       @map("new_status")
+  changedBy  String       @map("changed_by") // userId of who made the change
+  changedAt  DateTime     @default(now()) @map("changed_at")
+  user       ProviderUser @relation("UserStatusLogs", fields: [userId], references: [id], onDelete: Cascade)
+  provider   Provider     @relation("ProviderStatusLogs", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([providerId])
+  @@index([changedAt])
+  @@map("user_status_logs")
 }
 
 model Crew {

@@ -35,14 +35,20 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Check if user is active
+      // Check if user is active - COMPLETELY BLOCK inactive users
       if (user.status !== 'active') {
         console.log('❌ User is inactive:', email);
         return NextResponse.json(
-          { error: 'Your account is inactive. Please contact your administrator.' },
+          { error: 'Your account has been deactivated. Contact your employer.' },
           { status: 403 }
         );
       }
+
+      // Update lastLoginAt for billing fraud prevention tracking
+      await prisma.providerUser.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      });
 
       // 🔓 DEV BYPASS - Master password for local testing only
       const DEV_BYPASS_PASSWORD = 'devpass123';

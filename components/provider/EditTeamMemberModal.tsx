@@ -8,11 +8,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Save, Trash2, User } from 'lucide-react';
+import { Loader2, Save, Trash2, User, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import SkillsTagInput from './SkillsTagInput';
 import ColorPicker from './ColorPicker';
@@ -63,6 +73,8 @@ export default function EditTeamMemberModal({
   onDelete,
 }: EditTeamMemberModalProps) {
   const [saving, setSaving] = useState(false);
+  const [showDeactivateWarning, setShowDeactivateWarning] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -164,6 +176,7 @@ export default function EditTeamMemberModal({
         body: JSON.stringify({
           providerId,
           userId,
+          changedBy: userId, // For audit logging
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
           phone: formData.phone || null,
@@ -322,7 +335,15 @@ export default function EditTeamMemberModal({
                 <Label htmlFor="status" className="text-zinc-200">Status</Label>
                 <Select
                   value={formData.status}
-                  onValueChange={(value) => setFormData({ ...formData, status: value })}
+                  onValueChange={(value) => {
+                    // Show warning when deactivating a user
+                    if (value === 'inactive' && member?.status !== 'inactive') {
+                      setPendingStatus(value);
+                      setShowDeactivateWarning(true);
+                    } else {
+                      setFormData({ ...formData, status: value });
+                    }
+                  }}
                   disabled={saving || isEditingSelf}
                 >
                   <SelectTrigger className="bg-zinc-900 border-zinc-800 text-zinc-100">
@@ -500,6 +521,50 @@ export default function EditTeamMemberModal({
           </div>
         </form>
       </DialogContent>
+
+      {/* Deactivation Warning Dialog */}
+      <AlertDialog open={showDeactivateWarning} onOpenChange={setShowDeactivateWarning}>
+        <AlertDialogContent className="bg-zinc-950 border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-red-400">
+              <AlertTriangle className="h-5 w-5" />
+              Deactivate {member?.firstName}?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-zinc-400 space-y-2">
+              <p>
+                This will <strong className="text-zinc-200">immediately log out {member?.firstName} {member?.lastName}</strong> and
+                prevent them from accessing the app.
+              </p>
+              <p>
+                They will see: &quot;Your account has been deactivated. Contact your employer.&quot;
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="bg-zinc-800 border-zinc-700 hover:bg-zinc-700"
+              onClick={() => {
+                setPendingStatus(null);
+                setShowDeactivateWarning(false);
+              }}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-500"
+              onClick={() => {
+                if (pendingStatus) {
+                  setFormData({ ...formData, status: pendingStatus });
+                }
+                setPendingStatus(null);
+                setShowDeactivateWarning(false);
+              }}
+            >
+              Deactivate
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

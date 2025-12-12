@@ -13,7 +13,20 @@ export async function PATCH(
 ) {
   try {
     const body = await request.json();
-    const { status, role, hourlyRate, payType, commissionRate, firstName, lastName, phone, skills, color } = body;
+    const { status, role, hourlyRate, payType, commissionRate, firstName, lastName, phone, skills, color, changedBy } = body;
+
+    // Get current user data before update (for status change logging)
+    const currentUser = await prisma.providerUser.findUnique({
+      where: { id: params.id },
+      select: { status: true, providerId: true },
+    });
+
+    if (!currentUser) {
+      return NextResponse.json(
+        { error: 'Team member not found' },
+        { status: 404 }
+      );
+    }
 
     // Build update data object
     const updateData: Record<string, unknown> = {};
@@ -32,6 +45,20 @@ export async function PATCH(
       where: { id: params.id },
       data: updateData,
     });
+
+    // Log status change for audit trail (billing fraud prevention)
+    if (status !== undefined && status !== currentUser.status) {
+      await prisma.userStatusLog.create({
+        data: {
+          userId: params.id,
+          providerId: currentUser.providerId,
+          oldStatus: currentUser.status,
+          newStatus: status,
+          changedBy: changedBy || 'unknown',
+        },
+      });
+      console.log(`📋 Status change logged: ${currentUser.status} → ${status} for user ${params.id}`);
+    }
 
     return NextResponse.json(updated);
   } catch (error: any) {
