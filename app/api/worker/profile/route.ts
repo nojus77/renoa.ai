@@ -65,3 +65,56 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+// PUT - Update worker profile (limited fields - workers can only edit their own basic info)
+export async function PUT(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { userId, firstName, lastName, phone } = body;
+
+    if (!userId) {
+      return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
+    }
+
+    // Validate required fields
+    if (!firstName?.trim() || !lastName?.trim()) {
+      return NextResponse.json({ error: 'First name and last name are required' }, { status: 400 });
+    }
+
+    // Optional phone validation
+    if (phone) {
+      const phoneDigits = phone.replace(/\D/g, '');
+      if (phoneDigits.length > 0 && phoneDigits.length !== 10) {
+        return NextResponse.json({ error: 'Phone number must be 10 digits' }, { status: 400 });
+      }
+    }
+
+    const updated = await prisma.providerUser.update({
+      where: { id: userId },
+      data: {
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        phone: phone || null,
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+      },
+    });
+
+    return NextResponse.json({ success: true, user: updated });
+  } catch (error: any) {
+    console.error('Error updating worker profile:', error);
+
+    if (error.code === 'P2025') {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    return NextResponse.json(
+      { error: 'Failed to update profile' },
+      { status: 500 }
+    );
+  }
+}

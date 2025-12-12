@@ -24,8 +24,19 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Save, Trash2, User, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
-import SkillsTagInput from './SkillsTagInput';
+import SkillsCheckboxPicker from './SkillsCheckboxPicker';
 import ColorPicker from './ColorPicker';
+
+interface WorkerSkill {
+  id: string;
+  skillId: string;
+  level: string;
+  skill: {
+    id: string;
+    name: string;
+    category?: string | null;
+  };
+}
 
 interface TeamMember {
   id: string;
@@ -36,6 +47,7 @@ interface TeamMember {
   role: string;
   status: string;
   skills: string[];
+  workerSkills?: WorkerSkill[];
   color?: string | null;
   hourlyRate?: number | null;
   payType?: string | null;
@@ -75,13 +87,13 @@ export default function EditTeamMemberModal({
   const [saving, setSaving] = useState(false);
   const [showDeactivateWarning, setShowDeactivateWarning] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string | null>(null);
+  const [workerSkills, setWorkerSkills] = useState<WorkerSkill[]>([]);
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
     phone: '',
     role: 'field',
     status: 'active',
-    skills: [] as string[],
     color: '',
     hourlyRate: '',
     payType: 'hourly',
@@ -97,12 +109,12 @@ export default function EditTeamMemberModal({
         phone: member.phone || '',
         role: member.role || 'field',
         status: member.status || 'active',
-        skills: member.skills || [],
         color: member.color || '',
         hourlyRate: member.hourlyRate ? String(member.hourlyRate) : '',
         payType: member.payType || 'hourly',
         commissionRate: member.commissionRate ? String(member.commissionRate) : '',
       });
+      setWorkerSkills(member.workerSkills || []);
     }
   }, [member]);
 
@@ -182,7 +194,6 @@ export default function EditTeamMemberModal({
           phone: formData.phone || null,
           role: formData.role,
           status: formData.status,
-          skills: formData.skills,
           color: formData.color || null,
           hourlyRate: formData.hourlyRate ? parseFloat(formData.hourlyRate) : null,
           payType: formData.payType || null,
@@ -372,11 +383,14 @@ export default function EditTeamMemberModal({
 
             <div className="space-y-2">
               <Label className="text-zinc-200">Skills</Label>
-              <SkillsTagInput
-                skills={formData.skills}
-                onChange={(skills) => setFormData({ ...formData, skills })}
-                disabled={saving}
-              />
+              {member && (
+                <SkillsCheckboxPicker
+                  workerId={member.id}
+                  workerSkills={workerSkills}
+                  onSkillsChange={setWorkerSkills}
+                  disabled={saving}
+                />
+              )}
             </div>
 
             <div className="space-y-2">
