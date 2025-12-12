@@ -290,10 +290,12 @@ export default function TeamManagementPage() {
   const handleTimeOffAction = async (requestId: string, action: 'approved' | 'denied') => {
     setProcessingTimeOff(requestId);
     try {
+      // API expects 'approve' or 'deny', not 'approved' or 'denied'
+      const apiAction = action === 'approved' ? 'approve' : 'deny';
       const res = await fetch(`/api/provider/time-off/${requestId}/approve`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: action }),
+        body: JSON.stringify({ action: apiAction }),
       });
 
       if (res.ok) {
