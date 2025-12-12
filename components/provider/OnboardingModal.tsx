@@ -152,11 +152,11 @@ export default function OnboardingModal({
   const canProceedToStep = (step: number): boolean => {
     switch (step) {
       case 2:
-        return formData.businessName.trim() !== '' && formData.serviceTypes.length > 0;
+        return true; // Welcome screen -> Profile setup (always allowed)
       case 3:
-        return true; // Photo is optional
+        return formData.businessName.trim() !== '' && formData.serviceTypes.length > 0; // Need business name & services to proceed
       case 4:
-        return true; // Availability is optional
+        return true; // Photo is optional
       default:
         return true;
     }
