@@ -665,10 +665,17 @@ export default function JobDetailPage() {
 
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files || !job) return;
+    if (!files || files.length === 0 || !job) {
+      console.log('No files selected or no job');
+      return;
+    }
+
+    console.log('Uploading files:', files.length);
+    toast.info(`Uploading ${files.length} file(s)...`);
 
     const formData = new FormData();
-    Array.from(files).forEach((file) => {
+    Array.from(files).forEach((file, index) => {
+      console.log(`File ${index + 1}:`, file.name, file.type, file.size);
       formData.append('files', file);
     });
     formData.append('jobId', job.id);
@@ -680,15 +687,21 @@ export default function JobDetailPage() {
         body: formData,
       });
 
+      console.log('Upload response status:', res.status);
+
       if (res.ok) {
-        toast.success('Media uploaded');
+        const data = await res.json();
+        console.log('Upload success:', data);
+        toast.success('Media uploaded successfully');
         fetchMedia(job.id);
       } else {
-        toast.error('Failed to upload media');
+        const errorData = await res.json().catch(() => ({}));
+        console.error('Upload failed:', res.status, errorData);
+        toast.error(errorData.error || 'Failed to upload media');
       }
     } catch (error) {
       console.error('Error uploading media:', error);
-      toast.error('Failed to upload media');
+      toast.error('Upload failed - check console for details');
     }
 
     if (fileInputRef.current) {
@@ -1181,22 +1194,52 @@ export default function JobDetailPage() {
 
                 {showServiceDropdown && (
                   <div className="absolute z-20 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
-                    {Object.entries(SERVICES_CATALOG).map(([category, services]) => (
-                      <div key={category}>
-                        <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/50">
-                          {category}
+                    {(() => {
+                      // Filter services based on current job type
+                      const jobType = job?.serviceType || '';
+                      const matchedCategory = Object.keys(SERVICES_CATALOG).find(
+                        cat => jobType.toLowerCase().includes(cat.toLowerCase()) || cat.toLowerCase().includes(jobType.toLowerCase())
+                      );
+
+                      if (matchedCategory) {
+                        // Show only services for the matched category
+                        const services = SERVICES_CATALOG[matchedCategory as keyof typeof SERVICES_CATALOG];
+                        return (
+                          <div>
+                            <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/50">
+                              {matchedCategory} Services
+                            </div>
+                            {services.map((service) => (
+                              <button
+                                key={service.id}
+                                onClick={() => handleAddService(service.id, service.name)}
+                                className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700"
+                              >
+                                {service.name}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      }
+
+                      // Fallback: show all services if no match
+                      return Object.entries(SERVICES_CATALOG).map(([category, services]) => (
+                        <div key={category}>
+                          <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/50">
+                            {category}
+                          </div>
+                          {services.map((service) => (
+                            <button
+                              key={service.id}
+                              onClick={() => handleAddService(service.id, service.name)}
+                              className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700"
+                            >
+                              {service.name}
+                            </button>
+                          ))}
                         </div>
-                        {services.map((service) => (
-                          <button
-                            key={service.id}
-                            onClick={() => handleAddService(service.id, service.name)}
-                            className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700"
-                          >
-                            {service.name}
-                          </button>
-                        ))}
-                      </div>
-                    ))}
+                      ));
+                    })()}
                   </div>
                 )}
               </div>
@@ -1743,11 +1786,14 @@ export default function JobDetailPage() {
 
       {/* Customer History Modal */}
       {showCustomerHistory && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center">
-          <div className="bg-zinc-900 w-full max-w-md max-h-[80vh] rounded-t-2xl sm:rounded-2xl border border-zinc-800 flex flex-col">
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
+          <div className="bg-zinc-900 w-full max-w-md max-h-[85vh] rounded-2xl border border-zinc-800 flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
-              <h2 className="text-lg font-semibold text-white">Customer History</h2>
+              <div>
+                <h2 className="text-lg font-semibold text-white">Customer History</h2>
+                <p className="text-sm text-zinc-500">{job?.customer.name}</p>
+              </div>
               <button
                 onClick={() => setShowCustomerHistory(false)}
                 className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
@@ -1831,6 +1877,16 @@ export default function JobDetailPage() {
                   <p className="text-zinc-500">No previous jobs with this customer</p>
                 </div>
               )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-zinc-800 shrink-0">
+              <button
+                onClick={() => setShowCustomerHistory(false)}
+                className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import WorkerLayout from '@/components/worker/WorkerLayout';
-import { ChevronLeft, ChevronRight, MapPin, Clock, Loader2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, MapPin, Clock, Loader2, Calendar, X } from 'lucide-react';
 
 interface Job {
   id: string;
@@ -36,6 +36,8 @@ export default function WorkerSchedule() {
   const [selectedDay, setSelectedDay] = useState<string>(
     new Date().toISOString().split('T')[0]
   );
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
 
   const fetchJobs = useCallback(async (uid: string, startDate: Date) => {
     setLoading(true);
@@ -122,20 +124,26 @@ export default function WorkerSchedule() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-bold text-white">Schedule</h1>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={() => changeWeek(-1)}
               className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700"
             >
               <ChevronLeft className="w-5 h-5 text-zinc-400" />
             </button>
-            <span className="text-sm text-zinc-400 min-w-[140px] text-center">
+            <span className="text-sm text-zinc-400 min-w-[110px] text-center">
               {weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} -{' '}
               {new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000).toLocaleDateString(
                 'en-US',
                 { month: 'short', day: 'numeric' }
               )}
             </span>
+            <button
+              onClick={() => setShowCalendar(true)}
+              className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700"
+            >
+              <Calendar className="w-5 h-5 text-[#a3e635]" />
+            </button>
             <button
               onClick={() => changeWeek(1)}
               className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700"
@@ -158,7 +166,7 @@ export default function WorkerSchedule() {
                 onClick={() => setSelectedDay(dateStr)}
                 className={`flex flex-col items-center py-2 rounded-lg transition-colors ${
                   isSelected
-                    ? 'bg-emerald-600 text-white'
+                    ? 'bg-[#a3e635] text-zinc-900'
                     : isToday(day)
                     ? 'bg-zinc-800 text-white'
                     : 'text-zinc-400 hover:bg-zinc-800'
@@ -171,7 +179,7 @@ export default function WorkerSchedule() {
                 {jobCount > 0 && (
                   <span
                     className={`text-[10px] px-1.5 rounded-full ${
-                      isSelected ? 'bg-emerald-500' : 'bg-zinc-700'
+                      isSelected ? 'bg-[#8bc934] text-zinc-900' : 'bg-zinc-700'
                     }`}
                   >
                     {jobCount}
@@ -246,6 +254,137 @@ export default function WorkerSchedule() {
           )}
         </div>
       </div>
+
+      {/* Full Month Calendar Modal */}
+      {showCalendar && (
+        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
+          <div className="bg-zinc-900 w-full max-w-sm rounded-2xl border border-zinc-800 shadow-2xl">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <button
+                onClick={() => {
+                  const newMonth = new Date(calendarMonth);
+                  newMonth.setMonth(newMonth.getMonth() - 1);
+                  setCalendarMonth(newMonth);
+                }}
+                className="p-2 hover:bg-zinc-800 rounded-lg"
+              >
+                <ChevronLeft className="w-5 h-5 text-zinc-400" />
+              </button>
+              <h2 className="text-lg font-semibold text-white">
+                {calendarMonth.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </h2>
+              <button
+                onClick={() => {
+                  const newMonth = new Date(calendarMonth);
+                  newMonth.setMonth(newMonth.getMonth() + 1);
+                  setCalendarMonth(newMonth);
+                }}
+                className="p-2 hover:bg-zinc-800 rounded-lg"
+              >
+                <ChevronRight className="w-5 h-5 text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Calendar Grid */}
+            <div className="p-4">
+              {/* Day Headers */}
+              <div className="grid grid-cols-7 gap-1 mb-2">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
+                  <div key={day} className="text-center text-xs text-zinc-500 font-medium py-1">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              {/* Calendar Days */}
+              <div className="grid grid-cols-7 gap-1">
+                {(() => {
+                  const year = calendarMonth.getFullYear();
+                  const month = calendarMonth.getMonth();
+                  const firstDay = new Date(year, month, 1).getDay();
+                  const daysInMonth = new Date(year, month + 1, 0).getDate();
+                  const today = new Date().toISOString().split('T')[0];
+                  const days = [];
+
+                  // Empty cells for days before month starts
+                  for (let i = 0; i < firstDay; i++) {
+                    days.push(<div key={`empty-${i}`} className="aspect-square" />);
+                  }
+
+                  // Days of the month
+                  for (let day = 1; day <= daysInMonth; day++) {
+                    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                    const isSelected = selectedDay === dateStr;
+                    const isToday = dateStr === today;
+                    const hasJobs = jobsByDay[dateStr]?.length > 0;
+
+                    days.push(
+                      <button
+                        key={dateStr}
+                        onClick={() => {
+                          setSelectedDay(dateStr);
+                          // Update week to include this day
+                          const selectedDate = new Date(dateStr);
+                          const dayOfWeek = selectedDate.getDay();
+                          const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                          const monday = new Date(selectedDate);
+                          monday.setDate(selectedDate.getDate() + mondayOffset);
+                          monday.setHours(0, 0, 0, 0);
+                          setWeekStart(monday);
+                          setShowCalendar(false);
+                        }}
+                        className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm transition-colors relative ${
+                          isSelected
+                            ? 'bg-[#a3e635] text-zinc-900 font-bold'
+                            : isToday
+                            ? 'bg-zinc-800 text-white'
+                            : 'text-zinc-400 hover:bg-zinc-800'
+                        }`}
+                      >
+                        {day}
+                        {hasJobs && !isSelected && (
+                          <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-[#a3e635]" />
+                        )}
+                      </button>
+                    );
+                  }
+
+                  return days;
+                })()}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-zinc-800 flex gap-2">
+              <button
+                onClick={() => {
+                  const today = new Date();
+                  const todayStr = today.toISOString().split('T')[0];
+                  setSelectedDay(todayStr);
+                  setCalendarMonth(today);
+                  const dayOfWeek = today.getDay();
+                  const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+                  const monday = new Date(today);
+                  monday.setDate(today.getDate() + mondayOffset);
+                  monday.setHours(0, 0, 0, 0);
+                  setWeekStart(monday);
+                  setShowCalendar(false);
+                }}
+                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+              >
+                Today
+              </button>
+              <button
+                onClick={() => setShowCalendar(false)}
+                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </WorkerLayout>
   );
 }

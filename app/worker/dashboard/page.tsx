@@ -431,8 +431,27 @@ export default function WorkerDashboard() {
   return (
     <WorkerLayout>
       <div className="p-4 space-y-6">
-        {/* Header - Action buttons only */}
-        <div className="flex items-center justify-end">
+        {/* Header with Clock */}
+        <div className="flex items-center justify-between">
+          {/* Clock Display */}
+          <div>
+            <p className="text-2xl font-bold text-[#a3e635]">
+              {currentTime.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              })}
+            </p>
+            <p className="text-sm text-zinc-400">
+              {currentTime.toLocaleDateString('en-US', {
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              })}
+            </p>
+          </div>
+
+          {/* Action Buttons */}
           <div className="flex items-center gap-2">
             {canCreateJobs && (
               <button
@@ -565,24 +584,6 @@ export default function WorkerDashboard() {
           )}
         </div>
 
-        {/* Large Clock & Date Display */}
-        <div className="py-8 text-center">
-          <p className="text-5xl font-bold text-[#a3e635]">
-            {currentTime.toLocaleTimeString('en-US', {
-              hour: 'numeric',
-              minute: '2-digit',
-              hour12: true,
-            })}
-          </p>
-          <p className="text-lg text-zinc-400 mt-2">
-            {currentTime.toLocaleDateString('en-US', {
-              weekday: 'long',
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
-            })}
-          </p>
-        </div>
       </div>
 
       {/* Create Job Modal */}
