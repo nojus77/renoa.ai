@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import WorkerLayout from '@/components/worker/WorkerLayout';
 import {
@@ -16,6 +16,10 @@ import {
   Calendar,
   CalendarX,
   Clock,
+  UserPlus,
+  Phone,
+  Mail,
+  MapPin,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -79,6 +83,7 @@ export default function WorkerDashboard() {
   const [stats, setStats] = useState<DayStats>({ jobsCount: 0, hoursWorked: 0, earnings: 0 });
   const [canCreateJobs, setCanCreateJobs] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const scrollPositionRef = useRef(0);
 
   // Job creation modal state
   const [showCreateJob, setShowCreateJob] = useState(false);
@@ -86,6 +91,13 @@ export default function WorkerDashboard() {
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [creatingJob, setCreatingJob] = useState(false);
+  const [isNewCustomer, setIsNewCustomer] = useState(false);
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+  });
   const [newJob, setNewJob] = useState({
     serviceType: '',
     date: new Date().toISOString().split('T')[0],
@@ -93,6 +105,30 @@ export default function WorkerDashboard() {
     endTime: '10:00',
     notes: '',
   });
+
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    if (showCreateJob) {
+      scrollPositionRef.current = window.scrollY;
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.top = `-${scrollPositionRef.current}px`;
+    } else {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+      window.scrollTo(0, scrollPositionRef.current);
+    }
+
+    return () => {
+      document.body.style.overflow = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.top = '';
+    };
+  }, [showCreateJob]);
 
   const fetchJobs = useCallback(async (uid: string) => {
     try {
@@ -188,19 +224,51 @@ export default function WorkerDashboard() {
 
   // Customer search with debounce
   useEffect(() => {
-    if (showCreateJob && providerId) {
+    if (showCreateJob && providerId && !isNewCustomer) {
       const timer = setTimeout(() => {
         fetchCustomers(providerId, customerSearch);
       }, 300);
       return () => clearTimeout(timer);
     }
-  }, [customerSearch, showCreateJob, providerId, fetchCustomers]);
+  }, [customerSearch, showCreateJob, providerId, fetchCustomers, isNewCustomer]);
+
+  const formatPhoneNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    if (digits.length <= 3) return digits;
+    if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+    return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6, 10)}`;
+  };
+
+  const closeModal = () => {
+    setShowCreateJob(false);
+    setSelectedCustomer(null);
+    setCustomerSearch('');
+    setIsNewCustomer(false);
+    setNewCustomer({ name: '', phone: '', email: '', address: '' });
+  };
 
   const handleCreateJob = async () => {
-    if (!selectedCustomer) {
-      toast.error('Please select a customer');
-      return;
+    // Validate based on customer mode
+    if (isNewCustomer) {
+      if (!newCustomer.name.trim()) {
+        toast.error('Please enter customer name');
+        return;
+      }
+      if (!newCustomer.phone.trim()) {
+        toast.error('Please enter customer phone');
+        return;
+      }
+      if (!newCustomer.address.trim()) {
+        toast.error('Please enter customer address');
+        return;
+      }
+    } else {
+      if (!selectedCustomer) {
+        toast.error('Please select a customer');
+        return;
+      }
     }
+
     if (!newJob.serviceType.trim()) {
       toast.error('Please enter a service type');
       return;
@@ -211,15 +279,44 @@ export default function WorkerDashboard() {
       const startDateTime = new Date(`${newJob.date}T${newJob.startTime}`);
       const endDateTime = new Date(`${newJob.date}T${newJob.endTime}`);
 
+      // If new customer, create customer first
+      let customerId = selectedCustomer?.id;
+      let customerAddress = selectedCustomer?.address;
+
+      if (isNewCustomer) {
+        const customerRes = await fetch('/api/provider/customers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            providerId,
+            name: newCustomer.name.trim(),
+            phone: newCustomer.phone.trim(),
+            email: newCustomer.email.trim() || null,
+            address: newCustomer.address.trim(),
+          }),
+        });
+
+        const customerData = await customerRes.json();
+
+        if (!customerRes.ok || !customerData.customer) {
+          toast.error(customerData.error || 'Failed to create customer');
+          setCreatingJob(false);
+          return;
+        }
+
+        customerId = customerData.customer.id;
+        customerAddress = newCustomer.address.trim();
+      }
+
       const res = await fetch('/api/worker/jobs/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId,
           providerId,
-          customerId: selectedCustomer.id,
+          customerId,
           serviceType: newJob.serviceType.trim(),
-          address: selectedCustomer.address,
+          address: customerAddress,
           startTime: startDateTime.toISOString(),
           endTime: endDateTime.toISOString(),
           notes: newJob.notes.trim() || null,
@@ -230,9 +327,7 @@ export default function WorkerDashboard() {
 
       if (data.success) {
         toast.success(data.message);
-        setShowCreateJob(false);
-        setSelectedCustomer(null);
-        setCustomerSearch('');
+        closeModal();
         setNewJob({
           serviceType: '',
           date: new Date().toISOString().split('T')[0],
@@ -329,6 +424,14 @@ export default function WorkerDashboard() {
       );
     }
     return null;
+  };
+
+  // Check if form is valid for submission
+  const isFormValid = () => {
+    if (isNewCustomer) {
+      return newCustomer.name.trim() && newCustomer.phone.trim() && newCustomer.address.trim() && newJob.serviceType.trim();
+    }
+    return selectedCustomer && newJob.serviceType.trim();
   };
 
   if (loading) {
@@ -500,94 +603,196 @@ export default function WorkerDashboard() {
 
       {/* Create Job Modal */}
       {showCreateJob && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+        <div
+          className="fixed inset-0 z-50"
+          onTouchMove={(e) => e.stopPropagation()}
+        >
           {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/70"
-            onClick={() => {
-              setShowCreateJob(false);
-              setSelectedCustomer(null);
-              setCustomerSearch('');
-            }}
-          />
+          <div className="absolute inset-0 bg-black/60" onClick={closeModal} />
 
-          {/* Modal */}
-          <div className="relative bg-zinc-900 w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[85vh] flex flex-col border border-zinc-800">
-            {/* Header - fixed */}
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
+          {/* Modal container */}
+          <div className="absolute bottom-0 left-0 right-0 bg-zinc-900 rounded-t-2xl max-h-[80vh] flex flex-col border-t border-zinc-800">
+            {/* Header - shrink-0 keeps it fixed */}
+            <div className="shrink-0 p-4 border-b border-zinc-800 flex justify-between items-center">
               <h2 className="text-lg font-semibold text-white">Add New Job</h2>
               <button
-                onClick={() => {
-                  setShowCreateJob(false);
-                  setSelectedCustomer(null);
-                  setCustomerSearch('');
-                }}
+                onClick={closeModal}
                 className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-zinc-400" />
               </button>
             </div>
 
-            {/* Content - scrollable */}
-            <div className="p-4 overflow-y-auto flex-1 space-y-4">
-              {/* Customer Selection */}
-              <div className="space-y-2">
-                <label className="text-base font-medium text-zinc-300">Customer</label>
-                {selectedCustomer ? (
-                  <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-[#a3e635]/30">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-[#a3e635]/20 flex items-center justify-center">
-                        <User className="w-5 h-5 text-[#a3e635]" />
-                      </div>
-                      <div>
-                        <p className="text-white font-medium">{selectedCustomer.name}</p>
-                        <p className="text-zinc-400 text-sm">{selectedCustomer.address}</p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setSelectedCustomer(null)}
-                      className="p-1 hover:bg-zinc-700 rounded"
-                    >
-                      <X className="w-4 h-4 text-zinc-400" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
+            {/* Scrollable content */}
+            <div
+              className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4"
+              onTouchMove={(e) => e.stopPropagation()}
+            >
+              {/* Customer Type Toggle */}
+              <div className="flex gap-2 p-1 bg-zinc-800 rounded-lg">
+                <button
+                  onClick={() => {
+                    setIsNewCustomer(false);
+                    setNewCustomer({ name: '', phone: '', email: '', address: '' });
+                  }}
+                  className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                    !isNewCustomer
+                      ? 'bg-[#a3e635] text-zinc-900'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <User className="w-4 h-4 inline mr-1.5" />
+                  Existing Customer
+                </button>
+                <button
+                  onClick={() => {
+                    setIsNewCustomer(true);
+                    setSelectedCustomer(null);
+                    setCustomerSearch('');
+                  }}
+                  className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-colors ${
+                    isNewCustomer
+                      ? 'bg-[#a3e635] text-zinc-900'
+                      : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <UserPlus className="w-4 h-4 inline mr-1.5" />
+                  New Customer
+                </button>
+              </div>
+
+              {/* Customer Selection / Creation */}
+              {isNewCustomer ? (
+                <div className="space-y-3">
+                  {/* Customer Name */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-zinc-300">
+                      Customer Name <span className="text-red-400">*</span>
+                    </label>
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
                       <input
                         type="text"
-                        value={customerSearch}
-                        onChange={(e) => setCustomerSearch(e.target.value)}
-                        placeholder="Search customers..."
+                        value={newCustomer.name}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                        placeholder="John Smith"
                         className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
                         style={{ fontSize: '16px' }}
                       />
                     </div>
-                    {customers.length > 0 && (
-                      <div className="bg-zinc-800 rounded-lg border border-zinc-700 max-h-48 overflow-y-auto">
-                        {customers.map((customer) => (
-                          <button
-                            key={customer.id}
-                            onClick={() => {
-                              setSelectedCustomer(customer);
-                              setCustomerSearch('');
-                            }}
-                            className="w-full p-3 text-left hover:bg-zinc-700 border-b border-zinc-700 last:border-b-0 transition-colors"
-                          >
-                            <p className="text-white font-medium">{customer.name}</p>
-                            <p className="text-zinc-400 text-sm truncate">{customer.address}</p>
-                          </button>
-                        ))}
-                      </div>
-                    )}
                   </div>
-                )}
-              </div>
+
+                  {/* Phone */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-zinc-300">
+                      Phone <span className="text-red-400">*</span>
+                    </label>
+                    <div className="relative">
+                      <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                      <input
+                        type="tel"
+                        value={newCustomer.phone}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, phone: formatPhoneNumber(e.target.value) })}
+                        placeholder="(555) 123-4567"
+                        className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
+                        style={{ fontSize: '16px' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Email */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-zinc-300">Email (optional)</label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                      <input
+                        type="email"
+                        value={newCustomer.email}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                        placeholder="john@example.com"
+                        className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
+                        style={{ fontSize: '16px' }}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Address */}
+                  <div className="space-y-1.5">
+                    <label className="text-sm font-medium text-zinc-300">
+                      Address <span className="text-red-400">*</span>
+                    </label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                      <input
+                        type="text"
+                        value={newCustomer.address}
+                        onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                        placeholder="123 Main St, City, ST 12345"
+                        className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
+                        style={{ fontSize: '16px' }}
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-300">Select Customer</label>
+                  {selectedCustomer ? (
+                    <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-[#a3e635]/30">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-[#a3e635]/20 flex items-center justify-center">
+                          <User className="w-5 h-5 text-[#a3e635]" />
+                        </div>
+                        <div>
+                          <p className="text-white font-medium">{selectedCustomer.name}</p>
+                          <p className="text-zinc-400 text-sm">{selectedCustomer.address}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setSelectedCustomer(null)}
+                        className="p-1 hover:bg-zinc-700 rounded"
+                      >
+                        <X className="w-4 h-4 text-zinc-400" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
+                        <input
+                          type="text"
+                          value={customerSearch}
+                          onChange={(e) => setCustomerSearch(e.target.value)}
+                          placeholder="Search customers..."
+                          className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
+                          style={{ fontSize: '16px' }}
+                        />
+                      </div>
+                      {customers.length > 0 && (
+                        <div className="bg-zinc-800 rounded-lg border border-zinc-700 max-h-48 overflow-y-auto">
+                          {customers.map((customer) => (
+                            <button
+                              key={customer.id}
+                              onClick={() => {
+                                setSelectedCustomer(customer);
+                                setCustomerSearch('');
+                              }}
+                              className="w-full p-3 text-left hover:bg-zinc-700 border-b border-zinc-700 last:border-b-0 transition-colors"
+                            >
+                              <p className="text-white font-medium">{customer.name}</p>
+                              <p className="text-zinc-400 text-sm truncate">{customer.address}</p>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Service Type */}
-              <div className="space-y-2">
-                <label className="text-base font-medium text-zinc-300">Service Type</label>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-zinc-300">Service Type</label>
                 <input
                   type="text"
                   value={newJob.serviceType}
@@ -599,8 +804,8 @@ export default function WorkerDashboard() {
               </div>
 
               {/* Date */}
-              <div className="space-y-2">
-                <label className="text-base font-medium text-zinc-300">Date</label>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-zinc-300">Date</label>
                 <div className="relative">
                   <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
                   <input
@@ -615,8 +820,8 @@ export default function WorkerDashboard() {
 
               {/* Time Range */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <label className="text-base font-medium text-zinc-300">Start Time</label>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-zinc-300">Start Time</label>
                   <div className="relative">
                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
                     <input
@@ -628,8 +833,8 @@ export default function WorkerDashboard() {
                     />
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-base font-medium text-zinc-300">End Time</label>
+                <div className="space-y-1.5">
+                  <label className="text-sm font-medium text-zinc-300">End Time</label>
                   <div className="relative">
                     <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
                     <input
@@ -644,8 +849,8 @@ export default function WorkerDashboard() {
               </div>
 
               {/* Notes */}
-              <div className="space-y-2">
-                <label className="text-base font-medium text-zinc-300">Notes (optional)</label>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-zinc-300">Notes (optional)</label>
                 <textarea
                   value={newJob.notes}
                   onChange={(e) => setNewJob({ ...newJob, notes: e.target.value })}
@@ -657,11 +862,11 @@ export default function WorkerDashboard() {
               </div>
             </div>
 
-            {/* Footer with button - fixed at bottom */}
-            <div className="p-4 border-t border-zinc-800 bg-zinc-900 shrink-0">
+            {/* Footer - shrink-0 keeps it fixed */}
+            <div className="shrink-0 p-4 border-t border-zinc-800 pb-8">
               <button
                 onClick={handleCreateJob}
-                disabled={creatingJob || !selectedCustomer || !newJob.serviceType.trim()}
+                disabled={creatingJob || !isFormValid()}
                 className="w-full py-4 bg-[#a3e635] hover:bg-[#8bc934] disabled:bg-zinc-700 disabled:text-zinc-500 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
               >
                 {creatingJob ? (

@@ -9,15 +9,18 @@ const prisma = new PrismaClient();
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
     const body = await request.json();
     const { status, role, hourlyRate, payType, commissionRate, firstName, lastName, phone, skills, color, changedBy, canCreateJobs, jobsNeedApproval } = body;
 
+    console.log('📝 Team member update request:', { id, payType, hourlyRate, commissionRate });
+
     // Get current user data before update (for status change logging)
     const currentUser = await prisma.providerUser.findUnique({
-      where: { id: params.id },
+      where: { id },
       select: { status: true, providerId: true },
     });
 
@@ -43,30 +46,34 @@ export async function PATCH(
     if (canCreateJobs !== undefined) updateData.canCreateJobs = canCreateJobs;
     if (jobsNeedApproval !== undefined) updateData.jobsNeedApproval = jobsNeedApproval;
 
+    console.log('📝 Updating with data:', updateData);
+
     const updated = await prisma.providerUser.update({
-      where: { id: params.id },
+      where: { id },
       data: updateData,
     });
+
+    console.log('✅ Updated team member:', { payType: updated.payType, hourlyRate: updated.hourlyRate, commissionRate: updated.commissionRate });
 
     // Log status change for audit trail (billing fraud prevention)
     if (status !== undefined && status !== currentUser.status) {
       await prisma.userStatusLog.create({
         data: {
-          userId: params.id,
+          userId: id,
           providerId: currentUser.providerId,
           oldStatus: currentUser.status,
           newStatus: status,
           changedBy: changedBy || 'unknown',
         },
       });
-      console.log(`📋 Status change logged: ${currentUser.status} → ${status} for user ${params.id}`);
+      console.log(`📋 Status change logged: ${currentUser.status} → ${status} for user ${id}`);
     }
 
     return NextResponse.json(updated);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating team member:', error);
 
-    if (error.code === 'P2025') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
       return NextResponse.json(
         { error: 'Team member not found' },
         { status: 404 }
@@ -86,18 +93,20 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params;
+
     await prisma.providerUser.delete({
-      where: { id: params.id },
+      where: { id },
     });
 
     return NextResponse.json({ success: true });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting team member:', error);
 
-    if (error.code === 'P2025') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
       return NextResponse.json(
         { error: 'Team member not found' },
         { status: 404 }
