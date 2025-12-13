@@ -4,12 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import WorkerLayout from '@/components/worker/WorkerLayout';
 import {
-  MapPin,
-  Phone,
-  Clock,
   ChevronRight,
-  Navigation,
-  CheckCircle2,
   Loader2,
   RefreshCw,
   DollarSign,
@@ -20,6 +15,7 @@ import {
   User,
   Calendar,
   CalendarX,
+  Clock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -80,8 +76,6 @@ export default function WorkerDashboard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [upcomingJobs, setUpcomingJobs] = useState<UpcomingJob[]>([]);
   const [loading, setLoading] = useState(true);
-  const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [stats, setStats] = useState<DayStats>({ jobsCount: 0, hoursWorked: 0, earnings: 0 });
   const [canCreateJobs, setCanCreateJobs] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -296,173 +290,45 @@ export default function WorkerDashboard() {
     return 'scheduled';
   };
 
-  const handleAction = async (job: Job, action: string) => {
-    setActionLoading(`${job.id}-${action}`);
-
-    try {
-      let endpoint = '';
-      let body: Record<string, unknown> = {};
-
-      switch (action) {
-        case 'on_the_way':
-        case 'arrived':
-          endpoint = '/api/worker/jobs/status';
-          body = { jobId: job.id, userId, action };
-          break;
-        case 'start':
-          endpoint = '/api/worker/clock-in';
-          body = { jobId: job.id, userId, providerId };
-          break;
-        case 'complete':
-          endpoint = '/api/worker/clock-out';
-          body = { jobId: job.id, userId };
-          break;
-      }
-
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        toast.success(
-          action === 'on_the_way'
-            ? 'Marked as on the way!'
-            : action === 'arrived'
-            ? 'Marked as arrived!'
-            : action === 'start'
-            ? 'Job started!'
-            : `Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`
-        );
-        fetchJobs(userId);
-      } else {
-        toast.error(data.error || 'Action failed');
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      toast.error('Something went wrong');
-    } finally {
-      setActionLoading(null);
-    }
+  // Navigate to job details
+  const handleJobClick = (jobId: string) => {
+    router.push(`/worker/job/${jobId}`);
   };
 
-  const openMaps = (address: string) => {
-    const encoded = encodeURIComponent(address);
-    window.open(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`, '_blank');
-  };
-
-  const callPhone = (phone: string) => {
-    window.location.href = `tel:${phone}`;
-  };
-
-  const renderActionButton = (job: Job) => {
+  // Get left border color based on status
+  const getLeftBorderColor = (job: Job) => {
     const status = getJobStatus(job);
-    const isLoading = (action: string) => actionLoading === `${job.id}-${action}`;
-
     switch (status) {
-      case 'scheduled':
-        return (
-          <button
-            onClick={() => handleAction(job, 'on_the_way')}
-            disabled={!!actionLoading}
-            className="w-full py-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
-          >
-            {isLoading('on_the_way') ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <Navigation className="w-5 h-5" />
-                On My Way
-              </>
-            )}
-          </button>
-        );
-      case 'on_the_way':
-        return (
-          <button
-            onClick={() => handleAction(job, 'arrived')}
-            disabled={!!actionLoading}
-            className="w-full py-4 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
-          >
-            {isLoading('arrived') ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <MapPin className="w-5 h-5" />
-                I&apos;ve Arrived
-              </>
-            )}
-          </button>
-        );
-      case 'arrived':
-        return (
-          <button
-            onClick={() => handleAction(job, 'start')}
-            disabled={!!actionLoading}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
-          >
-            {isLoading('start') ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <Clock className="w-5 h-5" />
-                Start Job
-              </>
-            )}
-          </button>
-        );
-      case 'working':
-        return (
-          <button
-            onClick={() => handleAction(job, 'complete')}
-            disabled={!!actionLoading}
-            className="w-full py-4 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
-          >
-            {isLoading('complete') ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <CheckCircle2 className="w-5 h-5" />
-                Complete Job
-              </>
-            )}
-          </button>
-        );
       case 'completed':
-        return (
-          <div className="w-full py-3 bg-zinc-800 text-emerald-400 font-semibold rounded-xl flex items-center justify-center gap-2">
-            <CheckCircle2 className="w-5 h-5" />
-            Completed
-          </div>
-        );
+        return 'border-l-purple-500';
+      case 'working':
+        return 'border-l-[#a3e635]';
+      case 'on_the_way':
+      case 'arrived':
+        return 'border-l-blue-500';
+      default:
+        return 'border-l-[#a3e635]';
     }
   };
 
+  // Get status badge for completed/cancelled jobs only
   const getStatusBadge = (job: Job) => {
     const status = getJobStatus(job);
-    const styles: Record<string, string> = {
-      scheduled: 'bg-zinc-700 text-zinc-300',
-      on_the_way: 'bg-blue-500/20 text-blue-400',
-      arrived: 'bg-orange-500/20 text-orange-400',
-      working: 'bg-[#a3e635]/20 text-[#a3e635]',
-      completed: 'bg-purple-500/20 text-purple-400',
-    };
-    const labels: Record<string, string> = {
-      scheduled: 'Scheduled',
-      on_the_way: 'On the way',
-      arrived: 'Arrived',
-      working: 'In Progress',
-      completed: 'Completed',
-    };
-
-    return (
-      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>
-        {labels[status]}
-      </span>
-    );
+    if (status === 'completed') {
+      return (
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
+          completed
+        </span>
+      );
+    }
+    if (status === 'working') {
+      return (
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[#a3e635]/20 text-[#a3e635]">
+          in progress
+        </span>
+      );
+    }
+    return null;
   };
 
   if (loading) {
@@ -478,18 +344,31 @@ export default function WorkerDashboard() {
   return (
     <WorkerLayout>
       <div className="p-4 space-y-8">
-        {/* Header with Clock */}
-        <div className="flex items-center justify-between">
-          {/* Clock Display */}
+        {/* Elegant Clock Header */}
+        <div className="flex items-start justify-between">
+          {/* Clock Display - Apple Watch Style */}
           <div>
-            <p className="text-3xl font-bold text-[#a3e635]">
-              {currentTime.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-              })}
-            </p>
-            <p className="text-sm text-gray-400">
+            <div className="flex items-baseline gap-1">
+              <span className="text-5xl font-light text-[#a3e635]">
+                {currentTime.toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: false,
+                }).split(':')[0]}
+              </span>
+              <span className="text-5xl font-light text-[#a3e635]">:</span>
+              <span className="text-5xl font-light text-[#a3e635]">
+                {currentTime.toLocaleTimeString('en-US', {
+                  hour: 'numeric',
+                  minute: '2-digit',
+                  hour12: false,
+                }).split(':')[1]}
+              </span>
+              <span className="text-xl font-light text-[#a3e635]/80 ml-1">
+                {currentTime.getHours() >= 12 ? 'PM' : 'AM'}
+              </span>
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
               {currentTime.toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
@@ -552,85 +431,30 @@ export default function WorkerDashboard() {
           ) : (
             <div className="space-y-3">
               {jobs.map((job) => (
-                <div
+                <button
                   key={job.id}
-                  className="bg-[#2a2a2a] rounded-xl overflow-hidden"
+                  onClick={() => handleJobClick(job.id)}
+                  className={`w-full bg-[#2a2a2a] rounded-xl py-4 px-5 text-left border-l-[3px] ${getLeftBorderColor(job)} hover:bg-zinc-700/50 transition-colors active:scale-[0.99]`}
                 >
-                  {/* Job Card - Clean Design */}
-                  <button
-                    onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
-                    className="w-full py-4 px-5 text-left flex items-center justify-between"
-                  >
-                    <div className="space-y-1 flex-1">
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-semibold text-white">{job.serviceType}</span>
-                        {getStatusBadge(job)}
-                      </div>
-                      <p className="text-base text-gray-300">{job.customer.name}</p>
-                      <p className="text-sm text-gray-500">
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1 flex-1 min-w-0">
+                      {/* Time - Lime green */}
+                      <p className="text-sm font-medium text-[#a3e635]">
                         {formatTime(job.startTime)} - {formatTime(job.endTime)}
                       </p>
-                    </div>
-                    <ChevronRight
-                      className={`w-5 h-5 text-gray-500 transition-transform ${
-                        expandedJobId === job.id ? 'rotate-90' : ''
-                      }`}
-                    />
-                  </button>
-
-                  {/* Expanded Content */}
-                  {expandedJobId === job.id && (
-                    <div className="px-5 pb-5 space-y-4 border-t border-zinc-800 pt-4">
+                      {/* Service Type + Customer */}
+                      <p className="text-base font-medium text-white">
+                        {job.serviceType} - {job.customer.name}
+                      </p>
                       {/* Address */}
-                      <div className="flex items-start gap-3">
-                        <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-gray-300 text-sm">{job.address}</p>
-                          <button
-                            onClick={() => openMaps(job.address)}
-                            className="text-[#a3e635] text-sm mt-1 hover:underline"
-                          >
-                            Open in Maps
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Phone */}
-                      {job.customer.phone && (
-                        <div className="flex items-center gap-3">
-                          <Phone className="w-5 h-5 text-gray-400" />
-                          <button
-                            onClick={() => callPhone(job.customer.phone!)}
-                            className="text-[#a3e635] text-sm hover:underline"
-                          >
-                            {job.customer.phone}
-                          </button>
-                        </div>
-                      )}
-
-                      {/* Notes */}
-                      {(job.customerNotes || job.internalNotes) && (
-                        <div className="bg-zinc-800/50 rounded-lg p-3 text-sm">
-                          {job.customerNotes && (
-                            <p className="text-gray-300">
-                              <span className="text-gray-500">Customer: </span>
-                              {job.customerNotes}
-                            </p>
-                          )}
-                          {job.internalNotes && (
-                            <p className="text-gray-300 mt-1">
-                              <span className="text-gray-500">Notes: </span>
-                              {job.internalNotes}
-                            </p>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Action Button */}
-                      {renderActionButton(job)}
+                      <p className="text-sm text-gray-400 truncate">{job.address}</p>
                     </div>
-                  )}
-                </div>
+                    <div className="flex items-center gap-2 ml-3 shrink-0">
+                      {getStatusBadge(job)}
+                      <ChevronRight className="w-5 h-5 text-gray-500" />
+                    </div>
+                  </div>
+                </button>
               ))}
             </div>
           )}
@@ -649,19 +473,24 @@ export default function WorkerDashboard() {
               {upcomingJobs.map((job) => (
                 <button
                   key={job.id}
-                  onClick={() => router.push(`/worker/job/${job.id}`)}
-                  className="w-full bg-[#2a2a2a] rounded-xl py-4 px-5 text-left flex items-center justify-between hover:bg-zinc-700/50 transition-colors"
+                  onClick={() => handleJobClick(job.id)}
+                  className="w-full bg-[#2a2a2a] rounded-xl py-4 px-5 text-left border-l-[3px] border-l-[#a3e635] hover:bg-zinc-700/50 transition-colors active:scale-[0.99]"
                 >
-                  <div className="space-y-1 flex-1 min-w-0">
-                    <p className="text-sm text-[#a3e635] font-medium">
-                      {formatUpcomingDate(job.startTime)}
-                    </p>
-                    <p className="text-base text-gray-300">
-                      {job.serviceType} - {job.customer.name}
-                    </p>
-                    <p className="text-sm text-gray-500 truncate">{job.address}</p>
+                  <div className="flex items-start justify-between">
+                    <div className="space-y-1 flex-1 min-w-0">
+                      {/* Date/Time - Lime green */}
+                      <p className="text-sm font-medium text-[#a3e635]">
+                        {formatUpcomingDate(job.startTime)}
+                      </p>
+                      {/* Service Type + Customer */}
+                      <p className="text-base font-medium text-white">
+                        {job.serviceType} - {job.customer.name}
+                      </p>
+                      {/* Address */}
+                      <p className="text-sm text-gray-400 truncate">{job.address}</p>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-gray-500 flex-shrink-0 ml-3" />
                   </div>
-                  <ChevronRight className="w-5 h-5 text-gray-500 flex-shrink-0 ml-3" />
                 </button>
               ))}
             </div>
