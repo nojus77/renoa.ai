@@ -39,7 +39,7 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
                 href={item.href}
                 className={`flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg transition-colors ${
                   isActive
-                    ? 'text-emerald-400'
+                    ? 'text-[#A8C63F]'
                     : 'text-zinc-400 hover:text-zinc-200'
                 }`}
               >

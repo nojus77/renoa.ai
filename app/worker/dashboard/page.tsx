@@ -66,7 +66,6 @@ export default function WorkerDashboard() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>('');
   const [providerId, setProviderId] = useState<string>('');
-  const [firstName, setFirstName] = useState<string>('');
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
@@ -147,7 +146,6 @@ export default function WorkerDashboard() {
   useEffect(() => {
     const uid = localStorage.getItem('workerUserId');
     const pid = localStorage.getItem('workerProviderId');
-    const name = localStorage.getItem('workerFirstName');
 
     if (!uid || !pid) {
       router.push('/provider/login');
@@ -156,7 +154,6 @@ export default function WorkerDashboard() {
 
     setUserId(uid);
     setProviderId(pid);
-    setFirstName(name || 'Worker');
     fetchJobs(uid);
     fetchWorkerPermissions(uid);
   }, [router, fetchJobs, fetchWorkerPermissions]);
@@ -225,13 +222,6 @@ export default function WorkerDashboard() {
     } finally {
       setCreatingJob(false);
     }
-  };
-
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
   };
 
   const formatTime = (dateStr: string) => {
@@ -432,25 +422,13 @@ export default function WorkerDashboard() {
   return (
     <WorkerLayout>
       <div className="p-4 space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">
-              {getGreeting()}, {firstName}!
-            </h1>
-            <p className="text-zinc-400 text-sm">
-              {new Date().toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'long',
-                day: 'numeric',
-              })}
-            </p>
-          </div>
+        {/* Header - Action buttons only */}
+        <div className="flex items-center justify-end">
           <div className="flex items-center gap-2">
             {canCreateJobs && (
               <button
                 onClick={() => setShowCreateJob(true)}
-                className="p-2 bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors"
+                className="p-2 bg-[#A8C63F] hover:bg-[#96b236] rounded-lg transition-colors"
               >
                 <Plus className="w-5 h-5 text-white" />
               </button>
@@ -467,17 +445,17 @@ export default function WorkerDashboard() {
         {/* Quick Stats */}
         <div className="grid grid-cols-3 gap-3">
           <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
-            <Briefcase className="w-5 h-5 text-blue-400 mb-1" />
+            <Briefcase className="w-5 h-5 text-[#A8C63F] mb-1" />
             <p className="text-xl font-bold">{stats.jobsCount}</p>
             <p className="text-xs text-zinc-500">Jobs Today</p>
           </div>
           <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
-            <Clock className="w-5 h-5 text-emerald-400 mb-1" />
+            <Clock className="w-5 h-5 text-[#A8C63F] mb-1" />
             <p className="text-xl font-bold">{stats.hoursWorked}h</p>
             <p className="text-xs text-zinc-500">Hours</p>
           </div>
           <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
-            <DollarSign className="w-5 h-5 text-yellow-400 mb-1" />
+            <DollarSign className="w-5 h-5 text-[#A8C63F] mb-1" />
             <p className="text-xl font-bold">${stats.earnings}</p>
             <p className="text-xs text-zinc-500">Earned</p>
           </div>
