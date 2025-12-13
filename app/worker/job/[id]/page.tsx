@@ -724,17 +724,45 @@ export default function JobDetailPage() {
   };
 
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime'];
+
     const files = e.target.files;
     if (!files || files.length === 0 || !job) {
       console.log('No files selected or no job');
       return;
     }
 
-    console.log('Uploading files:', files.length);
-    toast.info(`Uploading ${files.length} file(s)...`);
+    // Validate files before upload
+    const validFiles: File[] = [];
+    for (const file of Array.from(files)) {
+      // Check file size
+      if (file.size > MAX_FILE_SIZE) {
+        toast.error(`"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max size is 5MB.`);
+        continue;
+      }
+
+      // Check file type
+      if (!ALLOWED_TYPES.includes(file.type) && !file.type.startsWith('image/')) {
+        toast.error(`"${file.name}" is not a supported file type. Use JPG, PNG, GIF, or MP4.`);
+        continue;
+      }
+
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    console.log('Uploading files:', validFiles.length);
+    toast.info(`Uploading ${validFiles.length} file(s)...`);
 
     const formData = new FormData();
-    Array.from(files).forEach((file, index) => {
+    validFiles.forEach((file, index) => {
       console.log(`File ${index + 1}:`, file.name, file.type, file.size);
       formData.append('files', file);
     });
@@ -757,11 +785,21 @@ export default function JobDetailPage() {
       } else {
         const errorData = await res.json().catch(() => ({}));
         console.error('Upload failed:', res.status, errorData);
-        toast.error(errorData.error || 'Failed to upload media');
+
+        // Better error messages based on status code
+        if (res.status === 413) {
+          toast.error('File too large. Maximum size is 5MB.');
+        } else if (res.status === 403) {
+          toast.error('You don\'t have permission to upload to this job.');
+        } else if (res.status === 404) {
+          toast.error('Job not found.');
+        } else {
+          toast.error(errorData.error || 'Failed to upload media');
+        }
       }
     } catch (error) {
       console.error('Error uploading media:', error);
-      toast.error('Upload failed - check console for details');
+      toast.error('Upload failed. Check your internet connection.');
     }
 
     if (fileInputRef.current) {

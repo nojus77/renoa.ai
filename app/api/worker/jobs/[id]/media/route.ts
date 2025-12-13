@@ -144,6 +144,35 @@ export async function POST(
       );
     }
 
+    // File validation constants
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime'];
+
+    // Validate files before upload
+    const validFiles: File[] = [];
+    for (const file of files) {
+      // Check file size
+      if (file.size > MAX_FILE_SIZE) {
+        console.log(`File too large: ${file.name} (${(file.size / 1024 / 1024).toFixed(1)}MB)`);
+        continue; // Skip this file
+      }
+
+      // Check file type
+      if (!ALLOWED_TYPES.includes(file.type) && !file.type.startsWith('image/')) {
+        console.log(`Invalid file type: ${file.name} (${file.type})`);
+        continue; // Skip this file
+      }
+
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      return NextResponse.json(
+        { error: 'No valid files to upload. Files must be images or videos under 5MB.' },
+        { status: 400 }
+      );
+    }
+
     const uploadedMedia: Array<{
       id: string;
       url: string;
@@ -151,8 +180,8 @@ export async function POST(
       createdAt: string;
     }> = [];
 
-    // Upload each file
-    for (const file of files) {
+    // Upload each valid file
+    for (const file of validFiles) {
       const isVideo = file.type.startsWith('video/');
       const fileExtension = file.name.split('.').pop() || (isVideo ? 'mp4' : 'jpg');
       const fileName = `jobs/${id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExtension}`;
