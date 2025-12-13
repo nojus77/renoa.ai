@@ -635,6 +635,8 @@ model Job {
   paymentMethod         String?                @map("payment_method") // cash, check, card
   paymentStatus         String?                @map("payment_status") // paid, pending
   tipAmount             Float?                 @map("tip_amount")
+  stripeSessionId       String?                @map("stripe_session_id")
+  stripePaymentUrl      String?                @map("stripe_payment_url")
   invoices              Invoice?
   photos                JobPhoto[]             @relation("JobPhotos")
   customer              Customer               @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)

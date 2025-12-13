@@ -125,7 +125,7 @@ interface JobNote {
 interface JobMedia {
   id: string;
   url: string;
-  type: 'photo' | 'video';
+  type: 'photo' | 'video' | 'before' | 'after' | 'check';
   caption?: string;
   createdAt: string;
 }
@@ -195,6 +195,7 @@ export default function JobDetailPage() {
   const [media, setMedia] = useState<JobMedia[]>([]);
   const [selectedMedia, setSelectedMedia] = useState<JobMedia | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const checkPhotoInputRef = useRef<HTMLInputElement>(null);
 
   // Customer history state
   const [showCustomerHistory, setShowCustomerHistory] = useState(false);
@@ -574,6 +575,16 @@ export default function JobDetailPage() {
       return;
     }
 
+    // Validate: require check photo if payment method is check
+    if (paymentMethod === 'check') {
+      const hasCheckPhoto = media.some(m => m.type === 'check');
+      if (!hasCheckPhoto) {
+        toast.error('Please upload a photo of the check before completing');
+        document.getElementById('media-section')?.scrollIntoView({ behavior: 'smooth' });
+        return;
+      }
+    }
+
     // Show confirmation modal
     setShowConfirmModal(true);
   };
@@ -620,7 +631,33 @@ export default function JobDetailPage() {
         setOnSiteStartTime(null);
         setTimerState('completed');
 
-        toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`);
+        // Handle card payment - send payment link
+        if (paymentMethod === 'card') {
+          try {
+            const paymentRes = await fetch(`/api/worker/jobs/${job.id}/send-payment-link`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount: totalPrice,
+                tipAmount: parseFloat(tipAmount) || 0,
+              }),
+            });
+            const paymentData = await paymentRes.json();
+            if (paymentData.success) {
+              toast.success('Job completed! Payment link sent to customer.');
+            } else {
+              toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`);
+              toast.error('Failed to send payment link to customer');
+            }
+          } catch (paymentError) {
+            console.error('Error sending payment link:', paymentError);
+            toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`);
+            toast.error('Failed to send payment link');
+          }
+        } else {
+          toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`);
+        }
+
         fetchJob(userId, jobId);
 
         // Clear draft since job is done
@@ -877,6 +914,63 @@ export default function JobDetailPage() {
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleCheckPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+
+    const file = e.target.files?.[0];
+    if (!file || !job) {
+      return;
+    }
+
+    // Check file size
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error(`Photo too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is 5MB.`);
+      if (checkPhotoInputRef.current) {
+        checkPhotoInputRef.current.value = '';
+      }
+      return;
+    }
+
+    // Check file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file');
+      if (checkPhotoInputRef.current) {
+        checkPhotoInputRef.current.value = '';
+      }
+      return;
+    }
+
+    toast.info('Uploading check photo...');
+
+    const formData = new FormData();
+    formData.append('files', file);
+    formData.append('jobId', job.id);
+    formData.append('userId', userId);
+    formData.append('photoType', 'check');
+
+    try {
+      const res = await fetch(`/api/worker/jobs/${job.id}/media`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (res.ok) {
+        toast.success('Check photo uploaded');
+        fetchMedia(job.id);
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        toast.error(errorData.error || 'Failed to upload check photo');
+      }
+    } catch (error) {
+      console.error('Error uploading check photo:', error);
+      toast.error('Upload failed');
+    }
+
+    if (checkPhotoInputRef.current) {
+      checkPhotoInputRef.current.value = '';
     }
   };
 
@@ -1555,6 +1649,61 @@ export default function JobDetailPage() {
                 ))}
               </div>
 
+              {/* Check Photo Upload - Only show when check is selected */}
+              {paymentMethod === 'check' && (
+                <div className="mt-4 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                  <label className="text-sm font-medium text-zinc-300 mb-2 block">Photo of Check (Required)</label>
+                  {media.some(m => m.type === 'check') ? (
+                    <div className="flex items-center gap-3">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0">
+                        <img
+                          src={media.find(m => m.type === 'check')?.url}
+                          alt="Check"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-emerald-400 flex items-center gap-1">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Check photo uploaded
+                        </p>
+                        <button
+                          onClick={() => checkPhotoInputRef.current?.click()}
+                          className="text-xs text-zinc-400 hover:text-white mt-1"
+                        >
+                          Upload different photo
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => checkPhotoInputRef.current?.click()}
+                      className="w-full py-3 px-4 border-2 border-dashed border-zinc-600 rounded-lg text-zinc-400 hover:border-[#a3e635] hover:text-white transition-colors flex items-center justify-center gap-2"
+                    >
+                      <Camera className="w-5 h-5" />
+                      <span>Take Photo of Check</span>
+                    </button>
+                  )}
+                  <input
+                    ref={checkPhotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    capture="environment"
+                    className="hidden"
+                    onChange={handleCheckPhotoUpload}
+                  />
+                </div>
+              )}
+
+              {/* Card Payment Info */}
+              {paymentMethod === 'card' && (
+                <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                  <p className="text-sm text-blue-400">
+                    A payment link will be sent to the customer when you complete the job.
+                  </p>
+                </div>
+              )}
+
               {/* Tip Amount */}
               <div className="mt-4">
                 <label className="text-sm text-zinc-400">Tip (optional)</label>
@@ -1650,7 +1799,7 @@ export default function JobDetailPage() {
 
         {/* Media Section - Only show when working or completed */}
         {canAddMedia && (
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div id="media-section" className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="p-4 border-b border-zinc-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">

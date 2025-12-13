@@ -842,21 +842,21 @@ export default function WorkerDashboard() {
                         }
                         setNewJob({ ...newJob, startTime: `${hr24.toString().padStart(2, '0')}:${mins}` });
                       }}
-                      className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-base text-white focus:outline-none focus:border-[#a3e635] min-w-[70px]"
+                      className="h-12 w-20 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (
                         <option key={h} value={h}>{h}</option>
                       ))}
                     </select>
-                    <span className="text-xl text-zinc-400">:</span>
+                    <span className="text-xl text-zinc-400 font-medium">:</span>
                     <select
                       value={newJob.startTime.split(':')[1] || '00'}
                       onChange={(e) => {
                         const hrs = newJob.startTime.split(':')[0] || '09';
                         setNewJob({ ...newJob, startTime: `${hrs}:${e.target.value}` });
                       }}
-                      className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-base text-white focus:outline-none focus:border-[#a3e635] min-w-[70px]"
+                      className="h-12 w-20 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       {['00', '15', '30', '45'].map((m) => (
@@ -880,7 +880,7 @@ export default function WorkerDashboard() {
                         }
                         setNewJob({ ...newJob, startTime: `${newHrs.toString().padStart(2, '0')}:${mins}` });
                       }}
-                      className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-base text-white focus:outline-none focus:border-[#a3e635] min-w-[70px]"
+                      className="h-12 w-24 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       <option value="AM">AM</option>
@@ -911,21 +911,21 @@ export default function WorkerDashboard() {
                         }
                         setNewJob({ ...newJob, endTime: `${hr24.toString().padStart(2, '0')}:${mins}` });
                       }}
-                      className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-base text-white focus:outline-none focus:border-[#a3e635] min-w-[70px]"
+                      className="h-12 w-20 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (
                         <option key={h} value={h}>{h}</option>
                       ))}
                     </select>
-                    <span className="text-xl text-zinc-400">:</span>
+                    <span className="text-xl text-zinc-400 font-medium">:</span>
                     <select
                       value={newJob.endTime.split(':')[1] || '00'}
                       onChange={(e) => {
                         const hrs = newJob.endTime.split(':')[0] || '10';
                         setNewJob({ ...newJob, endTime: `${hrs}:${e.target.value}` });
                       }}
-                      className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-base text-white focus:outline-none focus:border-[#a3e635] min-w-[70px]"
+                      className="h-12 w-20 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       {['00', '15', '30', '45'].map((m) => (
@@ -949,7 +949,7 @@ export default function WorkerDashboard() {
                         }
                         setNewJob({ ...newJob, endTime: `${newHrs.toString().padStart(2, '0')}:${mins}` });
                       }}
-                      className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 text-base text-white focus:outline-none focus:border-[#a3e635] min-w-[70px]"
+                      className="h-12 w-24 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       <option value="AM">AM</option>

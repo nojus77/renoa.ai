@@ -7,7 +7,6 @@ import {
   User,
   Mail,
   Phone,
-  Clock,
   Award,
   DollarSign,
   LogOut,
@@ -26,10 +25,8 @@ import {
   Bell,
   Shield,
   Trash2,
-  Calendar,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Switch } from '@/components/ui/switch';
 import {
   Dialog,
   DialogContent,
@@ -83,23 +80,6 @@ interface UserProfile {
   };
 }
 
-const DAYS = [
-  { key: 'monday', label: 'Monday', short: 'Mon' },
-  { key: 'tuesday', label: 'Tuesday', short: 'Tue' },
-  { key: 'wednesday', label: 'Wednesday', short: 'Wed' },
-  { key: 'thursday', label: 'Thursday', short: 'Thu' },
-  { key: 'friday', label: 'Friday', short: 'Fri' },
-  { key: 'saturday', label: 'Saturday', short: 'Sat' },
-  { key: 'sunday', label: 'Sunday', short: 'Sun' },
-];
-
-const TIME_OPTIONS = [
-  '05:00', '05:30', '06:00', '06:30', '07:00', '07:30', '08:00', '08:30', '09:00', '09:30',
-  '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
-  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
-  '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00',
-];
-
 export default function WorkerProfile() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -112,7 +92,6 @@ export default function WorkerProfile() {
     lastName: '',
     phone: '',
   });
-  const [scheduleForm, setScheduleForm] = useState<Record<string, { enabled: boolean; start: string; end: string }>>({});
   const [passwordForm, setPasswordForm] = useState({
     currentPassword: '',
     newPassword: '',
@@ -124,14 +103,12 @@ export default function WorkerProfile() {
 
   // UI states
   const [savingProfile, setSavingProfile] = useState(false);
-  const [savingSchedule, setSavingSchedule] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [passwordModalOpen, setPasswordModalOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [hasProfileChanges, setHasProfileChanges] = useState(false);
-  const [hasScheduleChanges, setHasScheduleChanges] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
@@ -149,17 +126,6 @@ export default function WorkerProfile() {
           lastName: data.user.lastName || '',
           phone: data.user.phone || '',
         });
-        // Initialize schedule form
-        const schedule: Record<string, { enabled: boolean; start: string; end: string }> = {};
-        DAYS.forEach(({ key }) => {
-          const hours = data.user.workingHours?.[key];
-          schedule[key] = {
-            enabled: !!hours,
-            start: hours?.start || '08:00',
-            end: hours?.end || '17:00',
-          };
-        });
-        setScheduleForm(schedule);
 
         // Initialize worker skills
         if (data.user.workerSkills) {
@@ -196,23 +162,6 @@ export default function WorkerProfile() {
       setHasProfileChanges(changed);
     }
   }, [profileForm, profile]);
-
-  // Track schedule changes
-  useEffect(() => {
-    if (profile) {
-      const hasChanges = DAYS.some(({ key }) => {
-        const current = profile.workingHours?.[key];
-        const form = scheduleForm[key];
-        if (!form) return false;
-        if (form.enabled !== !!current) return true;
-        if (form.enabled && current) {
-          return form.start !== current.start || form.end !== current.end;
-        }
-        return false;
-      });
-      setHasScheduleChanges(hasChanges);
-    }
-  }, [scheduleForm, profile]);
 
   const formatPhoneNumber = (value: string) => {
     const digits = value.replace(/\D/g, '');
@@ -295,41 +244,6 @@ export default function WorkerProfile() {
       if (photoInputRef.current) {
         photoInputRef.current.value = '';
       }
-    }
-  };
-
-  const handleSaveSchedule = async () => {
-    if (!profile) return;
-    setSavingSchedule(true);
-
-    try {
-      const workingHours: Record<string, { start: string; end: string }> = {};
-      Object.entries(scheduleForm).forEach(([day, data]) => {
-        if (data.enabled) {
-          workingHours[day] = { start: data.start, end: data.end };
-        }
-      });
-
-      const res = await fetch('/api/worker/availability', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: profile.id,
-          workingHours: Object.keys(workingHours).length > 0 ? workingHours : null,
-        }),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        setProfile({ ...profile, workingHours: data.workingHours });
-        toast.success('Schedule updated successfully');
-      } else {
-        toast.error(data.error || 'Failed to update schedule');
-      }
-    } catch {
-      toast.error('Connection error');
-    } finally {
-      setSavingSchedule(false);
     }
   };
 
@@ -627,81 +541,6 @@ export default function WorkerProfile() {
 
             {/* Right Column */}
             <div className="space-y-6">
-              {/* Weekly Schedule Card */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800">
-                <div className="p-6 border-b border-zinc-800">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5 text-blue-400" />
-                    <h2 className="text-lg font-semibold text-white">Weekly Schedule</h2>
-                  </div>
-                </div>
-                <div className="p-6 space-y-4">
-                  {DAYS.map(({ key, label }) => (
-                    <div key={key} className="flex items-center gap-4">
-                      <div className="w-24 flex items-center gap-3">
-                        <Switch
-                          checked={scheduleForm[key]?.enabled || false}
-                          onCheckedChange={(checked) => setScheduleForm({
-                            ...scheduleForm,
-                            [key]: { ...scheduleForm[key], enabled: checked }
-                          })}
-                          className="data-[state=checked]:bg-emerald-600"
-                        />
-                        <span className={`text-sm font-medium ${scheduleForm[key]?.enabled ? 'text-white' : 'text-zinc-600'}`}>
-                          {label.slice(0, 3)}
-                        </span>
-                      </div>
-                      {scheduleForm[key]?.enabled ? (
-                        <div className="flex items-center gap-2 flex-1">
-                          <select
-                            value={scheduleForm[key]?.start || '08:00'}
-                            onChange={(e) => setScheduleForm({
-                              ...scheduleForm,
-                              [key]: { ...scheduleForm[key], start: e.target.value }
-                            })}
-                            className="h-9 px-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:border-emerald-500 focus:outline-none"
-                          >
-                            {TIME_OPTIONS.map(t => (
-                              <option key={t} value={t}>{t}</option>
-                            ))}
-                          </select>
-                          <span className="text-zinc-500 text-sm">to</span>
-                          <select
-                            value={scheduleForm[key]?.end || '17:00'}
-                            onChange={(e) => setScheduleForm({
-                              ...scheduleForm,
-                              [key]: { ...scheduleForm[key], end: e.target.value }
-                            })}
-                            className="h-9 px-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:border-emerald-500 focus:outline-none"
-                          >
-                            {TIME_OPTIONS.map(t => (
-                              <option key={t} value={t}>{t}</option>
-                            ))}
-                          </select>
-                        </div>
-                      ) : (
-                        <span className="text-sm text-zinc-600 flex-1">Off</span>
-                      )}
-                    </div>
-                  ))}
-
-                  <button
-                    onClick={handleSaveSchedule}
-                    disabled={savingSchedule || !hasScheduleChanges}
-                    className="w-full h-11 mt-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
-                  >
-                    {savingSchedule ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Save className="w-4 h-4" />
-                        Save Schedule
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-
               {/* Account & Security Card */}
               <div className="bg-zinc-900 rounded-xl border border-zinc-800">
                 <div className="p-6 border-b border-zinc-800">

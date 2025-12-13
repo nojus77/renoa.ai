@@ -73,6 +73,7 @@ export async function POST(
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
     const userId = formData.get('userId') as string;
+    const photoType = (formData.get('photoType') as string) || null; // e.g., 'before', 'after', 'check'
 
     if (!files || files.length === 0) {
       return NextResponse.json(
@@ -193,11 +194,13 @@ export async function POST(
         });
 
         // Save to JobPhoto model
+        // Type can be: 'photo', 'video', 'before', 'after', 'check'
+        const mediaType = isVideo ? 'video' : (photoType || 'photo');
         const savedPhoto = await prisma.jobPhoto.create({
           data: {
             jobId: id,
             url: blob.url,
-            type: isVideo ? 'video' : 'photo',
+            type: mediaType,
             blobPathname: fileName,
           },
         });

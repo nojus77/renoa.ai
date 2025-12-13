@@ -16,7 +16,10 @@ import {
   ChevronRight,
   MapPin,
   Briefcase,
+  ChevronDown,
+  Save,
 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 
 interface TimeOffRequest {
@@ -51,6 +54,23 @@ const REASONS = [
   { value: 'other', label: 'Other' },
 ];
 
+const DAYS = [
+  { key: 'monday', label: 'Monday', short: 'Mon' },
+  { key: 'tuesday', label: 'Tuesday', short: 'Tue' },
+  { key: 'wednesday', label: 'Wednesday', short: 'Wed' },
+  { key: 'thursday', label: 'Thursday', short: 'Thu' },
+  { key: 'friday', label: 'Friday', short: 'Fri' },
+  { key: 'saturday', label: 'Saturday', short: 'Sat' },
+  { key: 'sunday', label: 'Sunday', short: 'Sun' },
+];
+
+const TIME_OPTIONS = [
+  '05:00', '05:30', '06:00', '06:30', '07:00', '07:30', '08:00', '08:30', '09:00', '09:30',
+  '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
+  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
+  '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00',
+];
+
 export default function WorkerSchedule() {
   const router = useRouter();
   const [userId, setUserId] = useState<string>('');
@@ -71,6 +91,13 @@ export default function WorkerSchedule() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [jobsByDay, setJobsByDay] = useState<Record<string, Job[]>>({});
   const [loadingJobs, setLoadingJobs] = useState(true);
+
+  // Working hours state
+  const [workingHoursExpanded, setWorkingHoursExpanded] = useState(false);
+  const [scheduleForm, setScheduleForm] = useState<Record<string, { enabled: boolean; start: string; end: string }>>({});
+  const [initialScheduleForm, setInitialScheduleForm] = useState<Record<string, { enabled: boolean; start: string; end: string }>>({});
+  const [savingSchedule, setSavingSchedule] = useState(false);
+  const [hasScheduleChanges, setHasScheduleChanges] = useState(false);
 
   const fetchJobs = useCallback(async (uid: string, date: Date) => {
     setLoadingJobs(true);
@@ -121,6 +148,28 @@ export default function WorkerSchedule() {
     }
   }, []);
 
+  const fetchWorkingHours = useCallback(async (uid: string) => {
+    try {
+      const res = await fetch(`/api/worker/profile?userId=${uid}`);
+      const data = await res.json();
+      if (data.user) {
+        const schedule: Record<string, { enabled: boolean; start: string; end: string }> = {};
+        DAYS.forEach(({ key }) => {
+          const hours = data.user.workingHours?.[key];
+          schedule[key] = {
+            enabled: !!hours,
+            start: hours?.start || '08:00',
+            end: hours?.end || '17:00',
+          };
+        });
+        setScheduleForm(schedule);
+        setInitialScheduleForm(JSON.parse(JSON.stringify(schedule)));
+      }
+    } catch (error) {
+      console.error('Error fetching working hours:', error);
+    }
+  }, []);
+
   useEffect(() => {
     const uid = localStorage.getItem('workerUserId');
     if (!uid) {
@@ -132,8 +181,24 @@ export default function WorkerSchedule() {
     Promise.all([
       fetchJobs(uid, selectedDate),
       fetchTimeOff(uid),
+      fetchWorkingHours(uid),
     ]).finally(() => setLoading(false));
-  }, [router, fetchJobs, fetchTimeOff, selectedDate]);
+  }, [router, fetchJobs, fetchTimeOff, fetchWorkingHours, selectedDate]);
+
+  // Track schedule changes
+  useEffect(() => {
+    const hasChanges = DAYS.some(({ key }) => {
+      const initial = initialScheduleForm[key];
+      const form = scheduleForm[key];
+      if (!form || !initial) return false;
+      if (form.enabled !== initial.enabled) return true;
+      if (form.enabled) {
+        return form.start !== initial.start || form.end !== initial.end;
+      }
+      return false;
+    });
+    setHasScheduleChanges(hasChanges);
+  }, [scheduleForm, initialScheduleForm]);
 
   // Refresh jobs when viewMode or selectedDate changes
   useEffect(() => {
@@ -313,6 +378,41 @@ export default function WorkerSchedule() {
 
   const getReasonLabel = (reason: string | null) => {
     return REASONS.find((r) => r.value === reason)?.label || reason || 'Other';
+  };
+
+  const handleSaveSchedule = async () => {
+    if (!userId) return;
+    setSavingSchedule(true);
+
+    try {
+      const workingHours: Record<string, { start: string; end: string }> = {};
+      Object.entries(scheduleForm).forEach(([day, data]) => {
+        if (data.enabled) {
+          workingHours[day] = { start: data.start, end: data.end };
+        }
+      });
+
+      const res = await fetch('/api/worker/availability', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: userId,
+          workingHours: Object.keys(workingHours).length > 0 ? workingHours : null,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setInitialScheduleForm(JSON.parse(JSON.stringify(scheduleForm)));
+        toast.success('Working hours updated');
+      } else {
+        toast.error(data.error || 'Failed to update working hours');
+      }
+    } catch {
+      toast.error('Connection error');
+    } finally {
+      setSavingSchedule(false);
+    }
   };
 
   if (loading) {
@@ -532,6 +632,92 @@ export default function WorkerSchedule() {
               ))
             )}
           </div>
+        </div>
+
+        {/* Section 3: My Working Hours (Collapsible) */}
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800">
+          <button
+            onClick={() => setWorkingHoursExpanded(!workingHoursExpanded)}
+            className="w-full p-4 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-blue-400" />
+              <h2 className="font-semibold text-white">My Working Hours</h2>
+            </div>
+            <ChevronDown
+              className={`w-5 h-5 text-zinc-400 transition-transform duration-200 ${
+                workingHoursExpanded ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
+
+          {workingHoursExpanded && (
+            <div className="px-4 pb-4 border-t border-zinc-800 pt-4 space-y-4">
+              {DAYS.map(({ key, label }) => (
+                <div key={key} className="flex items-center gap-4">
+                  <div className="w-24 flex items-center gap-3">
+                    <Switch
+                      checked={scheduleForm[key]?.enabled || false}
+                      onCheckedChange={(checked) => setScheduleForm({
+                        ...scheduleForm,
+                        [key]: { ...scheduleForm[key], enabled: checked }
+                      })}
+                      className="data-[state=checked]:bg-emerald-600"
+                    />
+                    <span className={`text-sm font-medium ${scheduleForm[key]?.enabled ? 'text-white' : 'text-zinc-600'}`}>
+                      {label.slice(0, 3)}
+                    </span>
+                  </div>
+                  {scheduleForm[key]?.enabled ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <select
+                        value={scheduleForm[key]?.start || '08:00'}
+                        onChange={(e) => setScheduleForm({
+                          ...scheduleForm,
+                          [key]: { ...scheduleForm[key], start: e.target.value }
+                        })}
+                        className="h-9 px-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:border-emerald-500 focus:outline-none"
+                      >
+                        {TIME_OPTIONS.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                      <span className="text-zinc-500 text-sm">to</span>
+                      <select
+                        value={scheduleForm[key]?.end || '17:00'}
+                        onChange={(e) => setScheduleForm({
+                          ...scheduleForm,
+                          [key]: { ...scheduleForm[key], end: e.target.value }
+                        })}
+                        className="h-9 px-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:border-emerald-500 focus:outline-none"
+                      >
+                        {TIME_OPTIONS.map(t => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <span className="text-sm text-zinc-600 flex-1">Off</span>
+                  )}
+                </div>
+              ))}
+
+              <button
+                onClick={handleSaveSchedule}
+                disabled={savingSchedule || !hasScheduleChanges}
+                className="w-full h-11 mt-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+              >
+                {savingSchedule ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    Save Working Hours
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Request Form Modal */}
