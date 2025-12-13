@@ -72,11 +72,14 @@ export async function GET(
             contentParts.push(match[2].trim());
           } else {
             // Try to remove "Name: " prefix at start of line
-            const cleaned = block.replace(/^[^:\n]+:\s*/gm, '').trim();
+            let cleaned = block.replace(/^[^:\n]+:\s*/gm, '').trim();
             // Remove bullet points
-            const noBullets = cleaned.replace(/^[•\-\*]\s*/gm, '').trim();
-            if (noBullets) {
-              contentParts.push(noBullets);
+            cleaned = cleaned.replace(/^[•\-\*]\s*/gm, '').trim();
+            // Remove stray parentheses and brackets
+            cleaned = cleaned.replace(/^\s*[\(\)\[\]]\s*/gm, '').trim();
+            cleaned = cleaned.replace(/\s*[\(\)\[\]]\s*$/gm, '').trim();
+            if (cleaned && cleaned.length > 1) {
+              contentParts.push(cleaned);
             }
           }
         }

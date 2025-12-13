@@ -550,11 +550,36 @@ export default function JobDetailPage() {
 
   const handleCompleteJob = async () => {
     if (!job) return;
+
+    // Validate: require at least one service with price
+    if (selectedServices.length === 0 || totalPrice === 0) {
+      toast.error('Add services with pricing before completing the job');
+      // Scroll to job details section
+      document.getElementById('job-details-section')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    // Optional: remind about photos (not required)
+    if (media.length === 0) {
+      const proceed = confirm('No photos added. Complete job anyway?');
+      if (!proceed) return;
+    }
+
     setActionLoading('complete');
 
     try {
+      // Save final job value before completing
+      await updateJobValue(totalPrice);
+
       // Stop on-site timer
       const finalOnSiteTime = onSiteStartTime ? Math.floor((Date.now() - onSiteStartTime) / 1000) : onSiteTime;
+
+      console.log('Completing job:', {
+        jobId: job.id,
+        totalPrice,
+        servicesCount: selectedServices.length,
+        partsCount: parts.length,
+      });
 
       const res = await fetch('/api/worker/clock-out', {
         method: 'POST',
@@ -577,10 +602,8 @@ export default function JobDetailPage() {
         toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`);
         fetchJob(userId, jobId);
 
-        // Scroll to job details section
-        setTimeout(() => {
-          document.getElementById('job-details-section')?.scrollIntoView({ behavior: 'smooth' });
-        }, 500);
+        // Clear draft since job is done
+        localStorage.removeItem(`jobDraft_${jobId}`);
       } else {
         toast.error(data.error || 'Action failed');
       }
@@ -696,6 +719,30 @@ export default function JobDetailPage() {
   const totalPrice = servicesSubtotal + partsSubtotal;
 
   const servicesWithoutPrice = selectedServices.filter(s => s.price === 0);
+
+  // Update job actualValue when services/parts change
+  const updateJobValue = useCallback(async (total: number) => {
+    if (!job || total === 0) return;
+    try {
+      await fetch(`/api/worker/jobs/${job.id}/value`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ actualValue: total, userId }),
+      });
+    } catch (error) {
+      console.error('Error updating job value:', error);
+    }
+  }, [job, userId]);
+
+  // Auto-save job value when total changes
+  useEffect(() => {
+    if (totalPrice > 0 && job) {
+      const debounceTimer = setTimeout(() => {
+        updateJobValue(totalPrice);
+      }, 1000); // Debounce to avoid too many API calls
+      return () => clearTimeout(debounceTimer);
+    }
+  }, [totalPrice, updateJobValue, job]);
 
   // Note handlers
   const handleAddNote = async () => {
@@ -1006,9 +1053,11 @@ export default function JobDetailPage() {
   const statusConfig = getStatusConfig(status);
 
   // Section visibility based on status
+  // Status values: 'scheduled', 'on_the_way', 'arrived', 'working', 'completed'
   const isPreArrival = ['scheduled', 'on_the_way'].includes(status);
-  const canAddMedia = ['working', 'arrived', 'in_progress', 'completed'].includes(status);
-  const canEditJobDetails = ['working', 'arrived', 'in_progress'].includes(status);
+  const isWorkingOrCompleted = ['working', 'arrived', 'completed'].includes(status);
+  const canEditJobDetails = ['working', 'arrived'].includes(status);
+  const canAddMedia = isWorkingOrCompleted;
 
   return (
     <WorkerLayout>
@@ -1104,30 +1153,14 @@ export default function JobDetailPage() {
             </div>
           </div>
 
-          {/* Existing Notes from Job */}
-          {(job.customerNotes || job.internalNotes) && (
+          {/* Customer Notes - only show if present */}
+          {job.customerNotes && (
             <div className="p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <FileText className="w-5 h-5 text-zinc-400" />
-                <span className="font-medium text-zinc-300">Job Notes</span>
-              </div>
-              <div className="space-y-3">
-                {job.customerNotes && (
-                  <div className="bg-zinc-800/50 rounded-lg p-3">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">
-                      Customer Notes
-                    </p>
-                    <p className="text-zinc-300 text-sm">{job.customerNotes}</p>
-                  </div>
-                )}
-                {job.internalNotes && (
-                  <div className="bg-zinc-800/50 rounded-lg p-3">
-                    <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">
-                      Internal Notes
-                    </p>
-                    <p className="text-zinc-300 text-sm">{job.internalNotes}</p>
-                  </div>
-                )}
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                <p className="text-xs text-amber-400 uppercase tracking-wider mb-1">
+                  Customer Request
+                </p>
+                <p className="text-zinc-300 text-sm">{job.customerNotes}</p>
               </div>
             </div>
           )}
