@@ -60,6 +60,32 @@ export async function GET(
         );
       }
 
+      // Parse notes to extract clean content (remove timestamps and author prefixes)
+      let cleanNotes: string | null = null;
+      if (job.internalNotes) {
+        // Notes are stored as: [timestamp] author: content
+        // Extract just the content parts
+        const noteBlocks = job.internalNotes.split('\n\n').filter(Boolean);
+        const contentParts: string[] = [];
+
+        for (const block of noteBlocks) {
+          // Try to parse the [timestamp] author: content format
+          // Regex: [timestamp] author: content (content can span multiple lines)
+          const match = block.match(/^\[([^\]]+)\]\s*[^:]+:\s*([\s\S]+)/);
+          if (match) {
+            contentParts.push(match[2].trim());
+          } else {
+            // If it doesn't match the format, use the whole block
+            contentParts.push(block.trim());
+          }
+        }
+
+        // Join with bullet points for multiple notes
+        cleanNotes = contentParts.length > 1
+          ? contentParts.map(n => `• ${n}`).join('\n')
+          : contentParts[0] || null;
+      }
+
       return {
         id: job.id,
         serviceType: job.serviceType,
@@ -68,7 +94,7 @@ export async function GET(
         status: job.status,
         workerName: workerNames[0] || 'N/A',
         duration,
-        notes: job.internalNotes || null,
+        notes: cleanNotes,
       };
     });
 

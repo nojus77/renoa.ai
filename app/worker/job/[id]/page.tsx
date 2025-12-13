@@ -35,30 +35,51 @@ import { toast } from 'sonner';
 // Lime green brand color
 const LIME_GREEN = '#a3e635';
 
-// Mock services data - NAMES ONLY, NO PRICES
-const SERVICES_CATALOG = {
-  HVAC: [
-    { id: 'hvac-1', name: 'Furnace Inspection' },
-    { id: 'hvac-2', name: 'Filter Replacement' },
-    { id: 'hvac-3', name: 'Thermostat Repair' },
-    { id: 'hvac-4', name: 'Emergency Service' },
-    { id: 'hvac-5', name: 'Annual Maintenance' },
-    { id: 'hvac-6', name: 'AC Repair' },
-    { id: 'hvac-7', name: 'Duct Cleaning' },
+// Services by category - matches OnboardingModal
+const SERVICES_BY_CATEGORY: Record<string, string[]> = {
+  'Landscaping & Lawn Care': [
+    'Lawn Mowing', 'Leaf Removal', 'Tree Trimming', 'Landscape Design', 'Irrigation',
+    'Fertilization', 'Mulching', 'Snow Removal', 'Hedge Trimming', 'Sod Installation',
   ],
-  Plumbing: [
-    { id: 'plumb-1', name: 'Drain Cleaning' },
-    { id: 'plumb-2', name: 'Leak Repair' },
-    { id: 'plumb-3', name: 'Fixture Installation' },
-    { id: 'plumb-4', name: 'Emergency Plumbing' },
-    { id: 'plumb-5', name: 'Water Heater Service' },
-    { id: 'plumb-6', name: 'Pipe Repair' },
+  'Electrical': [
+    'Wiring & Rewiring', 'Panel Upgrades', 'Outlet Installation', 'Lighting Installation',
+    'Ceiling Fans', 'Generator Installation', 'EV Charger Install', 'Troubleshooting', 'Code Corrections',
   ],
-  Electrical: [
-    { id: 'elec-1', name: 'Outlet Installation' },
-    { id: 'elec-2', name: 'Panel Upgrade' },
-    { id: 'elec-3', name: 'Wiring Repair' },
-    { id: 'elec-4', name: 'Light Fixture Installation' },
+  'Plumbing': [
+    'Drain Cleaning', 'Leak Repair', 'Water Heater', 'Fixture Installation', 'Pipe Repair',
+    'Sewer Line', 'Garbage Disposal', 'Bathroom Remodel', 'Water Filtration',
+  ],
+  'HVAC': [
+    'AC Installation', 'AC Repair', 'Heating Repair', 'Furnace Install', 'Duct Cleaning',
+    'Thermostat Install', 'Maintenance Plans', 'Air Quality', 'Heat Pump',
+  ],
+  'Roofing': [
+    'Shingle Repair', 'Roof Replacement', 'Gutter Install', 'Gutter Cleaning', 'Roof Inspection',
+    'Leak Repair', 'Flat Roof', 'Metal Roofing', 'Skylight Install',
+  ],
+  'Painting': [
+    'Interior Painting', 'Exterior Painting', 'Cabinet Painting', 'Deck Staining',
+    'Wallpaper', 'Pressure Washing', 'Drywall Repair', 'Color Consulting',
+  ],
+  'Home Remodeling': [
+    'Kitchen Remodel', 'Bathroom Remodel', 'Basement Finishing', 'Room Additions',
+    'Flooring', 'Tile Work', 'Custom Carpentry', 'Deck Building',
+  ],
+  'Fencing': [
+    'Wood Fence', 'Vinyl Fence', 'Chain Link', 'Iron/Metal Fence',
+    'Gate Installation', 'Fence Repair', 'Privacy Fence',
+  ],
+  'Flooring': [
+    'Hardwood Install', 'Laminate', 'Tile', 'Carpet', 'Vinyl/LVP',
+    'Floor Refinishing', 'Subfloor Repair',
+  ],
+  'Cleaning Services': [
+    'Regular Cleaning', 'Deep Cleaning', 'Move-in/Move-out', 'Window Cleaning',
+    'Carpet Cleaning', 'Pressure Washing', 'Post-Construction',
+  ],
+  'General Contracting': [
+    'Project Management', 'Permit Handling', 'Full Renovations',
+    'New Construction', 'Commercial Build-out',
   ],
 };
 
@@ -146,6 +167,7 @@ export default function JobDetailPage() {
 
   const [userId, setUserId] = useState<string>('');
   const [providerId, setProviderId] = useState<string>('');
+  const [providerCategory, setProviderCategory] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -183,6 +205,7 @@ export default function JobDetailPage() {
   const [showServiceDropdown, setShowServiceDropdown] = useState(false);
   const [showCustomServiceInput, setShowCustomServiceInput] = useState(false);
   const [customServiceName, setCustomServiceName] = useState('');
+  const [savedCustomServices, setSavedCustomServices] = useState<string[]>([]);
 
   // Parts state
   const [parts, setParts] = useState<Part[]>([]);
@@ -371,6 +394,34 @@ export default function JobDetailPage() {
       fetchNotes(jobId);
       fetchMedia(jobId);
     }
+
+    // Fetch provider category for service filtering
+    const fetchProviderCategory = async () => {
+      try {
+        const res = await fetch(`/api/worker/profile?userId=${uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          setProviderCategory(data.user?.provider?.primaryCategory || null);
+        }
+      } catch (error) {
+        console.error('Error fetching provider category:', error);
+      }
+    };
+    fetchProviderCategory();
+
+    // Fetch saved custom services
+    const fetchCustomServices = async () => {
+      try {
+        const res = await fetch(`/api/worker/services?userId=${uid}`);
+        if (res.ok) {
+          const data = await res.json();
+          setSavedCustomServices(data.customServices?.map((s: { name: string }) => s.name) || []);
+        }
+      } catch (error) {
+        console.error('Error fetching custom services:', error);
+      }
+    };
+    fetchCustomServices();
   }, [router, jobId, fetchJob, fetchNotes, fetchMedia]);
 
   const getJobStatus = (j: Job) => {
@@ -551,13 +602,15 @@ export default function JobDetailPage() {
     setShowServiceDropdown(false);
   };
 
-  const handleAddCustomService = () => {
+  const handleAddCustomService = async () => {
     if (!customServiceName.trim()) return;
+
+    const serviceName = customServiceName.trim();
 
     const newService: SelectedService = {
       id: `custom-${Date.now()}`,
       serviceId: null,
-      serviceName: customServiceName.trim(),
+      serviceName,
       price: 0,
       customNotes: '',
       isCustom: true,
@@ -566,6 +619,23 @@ export default function JobDetailPage() {
     setSelectedServices([...selectedServices, newService]);
     setCustomServiceName('');
     setShowCustomServiceInput(false);
+
+    // Save custom service for future use
+    if (!savedCustomServices.includes(serviceName)) {
+      try {
+        const res = await fetch('/api/worker/services', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, serviceName }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setSavedCustomServices(data.customServices?.map((s: { name: string }) => s.name) || []);
+        }
+      } catch (error) {
+        console.error('Error saving custom service:', error);
+      }
+    }
   };
 
   const handleRemoveService = (serviceId: string) => {
@@ -1115,47 +1185,60 @@ export default function JobDetailPage() {
 
                 {showServiceDropdown && (
                   <div className="absolute z-20 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                    {/* Saved Custom Services - show first */}
+                    {savedCustomServices.length > 0 && (
+                      <div>
+                        <div className="px-3 py-2 text-xs font-semibold text-emerald-500 uppercase tracking-wider bg-zinc-900/50">
+                          Your Saved Services
+                        </div>
+                        {savedCustomServices.map((serviceName, index) => (
+                          <button
+                            key={`saved-${index}`}
+                            onClick={() => handleAddService(`saved-${index}`, serviceName)}
+                            className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700"
+                          >
+                            {serviceName}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                     {(() => {
-                      // Filter services based on current job type
-                      const jobType = job?.serviceType || '';
-                      const matchedCategory = Object.keys(SERVICES_CATALOG).find(
-                        cat => jobType.toLowerCase().includes(cat.toLowerCase()) || cat.toLowerCase().includes(jobType.toLowerCase())
-                      );
+                      // Use provider's primaryCategory if available
+                      const services = providerCategory ? SERVICES_BY_CATEGORY[providerCategory] : null;
 
-                      if (matchedCategory) {
-                        // Show only services for the matched category
-                        const services = SERVICES_CATALOG[matchedCategory as keyof typeof SERVICES_CATALOG];
+                      if (services && services.length > 0) {
+                        // Show only services for the provider's category
                         return (
                           <div>
                             <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/50">
-                              {matchedCategory} Services
+                              {providerCategory} Services
                             </div>
-                            {services.map((service) => (
+                            {services.map((serviceName, index) => (
                               <button
-                                key={service.id}
-                                onClick={() => handleAddService(service.id, service.name)}
+                                key={`${providerCategory}-${index}`}
+                                onClick={() => handleAddService(`${providerCategory}-${index}`, serviceName)}
                                 className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700"
                               >
-                                {service.name}
+                                {serviceName}
                               </button>
                             ))}
                           </div>
                         );
                       }
 
-                      // Fallback: show all services if no match
-                      return Object.entries(SERVICES_CATALOG).map(([category, services]) => (
+                      // Fallback: show all categories if no provider category set
+                      return Object.entries(SERVICES_BY_CATEGORY).map(([category, categoryServices]) => (
                         <div key={category}>
                           <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/50">
                             {category}
                           </div>
-                          {services.map((service) => (
+                          {categoryServices.map((serviceName, index) => (
                             <button
-                              key={service.id}
-                              onClick={() => handleAddService(service.id, service.name)}
+                              key={`${category}-${index}`}
+                              onClick={() => handleAddService(`${category}-${index}`, serviceName)}
                               className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700"
                             >
-                              {service.name}
+                              {serviceName}
                             </button>
                           ))}
                         </div>

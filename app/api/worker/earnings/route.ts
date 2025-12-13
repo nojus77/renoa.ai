@@ -29,8 +29,18 @@ export async function GET(request: NextRequest) {
       startDate.setHours(0, 0, 0, 0);
     }
 
+    // Get user pay info first (needed for earnings calculation)
+    const user = await prisma.providerUser.findUnique({
+      where: { id: userId },
+      select: {
+        payType: true,
+        hourlyRate: true,
+        commissionRate: true,
+      },
+    });
+
     // Get work logs for period
-    const workLogs = await prisma.workLog.findMany({
+    const workLogsRaw = await prisma.workLog.findMany({
       where: {
         userId,
         clockIn: { gte: startDate },
@@ -41,6 +51,8 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             serviceType: true,
+            actualValue: true,
+            estimatedValue: true,
             customer: {
               select: { name: true },
             },
@@ -50,7 +62,34 @@ export async function GET(request: NextRequest) {
       orderBy: { clockIn: 'desc' },
     });
 
-    // Calculate totals
+    // Recalculate earnings if they're 0 but worker has pay configured
+    const workLogs = workLogsRaw.map(log => {
+      let calculatedEarnings = log.earnings || 0;
+
+      // If earnings is 0 but worker has pay configured, try to calculate
+      if (calculatedEarnings === 0 && log.hoursWorked && user) {
+        if (user.payType === 'hourly' && user.hourlyRate) {
+          calculatedEarnings = log.hoursWorked * user.hourlyRate;
+        } else if (user.payType === 'commission' && user.commissionRate) {
+          const jobValue = log.job?.actualValue || log.job?.estimatedValue || 0;
+          calculatedEarnings = jobValue * (user.commissionRate / 100);
+        }
+        calculatedEarnings = Math.round(calculatedEarnings * 100) / 100;
+      }
+
+      return {
+        ...log,
+        earnings: calculatedEarnings,
+        // Clean job object for response
+        job: {
+          id: log.job.id,
+          serviceType: log.job.serviceType,
+          customer: log.job.customer,
+        },
+      };
+    });
+
+    // Calculate totals with recalculated earnings
     const totalEarnings = workLogs.reduce((sum, log) => sum + (log.earnings || 0), 0);
     const totalHours = workLogs.reduce((sum, log) => sum + (log.hoursWorked || 0), 0);
     const jobsCompleted = workLogs.length;
@@ -69,16 +108,6 @@ export async function GET(request: NextRequest) {
         byDate[dateKey] = [];
       }
       byDate[dateKey].push(log);
-    });
-
-    // Get user pay info
-    const user = await prisma.providerUser.findUnique({
-      where: { id: userId },
-      select: {
-        payType: true,
-        hourlyRate: true,
-        commissionRate: true,
-      },
     });
 
     return NextResponse.json({

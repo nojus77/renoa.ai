@@ -88,16 +88,47 @@ export async function POST(
       );
     }
 
-    // Verify worker is assigned to this job
-    const job = await prisma.job.findFirst({
-      where: {
-        id,
-        assignedUserIds: { has: userId },
+    // Find the job first to check assignment
+    const jobCheck = await prisma.job.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        assignedUserIds: true,
+        providerId: true,
       },
-      select: { id: true },
     });
 
-    if (!job) {
+    if (!jobCheck) {
+      console.error('Media upload: Job not found', { id, userId });
+      return NextResponse.json(
+        { error: 'Job not found' },
+        { status: 404 }
+      );
+    }
+
+    // Check if worker is assigned OR if they belong to the provider (owner/admin can upload too)
+    const isAssigned = jobCheck.assignedUserIds.includes(userId);
+
+    // If not assigned, check if user is owner/admin of the provider
+    let hasAccess = isAssigned;
+    if (!hasAccess) {
+      const user = await prisma.providerUser.findFirst({
+        where: {
+          id: userId,
+          providerId: jobCheck.providerId,
+          role: { in: ['owner', 'admin', 'manager'] },
+        },
+      });
+      hasAccess = !!user;
+    }
+
+    if (!hasAccess) {
+      console.error('Media upload: Access denied', {
+        jobId: id,
+        userId,
+        assignedUserIds: jobCheck.assignedUserIds,
+        isAssigned,
+      });
       return NextResponse.json(
         { error: 'Job not found or not assigned to you' },
         { status: 403 }

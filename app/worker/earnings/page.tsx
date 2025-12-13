@@ -192,9 +192,10 @@ export default function WorkerEarnings() {
                 <div key={date} className="space-y-2">
                   <h3 className="text-sm font-medium text-zinc-400">{formatDate(date)}</h3>
                   {logs.map((log) => (
-                    <div
+                    <button
                       key={log.id}
-                      className="bg-zinc-900 rounded-xl p-4 border border-zinc-800"
+                      onClick={() => router.push(`/worker/job/${log.job.id}`)}
+                      className="w-full text-left bg-zinc-900 rounded-xl p-4 border border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800/50 transition-colors"
                     >
                       <div className="flex items-start justify-between">
                         <div>
@@ -233,7 +234,7 @@ export default function WorkerEarnings() {
                         </span>
                         <span>{log.hoursWorked?.toFixed(1) || '0'}h</span>
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               ))
