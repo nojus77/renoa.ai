@@ -1481,24 +1481,21 @@ export default function TeamManagementPage() {
                             <th className="px-4 py-3">Skills</th>
                             <th className="px-4 py-3 text-right">This Week</th>
                             <th className="px-4 py-3">Next Job</th>
-                            {isOwner && <th className="px-4 py-3 text-right">Actions</th>}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800">
                           {filteredTeamMembers.map((member, idx) => (
                             <tr
                               key={member.id}
+                              onClick={() => setProfileWorkerId(member.id)}
                               className={cn(
-                                "hover:bg-zinc-800/70 transition-colors",
+                                "hover:bg-zinc-800/70 transition-colors cursor-pointer",
                                 idx % 2 === 0 ? "bg-zinc-900" : "bg-zinc-900/50"
                               )}
                             >
                             {/* Member - Frozen Column */}
                             <td className="px-4 py-3 sticky left-0 bg-inherit z-10">
-                              <button
-                                onClick={() => setProfileWorkerId(member.id)}
-                                className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
-                              >
+                              <div className="flex items-center gap-3">
                                 <Avatar
                                   className="w-8 h-8"
                                   style={{ backgroundColor: member.color || '#6b7280' }}
@@ -1508,14 +1505,14 @@ export default function TeamManagementPage() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium text-sm text-zinc-100 hover:text-emerald-400 transition-colors">{member.firstName} {member.lastName}</div>
+                                  <div className="font-medium text-sm text-zinc-100">{member.firstName} {member.lastName}</div>
                                   <div className="text-xs text-zinc-500">{member.email}</div>
                                 </div>
-                              </button>
+                              </div>
                             </td>
 
                             {/* Role */}
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                               <Select
                                 value={member.role}
                                 onValueChange={(value) => isOwner && updateMemberRole(member.id, value)}
@@ -1533,7 +1530,7 @@ export default function TeamManagementPage() {
                             </td>
 
                             {/* Status */}
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-2">
                                 <Switch
                                   checked={member.status === 'active'}
@@ -1551,7 +1548,7 @@ export default function TeamManagementPage() {
                             </td>
 
                             {/* Skills */}
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                               <div className="flex items-center gap-1 flex-wrap max-w-[200px]">
                                 {member.workerSkills && member.workerSkills.length > 0 ? (
                                   <>
@@ -1683,21 +1680,6 @@ export default function TeamManagementPage() {
                               )}
                             </td>
 
-                            {/* Actions */}
-                            {isOwner && (
-                              <td className="px-4 py-3">
-                                <div className="flex items-center justify-end gap-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="w-7 h-7"
-                                    onClick={() => setProfileWorkerId(member.id)}
-                                  >
-                                    <Pencil className="w-4 h-4 text-zinc-400" />
-                                  </Button>
-                                </div>
-                              </td>
-                            )}
                           </tr>
                         ))}
                       </tbody>
