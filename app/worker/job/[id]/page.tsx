@@ -21,14 +21,12 @@ import {
   Plus,
   Send,
   History,
-  Receipt,
   X,
   ChevronRight,
   Wrench,
   Package,
   DollarSign,
   ChevronDown,
-  Eye,
   Trash2,
   Timer,
 } from 'lucide-react';
@@ -178,10 +176,7 @@ export default function JobDetailPage() {
   const [customerJobs, setCustomerJobs] = useState<CustomerJob[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
-  // Invoice state
-  const [sendingInvoice, setSendingInvoice] = useState(false);
-  const [invoiceSent, setInvoiceSent] = useState(false);
-  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
+  // Invoice state - removed for workers, handled by office
 
   // Service selection state
   const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
@@ -625,11 +620,6 @@ export default function JobDetailPage() {
   const partsSubtotal = parts.reduce((sum, p) => sum + (p.quantity * p.unitPrice), 0);
   const totalPrice = servicesSubtotal + partsSubtotal;
 
-  // Validation
-  const canSendInvoice = timerState === 'completed' &&
-    selectedServices.some(s => s.price > 0) &&
-    totalPrice > 0;
-
   const servicesWithoutPrice = selectedServices.filter(s => s.price === 0);
 
   // Note handlers
@@ -725,64 +715,6 @@ export default function JobDetailPage() {
       toast.error('Failed to load customer history');
     } finally {
       setLoadingHistory(false);
-    }
-  };
-
-  const handleSendInvoice = async () => {
-    if (!job || !canSendInvoice) return;
-    setSendingInvoice(true);
-
-    try {
-      const invoiceData = {
-        userId,
-        services: selectedServices.map(s => ({
-          name: s.serviceName,
-          price: s.price,
-          notes: s.customNotes,
-          isCustom: s.isCustom,
-        })),
-        parts: parts.map(p => ({
-          name: p.name,
-          quantity: p.quantity,
-          unitPrice: p.unitPrice,
-        })),
-        times: {
-          travel: travelTime,
-          onSite: onSiteTime,
-          total: travelTime + onSiteTime,
-        },
-        pricing: {
-          servicesTotal: servicesSubtotal,
-          partsTotal: partsSubtotal,
-          finalTotal: totalPrice,
-        },
-      };
-
-      const res = await fetch(`/api/worker/jobs/${job.id}/invoice`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(invoiceData),
-      });
-
-      if (res.ok) {
-        setInvoiceSent(true);
-        setShowInvoicePreview(false);
-        toast.success('Invoice sent to customer');
-
-        // Clear draft
-        localStorage.removeItem(`jobDraft_${jobId}`);
-
-        // Reset success state after 2 seconds
-        setTimeout(() => setInvoiceSent(false), 2000);
-      } else {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to send invoice');
-      }
-    } catch (error) {
-      console.error('Error sending invoice:', error);
-      toast.error('Failed to send invoice');
-    } finally {
-      setSendingInvoice(false);
     }
   };
 
@@ -925,17 +857,6 @@ export default function JobDetailPage() {
       default:
         return null;
     }
-  };
-
-  // Format time for invoice (readable)
-  const formatTimeForInvoice = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-
-    if (hours > 0) {
-      return `${hours} hour${hours > 1 ? 's' : ''} ${mins} minute${mins !== 1 ? 's' : ''}`;
-    }
-    return `${mins} minute${mins !== 1 ? 's' : ''}`;
   };
 
   if (loading) {
@@ -1432,46 +1353,7 @@ export default function JobDetailPage() {
               )}
             </div>
 
-            {/* ACTION BUTTONS */}
-            <div className="space-y-3">
-              {/* Preview Invoice Button */}
-              <button
-                onClick={() => setShowInvoicePreview(true)}
-                disabled={selectedServices.length === 0}
-                className="w-full flex items-center justify-center gap-2 py-3 border border-zinc-700 rounded-lg text-sm font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Eye className="w-4 h-4" />
-                Preview Invoice
-              </button>
-
-              {/* Send Invoice Button */}
-              <button
-                onClick={handleSendInvoice}
-                disabled={!canSendInvoice || sendingInvoice}
-                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-semibold text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                style={{ backgroundColor: canSendInvoice ? LIME_GREEN : '#3f3f46' }}
-              >
-                {sendingInvoice ? (
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                ) : invoiceSent ? (
-                  <>
-                    <CheckCircle2 className="w-5 h-5" />
-                    Invoice Sent
-                  </>
-                ) : (
-                  <>
-                    <Receipt className="w-5 h-5" />
-                    Send Invoice to Customer
-                  </>
-                )}
-              </button>
-
-              {!canSendInvoice && timerState !== 'completed' && (
-                <p className="text-xs text-center text-zinc-500">
-                  Complete the job to send invoice
-                </p>
-              )}
-            </div>
+            {/* Note: Invoice sending is handled by office staff */}
           </div>
         </div>
 
@@ -1663,124 +1545,6 @@ export default function JobDetailPage() {
               className="max-w-full max-h-full"
             />
           )}
-        </div>
-      )}
-
-      {/* Invoice Preview Modal */}
-      {showInvoicePreview && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center">
-          <div className="bg-zinc-900 w-full max-w-md max-h-[90vh] rounded-t-2xl sm:rounded-2xl border border-zinc-800 flex flex-col">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
-              <h2 className="text-lg font-semibold text-white">Invoice Preview</h2>
-              <button
-                onClick={() => setShowInvoicePreview(false)}
-                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-zinc-400" />
-              </button>
-            </div>
-
-            {/* Invoice Content */}
-            <div className="p-4 overflow-y-auto flex-1">
-              <div className="bg-white text-zinc-900 rounded-lg p-4 text-sm">
-                {/* Header */}
-                <div className="text-center border-b border-zinc-200 pb-4 mb-4">
-                  <h3 className="text-lg font-bold">{job.serviceType} Service Invoice</h3>
-                  <p className="text-zinc-500 text-xs mt-1">
-                    {new Date().toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric'
-                    })}
-                  </p>
-                </div>
-
-                {/* Customer Info */}
-                <div className="mb-4">
-                  <p className="font-medium">Customer: {job.customer.name}</p>
-                  <p className="text-zinc-500 text-xs">{job.address}</p>
-                </div>
-
-                {/* Services */}
-                <div className="mb-4">
-                  <p className="font-semibold mb-2">SERVICES</p>
-                  {selectedServices.map((service) => (
-                    <div key={service.id} className="mb-2">
-                      <div className="flex justify-between">
-                        <span>{service.serviceName}</span>
-                        <span>${service.price.toFixed(2)}</span>
-                      </div>
-                      {service.customNotes && (
-                        <p className="text-xs text-zinc-500 italic ml-2">({service.customNotes})</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-
-                {/* Parts */}
-                {parts.length > 0 && (
-                  <div className="mb-4">
-                    <p className="font-semibold mb-2">PARTS</p>
-                    {parts.map((part) => (
-                      <div key={part.id} className="flex justify-between">
-                        <span>{part.name} x{part.quantity}</span>
-                        <span>${(part.quantity * part.unitPrice).toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Labor Time */}
-                {timerState === 'completed' && (
-                  <div className="mb-4 py-2 border-t border-zinc-200">
-                    <p className="font-semibold mb-2">LABOR TIME</p>
-                    <p className="text-xs">Travel Time: {formatTimeForInvoice(travelTime)}</p>
-                    <p className="text-xs">On-Site Time: {formatTimeForInvoice(onSiteTime)}</p>
-                    <p className="text-xs font-medium">Total Time: {formatTimeForInvoice(travelTime + onSiteTime)}</p>
-                  </div>
-                )}
-
-                {/* Totals */}
-                <div className="border-t border-zinc-300 pt-3 mt-3">
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal (Services)</span>
-                    <span>${servicesSubtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal (Parts)</span>
-                    <span>${partsSubtotal.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-lg mt-2 pt-2 border-t border-zinc-300">
-                    <span>TOTAL DUE</span>
-                    <span>${totalPrice.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Actions */}
-            <div className="p-4 border-t border-zinc-800 shrink-0 space-y-2">
-              <button
-                onClick={() => setShowInvoicePreview(false)}
-                className="w-full py-3 border border-zinc-700 rounded-lg text-sm font-medium text-zinc-300 hover:bg-zinc-800"
-              >
-                Edit
-              </button>
-              <button
-                onClick={handleSendInvoice}
-                disabled={!canSendInvoice || sendingInvoice}
-                className="w-full py-3 rounded-lg font-semibold text-zinc-900 disabled:opacity-50"
-                style={{ backgroundColor: LIME_GREEN }}
-              >
-                {sendingInvoice ? (
-                  <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                ) : (
-                  'Send Invoice'
-                )}
-              </button>
-            </div>
-          </div>
         </div>
       )}
 
