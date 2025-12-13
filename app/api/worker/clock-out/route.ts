@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { jobId, userId } = body;
+    const { jobId, userId, paymentMethod, tipAmount } = body;
 
     if (!jobId || !userId) {
       return NextResponse.json(
@@ -107,13 +107,15 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Update job status to completed
+    // Update job status to completed with payment info
     await prisma.job.update({
       where: { id: jobId },
       data: {
         status: 'completed',
         completedAt: clockOut,
         completedByUserId: userId,
+        paymentMethod: paymentMethod || null,
+        tipAmount: tipAmount ? Math.round(tipAmount * 100) / 100 : null,
       },
     });
 

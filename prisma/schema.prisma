@@ -492,6 +492,7 @@ model ProviderUser {
   commissionRate    Float?              @map("commission_rate") // percentage like 50.0 for 50%
   workingHours      Json?               @map("working_hours") // {"monday": {"start": "08:00", "end": "17:00"}}
   profilePhotoUrl   String?             @map("profile_photo_url")
+  profilePhotoBlobPath String?          @map("profile_photo_blob_path")
   // Smart Scheduler fields
   homeAddress       String?             @map("home_address") // For travel distance calculations
   homeLatitude      Float?              @map("home_latitude")
@@ -630,6 +631,9 @@ model Job {
   longitude             Float? // For distance calculations
   zone                  String? // ZIP code or service area
   estimatedDuration     Float?                 @map("estimated_duration") // hours
+  // Payment fields
+  paymentMethod         String?                @map("payment_method") // cash, check, card, invoice
+  tipAmount             Float?                 @map("tip_amount")
   invoices              Invoice?
   photos                JobPhoto[]             @relation("JobPhotos")
   customer              Customer               @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)

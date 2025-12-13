@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import WorkerLayout from '@/components/worker/WorkerLayout';
 import {
@@ -104,6 +104,7 @@ export default function WorkerProfile() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [jobsThisWeek, setJobsThisWeek] = useState(0);
 
   // Form data
   const [profileForm, setProfileForm] = useState({
@@ -131,6 +132,8 @@ export default function WorkerProfile() {
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [hasProfileChanges, setHasProfileChanges] = useState(false);
   const [hasScheduleChanges, setHasScheduleChanges] = useState(false);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const photoInputRef = useRef<HTMLInputElement>(null);
 
   const fetchProfile = useCallback(async (uid: string) => {
     try {
@@ -138,6 +141,9 @@ export default function WorkerProfile() {
       const data = await res.json();
       if (data.user) {
         setProfile(data.user);
+        if (data.stats?.jobsThisWeek !== undefined) {
+          setJobsThisWeek(data.stats.jobsThisWeek);
+        }
         setProfileForm({
           firstName: data.user.firstName || '',
           lastName: data.user.lastName || '',
@@ -243,6 +249,52 @@ export default function WorkerProfile() {
       toast.error('Connection error');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !profile) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    if (!validTypes.includes(file.type)) {
+      toast.error('Please upload a JPG, PNG, or WebP image');
+      return;
+    }
+
+    // Validate file size (5MB max)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Photo too large. Max 5MB.');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('userId', profile.id);
+
+      const res = await fetch('/api/worker/profile/photo', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await res.json();
+      if (res.ok && data.url) {
+        setProfile({ ...profile, profilePhotoUrl: data.url });
+        toast.success('Photo updated!');
+      } else {
+        toast.error(data.error || 'Failed to upload photo');
+      }
+    } catch {
+      toast.error('Upload failed');
+    } finally {
+      setUploadingPhoto(false);
+      // Reset file input
+      if (photoInputRef.current) {
+        photoInputRef.current.value = '';
+      }
     }
   };
 
@@ -388,9 +440,21 @@ export default function WorkerProfile() {
                     <User className="w-12 h-12 text-zinc-500" />
                   )}
                 </div>
-                <button className="absolute bottom-0 right-0 w-9 h-9 bg-emerald-600 hover:bg-emerald-500 rounded-full flex items-center justify-center transition-colors shadow-lg">
-                  <Camera className="w-4 h-4 text-white" />
-                </button>
+                <label className="absolute bottom-0 right-0 w-9 h-9 bg-emerald-600 hover:bg-emerald-500 rounded-full flex items-center justify-center transition-colors shadow-lg cursor-pointer">
+                  {uploadingPhoto ? (
+                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                  ) : (
+                    <Camera className="w-4 h-4 text-white" />
+                  )}
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                    disabled={uploadingPhoto}
+                  />
+                </label>
               </div>
 
               {/* Name and Title */}
@@ -424,7 +488,7 @@ export default function WorkerProfile() {
               <div className="flex items-center justify-center w-10 h-10 bg-blue-500/20 rounded-lg mb-3 mx-auto">
                 <Briefcase className="w-5 h-5 text-blue-400" />
               </div>
-              <p className="text-2xl font-bold text-white text-center">0</p>
+              <p className="text-2xl font-bold text-white text-center">{jobsThisWeek}</p>
               <p className="text-xs text-zinc-500 text-center">Jobs this week</p>
             </div>
 

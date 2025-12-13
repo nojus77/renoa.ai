@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Calendar, DollarSign, Clock, User } from 'lucide-react';
+import { Home, Calendar, DollarSign, User } from 'lucide-react';
 
 interface WorkerLayoutProps {
   children: React.ReactNode;
@@ -10,9 +10,8 @@ interface WorkerLayoutProps {
 
 const navItems = [
   { href: '/worker/dashboard', icon: Home, label: 'Home' },
-  { href: '/worker/schedule', icon: Calendar, label: 'Schedule' },
   { href: '/worker/earnings', icon: DollarSign, label: 'Earnings' },
-  { href: '/worker/time-off', icon: Clock, label: 'Time Off' },
+  { href: '/worker/time-off', icon: Calendar, label: 'Schedule' },
   { href: '/worker/profile', icon: User, label: 'Profile' },
 ];
 

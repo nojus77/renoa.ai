@@ -63,7 +63,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ user });
+    // Calculate jobs this week
+    const startOfWeek = new Date();
+    startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const jobsThisWeek = await prisma.job.count({
+      where: {
+        assignedUserIds: { has: userId },
+        status: 'completed',
+        completedAt: { gte: startOfWeek },
+      },
+    });
+
+    return NextResponse.json({ user, stats: { jobsThisWeek } });
   } catch (error) {
     console.error('Error fetching worker profile:', error);
     return NextResponse.json(

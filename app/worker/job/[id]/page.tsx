@@ -29,6 +29,9 @@ import {
   ChevronDown,
   Trash2,
   Timer,
+  Banknote,
+  CreditCard,
+  Mail,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PropertyPhoto } from '@/components/PropertyPhoto';
@@ -214,6 +217,10 @@ export default function JobDetailPage() {
   const [newPartName, setNewPartName] = useState('');
   const [newPartQty, setNewPartQty] = useState(1);
   const [newPartPrice, setNewPartPrice] = useState(0);
+
+  // Payment state
+  const [paymentMethod, setPaymentMethod] = useState<string>('');
+  const [tipAmount, setTipAmount] = useState<string>('');
 
   // Update current time every minute
   useEffect(() => {
@@ -559,6 +566,13 @@ export default function JobDetailPage() {
       return;
     }
 
+    // Validate: require payment method
+    if (!paymentMethod) {
+      toast.error('Please select how customer paid');
+      document.getElementById('payment-section')?.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
     // Optional: remind about photos (not required)
     if (media.length === 0) {
       const proceed = confirm('No photos added. Complete job anyway?');
@@ -579,6 +593,8 @@ export default function JobDetailPage() {
         totalPrice,
         servicesCount: selectedServices.length,
         partsCount: parts.length,
+        paymentMethod,
+        tipAmount: parseFloat(tipAmount) || 0,
       });
 
       const res = await fetch('/api/worker/clock-out', {
@@ -589,6 +605,8 @@ export default function JobDetailPage() {
           userId,
           travelDuration: travelTime,
           onSiteDuration: finalOnSiteTime,
+          paymentMethod,
+          tipAmount: parseFloat(tipAmount) || 0,
         }),
       });
 
@@ -1506,6 +1524,60 @@ export default function JobDetailPage() {
                   <p className="text-sm text-amber-400">
                     {servicesWithoutPrice.length} service{servicesWithoutPrice.length > 1 ? 's' : ''} missing price
                   </p>
+                </div>
+              )}
+            </div>
+
+            {/* PAYMENT METHOD SECTION */}
+            <div id="payment-section" className="border-t border-zinc-800 pt-4">
+              <label className="block text-sm font-medium text-zinc-300 mb-3">How did customer pay?</label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'cash', label: 'Cash', Icon: Banknote },
+                  { id: 'check', label: 'Check', Icon: FileText },
+                  { id: 'card', label: 'Card', Icon: CreditCard },
+                  { id: 'invoice', label: 'Invoice Later', Icon: Mail },
+                ].map((method) => (
+                  <button
+                    key={method.id}
+                    onClick={() => setPaymentMethod(method.id)}
+                    className={`p-3 rounded-lg border flex items-center gap-2 transition-colors ${
+                      paymentMethod === method.id
+                        ? 'border-[#a3e635] bg-[#a3e635]/20 text-white'
+                        : 'border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                    }`}
+                  >
+                    <method.Icon className="w-5 h-5" />
+                    <span className="text-sm font-medium">{method.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Tip Amount */}
+              <div className="mt-4">
+                <label className="text-sm text-zinc-400">Tip (optional)</label>
+                <div className="flex items-center gap-2 mt-1">
+                  <span className="text-zinc-400">$</span>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={tipAmount}
+                    onChange={(e) => setTipAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 w-32 text-base text-white focus:outline-none focus:border-[#a3e635]"
+                    style={{ fontSize: '16px' }}
+                  />
+                </div>
+              </div>
+
+              {/* Total with tip */}
+              {parseFloat(tipAmount) > 0 && (
+                <div className="mt-3 flex justify-between text-sm">
+                  <span className="text-zinc-400">Total + Tip</span>
+                  <span style={{ color: LIME_GREEN }} className="font-bold">
+                    ${(totalPrice + parseFloat(tipAmount)).toFixed(2)}
+                  </span>
                 </div>
               )}
             </div>
