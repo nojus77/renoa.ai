@@ -115,6 +115,12 @@ export async function GET(request: NextRequest) {
       totalTips: number;
       cashTipsKept: number;
       unpaidTotal: number;
+      totalBase: number;
+      unpaidBase: number;
+      unpaidTips: number;
+      unpaidJobs: number;
+      totalJobs: number;
+      unpaidHours: number;
     }> = {};
 
     formattedLogs.forEach((log) => {
@@ -127,19 +133,41 @@ export async function GET(request: NextRequest) {
           totalTips: 0,
           cashTipsKept: 0,
           unpaidTotal: 0,
+          totalBase: 0,
+          unpaidBase: 0,
+          unpaidTips: 0,
+          unpaidJobs: 0,
+          totalJobs: 0,
+          unpaidHours: 0,
         };
       }
 
       const workerGroup = byWorkerMap[log.userId];
       workerGroup.logs.push(log);
       workerGroup.totalHours += log.hoursWorked || 0;
-      workerGroup.totalOwed += log.payoutAmount || 0;
-      workerGroup.totalTips += log.tipEligible || 0;
-      workerGroup.unpaidTotal += !log.isPaid ? (log.payoutAmount || 0) : 0;
+      workerGroup.totalJobs += 1;
+
+      const payoutAmount = log.payoutAmount || 0;
+      const tipEligible = log.tipEligible || 0;
+      const basePay = typeof log.baseEarnings === 'number'
+        ? Math.max(log.baseEarnings, 0)
+        : Math.max(payoutAmount - tipEligible, 0);
+
+      workerGroup.totalOwed += payoutAmount;
+      workerGroup.totalTips += tipEligible;
+      workerGroup.totalBase += basePay;
 
       const recordedTip = log.recordedTip || 0;
-      if (recordedTip > (log.tipEligible || 0)) {
-        workerGroup.cashTipsKept += recordedTip - (log.tipEligible || 0);
+      if (recordedTip > tipEligible) {
+        workerGroup.cashTipsKept += recordedTip - tipEligible;
+      }
+
+      if (!log.isPaid) {
+        workerGroup.unpaidTotal += payoutAmount;
+        workerGroup.unpaidTips += tipEligible;
+        workerGroup.unpaidBase += basePay;
+        workerGroup.unpaidJobs += 1;
+        workerGroup.unpaidHours += log.hoursWorked || 0;
       }
     });
 

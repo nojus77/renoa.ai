@@ -270,6 +270,55 @@ export default function TeamManagementPage() {
       }, 0),
     [unpaidWorkLogs]
   );
+  const workerSummaries = useMemo(() => {
+    return (payrollByWorker || [])
+      .map(worker => {
+        const workerId = worker?.user?.id || worker?.logs?.[0]?.userId || worker?.id;
+        const unpaidLogs = (worker?.logs || []).filter((log: any) => !log.isPaid);
+        const unpaidJobs =
+          typeof worker?.unpaidJobs === 'number' ? worker.unpaidJobs : unpaidLogs.length;
+        const totalJobs =
+          typeof worker?.totalJobs === 'number' ? worker.totalJobs : (worker?.logs?.length || 0);
+        const hoursDue =
+          typeof worker?.unpaidHours === 'number'
+            ? worker.unpaidHours
+            : unpaidLogs.reduce((sum: number, log: any) => sum + (log.hoursWorked || 0), 0);
+        const tipsDue =
+          typeof worker?.unpaidTips === 'number'
+            ? worker.unpaidTips
+            : unpaidLogs.reduce((sum: number, log: any) => sum + getTipEligible(log), 0);
+        const baseDue =
+          typeof worker?.unpaidBase === 'number'
+            ? worker.unpaidBase
+            : unpaidLogs.reduce(
+                (sum: number, log: any) => sum + Math.max(getPayoutAmount(log) - getTipEligible(log), 0),
+                0
+              );
+        const totalDue =
+          typeof worker?.unpaidTotal === 'number' ? worker.unpaidTotal : baseDue + tipsDue;
+        const totalHours = worker?.totalHours || worker?.logs?.reduce((sum: number, log: any) => sum + (log.hoursWorked || 0), 0) || 0;
+        const totalTips =
+          typeof worker?.totalTips === 'number'
+            ? worker.totalTips
+            : (worker?.logs || []).reduce((sum: number, log: any) => sum + getTipEligible(log), 0);
+
+        return {
+          worker,
+          workerId,
+          unpaidJobs,
+          totalJobs,
+          hoursDue,
+          totalHours,
+          baseDue,
+          tipsDue,
+          totalDue,
+          cashTips: worker?.cashTipsKept || 0,
+          totalTips,
+        };
+      })
+      .filter(summary => summary.totalDue > 0)
+      .sort((a, b) => b.totalDue - a.totalDue);
+  }, [payrollByWorker]);
 
   useEffect(() => {
     setSelectedWorkLogIds(prev => {
@@ -2611,64 +2660,106 @@ export default function TeamManagementPage() {
                         </CardDescription>
                       </CardHeader>
                       <CardContent className="space-y-3">
-                        {payrollByWorker.length === 0 ? (
+                        {workerSummaries.length === 0 ? (
                           <p className="text-sm text-zinc-400">Everyone is caught up. 🎉</p>
                         ) : (
-                          payrollByWorker.map(worker => {
-                            const workerId = worker.user?.id || worker.logs?.[0]?.userId;
-                            return (
-                              <div
-                                key={workerId || worker.logs?.[0]?.id}
-                                className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border border-zinc-700/70 bg-zinc-900/40"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <Avatar className="h-10 w-10">
-                                    <AvatarFallback style={{ backgroundColor: worker.user?.color || '#10b981' }}>
-                                      {worker.user?.firstName?.[0] ?? '?'}
-                                      {worker.user?.lastName?.[0] ?? ''}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <div>
-                                    <div className="text-sm font-medium text-zinc-100">
-                                      {worker.user
-                                        ? `${worker.user.firstName} ${worker.user.lastName}`
-                                        : 'Worker'}
-                                    </div>
-                                    <div className="text-xs text-zinc-400">
-                                      {worker.logs?.length || 0} job{(worker.logs?.length || 0) === 1 ? '' : 's'} •{' '}
-                                      {worker.totalHours?.toFixed(1) || '0.0'}h
-                                    </div>
-                                    <div className="text-xs text-zinc-500">
-                                      Tips to pay ${worker.totalTips?.toFixed(2) || '0.00'}
-                                      {worker.cashTipsKept > 0 && (
-                                        <span className="ml-1 text-amber-400">
-                                          + ${worker.cashTipsKept.toFixed(2)} cash
-                                        </span>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <div className="text-sm font-semibold text-emerald-400">
-                                    ${worker.totalOwed?.toFixed(2) || '0.00'}
-                                  </div>
-                                  <div className="text-xs text-zinc-500">Outstanding</div>
-                                </div>
-                                <Button
-                                  size="sm"
-                                  className="bg-emerald-600 hover:bg-emerald-500"
-                                  disabled={!workerId || processingWorkerPay === workerId}
-                                  onClick={() => workerId && handleMarkWorkerPaid(workerId)}
-                                >
-                                  {processingWorkerPay === workerId ? (
-                                    <Loader2 className="h-4 w-4 animate-spin" />
-                                  ) : (
-                                    'Pay Worker'
-                                  )}
-                                </Button>
-                              </div>
-                            );
-                          })
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="text-xs uppercase tracking-wide text-zinc-400 border-b border-zinc-700/60">
+                                  <th className="text-left py-2">Worker</th>
+                                  <th className="text-left py-2">Jobs</th>
+                                  <th className="text-left py-2">Hours</th>
+                                  <th className="text-left py-2">Base Pay</th>
+                                  <th className="text-left py-2">Tips Due</th>
+                                  <th className="text-left py-2">Total Owed</th>
+                                  <th className="text-right py-2">Action</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-zinc-700/50">
+                                {workerSummaries.map(summary => {
+                                  const workerId = summary.workerId;
+                                  const worker = summary.worker;
+                                  return (
+                                    <tr key={workerId || summary.worker?.logs?.[0]?.id} className="hover:bg-zinc-900/40">
+                                      <td className="py-3 pr-3">
+                                        <div className="flex items-center gap-3">
+                                          <Avatar className="h-10 w-10">
+                                            <AvatarFallback style={{ backgroundColor: worker?.user?.color || '#10b981' }}>
+                                              {worker?.user?.firstName?.[0] ?? '?'}
+                                              {worker?.user?.lastName?.[0] ?? ''}
+                                            </AvatarFallback>
+                                          </Avatar>
+                                          <div>
+                                            <div className="text-sm font-medium text-zinc-100">
+                                              {worker?.user
+                                                ? `${worker.user.firstName} ${worker.user.lastName}`
+                                                : 'Worker'}
+                                            </div>
+                                            <div className="text-xs text-zinc-500">
+                                              {summary.totalJobs} job{summary.totalJobs === 1 ? '' : 's'} this period
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="py-3 text-zinc-300">
+                                        <div className="font-medium text-zinc-100">
+                                          {summary.unpaidJobs} unpaid
+                                        </div>
+                                        <div className="text-xs text-zinc-500">
+                                          of {summary.totalJobs} total
+                                        </div>
+                                      </td>
+                                      <td className="py-3 text-zinc-300">
+                                        <div className="font-medium text-zinc-100">
+                                          {summary.hoursDue.toFixed(1)}h
+                                        </div>
+                                        <div className="text-xs text-zinc-500">
+                                          {summary.totalHours.toFixed(1)}h worked
+                                        </div>
+                                      </td>
+                                      <td className="py-3 text-zinc-300">
+                                        <div className="font-medium text-zinc-100">
+                                          ${summary.baseDue.toFixed(2)}
+                                        </div>
+                                        <div className="text-xs text-zinc-500">Base pay</div>
+                                      </td>
+                                      <td className="py-3 text-zinc-300">
+                                        <div className="font-medium text-emerald-300">
+                                          ${summary.tipsDue.toFixed(2)}
+                                        </div>
+                                        <div className="text-xs text-zinc-500">
+                                          Tips to send
+                                          {summary.cashTips > 0 && (
+                                            <span className="ml-1 text-amber-400">
+                                              (+ ${summary.cashTips.toFixed(2)} cash)
+                                            </span>
+                                          )}
+                                        </div>
+                                      </td>
+                                      <td className="py-3 text-emerald-400 font-semibold">
+                                        ${summary.totalDue.toFixed(2)}
+                                      </td>
+                                      <td className="py-3 text-right">
+                                        <Button
+                                          size="sm"
+                                          className="bg-emerald-600 hover:bg-emerald-500"
+                                          disabled={!workerId || processingWorkerPay === workerId}
+                                          onClick={() => workerId && handleMarkWorkerPaid(workerId)}
+                                        >
+                                          {processingWorkerPay === workerId ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            `Pay $${summary.totalDue.toFixed(2)}`
+                                          )}
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
                         )}
                       </CardContent>
                     </Card>
