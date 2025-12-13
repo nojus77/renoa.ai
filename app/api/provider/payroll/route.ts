@@ -3,21 +3,65 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-// GET unpaid work logs for provider
+const roundCurrency = (value: number) => Math.round(value * 100) / 100;
+
+function getDateRange(range: string) {
+  const now = new Date();
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  if (range === 'this-month') {
+    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    const endDate = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    return { startDate, endDate };
+  }
+
+  const getMonday = (date: Date) => {
+    const d = new Date(date);
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
+  if (range === 'last-week') {
+    const startDate = getMonday(today);
+    startDate.setDate(startDate.getDate() - 7);
+    const endDate = new Date(startDate);
+    endDate.setDate(endDate.getDate() + 7);
+    return { startDate, endDate };
+  }
+
+  // default to this week
+  const startDate = getMonday(today);
+  const endDate = new Date(startDate);
+  endDate.setDate(endDate.getDate() + 7);
+  return { startDate, endDate };
+}
+
+// GET work logs for provider/payroll summary
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const providerId = searchParams.get('providerId');
+    const range = searchParams.get('range') || 'this-week';
 
     if (!providerId) {
       return NextResponse.json({ error: 'Provider ID is required' }, { status: 400 });
     }
 
+    const { startDate, endDate } = getDateRange(range);
+    const clockOutFilter: Record<string, any> = { not: null };
+    if (startDate && endDate) {
+      clockOutFilter.gte = startDate;
+      clockOutFilter.lt = endDate;
+    }
+
     const workLogs = await prisma.workLog.findMany({
       where: {
         providerId,
-        isPaid: false,
-        clockOut: { not: null },
+        clockOut: clockOutFilter,
       },
       include: {
         user: {
@@ -34,6 +78,9 @@ export async function GET(request: NextRequest) {
           select: {
             id: true,
             serviceType: true,
+            paymentMethod: true,
+            tipAmount: true,
+            assignedUserIds: true,
             customer: {
               select: { name: true },
             },
@@ -43,40 +90,81 @@ export async function GET(request: NextRequest) {
       orderBy: { clockIn: 'desc' },
     });
 
-    // Group by worker
-    const byWorker: Record<string, {
-      user: typeof workLogs[0]['user'];
-      logs: typeof workLogs;
+    const formattedLogs = workLogs.map((log) => {
+      const recordedTip = log.job?.tipAmount || 0;
+      const paymentMethod = log.job?.paymentMethod?.toLowerCase();
+      const tipEligible = paymentMethod === 'cash' ? 0 : recordedTip;
+      const payoutAmount = roundCurrency(((log.earnings || 0) - recordedTip + tipEligible));
+      const baseEarnings = roundCurrency((log.earnings || 0) - recordedTip);
+
+      return {
+        ...log,
+        recordedTip,
+        tipEligible,
+        baseEarnings,
+        payoutAmount,
+        tipExcludedReason: paymentMethod === 'cash' && recordedTip > 0 ? 'cash' : null,
+      };
+    });
+
+    const byWorkerMap: Record<string, {
+      user: (typeof formattedLogs)[number]['user'];
+      logs: typeof formattedLogs;
       totalHours: number;
       totalOwed: number;
+      totalTips: number;
+      cashTipsKept: number;
+      unpaidTotal: number;
     }> = {};
 
-    workLogs.forEach((log) => {
-      if (!byWorker[log.userId]) {
-        byWorker[log.userId] = {
+    formattedLogs.forEach((log) => {
+      if (!byWorkerMap[log.userId]) {
+        byWorkerMap[log.userId] = {
           user: log.user,
           logs: [],
           totalHours: 0,
           totalOwed: 0,
+          totalTips: 0,
+          cashTipsKept: 0,
+          unpaidTotal: 0,
         };
       }
-      byWorker[log.userId].logs.push(log);
-      byWorker[log.userId].totalHours += log.hoursWorked || 0;
-      byWorker[log.userId].totalOwed += log.earnings || 0;
+
+      const workerGroup = byWorkerMap[log.userId];
+      workerGroup.logs.push(log);
+      workerGroup.totalHours += log.hoursWorked || 0;
+      workerGroup.totalOwed += log.payoutAmount || 0;
+      workerGroup.totalTips += log.tipEligible || 0;
+      workerGroup.unpaidTotal += !log.isPaid ? (log.payoutAmount || 0) : 0;
+
+      const recordedTip = log.recordedTip || 0;
+      if (recordedTip > (log.tipEligible || 0)) {
+        workerGroup.cashTipsKept += recordedTip - (log.tipEligible || 0);
+      }
     });
 
-    // Calculate totals
-    const totalOwed = workLogs.reduce((sum, log) => sum + (log.earnings || 0), 0);
-    const totalHours = workLogs.reduce((sum, log) => sum + (log.hoursWorked || 0), 0);
+    const totalHours = formattedLogs.reduce((sum, log) => sum + (log.hoursWorked || 0), 0);
+    const totalEarnings = formattedLogs.reduce((sum, log) => sum + (log.payoutAmount || 0), 0);
+    const totalTipsEligible = formattedLogs.reduce((sum, log) => sum + (log.tipEligible || 0), 0);
+    const totalTipsRecorded = formattedLogs.reduce((sum, log) => sum + (log.recordedTip || 0), 0);
+    const totalUnpaid = formattedLogs.filter((log) => !log.isPaid).reduce((sum, log) => sum + (log.payoutAmount || 0), 0);
+    const totalPaid = totalEarnings - totalUnpaid;
 
     return NextResponse.json({
-      workLogs,
-      byWorker: Object.values(byWorker),
+      workLogs: formattedLogs,
+      byWorker: Object.values(byWorkerMap),
       summary: {
-        totalOwed: Math.round(totalOwed * 100) / 100,
-        totalHours: Math.round(totalHours * 100) / 100,
-        workersCount: Object.keys(byWorker).length,
-        logsCount: workLogs.length,
+        totalHours: roundCurrency(totalHours),
+        totalEarnings: roundCurrency(totalEarnings),
+        totalUnpaid: roundCurrency(totalUnpaid),
+        totalPaid: roundCurrency(totalPaid),
+        totalTipsEligible: roundCurrency(totalTipsEligible),
+        totalTipsRecorded: roundCurrency(totalTipsRecorded),
+        workersCount: Object.keys(byWorkerMap).length,
+        logsCount: formattedLogs.length,
+        range,
+        startDate,
+        endDate,
       },
     });
   } catch (error) {

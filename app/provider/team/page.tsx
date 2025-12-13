@@ -97,10 +97,39 @@ interface Crew {
 }
 
 const EMPTY_PAYROLL_SUMMARY = {
-  totalOwed: 0,
   totalHours: 0,
+  totalEarnings: 0,
+  totalUnpaid: 0,
+  totalPaid: 0,
+  totalTipsEligible: 0,
+  totalTipsRecorded: 0,
   workersCount: 0,
   logsCount: 0,
+};
+
+const getRecordedTip = (log: any) => {
+  if (!log) return 0;
+  if (typeof log.recordedTip === 'number') return log.recordedTip;
+  if (log.job?.tipAmount) return log.job.tipAmount || 0;
+  return 0;
+};
+
+const getTipEligible = (log: any) => {
+  if (!log) return 0;
+  if (typeof log.tipEligible === 'number') return log.tipEligible;
+  const recorded = getRecordedTip(log);
+  const paymentMethod = log.job?.paymentMethod?.toLowerCase();
+  if (paymentMethod === 'cash') return 0;
+  return recorded;
+};
+
+const getPayoutAmount = (log: any) => {
+  if (!log) return 0;
+  if (typeof log.payoutAmount === 'number') return log.payoutAmount;
+  const recorded = getRecordedTip(log);
+  const eligible = getTipEligible(log);
+  const base = (log.earnings || 0) - recorded;
+  return Math.round((base + eligible) * 100) / 100;
 };
 
 export default function TeamManagementPage() {
@@ -199,24 +228,46 @@ export default function TeamManagementPage() {
 
   const unpaidWorkLogs = useMemo(() => workLogs.filter(log => !log.isPaid), [workLogs]);
   const allSelectableIds = useMemo(() => unpaidWorkLogs.map(log => log.id), [unpaidWorkLogs]);
+  const unpaidWorkerCount = useMemo(() => {
+    const ids = new Set<string>();
+    unpaidWorkLogs.forEach(log => {
+      if (log.userId) ids.add(log.userId);
+    });
+    return ids.size;
+  }, [unpaidWorkLogs]);
   const areAllSelected = allSelectableIds.length > 0 && allSelectableIds.every(id => selectedWorkLogIds.includes(id));
-  const selectedTotals = useMemo(
-    () =>
-      workLogs.reduce(
-        (acc, log) => {
-          if (selectedWorkLogIds.includes(log.id)) {
-            acc.count += 1;
-            acc.hours += log.hoursWorked || 0;
-            acc.amount += log.earnings || 0;
-          }
-          return acc;
-        },
-        { count: 0, hours: 0, amount: 0 }
-      ),
-    [selectedWorkLogIds, workLogs]
-  );
+  const selectedTotals = useMemo(() => {
+    const workerIds = new Set<string>();
+    let count = 0;
+    let hours = 0;
+    let amount = 0;
+    let tips = 0;
+
+    workLogs.forEach(log => {
+      if (selectedWorkLogIds.includes(log.id) && !log.isPaid) {
+        count += 1;
+        hours += log.hoursWorked || 0;
+        amount += getPayoutAmount(log);
+        tips += getTipEligible(log);
+        if (log.userId) {
+          workerIds.add(log.userId);
+        }
+      }
+    });
+
+    return {
+      count,
+      hours,
+      amount,
+      tips,
+      workerCount: workerIds.size,
+    };
+  }, [selectedWorkLogIds, workLogs]);
   const totalUnpaidAmount = useMemo(
-    () => unpaidWorkLogs.reduce((sum, log) => sum + (log.earnings || 0), 0),
+    () =>
+      unpaidWorkLogs.reduce((sum, log) => {
+        return sum + getPayoutAmount(log);
+      }, 0),
     [unpaidWorkLogs]
   );
 
@@ -2454,12 +2505,12 @@ export default function TeamManagementPage() {
               ) : (
                 <div className="space-y-4">
                   {/* Summary Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <Card className="bg-zinc-800 border-zinc-700">
                       <CardContent className="p-4">
                         <div className="text-sm text-zinc-400">Total Hours</div>
                         <div className="text-2xl font-bold text-zinc-100">
-                          {workLogs.reduce((sum, log) => sum + (log.hoursWorked || 0), 0).toFixed(1)}h
+                          {(payrollSummary.totalHours || 0).toFixed(1)}h
                         </div>
                       </CardContent>
                     </Card>
@@ -2467,7 +2518,7 @@ export default function TeamManagementPage() {
                       <CardContent className="p-4">
                         <div className="text-sm text-zinc-400">Total Earnings</div>
                         <div className="text-2xl font-bold text-emerald-400">
-                          ${workLogs.reduce((sum, log) => sum + (log.earnings || 0), 0).toFixed(2)}
+                          ${(payrollSummary.totalEarnings || 0).toFixed(2)}
                         </div>
                       </CardContent>
                     </Card>
@@ -2475,8 +2526,21 @@ export default function TeamManagementPage() {
                       <CardContent className="p-4">
                         <div className="text-sm text-zinc-400">Unpaid</div>
                         <div className="text-2xl font-bold text-amber-400">
-                          ${workLogs.filter(l => !l.isPaid).reduce((sum, log) => sum + (log.earnings || 0), 0).toFixed(2)}
+                          ${(payrollSummary.totalUnpaid || 0).toFixed(2)}
                         </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="bg-zinc-800 border-zinc-700">
+                      <CardContent className="p-4">
+                        <div className="text-sm text-zinc-400">Tips to Pay</div>
+                        <div className="text-2xl font-bold text-emerald-300">
+                          ${(payrollSummary.totalTipsEligible || 0).toFixed(2)}
+                        </div>
+                        {(payrollSummary.totalTipsRecorded || 0) > (payrollSummary.totalTipsEligible || 0) && (
+                          <p className="text-xs text-zinc-500 mt-2">
+                            Cash tips recorded: ${((payrollSummary.totalTipsRecorded || 0) - (payrollSummary.totalTipsEligible || 0)).toFixed(2)}
+                          </p>
+                        )}
                       </CardContent>
                     </Card>
                   </div>
@@ -2491,9 +2555,17 @@ export default function TeamManagementPage() {
                       </CardHeader>
                       <CardContent className="space-y-3">
                         {selectedTotals.count > 0 ? (
-                          <div className="text-xs text-emerald-400 font-medium">
-                            {selectedTotals.count} job{selectedTotals.count !== 1 ? 's' : ''} selected •{' '}
-                            {selectedTotals.hours.toFixed(1)}h • ${selectedTotals.amount.toFixed(2)}
+                          <div className="text-xs text-emerald-400 font-medium space-y-1">
+                            <div>
+                              {selectedTotals.count} job{selectedTotals.count !== 1 ? 's' : ''} •{' '}
+                              {selectedTotals.workerCount} worker{selectedTotals.workerCount !== 1 ? 's' : ''} •{' '}
+                              {selectedTotals.hours.toFixed(1)}h • ${selectedTotals.amount.toFixed(2)}
+                            </div>
+                            {selectedTotals.tips > 0 && (
+                              <div className="text-emerald-300">
+                                Includes ${selectedTotals.tips.toFixed(2)} in tips owed
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <div className="text-xs text-zinc-400">
@@ -2512,7 +2584,7 @@ export default function TeamManagementPage() {
                                 Processing...
                               </span>
                             ) : (
-                              `Pay Selected${selectedTotals.count > 0 ? ` (${selectedTotals.count})` : ''}`
+                              `Pay Selected Jobs${selectedTotals.count > 0 ? ` (${selectedTotals.count})` : ''}`
                             )}
                           </Button>
                           <Button
@@ -2524,7 +2596,7 @@ export default function TeamManagementPage() {
                             {bulkPayLoading ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              `Pay All (${unpaidWorkLogs.length} jobs • $${totalUnpaidAmount.toFixed(2)})`
+                              `Pay All (${unpaidWorkLogs.length} jobs • ${unpaidWorkerCount} workers • $${totalUnpaidAmount.toFixed(2)})`
                             )}
                           </Button>
                         </div>
@@ -2565,6 +2637,14 @@ export default function TeamManagementPage() {
                                     <div className="text-xs text-zinc-400">
                                       {worker.logs?.length || 0} job{(worker.logs?.length || 0) === 1 ? '' : 's'} •{' '}
                                       {worker.totalHours?.toFixed(1) || '0.0'}h
+                                    </div>
+                                    <div className="text-xs text-zinc-500">
+                                      Tips to pay ${worker.totalTips?.toFixed(2) || '0.00'}
+                                      {worker.cashTipsKept > 0 && (
+                                        <span className="ml-1 text-amber-400">
+                                          + ${worker.cashTipsKept.toFixed(2)} cash
+                                        </span>
+                                      )}
                                     </div>
                                   </div>
                                 </div>
@@ -2614,19 +2694,27 @@ export default function TeamManagementPage() {
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Job</th>
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Date</th>
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Hours</th>
-                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Earnings</th>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Base Pay</th>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Tip</th>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Total Due</th>
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Status</th>
                             <th className="text-right p-4 text-sm font-medium text-zinc-400">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-700">
-                          {workLogs.map(log => (
-                            <tr key={log.id} className="hover:bg-zinc-700/30">
-                              <td className="p-4">
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
-                                  checked={selectedWorkLogIds.includes(log.id)}
+                          {workLogs.map(log => {
+                            const recordedTip = getRecordedTip(log);
+                            const tipEligible = getTipEligible(log);
+                            const payoutAmount = getPayoutAmount(log);
+                            const basePay = Math.max(payoutAmount - tipEligible, 0);
+
+                            return (
+                              <tr key={log.id} className="hover:bg-zinc-700/30">
+                                <td className="p-4">
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
+                                    checked={selectedWorkLogIds.includes(log.id)}
                                   onChange={() => toggleSelectWorkLog(log.id)}
                                   disabled={log.isPaid}
                                 />
@@ -2655,8 +2743,29 @@ export default function TeamManagementPage() {
                               <td className="p-4 text-sm text-zinc-300">
                                 {log.hoursWorked?.toFixed(1) || '-'}h
                               </td>
+                              <td className="p-4 text-sm text-zinc-300">
+                                ${basePay.toFixed(2)}
+                              </td>
+                              <td className="p-4 text-sm">
+                                {tipEligible > 0 ? (
+                                  <div className="text-emerald-400 font-medium">
+                                    +${tipEligible.toFixed(2)}
+                                    <div className="text-xs text-zinc-500">Card/Check/Invoice</div>
+                                  </div>
+                                ) : recordedTip > 0 ? (
+                                  <div className="text-amber-400 font-medium">
+                                    Cash ${recordedTip.toFixed(2)}
+                                    <div className="text-xs text-zinc-500">Worker already has it</div>
+                                  </div>
+                                ) : (
+                                  <span className="text-zinc-500">—</span>
+                                )}
+                              </td>
                               <td className="p-4 text-sm font-medium text-emerald-400">
-                                ${log.earnings?.toFixed(2) || '0.00'}
+                                ${payoutAmount.toFixed(2)}
+                                {tipEligible > 0 && (
+                                  <div className="text-xs text-zinc-500">Includes tip</div>
+                                )}
                               </td>
                               <td className="p-4">
                                 <Badge
@@ -2687,7 +2796,8 @@ export default function TeamManagementPage() {
                                 )}
                               </td>
                             </tr>
-                          ))}
+                            );
+                          })}
                         </tbody>
                       </table>
                     </CardContent>
