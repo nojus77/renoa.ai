@@ -68,12 +68,27 @@ export async function POST(request: NextRequest) {
 
     // Calculate earnings based on pay type
     let earnings = 0;
+    const jobValue = job?.actualValue || job?.estimatedValue || 0;
+
+    console.log('Clock-out earnings calculation:', {
+      userId,
+      jobId,
+      payType: user?.payType,
+      hourlyRate: user?.hourlyRate,
+      commissionRate: user?.commissionRate,
+      actualValue: job?.actualValue,
+      estimatedValue: job?.estimatedValue,
+      jobValue,
+      hoursWorked,
+    });
+
     if (user?.payType === 'hourly' && user.hourlyRate) {
       earnings = hoursWorked * user.hourlyRate;
     } else if (user?.payType === 'commission' && user.commissionRate) {
-      const jobValue = job?.actualValue || job?.estimatedValue || 0;
       earnings = jobValue * (user.commissionRate / 100);
     }
+
+    console.log('Calculated earnings:', earnings);
 
     // Update work log
     const updatedWorkLog = await prisma.workLog.update({

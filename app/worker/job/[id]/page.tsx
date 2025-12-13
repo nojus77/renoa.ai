@@ -1678,12 +1678,6 @@ export default function JobDetailPage() {
                         </p>
                       )}
 
-                      {cJob.duration && (
-                        <p className="text-zinc-400 text-sm">
-                          <span className="text-zinc-500">Duration:</span> {formatTimePill(cJob.duration)}
-                        </p>
-                      )}
-
                       {cJob.workPerformed && (
                         <p className="text-zinc-400 text-sm">
                           <span className="text-zinc-500">Work:</span> {cJob.workPerformed}

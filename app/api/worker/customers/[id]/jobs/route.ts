@@ -52,31 +52,32 @@ export async function GET(
         .map(id => workerMap.get(id) || 'Unknown')
         .filter(Boolean);
 
-      // Calculate duration if we have times
-      let duration = 0;
-      if (job.startTime && job.endTime) {
-        duration = Math.round(
-          (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / 1000
-        );
-      }
-
-      // Parse notes to extract clean content (remove timestamps and author prefixes)
+      // Parse notes to extract clean content (remove ALL metadata)
       let cleanNotes: string | null = null;
       if (job.internalNotes) {
-        // Notes are stored as: [timestamp] author: content
-        // Extract just the content parts
-        const noteBlocks = job.internalNotes.split('\n\n').filter(Boolean);
+        let notes = job.internalNotes;
+
+        // Remove patterns like "[Created by Name]", "[12/13/2025, 10:47:29 AM]"
+        notes = notes.replace(/\[Created by [^\]]+\]/g, '');
+        notes = notes.replace(/\[\d{1,2}\/\d{1,2}\/\d{4},?\s*\d{1,2}:\d{2}:\d{2}\s*(AM|PM)?\]/gi, '');
+
+        // Split into blocks
+        const noteBlocks = notes.split('\n\n').filter(Boolean);
         const contentParts: string[] = [];
 
         for (const block of noteBlocks) {
           // Try to parse the [timestamp] author: content format
-          // Regex: [timestamp] author: content (content can span multiple lines)
           const match = block.match(/^\[([^\]]+)\]\s*[^:]+:\s*([\s\S]+)/);
           if (match) {
             contentParts.push(match[2].trim());
           } else {
-            // If it doesn't match the format, use the whole block
-            contentParts.push(block.trim());
+            // Try to remove "Name: " prefix at start of line
+            const cleaned = block.replace(/^[^:\n]+:\s*/gm, '').trim();
+            // Remove bullet points
+            const noBullets = cleaned.replace(/^[•\-\*]\s*/gm, '').trim();
+            if (noBullets) {
+              contentParts.push(noBullets);
+            }
           }
         }
 
@@ -93,7 +94,6 @@ export async function GET(
         amount: job.actualValue || job.estimatedValue || 0,
         status: job.status,
         workerName: workerNames[0] || 'N/A',
-        duration,
         notes: cleanNotes,
       };
     });

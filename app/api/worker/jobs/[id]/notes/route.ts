@@ -51,8 +51,8 @@ export async function GET(
       let index = 0;
 
       for (const block of noteBlocks) {
-        // Parse notes that follow the format: [timestamp] author: content
-        const match = block.match(/^\[([^\]]+)\]\s*([^:]+):\s*(.+)/);
+        // Parse notes that follow the format: [timestamp] author: content (content can be multiline)
+        const match = block.match(/^\[([^\]]+)\]\s*([^:]+):\s*([\s\S]+)/);
         if (match) {
           notes.push({
             id: `note-${index++}`,
@@ -61,6 +61,32 @@ export async function GET(
             content: match[3].trim(),
             authorRole: match[2].toLowerCase().includes('dispatcher') ? 'dispatcher' : 'worker',
           });
+        } else {
+          // Handle notes that don't match the standard format
+          // Try "[Created by Name]" or other patterns
+          const createdByMatch = block.match(/\[Created by ([^\]]+)\]/);
+          if (createdByMatch) {
+            // Extract content after the "[Created by Name]" part
+            const contentAfter = block.replace(/\[Created by [^\]]+\]\s*/, '').trim();
+            if (contentAfter) {
+              notes.push({
+                id: `note-${index++}`,
+                createdAt: 'Unknown',
+                author: createdByMatch[1].trim(),
+                content: contentAfter,
+                authorRole: 'dispatcher',
+              });
+            }
+          } else if (block.trim()) {
+            // Plain text note without metadata
+            notes.push({
+              id: `note-${index++}`,
+              createdAt: 'Unknown',
+              author: 'System',
+              content: block.trim(),
+              authorRole: 'dispatcher',
+            });
+          }
         }
       }
     }

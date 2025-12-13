@@ -106,17 +106,17 @@ export async function POST(
       );
     }
 
-    // Check if worker is assigned OR if they belong to the provider (owner/admin can upload too)
+    // Check if worker is assigned OR if they belong to the provider (owner/office can upload too)
     const isAssigned = jobCheck.assignedUserIds.includes(userId);
 
-    // If not assigned, check if user is owner/admin of the provider
+    // If not assigned, check if user is owner/office of the provider
     let hasAccess = isAssigned;
     if (!hasAccess) {
       const user = await prisma.providerUser.findFirst({
         where: {
           id: userId,
           providerId: jobCheck.providerId,
-          role: { in: ['owner', 'admin', 'manager'] },
+          role: { in: ['owner', 'office'] },
         },
       });
       hasAccess = !!user;
