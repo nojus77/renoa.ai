@@ -95,19 +95,26 @@ export async function POST(request: NextRequest) {
       earnings = workerShareOfJob * (user.commissionRate / 100);
     }
 
-    console.log('Calculated earnings:', earnings);
+    // Tips go 100% to worker - add to earnings
+    const tipValue = tipAmount ? Math.round(tipAmount * 100) / 100 : 0;
+    const totalEarnings = earnings + tipValue;
 
-    // Update work log
+    console.log('Calculated earnings:', { baseEarnings: earnings, tip: tipValue, totalEarnings });
+
+    // Update work log (includes tip in earnings)
     const updatedWorkLog = await prisma.workLog.update({
       where: { id: workLog.id },
       data: {
         clockOut,
         hoursWorked: Math.round(hoursWorked * 100) / 100, // Round to 2 decimals
-        earnings: Math.round(earnings * 100) / 100,
+        earnings: Math.round(totalEarnings * 100) / 100, // Includes tip
       },
     });
 
     // Update job status to completed with payment info
+    // Payment status is "paid" for cash/check/card, "pending" for invoice
+    const paymentStatus = paymentMethod && ['cash', 'check', 'card'].includes(paymentMethod) ? 'paid' : 'pending';
+
     await prisma.job.update({
       where: { id: jobId },
       data: {
@@ -115,6 +122,7 @@ export async function POST(request: NextRequest) {
         completedAt: clockOut,
         completedByUserId: userId,
         paymentMethod: paymentMethod || null,
+        paymentStatus,
         tipAmount: tipAmount ? Math.round(tipAmount * 100) / 100 : null,
       },
     });
@@ -134,7 +142,9 @@ export async function POST(request: NextRequest) {
       success: true,
       workLog: updatedWorkLog,
       hoursWorked: Math.round(hoursWorked * 100) / 100,
-      earnings: Math.round(earnings * 100) / 100,
+      earnings: Math.round(totalEarnings * 100) / 100, // Includes tip
+      baseEarnings: Math.round(earnings * 100) / 100,
+      tip: tipValue,
     });
   } catch (error) {
     console.error('Error clocking out:', error);

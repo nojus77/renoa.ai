@@ -632,7 +632,8 @@ model Job {
   zone                  String? // ZIP code or service area
   estimatedDuration     Float?                 @map("estimated_duration") // hours
   // Payment fields
-  paymentMethod         String?                @map("payment_method") // cash, check, card, invoice
+  paymentMethod         String?                @map("payment_method") // cash, check, card
+  paymentStatus         String?                @map("payment_status") // paid, pending
   tipAmount             Float?                 @map("tip_amount")
   invoices              Invoice?
   photos                JobPhoto[]             @relation("JobPhotos")

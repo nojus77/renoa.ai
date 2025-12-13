@@ -12,10 +12,12 @@ import {
   Clock,
   X,
   Trash2,
-  Save,
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  Briefcase,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Switch } from '@/components/ui/switch';
 
 interface TimeOffRequest {
   id: string;
@@ -27,22 +29,19 @@ interface TimeOffRequest {
   createdAt: string;
 }
 
-const DAYS = [
-  { key: 'monday', label: 'Monday', short: 'Mon' },
-  { key: 'tuesday', label: 'Tuesday', short: 'Tue' },
-  { key: 'wednesday', label: 'Wednesday', short: 'Wed' },
-  { key: 'thursday', label: 'Thursday', short: 'Thu' },
-  { key: 'friday', label: 'Friday', short: 'Fri' },
-  { key: 'saturday', label: 'Saturday', short: 'Sat' },
-  { key: 'sunday', label: 'Sunday', short: 'Sun' },
-];
-
-const TIME_OPTIONS = [
-  '05:00', '05:30', '06:00', '06:30', '07:00', '07:30', '08:00', '08:30', '09:00', '09:30',
-  '10:00', '10:30', '11:00', '11:30', '12:00', '12:30', '13:00', '13:30',
-  '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
-  '18:00', '18:30', '19:00', '19:30', '20:00', '20:30', '21:00', '21:30', '22:00',
-];
+interface Job {
+  id: string;
+  serviceType: string;
+  address: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  customer: {
+    id: string;
+    name: string;
+    phone: string | null;
+  };
+}
 
 const REASONS = [
   { value: 'vacation', label: 'Vacation' },
@@ -66,46 +65,59 @@ export default function WorkerSchedule() {
     notes: '',
   });
 
-  // Working hours state
-  const [workingHours, setWorkingHours] = useState<Record<string, { start: string; end: string } | null>>({});
-  const [scheduleForm, setScheduleForm] = useState<Record<string, { enabled: boolean; start: string; end: string }>>({});
-  const [savingSchedule, setSavingSchedule] = useState(false);
-  const [hasScheduleChanges, setHasScheduleChanges] = useState(false);
-  const [canEditAvailability, setCanEditAvailability] = useState(false);
+  // Job schedule state
+  const [viewMode, setViewMode] = useState<'day' | 'week'>('day');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [jobsByDay, setJobsByDay] = useState<Record<string, Job[]>>({});
+  const [loadingJobs, setLoadingJobs] = useState(true);
 
-  const fetchData = useCallback(async (uid: string) => {
+  const fetchJobs = useCallback(async (uid: string, date: Date) => {
+    setLoadingJobs(true);
     try {
-      // Fetch time off requests
-      const timeOffRes = await fetch(`/api/worker/time-off?userId=${uid}`);
-      const timeOffData = await timeOffRes.json();
-      if (timeOffData.requests) {
-        setRequests(timeOffData.requests);
-      }
+      if (viewMode === 'week') {
+        // Get Monday of the selected week
+        const monday = new Date(date);
+        const day = monday.getDay();
+        const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
+        monday.setDate(diff);
+        monday.setHours(0, 0, 0, 0);
 
-      // Fetch profile for working hours
-      const profileRes = await fetch(`/api/worker/profile?userId=${uid}`);
-      const profileData = await profileRes.json();
-      if (profileData.user) {
-        const hours = profileData.user.workingHours || {};
-        setWorkingHours(hours);
-        setCanEditAvailability(profileData.user.provider?.workersCanEditAvailability || false);
-
-        // Initialize schedule form
-        const schedule: Record<string, { enabled: boolean; start: string; end: string }> = {};
-        DAYS.forEach(({ key }) => {
-          const dayHours = hours[key];
-          schedule[key] = {
-            enabled: !!dayHours,
-            start: dayHours?.start || '08:00',
-            end: dayHours?.end || '17:00',
-          };
-        });
-        setScheduleForm(schedule);
+        const res = await fetch(`/api/worker/jobs/week?userId=${uid}&startDate=${monday.toISOString()}`);
+        const data = await res.json();
+        if (data.jobs) {
+          setJobs(data.jobs);
+          setJobsByDay(data.jobsByDay || {});
+        }
+      } else {
+        // Day view - fetch today's jobs
+        const res = await fetch(`/api/worker/jobs/today?userId=${uid}`);
+        const data = await res.json();
+        if (data.jobs) {
+          // Filter for selected date
+          const dateStr = date.toISOString().split('T')[0];
+          const filteredJobs = data.jobs.filter((job: Job) =>
+            job.startTime.split('T')[0] === dateStr
+          );
+          setJobs(filteredJobs);
+        }
       }
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('Error fetching jobs:', error);
     } finally {
-      setLoading(false);
+      setLoadingJobs(false);
+    }
+  }, [viewMode]);
+
+  const fetchTimeOff = useCallback(async (uid: string) => {
+    try {
+      const res = await fetch(`/api/worker/time-off?userId=${uid}`);
+      const data = await res.json();
+      if (data.requests) {
+        setRequests(data.requests);
+      }
+    } catch (error) {
+      console.error('Error fetching time off:', error);
     }
   }, []);
 
@@ -116,66 +128,92 @@ export default function WorkerSchedule() {
       return;
     }
     setUserId(uid);
-    fetchData(uid);
-  }, [router, fetchData]);
 
-  // Track schedule changes
+    Promise.all([
+      fetchJobs(uid, selectedDate),
+      fetchTimeOff(uid),
+    ]).finally(() => setLoading(false));
+  }, [router, fetchJobs, fetchTimeOff, selectedDate]);
+
+  // Refresh jobs when viewMode or selectedDate changes
   useEffect(() => {
-    const hasChanges = DAYS.some(({ key }) => {
-      const current = workingHours[key];
-      const form = scheduleForm[key];
-      if (!form) return false;
-      if (form.enabled !== !!current) return true;
-      if (form.enabled && current) {
-        return form.start !== current.start || form.end !== current.end;
-      }
-      return false;
-    });
-    setHasScheduleChanges(hasChanges);
-  }, [scheduleForm, workingHours]);
+    if (userId) {
+      fetchJobs(userId, selectedDate);
+    }
+  }, [userId, selectedDate, viewMode, fetchJobs]);
 
-  const formatTime12 = (time24: string) => {
-    const [hours, minutes] = time24.split(':');
-    const h = parseInt(hours);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-    return `${h12}:${minutes} ${ampm}`;
+  const formatTime = (dateStr: string) => {
+    return new Date(dateStr).toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
   };
 
-  const handleSaveSchedule = async () => {
-    setSavingSchedule(true);
-    try {
-      const newWorkingHours: Record<string, { start: string; end: string }> = {};
-      DAYS.forEach(({ key }) => {
-        const form = scheduleForm[key];
-        if (form?.enabled) {
-          newWorkingHours[key] = {
-            start: form.start,
-            end: form.end,
-          };
-        }
-      });
+  const formatDate = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
 
-      const res = await fetch('/api/worker/schedule', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          workingHours: newWorkingHours,
-        }),
-      });
+  const formatDayHeader = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    });
+  };
 
-      const data = await res.json();
-      if (res.ok) {
-        setWorkingHours(newWorkingHours);
-        toast.success('Schedule updated!');
-      } else {
-        toast.error(data.error || 'Failed to update schedule');
-      }
-    } catch {
-      toast.error('Connection error');
-    } finally {
-      setSavingSchedule(false);
+  const formatShortDay = (dateStr: string) => {
+    return new Date(dateStr).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const navigateDate = (direction: 'prev' | 'next') => {
+    const newDate = new Date(selectedDate);
+    if (viewMode === 'week') {
+      newDate.setDate(newDate.getDate() + (direction === 'next' ? 7 : -7));
+    } else {
+      newDate.setDate(newDate.getDate() + (direction === 'next' ? 1 : -1));
+    }
+    setSelectedDate(newDate);
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date());
+  };
+
+  const getWeekDays = () => {
+    const monday = new Date(selectedDate);
+    const day = monday.getDay();
+    const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
+    monday.setDate(diff);
+    monday.setHours(0, 0, 0, 0);
+
+    const days: Date[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(monday);
+      d.setDate(d.getDate() + i);
+      days.push(d);
+    }
+    return days;
+  };
+
+  const getJobStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+      case 'in_progress':
+        return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+      case 'on_the_way':
+        return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
+      default:
+        return 'bg-zinc-700/50 text-zinc-300 border-zinc-600';
     }
   };
 
@@ -213,7 +251,7 @@ export default function WorkerSchedule() {
         toast.success('Time off request submitted!');
         setShowForm(false);
         setFormData({ startDate: '', endDate: '', reason: 'vacation', notes: '' });
-        fetchData(userId);
+        fetchTimeOff(userId);
       } else {
         toast.error(data.error || 'Failed to submit request');
       }
@@ -237,7 +275,7 @@ export default function WorkerSchedule() {
 
       if (data.success) {
         toast.success('Request cancelled');
-        fetchData(userId);
+        fetchTimeOff(userId);
       } else {
         toast.error(data.error || 'Failed to cancel request');
       }
@@ -245,14 +283,6 @@ export default function WorkerSchedule() {
       console.error('Error cancelling request:', error);
       toast.error('Something went wrong');
     }
-  };
-
-  const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
   };
 
   const getStatusBadge = (status: string) => {
@@ -301,86 +331,152 @@ export default function WorkerSchedule() {
         {/* Header */}
         <h1 className="text-xl font-bold text-white">Schedule</h1>
 
-        {/* Section 1: Working Hours */}
+        {/* Section 1: Job Schedule View */}
         <div className="bg-zinc-900 rounded-xl border border-zinc-800">
-          <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-            <h2 className="font-semibold text-white">My Working Hours</h2>
-            {canEditAvailability && hasScheduleChanges && (
-              <button
-                onClick={handleSaveSchedule}
-                disabled={savingSchedule}
-                className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg font-medium transition-colors"
-              >
-                {savingSchedule ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Save className="w-4 h-4" />
-                )}
-                Save
-              </button>
-            )}
-          </div>
-          <div className="p-4 space-y-3">
-            {!canEditAvailability && (
-              <p className="text-zinc-500 text-sm mb-3">
-                Contact your manager to update your schedule
-              </p>
-            )}
-            {DAYS.map(({ key, short }) => (
-              <div key={key} className="flex items-center gap-3">
-                <Switch
-                  checked={scheduleForm[key]?.enabled || false}
-                  onCheckedChange={(checked) => {
-                    if (!canEditAvailability) return;
-                    setScheduleForm((prev) => ({
-                      ...prev,
-                      [key]: { ...prev[key], enabled: checked },
-                    }));
-                  }}
-                  disabled={!canEditAvailability}
-                />
-                <span className="w-10 text-sm text-zinc-300">{short}</span>
-                {scheduleForm[key]?.enabled ? (
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={scheduleForm[key]?.start || '08:00'}
-                      onChange={(e) => {
-                        if (!canEditAvailability) return;
-                        setScheduleForm((prev) => ({
-                          ...prev,
-                          [key]: { ...prev[key], start: e.target.value },
-                        }));
-                      }}
-                      disabled={!canEditAvailability}
-                      className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm text-white disabled:opacity-50"
-                    >
-                      {TIME_OPTIONS.map((t) => (
-                        <option key={t} value={t}>{formatTime12(t)}</option>
-                      ))}
-                    </select>
-                    <span className="text-zinc-500">to</span>
-                    <select
-                      value={scheduleForm[key]?.end || '17:00'}
-                      onChange={(e) => {
-                        if (!canEditAvailability) return;
-                        setScheduleForm((prev) => ({
-                          ...prev,
-                          [key]: { ...prev[key], end: e.target.value },
-                        }));
-                      }}
-                      disabled={!canEditAvailability}
-                      className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 rounded text-sm text-white disabled:opacity-50"
-                    >
-                      {TIME_OPTIONS.map((t) => (
-                        <option key={t} value={t}>{formatTime12(t)}</option>
-                      ))}
-                    </select>
-                  </div>
-                ) : (
-                  <span className="text-zinc-500 text-sm">Off</span>
-                )}
+          <div className="p-4 border-b border-zinc-800">
+            <div className="flex items-center justify-between">
+              <h2 className="font-semibold text-white">My Jobs</h2>
+              <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('day')}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    viewMode === 'day'
+                      ? 'bg-emerald-600 text-white'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Day
+                </button>
+                <button
+                  onClick={() => setViewMode('week')}
+                  className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                    viewMode === 'week'
+                      ? 'bg-emerald-600 text-white'
+                      : 'text-zinc-400 hover:text-zinc-200'
+                  }`}
+                >
+                  Week
+                </button>
               </div>
-            ))}
+            </div>
+
+            {/* Date Navigation */}
+            <div className="flex items-center justify-between mt-3">
+              <button
+                onClick={() => navigateDate('prev')}
+                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <div className="text-center">
+                <p className="font-medium text-white">
+                  {viewMode === 'day'
+                    ? formatDayHeader(selectedDate)
+                    : `Week of ${getWeekDays()[0].toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+                  }
+                </p>
+                <button
+                  onClick={goToToday}
+                  className="text-xs text-emerald-400 hover:text-emerald-300"
+                >
+                  Go to Today
+                </button>
+              </div>
+              <button
+                onClick={() => navigateDate('next')}
+                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-4">
+            {loadingJobs ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+              </div>
+            ) : viewMode === 'day' ? (
+              // Day View
+              jobs.length === 0 ? (
+                <div className="text-center py-8">
+                  <Briefcase className="w-10 h-10 text-zinc-600 mx-auto mb-2" />
+                  <p className="text-zinc-500 text-sm">No jobs scheduled for this day</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {jobs.map((job) => (
+                    <button
+                      key={job.id}
+                      onClick={() => router.push(`/worker/job/${job.id}`)}
+                      className={`w-full text-left p-3 rounded-lg border transition-colors hover:bg-zinc-800/50 ${getJobStatusColor(job.status)}`}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <p className="font-medium text-white">{job.serviceType}</p>
+                          <p className="text-sm text-zinc-400">{job.customer.name}</p>
+                        </div>
+                        <span className="text-sm font-medium">
+                          {formatTime(job.startTime)}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1 mt-2 text-zinc-500 text-xs">
+                        <MapPin className="w-3 h-3" />
+                        <span className="truncate">{job.address}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )
+            ) : (
+              // Week View
+              <div className="space-y-4">
+                {getWeekDays().map((day) => {
+                  const dateKey = day.toISOString().split('T')[0];
+                  const dayJobs = jobsByDay[dateKey] || [];
+                  const isToday = dateKey === new Date().toISOString().split('T')[0];
+
+                  return (
+                    <div key={dateKey}>
+                      <div className={`flex items-center gap-2 mb-2 ${isToday ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                        <span className="text-sm font-medium">
+                          {day.toLocaleDateString('en-US', { weekday: 'short' })}
+                        </span>
+                        <span className={`text-sm ${isToday ? 'bg-emerald-600 text-white px-2 py-0.5 rounded-full' : ''}`}>
+                          {day.getDate()}
+                        </span>
+                        {dayJobs.length > 0 && (
+                          <span className="text-xs text-zinc-500">
+                            ({dayJobs.length} job{dayJobs.length > 1 ? 's' : ''})
+                          </span>
+                        )}
+                      </div>
+                      {dayJobs.length > 0 ? (
+                        <div className="space-y-2 pl-2 border-l-2 border-zinc-800">
+                          {dayJobs.map((job) => (
+                            <button
+                              key={job.id}
+                              onClick={() => router.push(`/worker/job/${job.id}`)}
+                              className={`w-full text-left p-2.5 rounded-lg border transition-colors hover:bg-zinc-800/50 ${getJobStatusColor(job.status)}`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-medium text-sm text-white truncate">{job.serviceType}</span>
+                                <span className="text-xs ml-2 flex-shrink-0">{formatTime(job.startTime)}</span>
+                              </div>
+                              <p className="text-xs text-zinc-500 truncate mt-0.5">{job.customer.name}</p>
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-zinc-600 pl-2 border-l-2 border-zinc-800 py-2">
+                          No jobs
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
 

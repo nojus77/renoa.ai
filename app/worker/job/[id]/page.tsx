@@ -31,7 +31,6 @@ import {
   Timer,
   Banknote,
   CreditCard,
-  Mail,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PropertyPhoto } from '@/components/PropertyPhoto';
@@ -221,6 +220,9 @@ export default function JobDetailPage() {
   // Payment state
   const [paymentMethod, setPaymentMethod] = useState<string>('');
   const [tipAmount, setTipAmount] = useState<string>('');
+
+  // Confirmation modal state
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   // Update current time every minute
   useEffect(() => {
@@ -555,13 +557,12 @@ export default function JobDetailPage() {
     }
   };
 
-  const handleCompleteJob = async () => {
+  const handleCompleteJobClick = () => {
     if (!job) return;
 
     // Validate: require at least one service with price
     if (selectedServices.length === 0 || totalPrice === 0) {
       toast.error('Add services with pricing before completing the job');
-      // Scroll to job details section
       document.getElementById('job-details-section')?.scrollIntoView({ behavior: 'smooth' });
       return;
     }
@@ -573,12 +574,14 @@ export default function JobDetailPage() {
       return;
     }
 
-    // Optional: remind about photos (not required)
-    if (media.length === 0) {
-      const proceed = confirm('No photos added. Complete job anyway?');
-      if (!proceed) return;
-    }
+    // Show confirmation modal
+    setShowConfirmModal(true);
+  };
 
+  const handleCompleteJob = async () => {
+    if (!job) return;
+
+    setShowConfirmModal(false);
     setActionLoading('complete');
 
     try {
@@ -1007,7 +1010,7 @@ export default function JobDetailPage() {
       case 'working':
         return (
           <button
-            onClick={handleCompleteJob}
+            onClick={handleCompleteJobClick}
             disabled={!!actionLoading}
             className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex flex-col items-center justify-center gap-1 disabled:opacity-50 transition-colors"
             style={{ backgroundColor: LIME_GREEN }}
@@ -1531,17 +1534,16 @@ export default function JobDetailPage() {
             {/* PAYMENT METHOD SECTION */}
             <div id="payment-section" className="border-t border-zinc-800 pt-4">
               <label className="block text-sm font-medium text-zinc-300 mb-3">How did customer pay?</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {[
                   { id: 'cash', label: 'Cash', Icon: Banknote },
                   { id: 'check', label: 'Check', Icon: FileText },
                   { id: 'card', label: 'Card', Icon: CreditCard },
-                  { id: 'invoice', label: 'Invoice Later', Icon: Mail },
                 ].map((method) => (
                   <button
                     key={method.id}
                     onClick={() => setPaymentMethod(method.id)}
-                    className={`p-3 rounded-lg border flex items-center gap-2 transition-colors ${
+                    className={`p-3 rounded-lg border flex flex-col items-center gap-1.5 transition-colors ${
                       paymentMethod === method.id
                         ? 'border-[#a3e635] bg-[#a3e635]/20 text-white'
                         : 'border-zinc-700 text-zinc-400 hover:border-zinc-600'
@@ -1885,6 +1887,87 @@ export default function JobDetailPage() {
                 className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
               >
                 Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Job Completion Confirmation Modal */}
+      {showConfirmModal && job && (
+        <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4">
+          <div className="bg-zinc-900 w-full max-w-md rounded-2xl border border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="p-6 pb-4 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: `${LIME_GREEN}20` }}>
+                <CheckCircle2 className="w-8 h-8" style={{ color: LIME_GREEN }} />
+              </div>
+              <h2 className="text-xl font-bold text-white mb-2">Complete This Job?</h2>
+              <p className="text-zinc-400 text-sm">Please confirm the details below before completing.</p>
+            </div>
+
+            {/* Job Summary */}
+            <div className="px-6 pb-4 space-y-3">
+              <div className="bg-zinc-800/50 rounded-lg p-4 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Service</span>
+                  <span className="text-white font-medium">{job.serviceType}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Customer</span>
+                  <span className="text-white">{job.customer.name}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Services ({selectedServices.length})</span>
+                  <span className="text-white">${servicesSubtotal.toFixed(2)}</span>
+                </div>
+                {partsSubtotal > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Parts ({parts.length})</span>
+                    <span className="text-white">${partsSubtotal.toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Payment</span>
+                  <span className="text-white capitalize">{paymentMethod}</span>
+                </div>
+                {parseFloat(tipAmount) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Tip</span>
+                    <span className="text-white">${parseFloat(tipAmount).toFixed(2)}</span>
+                  </div>
+                )}
+                <div className="pt-2 border-t border-zinc-700 flex justify-between">
+                  <span className="font-semibold text-white">Total</span>
+                  <span className="font-bold text-lg" style={{ color: LIME_GREEN }}>
+                    ${(totalPrice + (parseFloat(tipAmount) || 0)).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+
+              {media.length === 0 && (
+                <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
+                  <p className="text-xs text-amber-400 text-center">
+                    No photos added to this job
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 border-t border-zinc-800 flex gap-3">
+              <button
+                onClick={() => setShowConfirmModal(false)}
+                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleCompleteJob}
+                className="flex-1 py-3 font-semibold rounded-xl transition-colors text-zinc-900"
+                style={{ backgroundColor: LIME_GREEN }}
+              >
+                Confirm & Complete
               </button>
             </div>
           </div>

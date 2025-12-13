@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
             actualValue: true,
             estimatedValue: true,
             assignedUserIds: true,
+            tipAmount: true,
             customer: {
               select: { name: true },
             },
@@ -66,24 +67,28 @@ export async function GET(request: NextRequest) {
     // Recalculate earnings if they're 0 but worker has pay configured
     const workLogs = workLogsRaw.map(log => {
       let calculatedEarnings = log.earnings || 0;
+      const tipAmount = log.job?.tipAmount || 0;
 
       // If earnings is 0 but worker has pay configured, try to calculate
       if (calculatedEarnings === 0 && log.hoursWorked && user) {
+        let baseEarnings = 0;
         if (user.payType === 'hourly' && user.hourlyRate) {
-          calculatedEarnings = log.hoursWorked * user.hourlyRate;
+          baseEarnings = log.hoursWorked * user.hourlyRate;
         } else if (user.payType === 'commission' && user.commissionRate) {
           // IMPORTANT: Split job value by number of workers first to prevent overpayment
           const totalJobValue = log.job?.actualValue || log.job?.estimatedValue || 0;
           const numWorkers = log.job?.assignedUserIds?.length || 1;
           const workerShareOfJob = totalJobValue / numWorkers;
-          calculatedEarnings = workerShareOfJob * (user.commissionRate / 100);
+          baseEarnings = workerShareOfJob * (user.commissionRate / 100);
         }
-        calculatedEarnings = Math.round(calculatedEarnings * 100) / 100;
+        // Tips go 100% to worker
+        calculatedEarnings = Math.round((baseEarnings + tipAmount) * 100) / 100;
       }
 
       return {
         ...log,
         earnings: calculatedEarnings,
+        tip: tipAmount,
         // Clean job object for response
         job: {
           id: log.job.id,
@@ -96,6 +101,7 @@ export async function GET(request: NextRequest) {
     // Calculate totals with recalculated earnings
     const totalEarnings = workLogs.reduce((sum, log) => sum + (log.earnings || 0), 0);
     const totalHours = workLogs.reduce((sum, log) => sum + (log.hoursWorked || 0), 0);
+    const totalTips = workLogs.reduce((sum, log) => sum + (log.tip || 0), 0);
     const jobsCompleted = workLogs.length;
     const pendingPay = workLogs
       .filter((log) => !log.isPaid)
@@ -120,6 +126,7 @@ export async function GET(request: NextRequest) {
       summary: {
         totalEarnings: Math.round(totalEarnings * 100) / 100,
         totalHours: Math.round(totalHours * 100) / 100,
+        totalTips: Math.round(totalTips * 100) / 100,
         jobsCompleted,
         pendingPay: Math.round(pendingPay * 100) / 100,
         paidPay: Math.round(paidPay * 100) / 100,
