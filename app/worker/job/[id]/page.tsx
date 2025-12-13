@@ -27,13 +27,42 @@ import {
   Wrench,
   Package,
   DollarSign,
-  Save,
+  ChevronDown,
+  Eye,
+  Trash2,
   Timer,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 // Lime green brand color
 const LIME_GREEN = '#a3e635';
+
+// Mock services data - NAMES ONLY, NO PRICES
+const SERVICES_CATALOG = {
+  HVAC: [
+    { id: 'hvac-1', name: 'Furnace Inspection' },
+    { id: 'hvac-2', name: 'Filter Replacement' },
+    { id: 'hvac-3', name: 'Thermostat Repair' },
+    { id: 'hvac-4', name: 'Emergency Service' },
+    { id: 'hvac-5', name: 'Annual Maintenance' },
+    { id: 'hvac-6', name: 'AC Repair' },
+    { id: 'hvac-7', name: 'Duct Cleaning' },
+  ],
+  Plumbing: [
+    { id: 'plumb-1', name: 'Drain Cleaning' },
+    { id: 'plumb-2', name: 'Leak Repair' },
+    { id: 'plumb-3', name: 'Fixture Installation' },
+    { id: 'plumb-4', name: 'Emergency Plumbing' },
+    { id: 'plumb-5', name: 'Water Heater Service' },
+    { id: 'plumb-6', name: 'Pipe Repair' },
+  ],
+  Electrical: [
+    { id: 'elec-1', name: 'Outlet Installation' },
+    { id: 'elec-2', name: 'Panel Upgrade' },
+    { id: 'elec-3', name: 'Wiring Repair' },
+    { id: 'elec-4', name: 'Light Fixture Installation' },
+  ],
+};
 
 interface Job {
   id: string;
@@ -93,12 +122,24 @@ interface CustomerJob {
   notes?: string;
 }
 
-interface JobDetails {
-  workPerformed: string;
-  partsUsed: string[];
-  laborHours: number;
+interface SelectedService {
+  id: string;
+  serviceId: string | null;
+  serviceName: string;
   price: number;
+  customNotes: string;
+  isCustom: boolean;
+  showNotes: boolean;
 }
+
+interface Part {
+  id: string;
+  name: string;
+  quantity: number;
+  unitPrice: number;
+}
+
+type TimerState = 'idle' | 'traveling' | 'working' | 'completed';
 
 export default function JobDetailPage() {
   const router = useRouter();
@@ -114,13 +155,13 @@ export default function JobDetailPage() {
   // Live date/time
   const [currentTime, setCurrentTime] = useState(new Date());
 
-  // Timer state
-  const [travelTimer, setTravelTimer] = useState<number>(0);
-  const [jobTimer, setJobTimer] = useState<number>(0);
-  const [isTraveling, setIsTraveling] = useState(false);
-  const [isWorking, setIsWorking] = useState(false);
-  const travelIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const jobIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  // Timer system
+  const [timerState, setTimerState] = useState<TimerState>('idle');
+  const [travelTime, setTravelTime] = useState<number>(0);
+  const [onSiteTime, setOnSiteTime] = useState<number>(0);
+  const [travelStartTime, setTravelStartTime] = useState<number | null>(null);
+  const [onSiteStartTime, setOnSiteStartTime] = useState<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Notes state
   const [notes, setNotes] = useState<JobNote[]>([]);
@@ -139,16 +180,21 @@ export default function JobDetailPage() {
 
   // Invoice state
   const [sendingInvoice, setSendingInvoice] = useState(false);
+  const [invoiceSent, setInvoiceSent] = useState(false);
+  const [showInvoicePreview, setShowInvoicePreview] = useState(false);
 
-  // Job Details form state
-  const [jobDetails, setJobDetails] = useState<JobDetails>({
-    workPerformed: '',
-    partsUsed: [],
-    laborHours: 0,
-    price: 0,
-  });
-  const [newPart, setNewPart] = useState('');
-  const [savingDetails, setSavingDetails] = useState(false);
+  // Service selection state
+  const [selectedServices, setSelectedServices] = useState<SelectedService[]>([]);
+  const [showServiceDropdown, setShowServiceDropdown] = useState(false);
+  const [showCustomServiceInput, setShowCustomServiceInput] = useState(false);
+  const [customServiceName, setCustomServiceName] = useState('');
+
+  // Parts state
+  const [parts, setParts] = useState<Part[]>([]);
+  const [showAddPart, setShowAddPart] = useState(false);
+  const [newPartName, setNewPartName] = useState('');
+  const [newPartQty, setNewPartQty] = useState(1);
+  const [newPartPrice, setNewPartPrice] = useState(0);
 
   // Update current time every minute
   useEffect(() => {
@@ -157,6 +203,58 @@ export default function JobDetailPage() {
     }, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Timer update effect
+  useEffect(() => {
+    if (timerState === 'traveling' && travelStartTime) {
+      timerRef.current = setInterval(() => {
+        setTravelTime(Math.floor((Date.now() - travelStartTime) / 1000));
+      }, 1000);
+    } else if (timerState === 'working' && onSiteStartTime) {
+      timerRef.current = setInterval(() => {
+        setOnSiteTime(Math.floor((Date.now() - onSiteStartTime) / 1000));
+      }, 1000);
+    }
+
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [timerState, travelStartTime, onSiteStartTime]);
+
+  // Auto-save draft to localStorage
+  useEffect(() => {
+    if (jobId && (selectedServices.length > 0 || parts.length > 0)) {
+      const draft = {
+        selectedServices,
+        parts,
+        travelTime,
+        onSiteTime,
+        timerState,
+      };
+      localStorage.setItem(`jobDraft_${jobId}`, JSON.stringify(draft));
+    }
+  }, [jobId, selectedServices, parts, travelTime, onSiteTime, timerState]);
+
+  // Load draft from localStorage
+  useEffect(() => {
+    if (jobId) {
+      const savedDraft = localStorage.getItem(`jobDraft_${jobId}`);
+      if (savedDraft) {
+        try {
+          const draft = JSON.parse(savedDraft);
+          if (draft.selectedServices) setSelectedServices(draft.selectedServices);
+          if (draft.parts) setParts(draft.parts);
+          if (draft.travelTime) setTravelTime(draft.travelTime);
+          if (draft.onSiteTime) setOnSiteTime(draft.onSiteTime);
+          if (draft.timerState === 'completed') setTimerState('completed');
+        } catch (e) {
+          console.error('Error loading draft:', e);
+        }
+      }
+    }
+  }, [jobId]);
 
   // Format current time for display
   const formatCurrentTime = () => {
@@ -170,11 +268,27 @@ export default function JobDetailPage() {
     });
   };
 
-  // Timer formatting
-  const formatTimer = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
+  // Format timer display
+  const formatTimerDisplay = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
+
+    if (hours > 0) {
+      return `${hours}h ${mins}m ${secs.toString().padStart(2, '0')}s`;
+    }
     return `${mins}m ${secs.toString().padStart(2, '0')}s`;
+  };
+
+  // Format time for pills/display (shorter format)
+  const formatTimePill = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+
+    if (hours > 0) {
+      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    }
+    return `${mins}m`;
   };
 
   const fetchJob = useCallback(async (uid: string, jid: string) => {
@@ -186,19 +300,18 @@ export default function JobDetailPage() {
         const foundJob = data.jobs.find((j: Job) => j.id === jid);
         if (foundJob) {
           setJob(foundJob);
-          // Initialize timers based on job state
-          if (foundJob.onTheWayAt && !foundJob.arrivedAt) {
-            setIsTraveling(true);
-            const elapsed = Math.floor((Date.now() - new Date(foundJob.onTheWayAt).getTime()) / 1000);
-            setTravelTimer(elapsed);
-          }
-          if (foundJob.workLogs?.some((l: { clockIn: string; clockOut: string | null }) => l.clockIn && !l.clockOut)) {
-            setIsWorking(true);
+          // Initialize timer state based on job state
+          if (foundJob.completedAt) {
+            setTimerState('completed');
+          } else if (foundJob.workLogs?.some((l: { clockIn: string; clockOut: string | null }) => l.clockIn && !l.clockOut)) {
+            setTimerState('working');
             const activeLog = foundJob.workLogs.find((l: { clockIn: string; clockOut: string | null }) => l.clockIn && !l.clockOut);
             if (activeLog) {
-              const elapsed = Math.floor((Date.now() - new Date(activeLog.clockIn).getTime()) / 1000);
-              setJobTimer(elapsed);
+              setOnSiteStartTime(new Date(activeLog.clockIn).getTime());
             }
+          } else if (foundJob.onTheWayAt && !foundJob.arrivedAt) {
+            setTimerState('traveling');
+            setTravelStartTime(new Date(foundJob.onTheWayAt).getTime());
           }
         } else {
           // Try fetching from week endpoint
@@ -265,44 +378,6 @@ export default function JobDetailPage() {
     }
   }, [router, jobId, fetchJob, fetchNotes, fetchMedia]);
 
-  // Travel timer effect
-  useEffect(() => {
-    if (isTraveling) {
-      travelIntervalRef.current = setInterval(() => {
-        setTravelTimer(prev => prev + 1);
-      }, 1000);
-    } else if (travelIntervalRef.current) {
-      clearInterval(travelIntervalRef.current);
-    }
-    return () => {
-      if (travelIntervalRef.current) clearInterval(travelIntervalRef.current);
-    };
-  }, [isTraveling]);
-
-  // Job timer effect
-  useEffect(() => {
-    if (isWorking) {
-      jobIntervalRef.current = setInterval(() => {
-        setJobTimer(prev => prev + 1);
-      }, 1000);
-    } else if (jobIntervalRef.current) {
-      clearInterval(jobIntervalRef.current);
-    }
-    return () => {
-      if (jobIntervalRef.current) clearInterval(jobIntervalRef.current);
-    };
-  }, [isWorking]);
-
-  // Update labor hours from timer
-  useEffect(() => {
-    if (jobTimer > 0) {
-      setJobDetails(prev => ({
-        ...prev,
-        laborHours: parseFloat((jobTimer / 3600).toFixed(2)),
-      }));
-    }
-  }, [jobTimer]);
-
   const getJobStatus = (j: Job) => {
     if (j.completedAt) return 'completed';
     if (j.workLogs?.some((l) => l.clockIn && !l.clockOut)) return 'working';
@@ -346,72 +421,28 @@ export default function JobDetailPage() {
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
-  const formatDuration = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
-    }
-    return `${mins}m`;
-  };
-
-  const handleAction = async (action: string) => {
+  // Timer action handlers
+  const handleOnMyWay = async () => {
     if (!job) return;
-    setActionLoading(action);
+    setActionLoading('on_the_way');
 
     try {
-      let endpoint = '';
-      let body: Record<string, unknown> = {};
-
-      switch (action) {
-        case 'on_the_way':
-          endpoint = '/api/worker/jobs/status';
-          body = { jobId: job.id, userId, action };
-          setIsTraveling(true);
-          setTravelTimer(0);
-          break;
-        case 'arrived':
-          endpoint = '/api/worker/jobs/status';
-          body = { jobId: job.id, userId, action, travelDuration: travelTimer };
-          setIsTraveling(false);
-          break;
-        case 'start':
-          endpoint = '/api/worker/clock-in';
-          body = { jobId: job.id, userId, providerId };
-          setIsWorking(true);
-          setJobTimer(0);
-          break;
-        case 'complete':
-          endpoint = '/api/worker/clock-out';
-          body = { jobId: job.id, userId, jobDuration: jobTimer };
-          setIsWorking(false);
-          break;
-      }
-
-      const res = await fetch(endpoint, {
+      const res = await fetch('/api/worker/jobs/status', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+        body: JSON.stringify({ jobId: job.id, userId, action: 'on_the_way' }),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        toast.success(
-          action === 'on_the_way'
-            ? 'On your way!'
-            : action === 'arrived'
-            ? 'Marked as arrived!'
-            : action === 'start'
-            ? 'Job started!'
-            : `Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`
-        );
+        setTimerState('traveling');
+        setTravelStartTime(Date.now());
+        setTravelTime(0);
+        toast.success('On your way!');
         fetchJob(userId, jobId);
       } else {
         toast.error(data.error || 'Action failed');
-        // Revert timer states on failure
-        if (action === 'on_the_way') setIsTraveling(false);
-        if (action === 'start') setIsWorking(false);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -421,6 +452,187 @@ export default function JobDetailPage() {
     }
   };
 
+  const handleStartJob = async () => {
+    if (!job) return;
+    setActionLoading('start');
+
+    try {
+      // First mark as arrived
+      await fetch('/api/worker/jobs/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id, userId, action: 'arrived', travelDuration: travelTime }),
+      });
+
+      // Then clock in
+      const res = await fetch('/api/worker/clock-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId: job.id, userId, providerId }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        // Stop travel timer, save final time
+        const finalTravelTime = travelStartTime ? Math.floor((Date.now() - travelStartTime) / 1000) : travelTime;
+        setTravelTime(finalTravelTime);
+        setTravelStartTime(null);
+
+        // Start on-site timer
+        setTimerState('working');
+        setOnSiteStartTime(Date.now());
+        setOnSiteTime(0);
+
+        toast.success('Job started!');
+        fetchJob(userId, jobId);
+      } else {
+        toast.error(data.error || 'Action failed');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCompleteJob = async () => {
+    if (!job) return;
+    setActionLoading('complete');
+
+    try {
+      // Stop on-site timer
+      const finalOnSiteTime = onSiteStartTime ? Math.floor((Date.now() - onSiteStartTime) / 1000) : onSiteTime;
+
+      const res = await fetch('/api/worker/clock-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: job.id,
+          userId,
+          travelDuration: travelTime,
+          onSiteDuration: finalOnSiteTime,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setOnSiteTime(finalOnSiteTime);
+        setOnSiteStartTime(null);
+        setTimerState('completed');
+
+        toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`);
+        fetchJob(userId, jobId);
+
+        // Scroll to job details section
+        setTimeout(() => {
+          document.getElementById('job-details-section')?.scrollIntoView({ behavior: 'smooth' });
+        }, 500);
+      } else {
+        toast.error(data.error || 'Action failed');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // Service handlers
+  const handleAddService = (serviceId: string, serviceName: string) => {
+    const newService: SelectedService = {
+      id: `service-${Date.now()}`,
+      serviceId,
+      serviceName,
+      price: 0,
+      customNotes: '',
+      isCustom: false,
+      showNotes: false,
+    };
+    setSelectedServices([...selectedServices, newService]);
+    setShowServiceDropdown(false);
+  };
+
+  const handleAddCustomService = () => {
+    if (!customServiceName.trim()) return;
+
+    const newService: SelectedService = {
+      id: `custom-${Date.now()}`,
+      serviceId: null,
+      serviceName: customServiceName.trim(),
+      price: 0,
+      customNotes: '',
+      isCustom: true,
+      showNotes: false,
+    };
+    setSelectedServices([...selectedServices, newService]);
+    setCustomServiceName('');
+    setShowCustomServiceInput(false);
+  };
+
+  const handleRemoveService = (serviceId: string) => {
+    const service = selectedServices.find(s => s.id === serviceId);
+    if (service?.customNotes && !confirm('This service has notes. Remove anyway?')) {
+      return;
+    }
+    setSelectedServices(selectedServices.filter(s => s.id !== serviceId));
+  };
+
+  const handleUpdateServicePrice = (serviceId: string, price: number) => {
+    setSelectedServices(selectedServices.map(s =>
+      s.id === serviceId ? { ...s, price: Math.max(0, price) } : s
+    ));
+  };
+
+  const handleUpdateServiceNotes = (serviceId: string, notes: string) => {
+    setSelectedServices(selectedServices.map(s =>
+      s.id === serviceId ? { ...s, customNotes: notes } : s
+    ));
+  };
+
+  const handleToggleServiceNotes = (serviceId: string) => {
+    setSelectedServices(selectedServices.map(s =>
+      s.id === serviceId ? { ...s, showNotes: !s.showNotes } : s
+    ));
+  };
+
+  // Parts handlers
+  const handleAddPart = () => {
+    if (!newPartName.trim()) return;
+
+    const newPart: Part = {
+      id: `part-${Date.now()}`,
+      name: newPartName.trim(),
+      quantity: Math.max(1, newPartQty),
+      unitPrice: Math.max(0, newPartPrice),
+    };
+    setParts([...parts, newPart]);
+    setNewPartName('');
+    setNewPartQty(1);
+    setNewPartPrice(0);
+    setShowAddPart(false);
+  };
+
+  const handleRemovePart = (partId: string) => {
+    setParts(parts.filter(p => p.id !== partId));
+  };
+
+  // Price calculations
+  const servicesSubtotal = selectedServices.reduce((sum, s) => sum + s.price, 0);
+  const partsSubtotal = parts.reduce((sum, p) => sum + (p.quantity * p.unitPrice), 0);
+  const totalPrice = servicesSubtotal + partsSubtotal;
+
+  // Validation
+  const canSendInvoice = timerState === 'completed' &&
+    selectedServices.some(s => s.price > 0) &&
+    totalPrice > 0;
+
+  const servicesWithoutPrice = selectedServices.filter(s => s.price === 0);
+
+  // Note handlers
   const handleAddNote = async () => {
     if (!newNote.trim() || !job) return;
     setAddingNote(true);
@@ -479,7 +691,6 @@ export default function JobDetailPage() {
       toast.error('Failed to upload media');
     }
 
-    // Clear the input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -505,18 +716,51 @@ export default function JobDetailPage() {
   };
 
   const handleSendInvoice = async () => {
-    if (!job) return;
+    if (!job || !canSendInvoice) return;
     setSendingInvoice(true);
 
     try {
+      const invoiceData = {
+        userId,
+        services: selectedServices.map(s => ({
+          name: s.serviceName,
+          price: s.price,
+          notes: s.customNotes,
+          isCustom: s.isCustom,
+        })),
+        parts: parts.map(p => ({
+          name: p.name,
+          quantity: p.quantity,
+          unitPrice: p.unitPrice,
+        })),
+        times: {
+          travel: travelTime,
+          onSite: onSiteTime,
+          total: travelTime + onSiteTime,
+        },
+        pricing: {
+          servicesTotal: servicesSubtotal,
+          partsTotal: partsSubtotal,
+          finalTotal: totalPrice,
+        },
+      };
+
       const res = await fetch(`/api/worker/jobs/${job.id}/invoice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, jobDetails }),
+        body: JSON.stringify(invoiceData),
       });
 
       if (res.ok) {
+        setInvoiceSent(true);
+        setShowInvoicePreview(false);
         toast.success('Invoice sent to customer');
+
+        // Clear draft
+        localStorage.removeItem(`jobDraft_${jobId}`);
+
+        // Reset success state after 2 seconds
+        setTimeout(() => setInvoiceSent(false), 2000);
       } else {
         const data = await res.json();
         toast.error(data.error || 'Failed to send invoice');
@@ -526,50 +770,6 @@ export default function JobDetailPage() {
       toast.error('Failed to send invoice');
     } finally {
       setSendingInvoice(false);
-    }
-  };
-
-  const handleAddPart = () => {
-    if (newPart.trim()) {
-      setJobDetails(prev => ({
-        ...prev,
-        partsUsed: [...prev.partsUsed, newPart.trim()],
-      }));
-      setNewPart('');
-    }
-  };
-
-  const handleRemovePart = (index: number) => {
-    setJobDetails(prev => ({
-      ...prev,
-      partsUsed: prev.partsUsed.filter((_, i) => i !== index),
-    }));
-  };
-
-  const handleSaveJobDetails = async () => {
-    if (!job) return;
-    setSavingDetails(true);
-
-    try {
-      const res = await fetch(`/api/worker/jobs/${job.id}/details`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId,
-          ...jobDetails,
-        }),
-      });
-
-      if (res.ok) {
-        toast.success('Job details saved');
-      } else {
-        toast.error('Failed to save job details');
-      }
-    } catch (error) {
-      console.error('Error saving job details:', error);
-      toast.error('Failed to save job details');
-    } finally {
-      setSavingDetails(false);
     }
   };
 
@@ -637,16 +837,15 @@ export default function JobDetailPage() {
     }
   };
 
-  const renderActionButtons = () => {
+  const renderActionButton = () => {
     if (!job) return null;
-    const status = getJobStatus(job);
     const isLoading = (action: string) => actionLoading === action;
 
-    switch (status) {
-      case 'scheduled':
+    switch (timerState) {
+      case 'idle':
         return (
           <button
-            onClick={() => handleAction('on_the_way')}
+            onClick={handleOnMyWay}
             disabled={!!actionLoading}
             className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
             style={{ backgroundColor: LIME_GREEN }}
@@ -661,38 +860,23 @@ export default function JobDetailPage() {
             )}
           </button>
         );
-      case 'on_the_way':
+      case 'traveling':
         return (
           <button
-            onClick={() => handleAction('arrived')}
+            onClick={handleStartJob}
             disabled={!!actionLoading}
-            className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
-            style={{ backgroundColor: LIME_GREEN }}
-          >
-            {isLoading('arrived') ? (
-              <Loader2 className="w-5 h-5 animate-spin" />
-            ) : (
-              <>
-                <Timer className="w-5 h-5" />
-                En Route: {formatTimer(travelTimer)}
-              </>
-            )}
-          </button>
-        );
-      case 'arrived':
-        return (
-          <button
-            onClick={() => handleAction('start')}
-            disabled={!!actionLoading}
-            className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex flex-col items-center justify-center gap-1 disabled:opacity-50 transition-colors"
             style={{ backgroundColor: LIME_GREEN }}
           >
             {isLoading('start') ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                <Clock className="w-5 h-5" />
-                Start Job
+                <span className="flex items-center gap-2">
+                  <Timer className="w-5 h-5" />
+                  Start Job
+                </span>
+                <span className="text-xs opacity-80">En Route: {formatTimerDisplay(travelTime)}</span>
               </>
             )}
           </button>
@@ -700,17 +884,20 @@ export default function JobDetailPage() {
       case 'working':
         return (
           <button
-            onClick={() => handleAction('complete')}
+            onClick={handleCompleteJob}
             disabled={!!actionLoading}
-            className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex flex-col items-center justify-center gap-1 disabled:opacity-50 transition-colors"
             style={{ backgroundColor: LIME_GREEN }}
           >
             {isLoading('complete') ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                <Timer className="w-5 h-5" />
-                Working: {formatTimer(jobTimer)}
+                <span className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5" />
+                  Complete Job
+                </span>
+                <span className="text-xs opacity-80">Working: {formatTimerDisplay(onSiteTime)}</span>
               </>
             )}
           </button>
@@ -725,6 +912,17 @@ export default function JobDetailPage() {
       default:
         return null;
     }
+  };
+
+  // Format time for invoice (readable)
+  const formatTimeForInvoice = (seconds: number): string => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+
+    if (hours > 0) {
+      return `${hours} hour${hours > 1 ? 's' : ''} ${mins} minute${mins !== 1 ? 's' : ''}`;
+    }
+    return `${mins} minute${mins !== 1 ? 's' : ''}`;
   };
 
   if (loading) {
@@ -891,69 +1089,348 @@ export default function JobDetailPage() {
           )}
         </div>
 
-        {/* SEND INVOICE BUTTON - Prominent Position */}
-        <button
-          onClick={handleSendInvoice}
-          disabled={sendingInvoice}
-          className="w-full rounded-xl p-4 flex items-center justify-center gap-2 transition-colors font-semibold text-zinc-900"
-          style={{ backgroundColor: LIME_GREEN }}
-        >
-          {sendingInvoice ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <>
-              <Receipt className="w-5 h-5" />
-              <span>Send Invoice to Customer</span>
-            </>
-          )}
-        </button>
+        {/* JOB DETAILS SECTION */}
+        <div id="job-details-section" className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div className="p-4 border-b border-zinc-800">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-5 h-5" style={{ color: LIME_GREEN }} />
+              <h3 className="font-medium text-white">Job Details</h3>
+            </div>
+          </div>
 
-        {/* Work Log Info (if started) */}
-        {job.workLogs && job.workLogs.length > 0 && (
-          <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
-            <h3 className="font-medium text-zinc-300 mb-3">Work Log</h3>
-            {job.workLogs.map((log) => (
-              <div key={log.id} className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-zinc-500">Clock In:</span>
-                  <span className="text-zinc-300">
-                    {new Date(log.clockIn).toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                      hour12: true,
-                    })}
-                  </span>
+          <div className="p-4 space-y-6">
+            {/* SERVICES PERFORMED */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-3">Services Performed</label>
+
+              {/* Selected Services List */}
+              {selectedServices.length > 0 && (
+                <div className="space-y-3 mb-3">
+                  {selectedServices.map((service) => (
+                    <div key={service.id} className="bg-zinc-800 rounded-lg p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1">
+                          <p className="font-medium text-white">{service.serviceName}</p>
+                          {service.isCustom && (
+                            <span className="text-xs text-zinc-500">Custom service</span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => handleRemoveService(service.id)}
+                          className="p-1 text-zinc-500 hover:text-red-400"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      </div>
+
+                      {/* Price Input */}
+                      <div className="mt-2">
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={service.price || ''}
+                            onChange={(e) => handleUpdateServicePrice(service.id, parseFloat(e.target.value) || 0)}
+                            placeholder="Enter price"
+                            className="w-full bg-zinc-700 border border-zinc-600 rounded-lg pl-8 pr-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-lime-500"
+                          />
+                        </div>
+                        {service.price === 0 && (
+                          <p className="text-xs text-amber-400 mt-1">Enter price for this service</p>
+                        )}
+                      </div>
+
+                      {/* Notes Toggle */}
+                      <button
+                        onClick={() => handleToggleServiceNotes(service.id)}
+                        className="flex items-center gap-1 text-xs text-zinc-400 mt-2 hover:text-zinc-300"
+                      >
+                        <ChevronDown className={`w-3 h-3 transition-transform ${service.showNotes ? 'rotate-180' : ''}`} />
+                        {service.showNotes ? 'Hide notes' : 'Add notes'}
+                      </button>
+
+                      {/* Notes Input */}
+                      {service.showNotes && (
+                        <textarea
+                          value={service.customNotes}
+                          onChange={(e) => handleUpdateServiceNotes(service.id, e.target.value)}
+                          placeholder="Add custom description or notes..."
+                          className="w-full mt-2 bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-lime-500 resize-none"
+                          rows={2}
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
-                {log.clockOut && (
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Clock Out:</span>
-                    <span className="text-zinc-300">
-                      {new Date(log.clockOut).toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true,
-                      })}
-                    </span>
-                  </div>
-                )}
-                {log.hoursWorked && (
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Hours Worked:</span>
-                    <span className="text-zinc-300">{log.hoursWorked.toFixed(2)}h</span>
-                  </div>
-                )}
-                {log.earnings && (
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Earnings:</span>
-                    <span className="font-medium" style={{ color: LIME_GREEN }}>
-                      ${log.earnings.toFixed(2)}
-                    </span>
+              )}
+
+              {/* Service Dropdown */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowServiceDropdown(!showServiceDropdown)}
+                  className="w-full flex items-center justify-between px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 hover:border-zinc-600"
+                >
+                  <span className="flex items-center gap-2">
+                    <Plus className="w-4 h-4" />
+                    Add Service
+                  </span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showServiceDropdown ? 'rotate-180' : ''}`} />
+                </button>
+
+                {showServiceDropdown && (
+                  <div className="absolute z-20 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                    {Object.entries(SERVICES_CATALOG).map(([category, services]) => (
+                      <div key={category}>
+                        <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/50">
+                          {category}
+                        </div>
+                        {services.map((service) => (
+                          <button
+                            key={service.id}
+                            onClick={() => handleAddService(service.id, service.name)}
+                            className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700"
+                          >
+                            {service.name}
+                          </button>
+                        ))}
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            ))}
+
+              {/* Custom Service Button */}
+              {!showCustomServiceInput ? (
+                <button
+                  onClick={() => setShowCustomServiceInput(true)}
+                  className="mt-2 flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-300"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Custom Service
+                </button>
+              ) : (
+                <div className="mt-2 flex gap-2">
+                  <input
+                    type="text"
+                    value={customServiceName}
+                    onChange={(e) => setCustomServiceName(e.target.value)}
+                    placeholder="Custom service name..."
+                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-lime-500"
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCustomService()}
+                  />
+                  <button
+                    onClick={handleAddCustomService}
+                    disabled={!customServiceName.trim()}
+                    className="px-3 py-2 rounded-lg text-sm font-medium text-zinc-900 disabled:opacity-50"
+                    style={{ backgroundColor: LIME_GREEN }}
+                  >
+                    Add
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowCustomServiceInput(false);
+                      setCustomServiceName('');
+                    }}
+                    className="px-3 py-2 bg-zinc-800 rounded-lg text-sm text-zinc-400"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* PARTS USED */}
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-3">Parts Used</label>
+
+              {/* Parts List */}
+              {parts.length > 0 && (
+                <div className="space-y-2 mb-3">
+                  {parts.map((part) => (
+                    <div key={part.id} className="flex items-center justify-between bg-zinc-800 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <Package className="w-4 h-4 text-zinc-500" />
+                        <span className="text-sm text-white">{part.name}</span>
+                        <span className="text-xs text-zinc-500">x{part.quantity}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm text-zinc-300">${(part.quantity * part.unitPrice).toFixed(2)}</span>
+                        <button
+                          onClick={() => handleRemovePart(part.id)}
+                          className="p-1 text-zinc-500 hover:text-red-400"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Add Part Form */}
+              {showAddPart ? (
+                <div className="bg-zinc-800 rounded-lg p-3 space-y-3">
+                  <input
+                    type="text"
+                    value={newPartName}
+                    onChange={(e) => setNewPartName(e.target.value)}
+                    placeholder="Part name"
+                    className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none"
+                  />
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <label className="text-xs text-zinc-500">Qty</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={newPartQty}
+                        onChange={(e) => setNewPartQty(parseInt(e.target.value) || 1)}
+                        className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="text-xs text-zinc-500">Unit Price</label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-500" />
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={newPartPrice || ''}
+                          onChange={(e) => setNewPartPrice(parseFloat(e.target.value) || 0)}
+                          className="w-full bg-zinc-700 border border-zinc-600 rounded-lg pl-6 pr-3 py-2 text-sm text-white focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleAddPart}
+                      disabled={!newPartName.trim()}
+                      className="flex-1 py-2 rounded-lg text-sm font-medium text-zinc-900 disabled:opacity-50"
+                      style={{ backgroundColor: LIME_GREEN }}
+                    >
+                      Add Part
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowAddPart(false);
+                        setNewPartName('');
+                        setNewPartQty(1);
+                        setNewPartPrice(0);
+                      }}
+                      className="px-4 py-2 bg-zinc-700 rounded-lg text-sm text-zinc-400"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAddPart(true)}
+                  className="flex items-center gap-2 text-sm text-zinc-400 hover:text-zinc-300"
+                >
+                  <Plus className="w-4 h-4" />
+                  Add Part
+                </button>
+              )}
+            </div>
+
+            {/* LABOR TIME (Only show after completion) */}
+            {timerState === 'completed' && (
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-3">Labor Time</label>
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-zinc-800 rounded-full text-sm text-zinc-300">
+                    <Clock className="w-3 h-3" />
+                    Travel: {formatTimePill(travelTime)}
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-zinc-800 rounded-full text-sm text-zinc-300">
+                    <Clock className="w-3 h-3" />
+                    On-Site: {formatTimePill(onSiteTime)}
+                  </span>
+                  <span
+                    className="inline-flex items-center gap-1 px-4 py-2 rounded-full text-sm font-medium text-zinc-900"
+                    style={{ backgroundColor: LIME_GREEN }}
+                  >
+                    <Timer className="w-4 h-4" />
+                    Total: {formatTimePill(travelTime + onSiteTime)}
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* PRICE BREAKDOWN */}
+            <div className="border-t border-zinc-800 pt-4">
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Services</span>
+                  <span className="text-zinc-300">${servicesSubtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-zinc-400">Parts</span>
+                  <span className="text-zinc-300">${partsSubtotal.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t border-zinc-800">
+                  <span className="text-white">Total</span>
+                  <span style={{ color: LIME_GREEN }}>${totalPrice.toFixed(2)}</span>
+                </div>
+              </div>
+
+              {/* Warning for services without price */}
+              {servicesWithoutPrice.length > 0 && (
+                <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
+                  <p className="text-sm text-amber-400">
+                    {servicesWithoutPrice.length} service{servicesWithoutPrice.length > 1 ? 's' : ''} missing price
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* ACTION BUTTONS */}
+            <div className="space-y-3">
+              {/* Preview Invoice Button */}
+              <button
+                onClick={() => setShowInvoicePreview(true)}
+                disabled={selectedServices.length === 0}
+                className="w-full flex items-center justify-center gap-2 py-3 border border-zinc-700 rounded-lg text-sm font-medium text-zinc-300 hover:bg-zinc-800 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Eye className="w-4 h-4" />
+                Preview Invoice
+              </button>
+
+              {/* Send Invoice Button */}
+              <button
+                onClick={handleSendInvoice}
+                disabled={!canSendInvoice || sendingInvoice}
+                className="w-full flex items-center justify-center gap-2 py-4 rounded-xl font-semibold text-zinc-900 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                style={{ backgroundColor: canSendInvoice ? LIME_GREEN : '#3f3f46' }}
+              >
+                {sendingInvoice ? (
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                ) : invoiceSent ? (
+                  <>
+                    <CheckCircle2 className="w-5 h-5" />
+                    Invoice Sent
+                  </>
+                ) : (
+                  <>
+                    <Receipt className="w-5 h-5" />
+                    Send Invoice to Customer
+                  </>
+                )}
+              </button>
+
+              {!canSendInvoice && timerState !== 'completed' && (
+                <p className="text-xs text-center text-zinc-500">
+                  Complete the job to send invoice
+                </p>
+              )}
+            </div>
           </div>
-        )}
+        </div>
 
         {/* Notes Section */}
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
@@ -964,7 +1441,6 @@ export default function JobDetailPage() {
             </div>
           </div>
           <div className="p-4 space-y-3">
-            {/* Existing Notes */}
             {notes.length > 0 ? (
               <div className="space-y-3 max-h-48 overflow-y-auto">
                 {notes.map((note) => (
@@ -986,14 +1462,12 @@ export default function JobDetailPage() {
               <p className="text-zinc-500 text-sm text-center py-2">No notes yet</p>
             )}
 
-            {/* Add Note Input */}
             <div className="flex gap-2">
               <textarea
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
                 placeholder="Add a note..."
                 className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none resize-none"
-                style={{ borderColor: newNote ? LIME_GREEN : undefined }}
                 rows={2}
               />
               <button
@@ -1009,126 +1483,6 @@ export default function JobDetailPage() {
                 )}
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Job Details Section - NEW */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <div className="p-4 border-b border-zinc-800">
-            <div className="flex items-center gap-2">
-              <Wrench className="w-5 h-5" style={{ color: LIME_GREEN }} />
-              <h3 className="font-medium text-white">Job Details</h3>
-            </div>
-          </div>
-          <div className="p-4 space-y-4">
-            {/* Work Performed */}
-            <div>
-              <label className="block text-sm text-zinc-400 mb-2">Work Performed</label>
-              <textarea
-                value={jobDetails.workPerformed}
-                onChange={(e) => setJobDetails(prev => ({ ...prev, workPerformed: e.target.value }))}
-                placeholder="Describe the work completed..."
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none resize-none"
-                rows={3}
-              />
-            </div>
-
-            {/* Parts Used */}
-            <div>
-              <label className="block text-sm text-zinc-400 mb-2">Parts Used</label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  type="text"
-                  value={newPart}
-                  onChange={(e) => setNewPart(e.target.value)}
-                  placeholder="Add a part..."
-                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none"
-                  onKeyDown={(e) => e.key === 'Enter' && handleAddPart()}
-                />
-                <button
-                  onClick={handleAddPart}
-                  disabled={!newPart.trim()}
-                  className="p-2 rounded-lg transition-colors disabled:bg-zinc-700"
-                  style={{ backgroundColor: newPart.trim() ? LIME_GREEN : undefined }}
-                >
-                  <Plus className="w-5 h-5 text-zinc-900" />
-                </button>
-              </div>
-              {jobDetails.partsUsed.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {jobDetails.partsUsed.map((part, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center gap-1 px-2 py-1 bg-zinc-800 rounded-lg text-sm text-zinc-300"
-                    >
-                      <Package className="w-3 h-3" />
-                      {part}
-                      <button
-                        onClick={() => handleRemovePart(index)}
-                        className="ml-1 text-zinc-500 hover:text-zinc-300"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Labor Hours */}
-            <div>
-              <label className="block text-sm text-zinc-400 mb-2">
-                Labor Hours {isWorking && <span className="text-xs" style={{ color: LIME_GREEN }}>(auto-updating from timer)</span>}
-              </label>
-              <input
-                type="number"
-                step="0.25"
-                value={jobDetails.laborHours}
-                onChange={(e) => setJobDetails(prev => ({ ...prev, laborHours: parseFloat(e.target.value) || 0 }))}
-                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
-              />
-            </div>
-
-            {/* Price/Cost */}
-            <div>
-              <label className="block text-sm text-zinc-400 mb-2">Price/Cost ($)</label>
-              <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-                <input
-                  type="number"
-                  step="0.01"
-                  value={jobDetails.price}
-                  onChange={(e) => setJobDetails(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:outline-none"
-                />
-              </div>
-            </div>
-
-            {/* Photos Link */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full flex items-center justify-center gap-2 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
-            >
-              <Camera className="w-4 h-4" />
-              Add Photos of Work Done
-            </button>
-
-            {/* Save Button */}
-            <button
-              onClick={handleSaveJobDetails}
-              disabled={savingDetails}
-              className="w-full py-3 rounded-lg font-semibold transition-colors text-zinc-900"
-              style={{ backgroundColor: LIME_GREEN }}
-            >
-              {savingDetails ? (
-                <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-              ) : (
-                <span className="flex items-center justify-center gap-2">
-                  <Save className="w-5 h-5" />
-                  Save Job Details
-                </span>
-              )}
-            </button>
           </div>
         </div>
 
@@ -1215,7 +1569,7 @@ export default function JobDetailPage() {
       <div className="fixed bottom-16 left-0 right-0 bg-zinc-900 border-t border-zinc-800 p-4 z-40">
         <div className="max-w-lg mx-auto flex gap-3">
           {/* Navigate Button */}
-          {status !== 'completed' && (
+          {timerState !== 'completed' && (
             <button
               onClick={() => openMaps(job.address)}
               className="p-4 rounded-xl transition-colors"
@@ -1226,7 +1580,7 @@ export default function JobDetailPage() {
           )}
 
           {/* Call Button */}
-          {job.customer.phone && status !== 'completed' && (
+          {job.customer.phone && timerState !== 'completed' && (
             <button
               onClick={() => callPhone(job.customer.phone!)}
               className="p-4 rounded-xl transition-colors"
@@ -1237,7 +1591,7 @@ export default function JobDetailPage() {
           )}
 
           {/* Main Action Button */}
-          {renderActionButtons()}
+          {renderActionButton()}
         </div>
       </div>
 
@@ -1266,6 +1620,124 @@ export default function JobDetailPage() {
               className="max-w-full max-h-full"
             />
           )}
+        </div>
+      )}
+
+      {/* Invoice Preview Modal */}
+      {showInvoicePreview && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center">
+          <div className="bg-zinc-900 w-full max-w-md max-h-[90vh] rounded-t-2xl sm:rounded-2xl border border-zinc-800 flex flex-col">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
+              <h2 className="text-lg font-semibold text-white">Invoice Preview</h2>
+              <button
+                onClick={() => setShowInvoicePreview(false)}
+                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Invoice Content */}
+            <div className="p-4 overflow-y-auto flex-1">
+              <div className="bg-white text-zinc-900 rounded-lg p-4 text-sm">
+                {/* Header */}
+                <div className="text-center border-b border-zinc-200 pb-4 mb-4">
+                  <h3 className="text-lg font-bold">{job.serviceType} Service Invoice</h3>
+                  <p className="text-zinc-500 text-xs mt-1">
+                    {new Date().toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric'
+                    })}
+                  </p>
+                </div>
+
+                {/* Customer Info */}
+                <div className="mb-4">
+                  <p className="font-medium">Customer: {job.customer.name}</p>
+                  <p className="text-zinc-500 text-xs">{job.address}</p>
+                </div>
+
+                {/* Services */}
+                <div className="mb-4">
+                  <p className="font-semibold mb-2">SERVICES</p>
+                  {selectedServices.map((service) => (
+                    <div key={service.id} className="mb-2">
+                      <div className="flex justify-between">
+                        <span>{service.serviceName}</span>
+                        <span>${service.price.toFixed(2)}</span>
+                      </div>
+                      {service.customNotes && (
+                        <p className="text-xs text-zinc-500 italic ml-2">({service.customNotes})</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Parts */}
+                {parts.length > 0 && (
+                  <div className="mb-4">
+                    <p className="font-semibold mb-2">PARTS</p>
+                    {parts.map((part) => (
+                      <div key={part.id} className="flex justify-between">
+                        <span>{part.name} x{part.quantity}</span>
+                        <span>${(part.quantity * part.unitPrice).toFixed(2)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Labor Time */}
+                {timerState === 'completed' && (
+                  <div className="mb-4 py-2 border-t border-zinc-200">
+                    <p className="font-semibold mb-2">LABOR TIME</p>
+                    <p className="text-xs">Travel Time: {formatTimeForInvoice(travelTime)}</p>
+                    <p className="text-xs">On-Site Time: {formatTimeForInvoice(onSiteTime)}</p>
+                    <p className="text-xs font-medium">Total Time: {formatTimeForInvoice(travelTime + onSiteTime)}</p>
+                  </div>
+                )}
+
+                {/* Totals */}
+                <div className="border-t border-zinc-300 pt-3 mt-3">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal (Services)</span>
+                    <span>${servicesSubtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal (Parts)</span>
+                    <span>${partsSubtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between font-bold text-lg mt-2 pt-2 border-t border-zinc-300">
+                    <span>TOTAL DUE</span>
+                    <span>${totalPrice.toFixed(2)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 border-t border-zinc-800 shrink-0 space-y-2">
+              <button
+                onClick={() => setShowInvoicePreview(false)}
+                className="w-full py-3 border border-zinc-700 rounded-lg text-sm font-medium text-zinc-300 hover:bg-zinc-800"
+              >
+                Edit
+              </button>
+              <button
+                onClick={handleSendInvoice}
+                disabled={!canSendInvoice || sendingInvoice}
+                className="w-full py-3 rounded-lg font-semibold text-zinc-900 disabled:opacity-50"
+                style={{ backgroundColor: LIME_GREEN }}
+              >
+                {sendingInvoice ? (
+                  <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                ) : (
+                  'Send Invoice'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1307,28 +1779,24 @@ export default function JobDetailPage() {
                         </span>
                       </div>
 
-                      {/* Worker Name */}
                       {cJob.workerName && (
                         <p className="text-zinc-400 text-sm">
                           <span className="text-zinc-500">Worker:</span> {cJob.workerName}
                         </p>
                       )}
 
-                      {/* Duration */}
                       {cJob.duration && (
                         <p className="text-zinc-400 text-sm">
-                          <span className="text-zinc-500">Duration:</span> {formatDuration(cJob.duration)}
+                          <span className="text-zinc-500">Duration:</span> {formatTimePill(cJob.duration)}
                         </p>
                       )}
 
-                      {/* Work Performed */}
                       {cJob.workPerformed && (
                         <p className="text-zinc-400 text-sm">
                           <span className="text-zinc-500">Work:</span> {cJob.workPerformed}
                         </p>
                       )}
 
-                      {/* Parts Used */}
                       {cJob.partsUsed && cJob.partsUsed.length > 0 && (
                         <div className="flex flex-wrap gap-1">
                           <span className="text-zinc-500 text-sm">Parts:</span>
@@ -1340,12 +1808,10 @@ export default function JobDetailPage() {
                         </div>
                       )}
 
-                      {/* Notes */}
                       {cJob.notes && (
                         <p className="text-zinc-400 text-sm italic">&quot;{cJob.notes}&quot;</p>
                       )}
 
-                      {/* Price and Photos */}
                       <div className="flex items-center justify-between pt-1">
                         <p className="font-medium" style={{ color: LIME_GREEN }}>
                           ${cJob.amount.toFixed(2)}
