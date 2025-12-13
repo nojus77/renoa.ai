@@ -822,28 +822,72 @@ export default function WorkerDashboard() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-zinc-300">Start Time</label>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-                    <input
-                      type="time"
-                      value={newJob.startTime}
-                      onChange={(e) => setNewJob({ ...newJob, startTime: e.target.value })}
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-[#a3e635]"
+                  <div className="relative flex gap-1">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 z-10" />
+                    <select
+                      value={newJob.startTime.split(':')[0]}
+                      onChange={(e) => {
+                        const mins = newJob.startTime.split(':')[1] || '00';
+                        setNewJob({ ...newJob, startTime: `${e.target.value}:${mins}` });
+                      }}
+                      className="flex-1 pl-10 pr-2 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-[#a3e635] appearance-none"
                       style={{ fontSize: '16px' }}
-                    />
+                    >
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <option key={i} value={i.toString().padStart(2, '0')}>
+                          {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={newJob.startTime.split(':')[1] || '00'}
+                      onChange={(e) => {
+                        const hrs = newJob.startTime.split(':')[0] || '09';
+                        setNewJob({ ...newJob, startTime: `${hrs}:${e.target.value}` });
+                      }}
+                      className="w-16 px-2 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-[#a3e635] appearance-none text-center"
+                      style={{ fontSize: '16px' }}
+                    >
+                      <option value="00">:00</option>
+                      <option value="15">:15</option>
+                      <option value="30">:30</option>
+                      <option value="45">:45</option>
+                    </select>
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-sm font-medium text-zinc-300">End Time</label>
-                  <div className="relative">
-                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500" />
-                    <input
-                      type="time"
-                      value={newJob.endTime}
-                      onChange={(e) => setNewJob({ ...newJob, endTime: e.target.value })}
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-[#a3e635]"
+                  <div className="relative flex gap-1">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-500 z-10" />
+                    <select
+                      value={newJob.endTime.split(':')[0]}
+                      onChange={(e) => {
+                        const mins = newJob.endTime.split(':')[1] || '00';
+                        setNewJob({ ...newJob, endTime: `${e.target.value}:${mins}` });
+                      }}
+                      className="flex-1 pl-10 pr-2 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-[#a3e635] appearance-none"
                       style={{ fontSize: '16px' }}
-                    />
+                    >
+                      {Array.from({ length: 24 }, (_, i) => (
+                        <option key={i} value={i.toString().padStart(2, '0')}>
+                          {i === 0 ? '12 AM' : i < 12 ? `${i} AM` : i === 12 ? '12 PM' : `${i - 12} PM`}
+                        </option>
+                      ))}
+                    </select>
+                    <select
+                      value={newJob.endTime.split(':')[1] || '00'}
+                      onChange={(e) => {
+                        const hrs = newJob.endTime.split(':')[0] || '10';
+                        setNewJob({ ...newJob, endTime: `${hrs}:${e.target.value}` });
+                      }}
+                      className="w-16 px-2 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-[#a3e635] appearance-none text-center"
+                      style={{ fontSize: '16px' }}
+                    >
+                      <option value="00">:00</option>
+                      <option value="15">:15</option>
+                      <option value="30">:30</option>
+                      <option value="45">:45</option>
+                    </select>
                   </div>
                 </div>
               </div>
