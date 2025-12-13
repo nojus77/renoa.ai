@@ -31,6 +31,7 @@ import {
   Timer,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PropertyPhoto } from '@/components/PropertyPhoto';
 
 // Lime green brand color
 const LIME_GREEN = '#a3e635';
@@ -738,13 +739,13 @@ export default function JobDetailPage() {
     for (const file of Array.from(files)) {
       // Check file size
       if (file.size > MAX_FILE_SIZE) {
-        toast.error(`"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max size is 5MB.`);
+        toast.error(`Photo too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is 5MB.`);
         continue;
       }
 
       // Check file type
       if (!ALLOWED_TYPES.includes(file.type) && !file.type.startsWith('image/')) {
-        toast.error(`"${file.name}" is not a supported file type. Use JPG, PNG, GIF, or MP4.`);
+        toast.error(`Unsupported file type. Use JPG, PNG, GIF, or MP4.`);
         continue;
       }
 
@@ -1039,46 +1040,38 @@ export default function JobDetailPage() {
             )}
           </div>
 
-          {/* Customer Info */}
-          <div className="p-4 border-b border-zinc-800">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${LIME_GREEN}20` }}>
-                <User className="w-5 h-5" style={{ color: LIME_GREEN }} />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-white">{job.customer.name}</p>
-                {job.customer.email && (
-                  <p className="text-zinc-500 text-sm">{job.customer.email}</p>
-                )}
-              </div>
-              {job.customer.phone && (
-                <button
-                  onClick={() => callPhone(job.customer.phone!)}
-                  className="p-2 rounded-lg transition-colors"
-                  style={{ backgroundColor: LIME_GREEN }}
-                >
-                  <Phone className="w-5 h-5 text-zinc-900" />
-                </button>
-              )}
+          {/* Property Photo with Customer Info Overlay */}
+          <div className="relative rounded-lg overflow-hidden h-48">
+            <PropertyPhoto
+              address={job.address}
+              customerId={job.customer.id}
+              className="w-full h-full"
+            />
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
+              <p className="text-white font-medium">{job.customer.name}</p>
+              <p className="text-white/70 text-sm">{job.address}</p>
             </div>
           </div>
 
-          {/* Address */}
-          <div className="p-4 border-b border-zinc-800">
-            <div className="flex items-start gap-3">
-              <MapPin className="w-5 h-5 text-zinc-400 mt-0.5 flex-shrink-0" />
-              <div className="flex-1">
-                <p className="text-zinc-300">{job.address}</p>
-                <button
-                  onClick={() => openMaps(job.address)}
-                  className="flex items-center gap-1 text-sm mt-2 hover:underline"
-                  style={{ color: LIME_GREEN }}
-                >
-                  <Navigation className="w-4 h-4" />
-                  Get Directions
-                </button>
-              </div>
-            </div>
+          {/* Quick Actions */}
+          <div className="p-4 border-b border-zinc-800 flex gap-2">
+            {job.customer.phone && (
+              <button
+                onClick={() => callPhone(job.customer.phone!)}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg transition-colors"
+                style={{ backgroundColor: LIME_GREEN }}
+              >
+                <Phone className="w-4 h-4 text-zinc-900" />
+                <span className="text-zinc-900 font-medium text-sm">Call</span>
+              </button>
+            )}
+            <button
+              onClick={() => openMaps(job.address)}
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
+            >
+              <Navigation className="w-4 h-4" style={{ color: LIME_GREEN }} />
+              <span className="text-zinc-300 text-sm">Navigate</span>
+            </button>
           </div>
 
           {/* Date & Time */}

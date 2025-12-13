@@ -558,6 +558,7 @@ model Customer {
   source                                              String                       @default("own")
   tags                                                String[]                     @default([])
   notes                                               String?
+  streetViewUrl                                       String?                      @map("street_view_url") // Cached Street View URL
   // Smart Scheduler fields
   latitude                                            Float? // For distance calculations
   longitude                                           Float? // For distance calculations
