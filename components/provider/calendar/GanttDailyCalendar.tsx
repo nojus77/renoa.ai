@@ -67,6 +67,7 @@ interface GanttDailyCalendarProps {
   providerId: string;
   initialDate?: Date;
   onJobClick?: (jobId: string) => void;
+  onWorkerClick?: (workerId: string) => void;
   onAddJob?: (workerId?: string, hour?: number) => void;
 }
 
@@ -80,6 +81,7 @@ export default function GanttDailyCalendar({
   providerId,
   initialDate = new Date(),
   onJobClick,
+  onWorkerClick,
   onAddJob,
 }: GanttDailyCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
@@ -580,6 +582,7 @@ export default function GanttDailyCalendar({
                     currentTimePosition={currentTimePosition}
                     getJobStyle={getJobStyle}
                     onJobClick={onJobClick}
+                    onWorkerClick={onWorkerClick}
                   />
                 ))}
 
@@ -622,6 +625,7 @@ interface WorkerRowProps {
   currentTimePosition: number | null;
   getJobStyle: (job: GanttJob) => { left: string; width: string };
   onJobClick?: (jobId: string) => void;
+  onWorkerClick?: (workerId: string) => void;
 }
 
 function WorkerRow({
@@ -631,6 +635,7 @@ function WorkerRow({
   currentTimePosition,
   getJobStyle,
   onJobClick,
+  onWorkerClick,
 }: WorkerRowProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `worker-row-${worker.id}`,
@@ -657,7 +662,10 @@ function WorkerRow({
         className="flex-shrink-0 p-3 border-r border-zinc-800 bg-zinc-900 sticky left-0 z-10"
         style={{ width: WORKER_COL_WIDTH }}
       >
-        <div className="flex items-center gap-2">
+        <button
+          onClick={() => onWorkerClick?.(worker.id)}
+          className="flex items-center gap-2 w-full text-left hover:opacity-80 transition-opacity"
+        >
           <Avatar className="w-8 h-8 border-2" style={{ borderColor: worker.color }}>
             {worker.photo ? (
               <AvatarImage src={worker.photo} alt={`${worker.firstName} ${worker.lastName}`} />
@@ -671,7 +679,7 @@ function WorkerRow({
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
-            <div className="text-sm font-medium text-zinc-200 truncate">
+            <div className="text-sm font-medium text-zinc-200 truncate hover:text-emerald-400 transition-colors">
               {worker.firstName} {worker.lastName[0]}.
             </div>
             <div className="flex items-center gap-2">
@@ -683,7 +691,7 @@ function WorkerRow({
               </Badge>
             </div>
           </div>
-        </div>
+        </button>
       </div>
 
       {/* Timeline area */}

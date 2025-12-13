@@ -17,6 +17,7 @@ import TeamDispatchView from '@/components/provider/TeamDispatchView';
 import DailyTeamCalendar from '@/components/provider/calendar/DailyTeamCalendar';
 import WeeklyTeamCalendar from '@/components/provider/calendar/WeeklyTeamCalendar';
 import GanttDailyCalendar from '@/components/provider/calendar/GanttDailyCalendar';
+import WorkerProfileModal from '@/components/provider/WorkerProfileModal';
 import { DndContext, DragEndEvent, DragStartEvent, pointerWithin, useDraggable } from '@dnd-kit/core';
 
 type ViewMode = 'day' | 'week' | 'month';
@@ -85,6 +86,7 @@ export default function ProviderCalendar() {
   const [showDeleteBlockModal, setShowDeleteBlockModal] = useState(false);
   const [selectedBlock, setSelectedBlock] = useState<BlockedTime | null>(null);
   const [activeDragJob, setActiveDragJob] = useState<Job | null>(null);
+  const [profileWorkerId, setProfileWorkerId] = useState<string | null>(null);
 
   // Set default view mode based on screen size
   useEffect(() => {
@@ -707,6 +709,7 @@ export default function ProviderCalendar() {
                   const job = jobs.find(j => j.id === jobId);
                   if (job) setSelectedJob(job);
                 }}
+                onWorkerClick={(workerId) => setProfileWorkerId(workerId)}
                 onAddJob={(workerId, hour) => {
                   if (hour !== undefined) {
                     setSelectedSlot({ date: currentDate, hour });
@@ -794,6 +797,13 @@ export default function ProviderCalendar() {
           }}
         />
       )}
+
+      {/* Worker Profile Modal */}
+      <WorkerProfileModal
+        workerId={profileWorkerId}
+        isOpen={!!profileWorkerId}
+        onClose={() => setProfileWorkerId(null)}
+      />
     </ProviderLayout>
   );
 }

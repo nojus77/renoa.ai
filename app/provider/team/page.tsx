@@ -13,6 +13,7 @@ import { toast } from 'sonner';
 import { UserPlus, Mail, User, Shield, Eye, EyeOff, Loader2, Users, Edit2, Trash2, X, RefreshCw, Pencil, Award, Star, Wrench, Monitor, Crown, DollarSign, Plus, Search, Library, ChevronDown, CalendarPlus, Calendar, Settings, Lightbulb, Clock } from 'lucide-react';
 import EditTeamMemberModal from '@/components/provider/EditTeamMemberModal';
 import DeleteMemberDialog from '@/components/provider/DeleteMemberDialog';
+import WorkerProfileModal from '@/components/provider/WorkerProfileModal';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -136,6 +137,9 @@ export default function TeamManagementPage() {
   // Team member edit/delete state
   const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
   const [deletingMember, setDeletingMember] = useState<TeamMember | null>(null);
+
+  // Profile modal state
+  const [profileWorkerId, setProfileWorkerId] = useState<string | null>(null);
 
   // Available skills state
   const [availableSkills, setAvailableSkills] = useState<any[]>([]);
@@ -1493,7 +1497,10 @@ export default function TeamManagementPage() {
                             >
                             {/* Member - Frozen Column */}
                             <td className="px-4 py-3 sticky left-0 bg-inherit z-10">
-                              <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => setProfileWorkerId(member.id)}
+                                className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                              >
                                 <Avatar
                                   className="w-8 h-8"
                                   style={{ backgroundColor: member.color || '#6b7280' }}
@@ -1503,10 +1510,10 @@ export default function TeamManagementPage() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <div>
-                                  <div className="font-medium text-sm text-zinc-100">{member.firstName} {member.lastName}</div>
+                                  <div className="font-medium text-sm text-zinc-100 hover:text-emerald-400 transition-colors">{member.firstName} {member.lastName}</div>
                                   <div className="text-xs text-zinc-500">{member.email}</div>
                                 </div>
-                              </div>
+                              </button>
                             </td>
 
                             {/* Role */}
@@ -2170,21 +2177,24 @@ export default function TeamManagementPage() {
                             <Card key={request.id} className="bg-zinc-800 border-amber-600/30">
                               <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => request.userId && setProfileWorkerId(request.userId)}
+                                    className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                                  >
                                     <Avatar className="h-10 w-10">
                                       <AvatarFallback style={{ backgroundColor: request.user?.color || '#10b981' }}>
                                         {request.user?.firstName?.[0]}{request.user?.lastName?.[0]}
                                       </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                      <div className="font-medium text-zinc-100">
+                                      <div className="font-medium text-zinc-100 hover:text-emerald-400 transition-colors">
                                         {request.user?.firstName} {request.user?.lastName}
                                       </div>
                                       <div className="text-sm text-zinc-400">
                                         {format(new Date(request.startDate), 'MMM d')} - {format(new Date(request.endDate), 'MMM d, yyyy')}
                                       </div>
                                     </div>
-                                  </div>
+                                  </button>
                                   <div className="flex items-center gap-2">
                                     <Badge variant="outline" className="border-zinc-600 text-zinc-300 capitalize">
                                       {request.reason || 'Time off'}
@@ -2239,21 +2249,24 @@ export default function TeamManagementPage() {
                             <Card key={request.id} className="bg-zinc-800/50 border-zinc-700">
                               <CardContent className="p-4">
                                 <div className="flex items-center justify-between">
-                                  <div className="flex items-center gap-3">
+                                  <button
+                                    onClick={() => request.userId && setProfileWorkerId(request.userId)}
+                                    className="flex items-center gap-3 text-left hover:opacity-80 transition-opacity"
+                                  >
                                     <Avatar className="h-10 w-10">
                                       <AvatarFallback style={{ backgroundColor: request.user?.color || '#10b981' }}>
                                         {request.user?.firstName?.[0]}{request.user?.lastName?.[0]}
                                       </AvatarFallback>
                                     </Avatar>
                                     <div>
-                                      <div className="font-medium text-zinc-100">
+                                      <div className="font-medium text-zinc-100 hover:text-emerald-400 transition-colors">
                                         {request.user?.firstName} {request.user?.lastName}
                                       </div>
                                       <div className="text-sm text-zinc-400">
                                         {format(new Date(request.startDate), 'MMM d')} - {format(new Date(request.endDate), 'MMM d, yyyy')}
                                       </div>
                                     </div>
-                                  </div>
+                                  </button>
                                   <Badge
                                     className={
                                       request.status === 'approved'
@@ -2366,16 +2379,19 @@ export default function TeamManagementPage() {
                           {workLogs.map(log => (
                             <tr key={log.id} className="hover:bg-zinc-700/30">
                               <td className="p-4">
-                                <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => log.userId && setProfileWorkerId(log.userId)}
+                                  className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                                >
                                   <Avatar className="h-8 w-8">
                                     <AvatarFallback style={{ backgroundColor: log.user?.color || '#10b981' }}>
                                       {log.user?.firstName?.[0]}{log.user?.lastName?.[0]}
                                     </AvatarFallback>
                                   </Avatar>
-                                  <span className="text-sm text-zinc-200">
+                                  <span className="text-sm text-zinc-200 hover:text-emerald-400 transition-colors">
                                     {log.user?.firstName} {log.user?.lastName}
                                   </span>
-                                </div>
+                                </button>
                               </td>
                               <td className="p-4 text-sm text-zinc-300">
                                 {log.job?.serviceType || 'Unknown'}
@@ -2650,6 +2666,19 @@ export default function TeamManagementPage() {
           // Optimistic update - remove member from state
           setTeamMembers(prev => prev.filter(m => m.id !== deletedMemberId));
           setDeletingMember(null);
+        }}
+      />
+
+      {/* Worker Profile Modal */}
+      <WorkerProfileModal
+        workerId={profileWorkerId}
+        isOpen={!!profileWorkerId}
+        onClose={() => setProfileWorkerId(null)}
+        onEdit={(workerId) => {
+          const member = teamMembers.find(m => m.id === workerId);
+          if (member) {
+            setEditingMember(member);
+          }
         }}
       />
 

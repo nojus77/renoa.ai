@@ -89,6 +89,7 @@ export interface CalendarStats {
 interface DailyTeamCalendarProps {
   providerId: string;
   onJobClick?: (jobId: string) => void;
+  onWorkerClick?: (workerId: string) => void;
   onAssignJob?: (jobId: string, userId: string) => void;
 }
 
@@ -100,6 +101,7 @@ const CALENDAR_END_HOUR = 20; // 8 PM
 export default function DailyTeamCalendar({
   providerId,
   onJobClick,
+  onWorkerClick,
   onAssignJob,
 }: DailyTeamCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -567,6 +569,7 @@ export default function DailyTeamCalendar({
                         startHour={CALENDAR_START_HOUR}
                         endHour={CALENDAR_END_HOUR}
                         onJobClick={onJobClick}
+                        onWorkerClick={onWorkerClick}
                         showCurrentTime={isToday(selectedDate)}
                         isDragging={isDragging}
                       />
