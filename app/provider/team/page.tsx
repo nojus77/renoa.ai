@@ -11,7 +11,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { UserPlus, Mail, User, Shield, Eye, EyeOff, Loader2, Users, Edit2, Trash2, X, RefreshCw, Pencil, Award, Star, Wrench, Monitor, Crown, DollarSign, Plus, Search, Library, ChevronDown, CalendarPlus, Calendar, Settings, Lightbulb, Clock } from 'lucide-react';
-import EditTeamMemberModal from '@/components/provider/EditTeamMemberModal';
 import DeleteMemberDialog from '@/components/provider/DeleteMemberDialog';
 import WorkerProfileModal from '@/components/provider/WorkerProfileModal';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -134,8 +133,7 @@ export default function TeamManagementPage() {
   const [deletingCrew, setDeletingCrew] = useState<Crew | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Team member edit/delete state
-  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  // Team member delete state
   const [deletingMember, setDeletingMember] = useState<TeamMember | null>(null);
 
   // Profile modal state
@@ -1693,17 +1691,9 @@ export default function TeamManagementPage() {
                                     variant="ghost"
                                     size="icon"
                                     className="w-7 h-7"
-                                    onClick={() => setEditingMember(member)}
+                                    onClick={() => setProfileWorkerId(member.id)}
                                   >
                                     <Pencil className="w-4 h-4 text-zinc-400" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="w-7 h-7"
-                                    onClick={() => setDeletingMember(member)}
-                                  >
-                                    <Trash2 className="w-4 h-4 text-red-400" />
                                   </Button>
                                 </div>
                               </td>
@@ -2639,24 +2629,6 @@ export default function TeamManagementPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit Team Member Modal */}
-      <EditTeamMemberModal
-        member={editingMember}
-        isOpen={!!editingMember}
-        onClose={() => setEditingMember(null)}
-        onSuccess={(updatedMember) => {
-          // Optimistic update - replace member in state
-          setTeamMembers(prev => prev.map(m =>
-            m.id === updatedMember.id ? updatedMember : m
-          ));
-          setEditingMember(null);
-        }}
-        onDelete={(member) => {
-          setEditingMember(null);
-          setDeletingMember(member);
-        }}
-      />
-
       {/* Delete Team Member Dialog */}
       <DeleteMemberDialog
         member={deletingMember}
@@ -2669,16 +2641,18 @@ export default function TeamManagementPage() {
         }}
       />
 
-      {/* Worker Profile Modal */}
+      {/* Worker Profile Modal (with inline editing) */}
       <WorkerProfileModal
         workerId={profileWorkerId}
         isOpen={!!profileWorkerId}
         onClose={() => setProfileWorkerId(null)}
-        onEdit={(workerId) => {
-          const member = teamMembers.find(m => m.id === workerId);
-          if (member) {
-            setEditingMember(member);
-          }
+        onUpdate={() => {
+          // Refresh team members after update
+          fetchTeamMembers();
+        }}
+        onDelete={(workerId) => {
+          // Remove deleted member from state
+          setTeamMembers(prev => prev.filter(m => m.id !== workerId));
         }}
       />
 
