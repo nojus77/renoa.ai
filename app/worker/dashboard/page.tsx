@@ -500,9 +500,20 @@ export default function WorkerDashboard() {
 
       {/* Create Job Modal */}
       {showCreateJob && (
-        <div className="fixed inset-0 bg-black/70 z-50 flex items-end sm:items-center justify-center">
-          <div className="bg-zinc-900 w-full max-w-md max-h-[90vh] rounded-t-2xl sm:rounded-2xl border border-zinc-800 flex flex-col">
-            {/* Modal Header */}
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/70"
+            onClick={() => {
+              setShowCreateJob(false);
+              setSelectedCustomer(null);
+              setCustomerSearch('');
+            }}
+          />
+
+          {/* Modal */}
+          <div className="relative bg-zinc-900 w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[85vh] flex flex-col border border-zinc-800">
+            {/* Header - fixed */}
             <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
               <h2 className="text-lg font-semibold text-white">Add New Job</h2>
               <button
@@ -517,8 +528,8 @@ export default function WorkerDashboard() {
               </button>
             </div>
 
-            {/* Modal Content */}
-            <div className="p-4 pb-8 space-y-4 overflow-y-auto flex-1">
+            {/* Content - scrollable */}
+            <div className="p-4 overflow-y-auto flex-1 space-y-4">
               {/* Customer Selection */}
               <div className="space-y-2">
                 <label className="text-base font-medium text-zinc-300">Customer</label>
@@ -644,8 +655,10 @@ export default function WorkerDashboard() {
                   style={{ fontSize: '16px' }}
                 />
               </div>
+            </div>
 
-              {/* Submit Button */}
+            {/* Footer with button - fixed at bottom */}
+            <div className="p-4 border-t border-zinc-800 bg-zinc-900 shrink-0">
               <button
                 onClick={handleCreateJob}
                 disabled={creatingJob || !selectedCustomer || !newJob.serviceType.trim()}

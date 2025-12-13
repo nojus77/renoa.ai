@@ -194,8 +194,16 @@ export default function WorkerTimeOff() {
 
         {/* Request Form Modal */}
         {showForm && (
-          <div className="fixed inset-0 bg-black/60 z-50 flex items-end justify-center sm:items-center">
-            <div className="bg-zinc-900 w-full max-w-md max-h-[90vh] rounded-t-2xl sm:rounded-2xl border border-zinc-800 flex flex-col">
+          <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center">
+            {/* Backdrop */}
+            <div
+              className="absolute inset-0 bg-black/60"
+              onClick={() => setShowForm(false)}
+            />
+
+            {/* Modal */}
+            <div className="relative bg-zinc-900 w-full sm:max-w-md sm:rounded-xl rounded-t-xl max-h-[85vh] flex flex-col border border-zinc-800">
+              {/* Header - fixed */}
               <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
                 <h2 className="text-lg font-semibold text-white">Request Time Off</h2>
                 <button
@@ -206,87 +214,96 @@ export default function WorkerTimeOff() {
                 </button>
               </div>
 
-              <form onSubmit={handleSubmit} className="p-4 pb-8 space-y-4 overflow-y-auto flex-1">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-base font-medium text-zinc-300 mb-2">
-                      Start Date
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.startDate}
-                      onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, startDate: e.target.value }))
-                      }
-                      className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
-                      required
-                    />
+              {/* Content - scrollable */}
+              <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+                <div className="p-4 overflow-y-auto flex-1 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-base font-medium text-zinc-300 mb-2">
+                        Start Date
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.startDate}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, startDate: e.target.value }))
+                        }
+                        className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                        style={{ fontSize: '16px' }}
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-base font-medium text-zinc-300 mb-2">
+                        End Date
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.endDate}
+                        onChange={(e) =>
+                          setFormData((prev) => ({ ...prev, endDate: e.target.value }))
+                        }
+                        className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                        style={{ fontSize: '16px' }}
+                        required
+                      />
+                    </div>
                   </div>
+
                   <div>
                     <label className="block text-base font-medium text-zinc-300 mb-2">
-                      End Date
+                      Reason
                     </label>
-                    <input
-                      type="date"
-                      value={formData.endDate}
+                    <select
+                      value={formData.reason}
                       onChange={(e) =>
-                        setFormData((prev) => ({ ...prev, endDate: e.target.value }))
+                        setFormData((prev) => ({ ...prev, reason: e.target.value }))
                       }
-                      className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
-                      required
+                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500 appearance-none cursor-pointer"
+                      style={{ fontSize: '16px' }}
+                    >
+                      {REASONS.map((reason) => (
+                        <option key={reason.value} value={reason.value} className="py-3 text-base">
+                          {reason.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-base font-medium text-zinc-300 mb-2">
+                      Notes (Optional)
+                    </label>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) =>
+                        setFormData((prev) => ({ ...prev, notes: e.target.value }))
+                      }
+                      placeholder="Any additional details..."
+                      rows={3}
+                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
+                      style={{ fontSize: '16px' }}
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-base font-medium text-zinc-300 mb-2">
-                    Reason
-                  </label>
-                  <select
-                    value={formData.reason}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, reason: e.target.value }))
-                    }
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500 appearance-none cursor-pointer"
-                    style={{ fontSize: '16px' }}
+                {/* Footer with button - fixed at bottom */}
+                <div className="p-4 border-t border-zinc-800 bg-zinc-900 shrink-0">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-colors"
                   >
-                    {REASONS.map((reason) => (
-                      <option key={reason.value} value={reason.value} className="py-3 text-base">
-                        {reason.label}
-                      </option>
-                    ))}
-                  </select>
+                    {submitting ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : (
+                      'Submit Request'
+                    )}
+                  </button>
                 </div>
-
-                <div>
-                  <label className="block text-base font-medium text-zinc-300 mb-2">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    value={formData.notes}
-                    onChange={(e) =>
-                      setFormData((prev) => ({ ...prev, notes: e.target.value }))
-                    }
-                    placeholder="Any additional details..."
-                    rows={3}
-                    className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full py-4 mt-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-semibold text-base flex items-center justify-center gap-2 transition-colors"
-                >
-                  {submitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Submitting...
-                    </>
-                  ) : (
-                    'Submit Request'
-                  )}
-                </button>
               </form>
             </div>
           </div>
