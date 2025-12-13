@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
             serviceType: true,
             actualValue: true,
             estimatedValue: true,
+            assignedUserIds: true,
             customer: {
               select: { name: true },
             },
@@ -71,8 +72,11 @@ export async function GET(request: NextRequest) {
         if (user.payType === 'hourly' && user.hourlyRate) {
           calculatedEarnings = log.hoursWorked * user.hourlyRate;
         } else if (user.payType === 'commission' && user.commissionRate) {
-          const jobValue = log.job?.actualValue || log.job?.estimatedValue || 0;
-          calculatedEarnings = jobValue * (user.commissionRate / 100);
+          // IMPORTANT: Split job value by number of workers first to prevent overpayment
+          const totalJobValue = log.job?.actualValue || log.job?.estimatedValue || 0;
+          const numWorkers = log.job?.assignedUserIds?.length || 1;
+          const workerShareOfJob = totalJobValue / numWorkers;
+          calculatedEarnings = workerShareOfJob * (user.commissionRate / 100);
         }
         calculatedEarnings = Math.round(calculatedEarnings * 100) / 100;
       }

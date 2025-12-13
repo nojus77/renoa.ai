@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Get job for actual value (for commission) and customer info
+    // Get job for actual value (for commission) and customer info, including assigned workers
     const job = await prisma.job.findUnique({
       where: { id: jobId },
       select: {
@@ -54,6 +54,7 @@ export async function POST(request: NextRequest) {
         estimatedValue: true,
         serviceType: true,
         providerId: true,
+        assignedUserIds: true,
         customer: {
           select: {
             name: true,
@@ -67,8 +68,11 @@ export async function POST(request: NextRequest) {
     const hoursWorked = (clockOut.getTime() - clockIn.getTime()) / (1000 * 60 * 60);
 
     // Calculate earnings based on pay type
+    // IMPORTANT: For commission, split job value by number of workers first to prevent overpayment
     let earnings = 0;
-    const jobValue = job?.actualValue || job?.estimatedValue || 0;
+    const totalJobValue = job?.actualValue || job?.estimatedValue || 0;
+    const numWorkers = job?.assignedUserIds?.length || 1;
+    const workerShareOfJob = totalJobValue / numWorkers; // Each worker's share before commission
 
     console.log('Clock-out earnings calculation:', {
       userId,
@@ -78,14 +82,17 @@ export async function POST(request: NextRequest) {
       commissionRate: user?.commissionRate,
       actualValue: job?.actualValue,
       estimatedValue: job?.estimatedValue,
-      jobValue,
+      totalJobValue,
+      numWorkers,
+      workerShareOfJob,
       hoursWorked,
     });
 
     if (user?.payType === 'hourly' && user.hourlyRate) {
       earnings = hoursWorked * user.hourlyRate;
     } else if (user?.payType === 'commission' && user.commissionRate) {
-      earnings = jobValue * (user.commissionRate / 100);
+      // Apply commission to worker's share of the job, not total job value
+      earnings = workerShareOfJob * (user.commissionRate / 100);
     }
 
     console.log('Calculated earnings:', earnings);
