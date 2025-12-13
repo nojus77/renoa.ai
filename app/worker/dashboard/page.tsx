@@ -604,14 +604,14 @@ export default function WorkerDashboard() {
       {/* Create Job Modal */}
       {showCreateJob && (
         <div
-          className="fixed inset-0 z-50"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
           onTouchMove={(e) => e.stopPropagation()}
         >
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60" onClick={closeModal} />
 
           {/* Modal container */}
-          <div className="absolute bottom-0 left-0 right-0 bg-zinc-900 rounded-t-2xl max-h-[80vh] flex flex-col border-t border-zinc-800">
+          <div className="relative bg-zinc-900 rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col border border-zinc-800 shadow-2xl">
             {/* Header - shrink-0 keeps it fixed */}
             <div className="shrink-0 p-4 border-b border-zinc-800 flex justify-between items-center">
               <h2 className="text-lg font-semibold text-white">Add New Job</h2>
@@ -863,7 +863,7 @@ export default function WorkerDashboard() {
             </div>
 
             {/* Footer - shrink-0 keeps it fixed */}
-            <div className="shrink-0 p-4 border-t border-zinc-800 pb-8">
+            <div className="shrink-0 p-4 border-t border-zinc-800">
               <button
                 onClick={handleCreateJob}
                 disabled={creatingJob || !isFormValid()}

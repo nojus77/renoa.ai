@@ -450,7 +450,11 @@ export default function JobDetailPage() {
   };
 
   const formatShortDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
+    // Handle "Unknown" or invalid dates
+    if (!dateStr || dateStr === 'Unknown') return '';
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '';
+    return date.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
       year: 'numeric',
@@ -1001,6 +1005,11 @@ export default function JobDetailPage() {
   const status = getJobStatus(job);
   const statusConfig = getStatusConfig(status);
 
+  // Section visibility based on status
+  const isPreArrival = ['scheduled', 'on_the_way'].includes(status);
+  const canAddMedia = ['working', 'arrived', 'in_progress', 'completed'].includes(status);
+  const canEditJobDetails = ['working', 'arrived', 'in_progress'].includes(status);
+
   return (
     <WorkerLayout>
       <div className="p-4 pb-44 space-y-4">
@@ -1124,7 +1133,8 @@ export default function JobDetailPage() {
           )}
         </div>
 
-        {/* JOB DETAILS SECTION */}
+        {/* JOB DETAILS SECTION - Only show when arrived/working */}
+        {canEditJobDetails && (
         <div id="job-details-section" className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="p-4 border-b border-zinc-800">
             <div className="flex items-center gap-2">
@@ -1470,6 +1480,7 @@ export default function JobDetailPage() {
             {/* Note: Invoice sending is handled by office staff */}
           </div>
         </div>
+        )}
 
         {/* Notes Section */}
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
@@ -1486,9 +1497,11 @@ export default function JobDetailPage() {
                   <div key={note.id} className="bg-zinc-800/50 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-zinc-300">{note.author}</span>
+                      {formatShortDate(note.createdAt) && (
                       <span className="text-xs text-zinc-500">
                         {formatShortDate(note.createdAt)}
                       </span>
+                      )}
                     </div>
                     <p className="text-zinc-400 text-sm">{note.content}</p>
                     <span className="text-xs text-zinc-600 mt-1 inline-block">
@@ -1501,6 +1514,8 @@ export default function JobDetailPage() {
               <p className="text-zinc-500 text-sm text-center py-2">No notes yet</p>
             )}
 
+            {/* Only show add note when working (not for scheduled/on_the_way/completed) */}
+            {canEditJobDetails && (
             <div className="flex gap-2">
               <textarea
                 value={newNote}
@@ -1522,10 +1537,12 @@ export default function JobDetailPage() {
                 )}
               </button>
             </div>
+            )}
           </div>
         </div>
 
-        {/* Media Section */}
+        {/* Media Section - Only show when working or completed */}
+        {canAddMedia && (
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="p-4 border-b border-zinc-800">
             <div className="flex items-center justify-between">
@@ -1533,6 +1550,7 @@ export default function JobDetailPage() {
                 <Camera className="w-5 h-5" style={{ color: LIME_GREEN }} />
                 <h3 className="font-medium text-white">Media</h3>
               </div>
+              {status !== 'completed' && (
               <button
                 onClick={() => fileInputRef.current?.click()}
                 className="flex items-center gap-1 text-sm"
@@ -1541,6 +1559,7 @@ export default function JobDetailPage() {
                 <Plus className="w-4 h-4" />
                 Add
               </button>
+              )}
             </div>
           </div>
           <div className="p-4">
@@ -1570,12 +1589,14 @@ export default function JobDetailPage() {
               <div className="text-center py-6">
                 <ImageIcon className="w-10 h-10 text-zinc-600 mx-auto mb-2" />
                 <p className="text-zinc-500 text-sm">No media yet</p>
+                {status !== 'completed' && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="mt-3 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg transition-colors"
                 >
                   Add Photos/Videos
                 </button>
+                )}
               </div>
             )}
           </div>
@@ -1588,6 +1609,7 @@ export default function JobDetailPage() {
             onChange={handleMediaUpload}
           />
         </div>
+        )}
 
         {/* Customer History Button */}
         <button
