@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatDistanceToNow, format } from 'date-fns';
@@ -96,6 +96,13 @@ interface Crew {
   skills?: string[];
 }
 
+const EMPTY_PAYROLL_SUMMARY = {
+  totalOwed: 0,
+  totalHours: 0,
+  workersCount: 0,
+  logsCount: 0,
+};
+
 export default function TeamManagementPage() {
   const [providerName, setProviderName] = useState('');
   const [userRole, setUserRole] = useState('');
@@ -167,6 +174,12 @@ export default function TeamManagementPage() {
   const [loadingPayroll, setLoadingPayroll] = useState(false);
   const [payrollDateRange, setPayrollDateRange] = useState<'this-week' | 'last-week' | 'this-month'>('this-week');
   const [processingPay, setProcessingPay] = useState<string | null>(null);
+  const [payrollSummary, setPayrollSummary] = useState(EMPTY_PAYROLL_SUMMARY);
+  const [payrollByWorker, setPayrollByWorker] = useState<any[]>([]);
+  const [selectedWorkLogIds, setSelectedWorkLogIds] = useState<string[]>([]);
+  const [bulkPayLoading, setBulkPayLoading] = useState(false);
+  const [processingWorkerPay, setProcessingWorkerPay] = useState<string | null>(null);
+  const selectAllRef = useRef<HTMLInputElement>(null);
 
   // Filtered team members based on search and filter
   const filteredTeamMembers = useMemo(() => {
@@ -183,6 +196,42 @@ export default function TeamManagementPage() {
         m.email.toLowerCase().includes(memberSearch.toLowerCase())
       );
   }, [teamMembers, memberFilter, memberSearch]);
+
+  const unpaidWorkLogs = useMemo(() => workLogs.filter(log => !log.isPaid), [workLogs]);
+  const allSelectableIds = useMemo(() => unpaidWorkLogs.map(log => log.id), [unpaidWorkLogs]);
+  const areAllSelected = allSelectableIds.length > 0 && allSelectableIds.every(id => selectedWorkLogIds.includes(id));
+  const selectedTotals = useMemo(
+    () =>
+      workLogs.reduce(
+        (acc, log) => {
+          if (selectedWorkLogIds.includes(log.id)) {
+            acc.count += 1;
+            acc.hours += log.hoursWorked || 0;
+            acc.amount += log.earnings || 0;
+          }
+          return acc;
+        },
+        { count: 0, hours: 0, amount: 0 }
+      ),
+    [selectedWorkLogIds, workLogs]
+  );
+  const totalUnpaidAmount = useMemo(
+    () => unpaidWorkLogs.reduce((sum, log) => sum + (log.earnings || 0), 0),
+    [unpaidWorkLogs]
+  );
+
+  useEffect(() => {
+    setSelectedWorkLogIds(prev => {
+      const filtered = prev.filter(id => allSelectableIds.includes(id));
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [allSelectableIds]);
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = selectedWorkLogIds.length > 0 && !areAllSelected;
+    }
+  }, [selectedWorkLogIds, areAllSelected]);
 
   useEffect(() => {
     const name = localStorage.getItem('providerName') || 'Provider Portal';
@@ -281,6 +330,9 @@ export default function TeamManagementPage() {
 
       if (res.ok) {
         setWorkLogs(data.workLogs || []);
+        setPayrollByWorker(data.byWorker || []);
+        setPayrollSummary(data.summary || { ...EMPTY_PAYROLL_SUMMARY });
+        setSelectedWorkLogIds([]);
       }
     } catch (error) {
       console.error('Error fetching payroll:', error);
@@ -330,6 +382,103 @@ export default function TeamManagementPage() {
       toast.error('Failed to mark as paid');
     } finally {
       setProcessingPay(null);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (areAllSelected) {
+      setSelectedWorkLogIds([]);
+    } else {
+      setSelectedWorkLogIds(allSelectableIds);
+    }
+  };
+
+  const toggleSelectWorkLog = (workLogId: string) => {
+    setSelectedWorkLogIds(prev =>
+      prev.includes(workLogId) ? prev.filter(id => id !== workLogId) : [...prev, workLogId]
+    );
+  };
+
+  const handleMarkSelectedPaid = async () => {
+    if (selectedWorkLogIds.length === 0) {
+      toast.error('Select at least one work log');
+      return;
+    }
+
+    setBulkPayLoading(true);
+    try {
+      const res = await fetch('/api/provider/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workLogIds: selectedWorkLogIds }),
+      });
+
+      if (res.ok) {
+        toast.success(`Marked ${selectedWorkLogIds.length} job${selectedWorkLogIds.length === 1 ? '' : 's'} as paid`);
+        setSelectedWorkLogIds([]);
+        fetchPayroll();
+      } else {
+        toast.error('Failed to mark selected jobs as paid');
+      }
+    } catch (error) {
+      toast.error('Failed to mark selected jobs as paid');
+    } finally {
+      setBulkPayLoading(false);
+    }
+  };
+
+  const handleMarkAllPaid = async () => {
+    if (allSelectableIds.length === 0) {
+      toast.error('No unpaid jobs to pay');
+      return;
+    }
+
+    setBulkPayLoading(true);
+    try {
+      const res = await fetch('/api/provider/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ workLogIds: allSelectableIds }),
+      });
+
+      if (res.ok) {
+        toast.success('Marked all unpaid jobs as paid');
+        setSelectedWorkLogIds([]);
+        fetchPayroll();
+      } else {
+        toast.error('Failed to mark all jobs as paid');
+      }
+    } catch (error) {
+      toast.error('Failed to mark all jobs as paid');
+    } finally {
+      setBulkPayLoading(false);
+    }
+  };
+
+  const handleMarkWorkerPaid = async (userId: string) => {
+    if (!userId) {
+      toast.error('Worker not found');
+      return;
+    }
+
+    setProcessingWorkerPay(userId);
+    try {
+      const res = await fetch('/api/provider/payroll', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId }),
+      });
+
+      if (res.ok) {
+        toast.success('Marked worker as paid');
+        fetchPayroll();
+      } else {
+        toast.error('Failed to mark worker as paid');
+      }
+    } catch (error) {
+      toast.error('Failed to mark worker as paid');
+    } finally {
+      setProcessingWorkerPay(null);
     }
   };
 
@@ -2332,12 +2481,135 @@ export default function TeamManagementPage() {
                     </Card>
                   </div>
 
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <Card className="bg-zinc-800 border-zinc-700">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-zinc-100 text-base">Bulk Payout</CardTitle>
+                        <CardDescription className="text-zinc-400">
+                          Select multiple jobs below or pay everything owed at once.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {selectedTotals.count > 0 ? (
+                          <div className="text-xs text-emerald-400 font-medium">
+                            {selectedTotals.count} job{selectedTotals.count !== 1 ? 's' : ''} selected •{' '}
+                            {selectedTotals.hours.toFixed(1)}h • ${selectedTotals.amount.toFixed(2)}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-zinc-400">
+                            Select rows in the table to build a payout batch.
+                          </div>
+                        )}
+                        <div className="flex flex-col gap-2">
+                          <Button
+                            onClick={handleMarkSelectedPaid}
+                            disabled={selectedTotals.count === 0 || bulkPayLoading}
+                            className="bg-emerald-600 hover:bg-emerald-500"
+                          >
+                            {bulkPayLoading ? (
+                              <span className="flex items-center gap-2">
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                                Processing...
+                              </span>
+                            ) : (
+                              `Pay Selected${selectedTotals.count > 0 ? ` (${selectedTotals.count})` : ''}`
+                            )}
+                          </Button>
+                          <Button
+                            variant="outline"
+                            onClick={handleMarkAllPaid}
+                            disabled={unpaidWorkLogs.length === 0 || bulkPayLoading}
+                            className="border-emerald-600 text-emerald-400 hover:bg-emerald-600/10"
+                          >
+                            {bulkPayLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              `Pay All (${unpaidWorkLogs.length} jobs • $${totalUnpaidAmount.toFixed(2)})`
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="bg-zinc-800 border-zinc-700 lg:col-span-2">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-zinc-100 text-base">Workers Owed</CardTitle>
+                        <CardDescription className="text-zinc-400">
+                          Pay each worker&apos;s outstanding jobs with a single click.
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        {payrollByWorker.length === 0 ? (
+                          <p className="text-sm text-zinc-400">Everyone is caught up. 🎉</p>
+                        ) : (
+                          payrollByWorker.map(worker => {
+                            const workerId = worker.user?.id || worker.logs?.[0]?.userId;
+                            return (
+                              <div
+                                key={workerId || worker.logs?.[0]?.id}
+                                className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between p-3 rounded-lg border border-zinc-700/70 bg-zinc-900/40"
+                              >
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="h-10 w-10">
+                                    <AvatarFallback style={{ backgroundColor: worker.user?.color || '#10b981' }}>
+                                      {worker.user?.firstName?.[0] ?? '?'}
+                                      {worker.user?.lastName?.[0] ?? ''}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <div className="text-sm font-medium text-zinc-100">
+                                      {worker.user
+                                        ? `${worker.user.firstName} ${worker.user.lastName}`
+                                        : 'Worker'}
+                                    </div>
+                                    <div className="text-xs text-zinc-400">
+                                      {worker.logs?.length || 0} job{(worker.logs?.length || 0) === 1 ? '' : 's'} •{' '}
+                                      {worker.totalHours?.toFixed(1) || '0.0'}h
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-sm font-semibold text-emerald-400">
+                                    ${worker.totalOwed?.toFixed(2) || '0.00'}
+                                  </div>
+                                  <div className="text-xs text-zinc-500">Outstanding</div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className="bg-emerald-600 hover:bg-emerald-500"
+                                  disabled={!workerId || processingWorkerPay === workerId}
+                                  onClick={() => workerId && handleMarkWorkerPaid(workerId)}
+                                >
+                                  {processingWorkerPay === workerId ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    'Pay Worker'
+                                  )}
+                                </Button>
+                              </div>
+                            );
+                          })
+                        )}
+                      </CardContent>
+                    </Card>
+                  </div>
+
                   {/* Work Logs Table */}
                   <Card className="bg-zinc-800 border-zinc-700">
                     <CardContent className="p-0">
                       <table className="w-full">
                         <thead className="bg-zinc-900/50">
                           <tr>
+                            <th className="w-12 p-4">
+                              <input
+                                ref={selectAllRef}
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
+                                onChange={toggleSelectAll}
+                                checked={areAllSelected && unpaidWorkLogs.length > 0}
+                                disabled={unpaidWorkLogs.length === 0}
+                              />
+                            </th>
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Worker</th>
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Job</th>
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Date</th>
@@ -2350,6 +2622,15 @@ export default function TeamManagementPage() {
                         <tbody className="divide-y divide-zinc-700">
                           {workLogs.map(log => (
                             <tr key={log.id} className="hover:bg-zinc-700/30">
+                              <td className="p-4">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
+                                  checked={selectedWorkLogIds.includes(log.id)}
+                                  onChange={() => toggleSelectWorkLog(log.id)}
+                                  disabled={log.isPaid}
+                                />
+                              </td>
                               <td className="p-4">
                                 <button
                                   onClick={() => log.userId && setProfileWorkerId(log.userId)}
