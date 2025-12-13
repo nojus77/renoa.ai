@@ -19,6 +19,7 @@ import {
   Search,
   User,
   Calendar,
+  CalendarX,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -49,6 +50,16 @@ interface Job {
   }[];
 }
 
+interface UpcomingJob {
+  id: string;
+  serviceType: string;
+  address: string;
+  startTime: string;
+  customer: {
+    name: string;
+  };
+}
+
 interface DayStats {
   jobsCount: number;
   hoursWorked: number;
@@ -67,6 +78,7 @@ export default function WorkerDashboard() {
   const [userId, setUserId] = useState<string>('');
   const [providerId, setProviderId] = useState<string>('');
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [upcomingJobs, setUpcomingJobs] = useState<UpcomingJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedJobId, setExpandedJobId] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -119,6 +131,18 @@ export default function WorkerDashboard() {
     }
   }, []);
 
+  const fetchUpcomingJobs = useCallback(async (uid: string) => {
+    try {
+      const res = await fetch(`/api/worker/jobs/upcoming?userId=${uid}&limit=3`);
+      const data = await res.json();
+      if (data.jobs) {
+        setUpcomingJobs(data.jobs);
+      }
+    } catch (error) {
+      console.error('Error fetching upcoming jobs:', error);
+    }
+  }, []);
+
   const fetchWorkerPermissions = useCallback(async (uid: string) => {
     try {
       const res = await fetch(`/api/worker/profile?userId=${uid}`);
@@ -156,8 +180,9 @@ export default function WorkerDashboard() {
     setUserId(uid);
     setProviderId(pid);
     fetchJobs(uid);
+    fetchUpcomingJobs(uid);
     fetchWorkerPermissions(uid);
-  }, [router, fetchJobs, fetchWorkerPermissions]);
+  }, [router, fetchJobs, fetchUpcomingJobs, fetchWorkerPermissions]);
 
   // Live clock update every second
   useEffect(() => {
@@ -222,6 +247,7 @@ export default function WorkerDashboard() {
           notes: '',
         });
         fetchJobs(userId);
+        fetchUpcomingJobs(userId);
       } else {
         toast.error(data.error || 'Failed to create job');
       }
@@ -239,6 +265,27 @@ export default function WorkerDashboard() {
       minute: '2-digit',
       hour12: true,
     });
+  };
+
+  const formatUpcomingDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Check if tomorrow
+    if (date.toDateString() === tomorrow.toDateString()) {
+      return `Tomorrow, ${formatTime(dateStr)}`;
+    }
+
+    // Check if within this week
+    const daysUntil = Math.ceil((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysUntil <= 7) {
+      return date.toLocaleDateString('en-US', { weekday: 'long' }) + ', ' + formatTime(dateStr);
+    }
+
+    // Otherwise show date
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ', ' + formatTime(dateStr);
   };
 
   const getJobStatus = (job: Job) => {
@@ -400,7 +447,7 @@ export default function WorkerDashboard() {
       scheduled: 'bg-zinc-700 text-zinc-300',
       on_the_way: 'bg-blue-500/20 text-blue-400',
       arrived: 'bg-orange-500/20 text-orange-400',
-      working: 'bg-emerald-500/20 text-emerald-400',
+      working: 'bg-[#a3e635]/20 text-[#a3e635]',
       completed: 'bg-purple-500/20 text-purple-400',
     };
     const labels: Record<string, string> = {
@@ -412,7 +459,7 @@ export default function WorkerDashboard() {
     };
 
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status]}`}>
+      <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${styles[status]}`}>
         {labels[status]}
       </span>
     );
@@ -422,7 +469,7 @@ export default function WorkerDashboard() {
     return (
       <WorkerLayout>
         <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-[#a3e635]" />
         </div>
       </WorkerLayout>
     );
@@ -430,19 +477,19 @@ export default function WorkerDashboard() {
 
   return (
     <WorkerLayout>
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-8">
         {/* Header with Clock */}
         <div className="flex items-center justify-between">
           {/* Clock Display */}
           <div>
-            <p className="text-2xl font-bold text-[#a3e635]">
+            <p className="text-3xl font-bold text-[#a3e635]">
               {currentTime.toLocaleTimeString('en-US', {
                 hour: 'numeric',
                 minute: '2-digit',
                 hour12: true,
               })}
             </p>
-            <p className="text-sm text-zinc-400">
+            <p className="text-sm text-gray-400">
               {currentTime.toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
@@ -456,134 +503,170 @@ export default function WorkerDashboard() {
             {canCreateJobs && (
               <button
                 onClick={() => setShowCreateJob(true)}
-                className="p-2 bg-[#A8C63F] hover:bg-[#96b236] rounded-lg transition-colors"
+                className="p-2.5 bg-[#a3e635] hover:bg-[#8bc934] rounded-xl transition-colors"
               >
-                <Plus className="w-5 h-5 text-white" />
+                <Plus className="w-5 h-5 text-zinc-900" />
               </button>
             )}
             <button
-              onClick={() => fetchJobs(userId)}
-              className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"
+              onClick={() => {
+                fetchJobs(userId);
+                fetchUpcomingJobs(userId);
+              }}
+              className="p-2.5 bg-[#2a2a2a] rounded-xl hover:bg-zinc-700 transition-colors"
             >
-              <RefreshCw className="w-5 h-5 text-zinc-400" />
+              <RefreshCw className="w-5 h-5 text-gray-400" />
             </button>
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-3">
-          <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
-            <Briefcase className="w-5 h-5 text-[#A8C63F] mb-1" />
-            <p className="text-xl font-bold">{stats.jobsCount}</p>
-            <p className="text-xs text-zinc-500">Jobs Today</p>
+        {/* Refined Stat Cards */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-[#2a2a2a] rounded-xl p-4 text-center">
+            <Briefcase className="w-6 h-6 text-[#a3e635] mx-auto mb-2" />
+            <p className="text-2xl font-bold text-white">{stats.jobsCount}</p>
+            <p className="text-xs text-gray-500">Jobs Today</p>
           </div>
-          <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
-            <Clock className="w-5 h-5 text-[#A8C63F] mb-1" />
-            <p className="text-xl font-bold">{stats.hoursWorked}h</p>
-            <p className="text-xs text-zinc-500">Hours</p>
+          <div className="bg-[#2a2a2a] rounded-xl p-4 text-center">
+            <Clock className="w-6 h-6 text-[#a3e635] mx-auto mb-2" />
+            <p className="text-2xl font-bold text-white">{stats.hoursWorked}h</p>
+            <p className="text-xs text-gray-500">Hours</p>
           </div>
-          <div className="bg-zinc-900 rounded-xl p-3 border border-zinc-800">
-            <DollarSign className="w-5 h-5 text-[#A8C63F] mb-1" />
-            <p className="text-xl font-bold">${stats.earnings}</p>
-            <p className="text-xs text-zinc-500">Earned</p>
+          <div className="bg-[#2a2a2a] rounded-xl p-4 text-center">
+            <DollarSign className="w-6 h-6 text-[#a3e635] mx-auto mb-2" />
+            <p className="text-2xl font-bold text-white">${stats.earnings}</p>
+            <p className="text-xs text-gray-500">Earned</p>
           </div>
         </div>
 
-        {/* Jobs List */}
-        <div className="space-y-3">
-          <h2 className="text-lg font-semibold text-white">Today&apos;s Jobs</h2>
+        {/* Today's Jobs Section */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-white">Today&apos;s Jobs</h2>
 
           {jobs.length === 0 ? (
-            <div className="bg-zinc-900 rounded-xl p-8 text-center border border-zinc-800">
-              <Briefcase className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
-              <p className="text-zinc-400">No jobs scheduled for today</p>
-              <p className="text-zinc-500 text-sm mt-1">Enjoy your day off!</p>
+            <div className="bg-[#2a2a2a] rounded-xl py-12 text-center">
+              <CalendarX className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+              <p className="text-gray-400">No jobs scheduled for today</p>
+              <p className="text-gray-500 text-sm mt-1">Enjoy your day off!</p>
             </div>
           ) : (
-            jobs.map((job) => (
-              <div
-                key={job.id}
-                className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden"
-              >
-                {/* Job Header - Always visible */}
-                <button
-                  onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
-                  className="w-full p-4 text-left flex items-center justify-between"
+            <div className="space-y-3">
+              {jobs.map((job) => (
+                <div
+                  key={job.id}
+                  className="bg-[#2a2a2a] rounded-xl overflow-hidden"
                 >
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-medium text-white">{job.serviceType}</span>
-                      {getStatusBadge(job)}
-                    </div>
-                    <p className="text-zinc-400 text-sm">{job.customer.name}</p>
-                    <p className="text-zinc-500 text-xs mt-1">
-                      {formatTime(job.startTime)} - {formatTime(job.endTime)}
-                    </p>
-                  </div>
-                  <ChevronRight
-                    className={`w-5 h-5 text-zinc-500 transition-transform ${
-                      expandedJobId === job.id ? 'rotate-90' : ''
-                    }`}
-                  />
-                </button>
-
-                {/* Expanded Content */}
-                {expandedJobId === job.id && (
-                  <div className="px-4 pb-4 space-y-4 border-t border-zinc-800 pt-4">
-                    {/* Address */}
-                    <div className="flex items-start gap-3">
-                      <MapPin className="w-5 h-5 text-zinc-400 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="text-zinc-300 text-sm">{job.address}</p>
-                        <button
-                          onClick={() => openMaps(job.address)}
-                          className="text-emerald-400 text-sm mt-1 hover:underline"
-                        >
-                          Open in Maps
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Phone */}
-                    {job.customer.phone && (
+                  {/* Job Card - Clean Design */}
+                  <button
+                    onClick={() => setExpandedJobId(expandedJobId === job.id ? null : job.id)}
+                    className="w-full py-4 px-5 text-left flex items-center justify-between"
+                  >
+                    <div className="space-y-1 flex-1">
                       <div className="flex items-center gap-3">
-                        <Phone className="w-5 h-5 text-zinc-400" />
-                        <button
-                          onClick={() => callPhone(job.customer.phone!)}
-                          className="text-emerald-400 text-sm hover:underline"
-                        >
-                          {job.customer.phone}
-                        </button>
+                        <span className="text-lg font-semibold text-white">{job.serviceType}</span>
+                        {getStatusBadge(job)}
                       </div>
-                    )}
+                      <p className="text-base text-gray-300">{job.customer.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {formatTime(job.startTime)} - {formatTime(job.endTime)}
+                      </p>
+                    </div>
+                    <ChevronRight
+                      className={`w-5 h-5 text-gray-500 transition-transform ${
+                        expandedJobId === job.id ? 'rotate-90' : ''
+                      }`}
+                    />
+                  </button>
 
-                    {/* Notes */}
-                    {(job.customerNotes || job.internalNotes) && (
-                      <div className="bg-zinc-800/50 rounded-lg p-3 text-sm">
-                        {job.customerNotes && (
-                          <p className="text-zinc-300">
-                            <span className="text-zinc-500">Customer: </span>
-                            {job.customerNotes}
-                          </p>
-                        )}
-                        {job.internalNotes && (
-                          <p className="text-zinc-300 mt-1">
-                            <span className="text-zinc-500">Notes: </span>
-                            {job.internalNotes}
-                          </p>
-                        )}
+                  {/* Expanded Content */}
+                  {expandedJobId === job.id && (
+                    <div className="px-5 pb-5 space-y-4 border-t border-zinc-800 pt-4">
+                      {/* Address */}
+                      <div className="flex items-start gap-3">
+                        <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
+                        <div className="flex-1">
+                          <p className="text-gray-300 text-sm">{job.address}</p>
+                          <button
+                            onClick={() => openMaps(job.address)}
+                            className="text-[#a3e635] text-sm mt-1 hover:underline"
+                          >
+                            Open in Maps
+                          </button>
+                        </div>
                       </div>
-                    )}
 
-                    {/* Action Button */}
-                    {renderActionButton(job)}
-                  </div>
-                )}
-              </div>
-            ))
+                      {/* Phone */}
+                      {job.customer.phone && (
+                        <div className="flex items-center gap-3">
+                          <Phone className="w-5 h-5 text-gray-400" />
+                          <button
+                            onClick={() => callPhone(job.customer.phone!)}
+                            className="text-[#a3e635] text-sm hover:underline"
+                          >
+                            {job.customer.phone}
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {(job.customerNotes || job.internalNotes) && (
+                        <div className="bg-zinc-800/50 rounded-lg p-3 text-sm">
+                          {job.customerNotes && (
+                            <p className="text-gray-300">
+                              <span className="text-gray-500">Customer: </span>
+                              {job.customerNotes}
+                            </p>
+                          )}
+                          {job.internalNotes && (
+                            <p className="text-gray-300 mt-1">
+                              <span className="text-gray-500">Notes: </span>
+                              {job.internalNotes}
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Action Button */}
+                      {renderActionButton(job)}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
         </div>
 
+        {/* Upcoming Jobs Section */}
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold text-white">Upcoming Jobs</h2>
+
+          {upcomingJobs.length === 0 ? (
+            <div className="bg-[#2a2a2a] rounded-xl py-8 text-center">
+              <p className="text-gray-500">No upcoming jobs scheduled</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {upcomingJobs.map((job) => (
+                <button
+                  key={job.id}
+                  onClick={() => router.push(`/worker/job/${job.id}`)}
+                  className="w-full bg-[#2a2a2a] rounded-xl py-4 px-5 text-left flex items-center justify-between hover:bg-zinc-700/50 transition-colors"
+                >
+                  <div className="space-y-1 flex-1 min-w-0">
+                    <p className="text-sm text-[#a3e635] font-medium">
+                      {formatUpcomingDate(job.startTime)}
+                    </p>
+                    <p className="text-base text-gray-300">
+                      {job.serviceType} - {job.customer.name}
+                    </p>
+                    <p className="text-sm text-gray-500 truncate">{job.address}</p>
+                  </div>
+                  <ChevronRight className="w-5 h-5 text-gray-500 flex-shrink-0 ml-3" />
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Create Job Modal */}
@@ -611,10 +694,10 @@ export default function WorkerDashboard() {
               <div className="space-y-2">
                 <label className="text-base font-medium text-zinc-300">Customer</label>
                 {selectedCustomer ? (
-                  <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-emerald-500/30">
+                  <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-[#a3e635]/30">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                        <User className="w-5 h-5 text-emerald-400" />
+                      <div className="w-10 h-10 rounded-full bg-[#a3e635]/20 flex items-center justify-center">
+                        <User className="w-5 h-5 text-[#a3e635]" />
                       </div>
                       <div>
                         <p className="text-white font-medium">{selectedCustomer.name}</p>
@@ -637,7 +720,7 @@ export default function WorkerDashboard() {
                         value={customerSearch}
                         onChange={(e) => setCustomerSearch(e.target.value)}
                         placeholder="Search customers..."
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                        className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
                         style={{ fontSize: '16px' }}
                       />
                     </div>
@@ -670,7 +753,7 @@ export default function WorkerDashboard() {
                   value={newJob.serviceType}
                   onChange={(e) => setNewJob({ ...newJob, serviceType: e.target.value })}
                   placeholder="e.g. Window Cleaning, Lawn Care"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500"
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
                   style={{ fontSize: '16px' }}
                 />
               </div>
@@ -684,7 +767,7 @@ export default function WorkerDashboard() {
                     type="date"
                     value={newJob.date}
                     onChange={(e) => setNewJob({ ...newJob, date: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-[#a3e635]"
                     style={{ fontSize: '16px' }}
                   />
                 </div>
@@ -700,7 +783,7 @@ export default function WorkerDashboard() {
                       type="time"
                       value={newJob.startTime}
                       onChange={(e) => setNewJob({ ...newJob, startTime: e.target.value })}
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-[#a3e635]"
                       style={{ fontSize: '16px' }}
                     />
                   </div>
@@ -713,7 +796,7 @@ export default function WorkerDashboard() {
                       type="time"
                       value={newJob.endTime}
                       onChange={(e) => setNewJob({ ...newJob, endTime: e.target.value })}
-                      className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-[#a3e635]"
                       style={{ fontSize: '16px' }}
                     />
                   </div>
@@ -728,7 +811,7 @@ export default function WorkerDashboard() {
                   onChange={(e) => setNewJob({ ...newJob, notes: e.target.value })}
                   placeholder="Any additional notes..."
                   rows={3}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
+                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635] resize-none"
                   style={{ fontSize: '16px' }}
                 />
               </div>
@@ -737,7 +820,7 @@ export default function WorkerDashboard() {
               <button
                 onClick={handleCreateJob}
                 disabled={creatingJob || !selectedCustomer || !newJob.serviceType.trim()}
-                className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-4 bg-[#a3e635] hover:bg-[#8bc934] disabled:bg-zinc-700 disabled:text-zinc-500 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
               >
                 {creatingJob ? (
                   <>
