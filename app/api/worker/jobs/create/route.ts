@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -118,6 +119,17 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    // Create notification if job needs approval
+    if (worker.provider.workerJobsNeedApproval) {
+      await createNotification({
+        providerId,
+        type: 'job_created_by_worker',
+        title: 'Job Needs Approval',
+        message: `${worker.firstName} ${worker.lastName} created a new ${serviceType} job for ${customer.name}`,
+        link: `/provider/jobs/${job.id}`,
+      });
+    }
 
     return NextResponse.json({
       success: true,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,6 +42,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get worker info for notification
+    const worker = await prisma.providerUser.findUnique({
+      where: { id: userId },
+      select: {
+        firstName: true,
+        lastName: true,
+        providerId: true,
+      },
+    });
+
+    if (!worker) {
+      return NextResponse.json({ error: 'Worker not found' }, { status: 404 });
+    }
+
     const timeOffRequest = await prisma.workerTimeOff.create({
       data: {
         userId,
@@ -50,6 +65,18 @@ export async function POST(request: NextRequest) {
         notes,
         status: 'pending',
       },
+    });
+
+    // Create notification for provider
+    const reasonLabel = reason || 'time off';
+    const startFormatted = new Date(startDate).toLocaleDateString();
+    const endFormatted = new Date(endDate).toLocaleDateString();
+    await createNotification({
+      providerId: worker.providerId,
+      type: 'time_off_request',
+      title: 'Time Off Request',
+      message: `${worker.firstName} ${worker.lastName} requested ${reasonLabel} from ${startFormatted} to ${endFormatted}`,
+      link: '/provider/team?tab=time-off',
     });
 
     return NextResponse.json({ success: true, request: timeOffRequest });

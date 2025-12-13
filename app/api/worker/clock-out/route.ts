@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,18 +37,28 @@ export async function POST(request: NextRequest) {
     const user = await prisma.providerUser.findUnique({
       where: { id: userId },
       select: {
+        firstName: true,
+        lastName: true,
+        providerId: true,
         payType: true,
         hourlyRate: true,
         commissionRate: true,
       },
     });
 
-    // Get job for actual value (for commission)
+    // Get job for actual value (for commission) and customer info
     const job = await prisma.job.findUnique({
       where: { id: jobId },
       select: {
         actualValue: true,
         estimatedValue: true,
+        serviceType: true,
+        providerId: true,
+        customer: {
+          select: {
+            name: true,
+          },
+        },
       },
     });
 
@@ -83,6 +94,17 @@ export async function POST(request: NextRequest) {
         completedByUserId: userId,
       },
     });
+
+    // Create notification for job completion
+    if (user && job) {
+      await createNotification({
+        providerId: job.providerId,
+        type: 'job_completed',
+        title: 'Job Completed',
+        message: `${user.firstName} ${user.lastName} completed ${job.serviceType || 'job'} for ${job.customer?.name || 'customer'}`,
+        link: `/provider/jobs/${jobId}`,
+      });
+    }
 
     return NextResponse.json({
       success: true,

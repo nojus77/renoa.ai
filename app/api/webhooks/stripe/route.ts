@@ -4,6 +4,7 @@ import { stripe } from '@/lib/stripe-server';
 import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
 import { sendNotification } from '@/lib/notifications/notification-service';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
   try {
@@ -210,6 +211,15 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
       console.error('Failed to send customer confirmation email:', emailError);
       // Don't throw - payment was successful even if email fails
     }
+
+    // Create in-app notification for provider
+    await createNotification({
+      providerId: invoice.providerId,
+      type: 'payment_received',
+      title: 'Payment Received',
+      message: `${invoice.customer.name} paid $${paymentAmount.toFixed(2)} for invoice #${invoice.invoiceNumber}`,
+      link: `/provider/invoices/${invoice.id}`,
+    });
 
   } catch (error) {
     console.error('Error handling payment succeeded:', error);

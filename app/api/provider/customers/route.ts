@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { createNotification } from '@/lib/notifications';
 
 const prisma = new PrismaClient();
 
@@ -158,6 +159,15 @@ export async function POST(request: NextRequest) {
         tags: tags || [],
         notes: notes || null,
       },
+    });
+
+    // Create notification for new customer
+    await createNotification({
+      providerId,
+      type: 'new_customer',
+      title: 'New Customer',
+      message: `${name} was added as a new customer`,
+      link: `/provider/customers/${customer.id}`,
     });
 
     return NextResponse.json({ success: true, customer });

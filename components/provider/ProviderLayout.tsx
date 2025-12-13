@@ -48,6 +48,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
   const [showAddJobModal, setShowAddJobModal] = useState(false);
   const [userRole, setUserRole] = useState<string>('owner');
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [providerId, setProviderId] = useState<string>('');
   const [providerServiceTypes, setProviderServiceTypes] = useState<string[]>([]);
   const [userEmail, setUserEmail] = useState<string>('');
@@ -101,12 +102,20 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       setProviderId(id);
 
       try {
-        const res = await fetch(`/api/provider/profile?id=${id}`);
-        const data = await res.json();
+        const [profileRes, notificationsRes] = await Promise.all([
+          fetch(`/api/provider/profile?id=${id}`),
+          fetch(`/api/provider/notifications?providerId=${id}&limit=1`),
+        ]);
 
-        if (res.ok && data.provider) {
-          setProfilePhotoUrl(data.provider.profilePhotoUrl || data.provider.avatar || '');
-          setProviderServiceTypes(data.provider.serviceTypes || []);
+        const profileData = await profileRes.json();
+        if (profileRes.ok && profileData.provider) {
+          setProfilePhotoUrl(profileData.provider.profilePhotoUrl || profileData.provider.avatar || '');
+          setProviderServiceTypes(profileData.provider.serviceTypes || []);
+        }
+
+        const notificationsData = await notificationsRes.json();
+        if (notificationsRes.ok) {
+          setUnreadNotificationCount(notificationsData.unreadCount || 0);
         }
       } catch (error) {
         console.error('Error fetching provider data:', error);
@@ -115,6 +124,26 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
 
     fetchProviderData();
   }, []);
+
+  // Poll for new notifications every 60 seconds
+  useEffect(() => {
+    if (!providerId) return;
+
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await fetch(`/api/provider/notifications?providerId=${providerId}&limit=1`);
+        const data = await res.json();
+        if (res.ok) {
+          setUnreadNotificationCount(data.unreadCount || 0);
+        }
+      } catch (error) {
+        // Silently ignore polling errors
+      }
+    };
+
+    const interval = setInterval(fetchUnreadCount, 60000);
+    return () => clearInterval(interval);
+  }, [providerId]);
 
   const handleLogout = () => {
     localStorage.removeItem('providerId');
@@ -277,8 +306,12 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                   title="Notifications"
                 >
                   <Bell className="h-5 w-5" />
-                  {/* Notification badge - placeholder */}
-                  <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full"></span>
+                  {/* Notification badge - only show if there are unread notifications */}
+                  {unreadNotificationCount > 0 && (
+                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center bg-red-500 text-white text-[10px] font-bold rounded-full">
+                      {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                    </span>
+                  )}
                 </button>
 
                 {/* Notifications Dropdown */}
@@ -286,6 +319,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                   isOpen={notificationsOpen}
                   onClose={() => setNotificationsOpen(false)}
                   providerId={providerId}
+                  onUnreadCountChange={setUnreadNotificationCount}
                 />
               </div>
 

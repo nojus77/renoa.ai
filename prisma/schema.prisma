@@ -460,14 +460,17 @@ model Notification {
   id          String   @id @default(cuid())
   providerId  String   @map("provider_id")
   provider    Provider @relation("ProviderNotifications", fields: [providerId], references: [id], onDelete: Cascade)
-  type        String   // 'new_team_member', 'job_completed', 'payment_received', etc.
+  userId      String?  @map("user_id") // specific user to notify, null = all owners/office
+  type        String   // 'time_off_request', 'job_completed', 'new_customer', 'payment_received', 'worker_clocked_in', 'job_created_by_worker'
   title       String
   message     String
+  link        String?  // where to go when clicked, e.g., "/provider/team?tab=time-off"
   data        Json?
   read        Boolean  @default(false)
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@index([providerId])
+  @@index([userId])
   @@index([read])
   @@map("notifications")
 }
