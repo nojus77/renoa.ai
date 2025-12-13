@@ -9,7 +9,7 @@ interface WorkerLayoutProps {
 }
 
 const navItems = [
-  { href: '/worker/dashboard', icon: Home, label: 'Today' },
+  { href: '/worker/dashboard', icon: Home, label: 'Home' },
   { href: '/worker/schedule', icon: Calendar, label: 'Schedule' },
   { href: '/worker/earnings', icon: DollarSign, label: 'Earnings' },
   { href: '/worker/time-off', icon: Clock, label: 'Time Off' },

@@ -72,6 +72,7 @@ export default function WorkerDashboard() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [stats, setStats] = useState<DayStats>({ jobsCount: 0, hoursWorked: 0, earnings: 0 });
   const [canCreateJobs, setCanCreateJobs] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   // Job creation modal state
   const [showCreateJob, setShowCreateJob] = useState(false);
@@ -157,6 +158,14 @@ export default function WorkerDashboard() {
     fetchJobs(uid);
     fetchWorkerPermissions(uid);
   }, [router, fetchJobs, fetchWorkerPermissions]);
+
+  // Live clock update every second
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Customer search with debounce
   useEffect(() => {
@@ -554,6 +563,25 @@ export default function WorkerDashboard() {
               </div>
             ))
           )}
+        </div>
+
+        {/* Large Clock & Date Display */}
+        <div className="py-8 text-center">
+          <p className="text-5xl font-bold text-[#a3e635]">
+            {currentTime.toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+              hour12: true,
+            })}
+          </p>
+          <p className="text-lg text-zinc-400 mt-2">
+            {currentTime.toLocaleDateString('en-US', {
+              weekday: 'long',
+              month: 'long',
+              day: 'numeric',
+              year: 'numeric',
+            })}
+          </p>
         </div>
       </div>
 
