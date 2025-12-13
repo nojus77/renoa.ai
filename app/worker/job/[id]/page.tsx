@@ -24,8 +24,16 @@ import {
   Receipt,
   X,
   ChevronRight,
+  Wrench,
+  Package,
+  DollarSign,
+  Save,
+  Timer,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Lime green brand color
+const LIME_GREEN = '#a3e635';
 
 interface Job {
   id: string;
@@ -67,6 +75,7 @@ interface JobMedia {
   id: string;
   url: string;
   type: 'photo' | 'video';
+  caption?: string;
   createdAt: string;
 }
 
@@ -76,6 +85,19 @@ interface CustomerJob {
   date: string;
   amount: number;
   status: string;
+  workerName?: string;
+  duration?: number;
+  workPerformed?: string;
+  partsUsed?: string[];
+  hasPhotos?: boolean;
+  notes?: string;
+}
+
+interface JobDetails {
+  workPerformed: string;
+  partsUsed: string[];
+  laborHours: number;
+  price: number;
 }
 
 export default function JobDetailPage() {
@@ -88,6 +110,17 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  // Live date/time
+  const [currentTime, setCurrentTime] = useState(new Date());
+
+  // Timer state
+  const [travelTimer, setTravelTimer] = useState<number>(0);
+  const [jobTimer, setJobTimer] = useState<number>(0);
+  const [isTraveling, setIsTraveling] = useState(false);
+  const [isWorking, setIsWorking] = useState(false);
+  const travelIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const jobIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Notes state
   const [notes, setNotes] = useState<JobNote[]>([]);
@@ -107,6 +140,43 @@ export default function JobDetailPage() {
   // Invoice state
   const [sendingInvoice, setSendingInvoice] = useState(false);
 
+  // Job Details form state
+  const [jobDetails, setJobDetails] = useState<JobDetails>({
+    workPerformed: '',
+    partsUsed: [],
+    laborHours: 0,
+    price: 0,
+  });
+  const [newPart, setNewPart] = useState('');
+  const [savingDetails, setSavingDetails] = useState(false);
+
+  // Update current time every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Format current time for display
+  const formatCurrentTime = () => {
+    return currentTime.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+    }) + ', ' + currentTime.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  };
+
+  // Timer formatting
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}m ${secs.toString().padStart(2, '0')}s`;
+  };
+
   const fetchJob = useCallback(async (uid: string, jid: string) => {
     try {
       const res = await fetch(`/api/worker/jobs/today?userId=${uid}`);
@@ -116,6 +186,20 @@ export default function JobDetailPage() {
         const foundJob = data.jobs.find((j: Job) => j.id === jid);
         if (foundJob) {
           setJob(foundJob);
+          // Initialize timers based on job state
+          if (foundJob.onTheWayAt && !foundJob.arrivedAt) {
+            setIsTraveling(true);
+            const elapsed = Math.floor((Date.now() - new Date(foundJob.onTheWayAt).getTime()) / 1000);
+            setTravelTimer(elapsed);
+          }
+          if (foundJob.workLogs?.some((l: { clockIn: string; clockOut: string | null }) => l.clockIn && !l.clockOut)) {
+            setIsWorking(true);
+            const activeLog = foundJob.workLogs.find((l: { clockIn: string; clockOut: string | null }) => l.clockIn && !l.clockOut);
+            if (activeLog) {
+              const elapsed = Math.floor((Date.now() - new Date(activeLog.clockIn).getTime()) / 1000);
+              setJobTimer(elapsed);
+            }
+          }
         } else {
           // Try fetching from week endpoint
           const weekRes = await fetch(`/api/worker/jobs/week?userId=${uid}`);
@@ -181,6 +265,44 @@ export default function JobDetailPage() {
     }
   }, [router, jobId, fetchJob, fetchNotes, fetchMedia]);
 
+  // Travel timer effect
+  useEffect(() => {
+    if (isTraveling) {
+      travelIntervalRef.current = setInterval(() => {
+        setTravelTimer(prev => prev + 1);
+      }, 1000);
+    } else if (travelIntervalRef.current) {
+      clearInterval(travelIntervalRef.current);
+    }
+    return () => {
+      if (travelIntervalRef.current) clearInterval(travelIntervalRef.current);
+    };
+  }, [isTraveling]);
+
+  // Job timer effect
+  useEffect(() => {
+    if (isWorking) {
+      jobIntervalRef.current = setInterval(() => {
+        setJobTimer(prev => prev + 1);
+      }, 1000);
+    } else if (jobIntervalRef.current) {
+      clearInterval(jobIntervalRef.current);
+    }
+    return () => {
+      if (jobIntervalRef.current) clearInterval(jobIntervalRef.current);
+    };
+  }, [isWorking]);
+
+  // Update labor hours from timer
+  useEffect(() => {
+    if (jobTimer > 0) {
+      setJobDetails(prev => ({
+        ...prev,
+        laborHours: parseFloat((jobTimer / 3600).toFixed(2)),
+      }));
+    }
+  }, [jobTimer]);
+
   const getJobStatus = (j: Job) => {
     if (j.completedAt) return 'completed';
     if (j.workLogs?.some((l) => l.clockIn && !l.clockOut)) return 'working';
@@ -224,6 +346,15 @@ export default function JobDetailPage() {
     return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
   };
 
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hours > 0) {
+      return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+    }
+    return `${mins}m`;
+  };
+
   const handleAction = async (action: string) => {
     if (!job) return;
     setActionLoading(action);
@@ -234,17 +365,26 @@ export default function JobDetailPage() {
 
       switch (action) {
         case 'on_the_way':
-        case 'arrived':
           endpoint = '/api/worker/jobs/status';
           body = { jobId: job.id, userId, action };
+          setIsTraveling(true);
+          setTravelTimer(0);
+          break;
+        case 'arrived':
+          endpoint = '/api/worker/jobs/status';
+          body = { jobId: job.id, userId, action, travelDuration: travelTimer };
+          setIsTraveling(false);
           break;
         case 'start':
           endpoint = '/api/worker/clock-in';
           body = { jobId: job.id, userId, providerId };
+          setIsWorking(true);
+          setJobTimer(0);
           break;
         case 'complete':
           endpoint = '/api/worker/clock-out';
-          body = { jobId: job.id, userId };
+          body = { jobId: job.id, userId, jobDuration: jobTimer };
+          setIsWorking(false);
           break;
       }
 
@@ -259,7 +399,7 @@ export default function JobDetailPage() {
       if (data.success) {
         toast.success(
           action === 'on_the_way'
-            ? 'Marked as on the way!'
+            ? 'On your way!'
             : action === 'arrived'
             ? 'Marked as arrived!'
             : action === 'start'
@@ -269,6 +409,9 @@ export default function JobDetailPage() {
         fetchJob(userId, jobId);
       } else {
         toast.error(data.error || 'Action failed');
+        // Revert timer states on failure
+        if (action === 'on_the_way') setIsTraveling(false);
+        if (action === 'start') setIsWorking(false);
       }
     } catch (error) {
       console.error('Error:', error);
@@ -369,7 +512,7 @@ export default function JobDetailPage() {
       const res = await fetch(`/api/worker/jobs/${job.id}/invoice`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ userId, jobDetails }),
       });
 
       if (res.ok) {
@@ -386,6 +529,50 @@ export default function JobDetailPage() {
     }
   };
 
+  const handleAddPart = () => {
+    if (newPart.trim()) {
+      setJobDetails(prev => ({
+        ...prev,
+        partsUsed: [...prev.partsUsed, newPart.trim()],
+      }));
+      setNewPart('');
+    }
+  };
+
+  const handleRemovePart = (index: number) => {
+    setJobDetails(prev => ({
+      ...prev,
+      partsUsed: prev.partsUsed.filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSaveJobDetails = async () => {
+    if (!job) return;
+    setSavingDetails(true);
+
+    try {
+      const res = await fetch(`/api/worker/jobs/${job.id}/details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          ...jobDetails,
+        }),
+      });
+
+      if (res.ok) {
+        toast.success('Job details saved');
+      } else {
+        toast.error('Failed to save job details');
+      }
+    } catch (error) {
+      console.error('Error saving job details:', error);
+      toast.error('Failed to save job details');
+    } finally {
+      setSavingDetails(false);
+    }
+  };
+
   const openMaps = (address: string) => {
     const encoded = encodeURIComponent(address);
     window.open(`https://www.google.com/maps/dir/?api=1&destination=${encoded}`, '_blank');
@@ -398,8 +585,8 @@ export default function JobDetailPage() {
   const getStatusConfig = (status: string) => {
     const configs: Record<string, { bg: string; text: string; label: string; icon: React.ReactNode }> = {
       scheduled: {
-        bg: 'bg-blue-500/20',
-        text: 'text-blue-400',
+        bg: 'bg-lime-500/20',
+        text: 'text-lime-400',
         label: 'Scheduled',
         icon: <Calendar className="w-4 h-4" />,
       },
@@ -416,8 +603,8 @@ export default function JobDetailPage() {
         icon: <MapPin className="w-4 h-4" />,
       },
       working: {
-        bg: 'bg-emerald-500/20',
-        text: 'text-emerald-400',
+        bg: 'bg-lime-500/20',
+        text: 'text-lime-400',
         label: 'In Progress',
         icon: <Clock className="w-4 h-4" />,
       },
@@ -442,7 +629,7 @@ export default function JobDetailPage() {
       case 'completed':
         return 'bg-purple-500/20 text-purple-400';
       case 'in_progress':
-        return 'bg-emerald-500/20 text-emerald-400';
+        return 'bg-lime-500/20 text-lime-400';
       case 'cancelled':
         return 'bg-red-500/20 text-red-400';
       default:
@@ -461,7 +648,8 @@ export default function JobDetailPage() {
           <button
             onClick={() => handleAction('on_the_way')}
             disabled={!!actionLoading}
-            className="flex-1 py-4 bg-blue-600 hover:bg-blue-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            style={{ backgroundColor: LIME_GREEN }}
           >
             {isLoading('on_the_way') ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -478,14 +666,15 @@ export default function JobDetailPage() {
           <button
             onClick={() => handleAction('arrived')}
             disabled={!!actionLoading}
-            className="flex-1 py-4 bg-orange-600 hover:bg-orange-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            style={{ backgroundColor: LIME_GREEN }}
           >
             {isLoading('arrived') ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                <MapPin className="w-5 h-5" />
-                I&apos;ve Arrived
+                <Timer className="w-5 h-5" />
+                En Route: {formatTimer(travelTimer)}
               </>
             )}
           </button>
@@ -495,7 +684,8 @@ export default function JobDetailPage() {
           <button
             onClick={() => handleAction('start')}
             disabled={!!actionLoading}
-            className="flex-1 py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            style={{ backgroundColor: LIME_GREEN }}
           >
             {isLoading('start') ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -512,14 +702,15 @@ export default function JobDetailPage() {
           <button
             onClick={() => handleAction('complete')}
             disabled={!!actionLoading}
-            className="flex-1 py-4 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            className="flex-1 py-4 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+            style={{ backgroundColor: LIME_GREEN }}
           >
             {isLoading('complete') ? (
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                <CheckCircle2 className="w-5 h-5" />
-                Complete Job
+                <Timer className="w-5 h-5" />
+                Working: {formatTimer(jobTimer)}
               </>
             )}
           </button>
@@ -540,7 +731,7 @@ export default function JobDetailPage() {
     return (
       <WorkerLayout>
         <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: LIME_GREEN }} />
         </div>
       </WorkerLayout>
     );
@@ -572,7 +763,7 @@ export default function JobDetailPage() {
   return (
     <WorkerLayout>
       <div className="p-4 pb-44 space-y-4">
-        {/* Header */}
+        {/* Header with Date/Time */}
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
@@ -582,6 +773,9 @@ export default function JobDetailPage() {
           </button>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-white">Job Details</h1>
+          </div>
+          <div className="text-right">
+            <p className="text-sm text-zinc-400">{formatCurrentTime()}</p>
           </div>
         </div>
 
@@ -599,7 +793,7 @@ export default function JobDetailPage() {
           <div className="p-4 border-b border-zinc-800">
             <h2 className="text-lg font-semibold text-white">{job.serviceType}</h2>
             {job.estimatedValue && (
-              <p className="text-teal-400 text-sm mt-1">
+              <p className="text-sm mt-1" style={{ color: LIME_GREEN }}>
                 ${job.estimatedValue.toFixed(2)} estimated
               </p>
             )}
@@ -608,8 +802,8 @@ export default function JobDetailPage() {
           {/* Customer Info */}
           <div className="p-4 border-b border-zinc-800">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-teal-500/20 flex items-center justify-center">
-                <User className="w-5 h-5 text-teal-400" />
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${LIME_GREEN}20` }}>
+                <User className="w-5 h-5" style={{ color: LIME_GREEN }} />
               </div>
               <div className="flex-1">
                 <p className="font-medium text-white">{job.customer.name}</p>
@@ -620,9 +814,10 @@ export default function JobDetailPage() {
               {job.customer.phone && (
                 <button
                   onClick={() => callPhone(job.customer.phone!)}
-                  className="p-2 bg-teal-600 hover:bg-teal-500 rounded-lg transition-colors"
+                  className="p-2 rounded-lg transition-colors"
+                  style={{ backgroundColor: LIME_GREEN }}
                 >
-                  <Phone className="w-5 h-5 text-white" />
+                  <Phone className="w-5 h-5 text-zinc-900" />
                 </button>
               )}
             </div>
@@ -636,7 +831,8 @@ export default function JobDetailPage() {
                 <p className="text-zinc-300">{job.address}</p>
                 <button
                   onClick={() => openMaps(job.address)}
-                  className="flex items-center gap-1 text-teal-400 text-sm mt-2 hover:underline"
+                  className="flex items-center gap-1 text-sm mt-2 hover:underline"
+                  style={{ color: LIME_GREEN }}
                 >
                   <Navigation className="w-4 h-4" />
                   Get Directions
@@ -695,6 +891,23 @@ export default function JobDetailPage() {
           )}
         </div>
 
+        {/* SEND INVOICE BUTTON - Prominent Position */}
+        <button
+          onClick={handleSendInvoice}
+          disabled={sendingInvoice}
+          className="w-full rounded-xl p-4 flex items-center justify-center gap-2 transition-colors font-semibold text-zinc-900"
+          style={{ backgroundColor: LIME_GREEN }}
+        >
+          {sendingInvoice ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <>
+              <Receipt className="w-5 h-5" />
+              <span>Send Invoice to Customer</span>
+            </>
+          )}
+        </button>
+
         {/* Work Log Info (if started) */}
         {job.workLogs && job.workLogs.length > 0 && (
           <div className="bg-zinc-900 rounded-xl border border-zinc-800 p-4">
@@ -732,7 +945,7 @@ export default function JobDetailPage() {
                 {log.earnings && (
                   <div className="flex justify-between">
                     <span className="text-zinc-500">Earnings:</span>
-                    <span className="text-teal-400 font-medium">
+                    <span className="font-medium" style={{ color: LIME_GREEN }}>
                       ${log.earnings.toFixed(2)}
                     </span>
                   </div>
@@ -746,7 +959,7 @@ export default function JobDetailPage() {
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           <div className="p-4 border-b border-zinc-800">
             <div className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-teal-400" />
+              <FileText className="w-5 h-5" style={{ color: LIME_GREEN }} />
               <h3 className="font-medium text-white">Notes</h3>
             </div>
           </div>
@@ -779,21 +992,143 @@ export default function JobDetailPage() {
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
                 placeholder="Add a note..."
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-teal-500 resize-none"
+                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none resize-none"
+                style={{ borderColor: newNote ? LIME_GREEN : undefined }}
                 rows={2}
               />
               <button
                 onClick={handleAddNote}
                 disabled={!newNote.trim() || addingNote}
-                className="p-3 bg-teal-600 hover:bg-teal-500 disabled:bg-zinc-700 disabled:text-zinc-500 rounded-lg transition-colors"
+                className="p-3 rounded-lg transition-colors disabled:bg-zinc-700 disabled:text-zinc-500"
+                style={{ backgroundColor: newNote.trim() ? LIME_GREEN : undefined }}
               >
                 {addingNote ? (
                   <Loader2 className="w-5 h-5 animate-spin text-white" />
                 ) : (
-                  <Send className="w-5 h-5 text-white" />
+                  <Send className="w-5 h-5 text-zinc-900" />
                 )}
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Job Details Section - NEW */}
+        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+          <div className="p-4 border-b border-zinc-800">
+            <div className="flex items-center gap-2">
+              <Wrench className="w-5 h-5" style={{ color: LIME_GREEN }} />
+              <h3 className="font-medium text-white">Job Details</h3>
+            </div>
+          </div>
+          <div className="p-4 space-y-4">
+            {/* Work Performed */}
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Work Performed</label>
+              <textarea
+                value={jobDetails.workPerformed}
+                onChange={(e) => setJobDetails(prev => ({ ...prev, workPerformed: e.target.value }))}
+                placeholder="Describe the work completed..."
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none resize-none"
+                rows={3}
+              />
+            </div>
+
+            {/* Parts Used */}
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Parts Used</label>
+              <div className="flex gap-2 mb-2">
+                <input
+                  type="text"
+                  value={newPart}
+                  onChange={(e) => setNewPart(e.target.value)}
+                  placeholder="Add a part..."
+                  className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none"
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddPart()}
+                />
+                <button
+                  onClick={handleAddPart}
+                  disabled={!newPart.trim()}
+                  className="p-2 rounded-lg transition-colors disabled:bg-zinc-700"
+                  style={{ backgroundColor: newPart.trim() ? LIME_GREEN : undefined }}
+                >
+                  <Plus className="w-5 h-5 text-zinc-900" />
+                </button>
+              </div>
+              {jobDetails.partsUsed.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {jobDetails.partsUsed.map((part, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center gap-1 px-2 py-1 bg-zinc-800 rounded-lg text-sm text-zinc-300"
+                    >
+                      <Package className="w-3 h-3" />
+                      {part}
+                      <button
+                        onClick={() => handleRemovePart(index)}
+                        className="ml-1 text-zinc-500 hover:text-zinc-300"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Labor Hours */}
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">
+                Labor Hours {isWorking && <span className="text-xs" style={{ color: LIME_GREEN }}>(auto-updating from timer)</span>}
+              </label>
+              <input
+                type="number"
+                step="0.25"
+                value={jobDetails.laborHours}
+                onChange={(e) => setJobDetails(prev => ({ ...prev, laborHours: parseFloat(e.target.value) || 0 }))}
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
+              />
+            </div>
+
+            {/* Price/Cost */}
+            <div>
+              <label className="block text-sm text-zinc-400 mb-2">Price/Cost ($)</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                <input
+                  type="number"
+                  step="0.01"
+                  value={jobDetails.price}
+                  onChange={(e) => setJobDetails(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-2 text-sm text-white focus:outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Photos Link */}
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg text-sm text-zinc-300 transition-colors"
+            >
+              <Camera className="w-4 h-4" />
+              Add Photos of Work Done
+            </button>
+
+            {/* Save Button */}
+            <button
+              onClick={handleSaveJobDetails}
+              disabled={savingDetails}
+              className="w-full py-3 rounded-lg font-semibold transition-colors text-zinc-900"
+              style={{ backgroundColor: LIME_GREEN }}
+            >
+              {savingDetails ? (
+                <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+              ) : (
+                <span className="flex items-center justify-center gap-2">
+                  <Save className="w-5 h-5" />
+                  Save Job Details
+                </span>
+              )}
+            </button>
           </div>
         </div>
 
@@ -802,12 +1137,13 @@ export default function JobDetailPage() {
           <div className="p-4 border-b border-zinc-800">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Camera className="w-5 h-5 text-teal-400" />
+                <Camera className="w-5 h-5" style={{ color: LIME_GREEN }} />
                 <h3 className="font-medium text-white">Media</h3>
               </div>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-1 text-teal-400 text-sm hover:text-teal-300"
+                className="flex items-center gap-1 text-sm"
+                style={{ color: LIME_GREEN }}
               >
                 <Plus className="w-4 h-4" />
                 Add
@@ -873,22 +1209,6 @@ export default function JobDetailPage() {
           </div>
           <ChevronRight className="w-5 h-5 text-zinc-500" />
         </button>
-
-        {/* Send Invoice Button */}
-        <button
-          onClick={handleSendInvoice}
-          disabled={sendingInvoice}
-          className="w-full bg-teal-600 hover:bg-teal-500 disabled:bg-teal-600/50 rounded-xl p-4 flex items-center justify-center gap-2 transition-colors"
-        >
-          {sendingInvoice ? (
-            <Loader2 className="w-5 h-5 animate-spin text-white" />
-          ) : (
-            <>
-              <Receipt className="w-5 h-5 text-white" />
-              <span className="font-semibold text-white">Send Invoice</span>
-            </>
-          )}
-        </button>
       </div>
 
       {/* Fixed Bottom Action Bar */}
@@ -898,9 +1218,10 @@ export default function JobDetailPage() {
           {status !== 'completed' && (
             <button
               onClick={() => openMaps(job.address)}
-              className="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors"
+              className="p-4 rounded-xl transition-colors"
+              style={{ backgroundColor: LIME_GREEN }}
             >
-              <Navigation className="w-5 h-5 text-zinc-400" />
+              <Navigation className="w-5 h-5 text-zinc-900" />
             </button>
           )}
 
@@ -908,9 +1229,10 @@ export default function JobDetailPage() {
           {job.customer.phone && status !== 'completed' && (
             <button
               onClick={() => callPhone(job.customer.phone!)}
-              className="p-4 bg-zinc-800 hover:bg-zinc-700 rounded-xl transition-colors"
+              className="p-4 rounded-xl transition-colors"
+              style={{ backgroundColor: LIME_GREEN }}
             >
-              <Phone className="w-5 h-5 text-zinc-400" />
+              <Phone className="w-5 h-5 text-zinc-900" />
             </button>
           )}
 
@@ -966,16 +1288,16 @@ export default function JobDetailPage() {
             <div className="p-4 overflow-y-auto flex-1">
               {loadingHistory ? (
                 <div className="flex items-center justify-center py-8">
-                  <Loader2 className="w-8 h-8 animate-spin text-teal-500" />
+                  <Loader2 className="w-8 h-8 animate-spin" style={{ color: LIME_GREEN }} />
                 </div>
               ) : customerJobs.length > 0 ? (
                 <div className="space-y-3">
                   {customerJobs.map((cJob) => (
                     <div
                       key={cJob.id}
-                      className="bg-zinc-800/50 rounded-lg p-3"
+                      className="bg-zinc-800/50 rounded-lg p-3 space-y-2"
                     >
-                      <div className="flex items-start justify-between mb-2">
+                      <div className="flex items-start justify-between">
                         <div>
                           <p className="font-medium text-white">{cJob.serviceType}</p>
                           <p className="text-zinc-500 text-sm">{formatShortDate(cJob.date)}</p>
@@ -984,9 +1306,56 @@ export default function JobDetailPage() {
                           {cJob.status}
                         </span>
                       </div>
-                      <p className="text-teal-400 font-medium">
-                        ${cJob.amount.toFixed(2)}
-                      </p>
+
+                      {/* Worker Name */}
+                      {cJob.workerName && (
+                        <p className="text-zinc-400 text-sm">
+                          <span className="text-zinc-500">Worker:</span> {cJob.workerName}
+                        </p>
+                      )}
+
+                      {/* Duration */}
+                      {cJob.duration && (
+                        <p className="text-zinc-400 text-sm">
+                          <span className="text-zinc-500">Duration:</span> {formatDuration(cJob.duration)}
+                        </p>
+                      )}
+
+                      {/* Work Performed */}
+                      {cJob.workPerformed && (
+                        <p className="text-zinc-400 text-sm">
+                          <span className="text-zinc-500">Work:</span> {cJob.workPerformed}
+                        </p>
+                      )}
+
+                      {/* Parts Used */}
+                      {cJob.partsUsed && cJob.partsUsed.length > 0 && (
+                        <div className="flex flex-wrap gap-1">
+                          <span className="text-zinc-500 text-sm">Parts:</span>
+                          {cJob.partsUsed.map((part, i) => (
+                            <span key={i} className="text-xs bg-zinc-700 px-2 py-0.5 rounded text-zinc-300">
+                              {part}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {cJob.notes && (
+                        <p className="text-zinc-400 text-sm italic">&quot;{cJob.notes}&quot;</p>
+                      )}
+
+                      {/* Price and Photos */}
+                      <div className="flex items-center justify-between pt-1">
+                        <p className="font-medium" style={{ color: LIME_GREEN }}>
+                          ${cJob.amount.toFixed(2)}
+                        </p>
+                        {cJob.hasPhotos && (
+                          <span className="text-xs text-zinc-500 flex items-center gap-1">
+                            <Camera className="w-3 h-3" /> Photos
+                          </span>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
