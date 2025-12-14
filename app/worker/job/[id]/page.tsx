@@ -322,40 +322,29 @@ export default function JobDetailPage() {
 
   const fetchJob = useCallback(async (uid: string, jid: string) => {
     try {
-      const res = await fetch(`/api/worker/jobs/today?userId=${uid}`);
+      // Use direct job endpoint for reliable fetching
+      const res = await fetch(`/api/worker/jobs/${jid}?userId=${uid}`);
       const data = await res.json();
 
-      if (data.jobs) {
-        const foundJob = data.jobs.find((j: Job) => j.id === jid);
-        if (foundJob) {
-          setJob(foundJob);
-          // Initialize timer state based on job state
-          if (foundJob.completedAt) {
-            setTimerState('completed');
-          } else if (foundJob.workLogs?.some((l: { clockIn: string; clockOut: string | null }) => l.clockIn && !l.clockOut)) {
-            setTimerState('working');
-            const activeLog = foundJob.workLogs.find((l: { clockIn: string; clockOut: string | null }) => l.clockIn && !l.clockOut);
-            if (activeLog) {
-              setOnSiteStartTime(new Date(activeLog.clockIn).getTime());
-            }
-          } else if (foundJob.onTheWayAt && !foundJob.arrivedAt) {
-            setTimerState('traveling');
-            setTravelStartTime(new Date(foundJob.onTheWayAt).getTime());
+      if (res.ok && data.job) {
+        const foundJob = data.job;
+        setJob(foundJob);
+        // Initialize timer state based on job state
+        if (foundJob.completedAt) {
+          setTimerState('completed');
+        } else if (foundJob.workLogs?.some((l: { clockIn: string; clockOut: string | null }) => l.clockIn && !l.clockOut)) {
+          setTimerState('working');
+          const activeLog = foundJob.workLogs.find((l: { clockIn: string; clockOut: string | null }) => l.clockIn && !l.clockOut);
+          if (activeLog) {
+            setOnSiteStartTime(new Date(activeLog.clockIn).getTime());
           }
-        } else {
-          // Try fetching from week endpoint
-          const weekRes = await fetch(`/api/worker/jobs/week?userId=${uid}`);
-          const weekData = await weekRes.json();
-          if (weekData.jobs) {
-            const weekJob = weekData.jobs.find((j: Job) => j.id === jid);
-            if (weekJob) {
-              setJob(weekJob);
-            } else {
-              toast.error('Job not found');
-              router.push('/worker/schedule');
-            }
-          }
+        } else if (foundJob.onTheWayAt && !foundJob.arrivedAt) {
+          setTimerState('traveling');
+          setTravelStartTime(new Date(foundJob.onTheWayAt).getTime());
         }
+      } else {
+        toast.error('Job not found');
+        router.push('/worker/schedule');
       }
     } catch (error) {
       console.error('Error fetching job:', error);

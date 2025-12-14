@@ -219,25 +219,25 @@ export default function WorkerEarnings() {
         <div className="grid grid-cols-2 gap-3">
           <StatCard
             icon={DollarSign}
-            iconColor="text-[#10B981]"
+            iconColor="text-[#A3E635]"
             value={`$${summary.totalEarnings.toFixed(2)}`}
             label="Total Earned"
           />
           <StatCard
             icon={Clock}
-            iconColor="text-[#3B82F6]"
+            iconColor="text-[#A3E635]"
             value={`${summary.totalHours.toFixed(1)}h`}
             label="Hours Worked"
           />
           <StatCard
             icon={Briefcase}
-            iconColor="text-[#8B5CF6]"
+            iconColor="text-[#A3E635]"
             value={`${summary.jobsCompleted}`}
             label="Jobs Completed"
           />
           <StatCard
             icon={AlertCircle}
-            iconColor="text-[#F59E0B]"
+            iconColor="text-[#A3E635]"
             value={`$${summary.pendingPay.toFixed(2)}`}
             label="Pending Pay"
           />
@@ -249,7 +249,7 @@ export default function WorkerEarnings() {
 
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-[#10B981]" />
+              <Loader2 className="w-8 h-8 animate-spin text-[#A3E635]" />
             </div>
           ) : Object.keys(byDate).length === 0 ? (
             <div className="bg-[#2D2D2D] rounded-2xl p-10 text-center border border-[#3A3A3A]">
