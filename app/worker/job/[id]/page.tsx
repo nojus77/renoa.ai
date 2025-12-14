@@ -35,8 +35,8 @@ import {
 import { toast } from 'sonner';
 import { PropertyPhoto } from '@/components/PropertyPhoto';
 
-// Lime green brand color
-const LIME_GREEN = '#a3e635';
+// Renoa Design System - Lime green brand color
+const LIME_GREEN = '#C4F542';
 
 // Services by category - matches OnboardingModal
 const SERVICES_BY_CATEGORY: Record<string, string[]> = {
@@ -1113,7 +1113,7 @@ export default function JobDetailPage() {
         );
       case 'completed':
         return (
-          <div className="flex-1 py-4 bg-zinc-800 text-purple-400 font-semibold rounded-xl flex items-center justify-center gap-2">
+          <div className="flex-1 py-4 bg-[#2A2A2A] text-purple-400 font-semibold rounded-xl flex items-center justify-center gap-2">
             <CheckCircle2 className="w-5 h-5" />
             Job Completed
           </div>
@@ -1144,7 +1144,7 @@ export default function JobDetailPage() {
             <ArrowLeft className="w-5 h-5" />
             Back
           </button>
-          <div className="bg-zinc-900 rounded-xl p-8 text-center border border-zinc-800">
+          <div className="bg-[#1F1F1F] rounded-xl p-8 text-center border border-[#2A2A2A]">
             <AlertCircle className="w-12 h-12 text-zinc-600 mx-auto mb-3" />
             <p className="text-zinc-400">Job not found</p>
           </div>
@@ -1170,7 +1170,7 @@ export default function JobDetailPage() {
         <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
-            className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700 transition-colors"
+            className="p-2 bg-[#2A2A2A] rounded-lg hover:bg-[#3A3A3A] transition-colors"
           >
             <ArrowLeft className="w-5 h-5 text-zinc-400" />
           </button>
@@ -1278,9 +1278,9 @@ export default function JobDetailPage() {
         )}
 
         {/* Main Job Info Card */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
+        <div className="bg-[#1F1F1F] rounded-xl border border-[#2A2A2A] overflow-hidden">
           {/* Service Type Header */}
-          <div className="p-4 border-b border-zinc-800">
+          <div className="p-4 border-b border-[#2A2A2A]">
             <h2 className="text-lg font-semibold text-white">{job.serviceType}</h2>
             {job.estimatedValue && (
               <p className="text-sm mt-1" style={{ color: LIME_GREEN }}>
@@ -1303,7 +1303,7 @@ export default function JobDetailPage() {
           </div>
 
           {/* Quick Actions */}
-          <div className="p-4 border-b border-zinc-800 flex gap-2">
+          <div className="p-4 border-b border-[#2A2A2A] flex gap-2">
             {job.customer.phone && (
               <button
                 onClick={() => callPhone(job.customer.phone!)}
@@ -1316,7 +1316,7 @@ export default function JobDetailPage() {
             )}
             <button
               onClick={() => openMaps(job.address)}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition-colors"
+              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#2A2A2A] hover:bg-[#3A3A3A] rounded-lg transition-colors"
             >
               <Navigation className="w-4 h-4" style={{ color: LIME_GREEN }} />
               <span className="text-zinc-300 text-sm">Navigate</span>
@@ -1324,7 +1324,7 @@ export default function JobDetailPage() {
           </div>
 
           {/* Date & Time */}
-          <div className="p-4 border-b border-zinc-800">
+          <div className="p-4 border-b border-[#2A2A2A]">
             <div className="flex items-start gap-3">
               <Calendar className="w-5 h-5 text-zinc-400 mt-0.5 flex-shrink-0" />
               <div className="flex-1">
@@ -1363,8 +1363,8 @@ export default function JobDetailPage() {
 
         {/* JOB DETAILS SECTION - Only show when arrived/working */}
         {canEditJobDetails && (
-        <div id="job-details-section" className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <div className="p-4 border-b border-zinc-800">
+        <div id="job-details-section" className="bg-[#1F1F1F] rounded-xl border border-[#2A2A2A] overflow-hidden">
+          <div className="p-4 border-b border-[#2A2A2A]">
             <div className="flex items-center gap-2">
               <Wrench className="w-5 h-5" style={{ color: LIME_GREEN }} />
               <h3 className="font-medium text-white">Job Details</h3>
@@ -1380,7 +1380,7 @@ export default function JobDetailPage() {
               {selectedServices.length > 0 && (
                 <div className="space-y-3 mb-3">
                   {selectedServices.map((service) => (
-                    <div key={service.id} className="bg-zinc-800 rounded-lg p-3">
+                    <div key={service.id} className="bg-[#2A2A2A] rounded-lg p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
                           <p className="font-medium text-white">{service.serviceName}</p>
@@ -1443,7 +1443,7 @@ export default function JobDetailPage() {
               <div className="relative">
                 <button
                   onClick={() => setShowServiceDropdown(!showServiceDropdown)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-zinc-300 hover:border-zinc-600"
+                  className="w-full flex items-center justify-between px-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-sm text-zinc-300 hover:border-zinc-600"
                 >
                   <span className="flex items-center gap-2">
                     <Plus className="w-4 h-4" />
@@ -1453,18 +1453,18 @@ export default function JobDetailPage() {
                 </button>
 
                 {showServiceDropdown && (
-                  <div className="absolute z-20 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                  <div className="absolute z-20 w-full mt-1 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg shadow-xl max-h-64 overflow-y-auto">
                     {/* Saved Custom Services - show first */}
                     {savedCustomServices.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider bg-zinc-900/50" style={{ color: LIME_GREEN }}>
+                        <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider bg-[#1F1F1F]/50" style={{ color: LIME_GREEN }}>
                           Your Saved Services
                         </div>
                         {savedCustomServices.map((serviceName, index) => (
                           <button
                             key={`saved-${index}`}
                             onClick={() => handleAddService(`saved-${index}`, serviceName)}
-                            className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700"
+                            className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-[#3A3A3A]"
                           >
                             {serviceName}
                           </button>
@@ -1479,14 +1479,14 @@ export default function JobDetailPage() {
                         // Show only services for the provider's category
                         return (
                           <div>
-                            <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/50">
+                            <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-[#1F1F1F]/50">
                               {providerCategory} Services
                             </div>
                             {services.map((serviceName, index) => (
                               <button
                                 key={`${providerCategory}-${index}`}
                                 onClick={() => handleAddService(`${providerCategory}-${index}`, serviceName)}
-                                className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700"
+                                className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-[#3A3A3A]"
                               >
                                 {serviceName}
                               </button>
@@ -1498,14 +1498,14 @@ export default function JobDetailPage() {
                       // Fallback: show all categories if no provider category set
                       return Object.entries(SERVICES_BY_CATEGORY).map(([category, categoryServices]) => (
                         <div key={category}>
-                          <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-zinc-900/50">
+                          <div className="px-3 py-2 text-xs font-semibold text-zinc-500 uppercase tracking-wider bg-[#1F1F1F]/50">
                             {category}
                           </div>
                           {categoryServices.map((serviceName, index) => (
                             <button
                               key={`${category}-${index}`}
                               onClick={() => handleAddService(`${category}-${index}`, serviceName)}
-                              className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-700"
+                              className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-[#3A3A3A]"
                             >
                               {serviceName}
                             </button>
@@ -1533,7 +1533,7 @@ export default function JobDetailPage() {
                     value={customServiceName}
                     onChange={(e) => setCustomServiceName(e.target.value)}
                     placeholder="Custom service name..."
-                    className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-lime-500"
+                    className="flex-1 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-lime-500"
                     onKeyDown={(e) => e.key === 'Enter' && handleAddCustomService()}
                   />
                   <button
@@ -1549,7 +1549,7 @@ export default function JobDetailPage() {
                       setShowCustomServiceInput(false);
                       setCustomServiceName('');
                     }}
-                    className="px-3 py-2 bg-zinc-800 rounded-lg text-sm text-zinc-400"
+                    className="px-3 py-2 bg-[#2A2A2A] rounded-lg text-sm text-zinc-400"
                   >
                     Cancel
                   </button>
@@ -1565,7 +1565,7 @@ export default function JobDetailPage() {
               {parts.length > 0 && (
                 <div className="space-y-2 mb-3">
                   {parts.map((part) => (
-                    <div key={part.id} className="flex items-center justify-between bg-zinc-800 rounded-lg p-3">
+                    <div key={part.id} className="flex items-center justify-between bg-[#2A2A2A] rounded-lg p-3">
                       <div className="flex items-center gap-2">
                         <Package className="w-4 h-4 text-zinc-500" />
                         <span className="text-sm text-white">{part.name}</span>
@@ -1587,7 +1587,7 @@ export default function JobDetailPage() {
 
               {/* Add Part Form */}
               {showAddPart ? (
-                <div className="bg-zinc-800 rounded-lg p-3 space-y-3">
+                <div className="bg-[#2A2A2A] rounded-lg p-3 space-y-3">
                   <input
                     type="text"
                     value={newPartName}
@@ -1659,11 +1659,11 @@ export default function JobDetailPage() {
               <div>
                 <label className="block text-sm font-medium text-zinc-300 mb-3">Labor Time</label>
                 <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-zinc-800 rounded-full text-sm text-zinc-300">
+                  <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#2A2A2A] rounded-full text-sm text-zinc-300">
                     <Clock className="w-3 h-3" />
                     Travel: {formatTimePill(travelTime)}
                   </span>
-                  <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-zinc-800 rounded-full text-sm text-zinc-300">
+                  <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#2A2A2A] rounded-full text-sm text-zinc-300">
                     <Clock className="w-3 h-3" />
                     On-Site: {formatTimePill(onSiteTime)}
                   </span>
@@ -1679,7 +1679,7 @@ export default function JobDetailPage() {
             )}
 
             {/* PRICE BREAKDOWN */}
-            <div className="border-t border-zinc-800 pt-4">
+            <div className="border-t border-[#2A2A2A] pt-4">
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Services</span>
@@ -1689,7 +1689,7 @@ export default function JobDetailPage() {
                   <span className="text-zinc-400">Parts</span>
                   <span className="text-zinc-300">${partsSubtotal.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-lg font-bold pt-2 border-t border-zinc-800">
+                <div className="flex justify-between text-lg font-bold pt-2 border-t border-[#2A2A2A]">
                   <span className="text-white">Total</span>
                   <span style={{ color: LIME_GREEN }}>${totalPrice.toFixed(2)}</span>
                 </div>
@@ -1706,7 +1706,7 @@ export default function JobDetailPage() {
             </div>
 
             {/* PAYMENT METHOD SECTION */}
-            <div id="payment-section" className="border-t border-zinc-800 pt-4">
+            <div id="payment-section" className="border-t border-[#2A2A2A] pt-4">
               <label className="block text-sm font-medium text-zinc-300 mb-3">How did customer pay?</label>
               <div className="grid grid-cols-3 gap-2">
                 {[
@@ -1719,8 +1719,8 @@ export default function JobDetailPage() {
                     onClick={() => setPaymentMethod(method.id)}
                     className={`p-3 rounded-lg border flex flex-col items-center gap-1.5 transition-colors ${
                       paymentMethod === method.id
-                        ? 'border-[#a3e635] bg-[#a3e635]/20 text-white'
-                        : 'border-zinc-700 text-zinc-400 hover:border-zinc-600'
+                        ? 'border-[#C4F542] bg-[#C4F542]/20 text-white'
+                        : 'border-[#3A3A3A] text-zinc-400 hover:border-zinc-600'
                     }`}
                   >
                     <method.Icon className="w-5 h-5" />
@@ -1731,11 +1731,11 @@ export default function JobDetailPage() {
 
               {/* Check Photo Upload - Only show when check is selected */}
               {paymentMethod === 'check' && (
-                <div className="mt-4 p-3 bg-zinc-800/50 rounded-lg border border-zinc-700">
+                <div className="mt-4 p-3 bg-[#2A2A2A]/50 rounded-lg border border-[#3A3A3A]">
                   <label className="text-sm font-medium text-zinc-300 mb-2 block">Photo of Check (Required)</label>
                   {media.some(m => m.type === 'check') ? (
                     <div className="flex items-center gap-3">
-                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-zinc-800 flex-shrink-0">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden bg-[#2A2A2A] flex-shrink-0">
                         <img
                           src={media.find(m => m.type === 'check')?.url}
                           alt="Check"
@@ -1758,7 +1758,7 @@ export default function JobDetailPage() {
                   ) : (
                     <button
                       onClick={() => checkPhotoInputRef.current?.click()}
-                      className="w-full py-3 px-4 border-2 border-dashed border-zinc-600 rounded-lg text-zinc-400 hover:border-[#a3e635] hover:text-white transition-colors flex items-center justify-center gap-2"
+                      className="w-full py-3 px-4 border-2 border-dashed border-zinc-600 rounded-lg text-zinc-400 hover:border-[#C4F542] hover:text-white transition-colors flex items-center justify-center gap-2"
                     >
                       <Camera className="w-5 h-5" />
                       <span>Take Photo of Check</span>
@@ -1796,7 +1796,7 @@ export default function JobDetailPage() {
                     value={tipAmount}
                     onChange={(e) => setTipAmount(e.target.value)}
                     placeholder="0.00"
-                    className="bg-zinc-800 border border-zinc-700 rounded-lg px-4 py-3 w-32 text-base text-white focus:outline-none focus:border-[#a3e635]"
+                    className="bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg px-4 py-3 w-32 text-base text-white focus:outline-none focus:border-[#C4F542]"
                     style={{ fontSize: '16px' }}
                   />
                 </div>
@@ -1839,7 +1839,7 @@ export default function JobDetailPage() {
                     key={note.id}
                     className={`rounded-lg p-3 ${
                       note.authorRole === 'dispatcher'
-                        ? 'bg-[#3A3A3A] border-l-2 border-l-[#A3E635]'
+                        ? 'bg-[#3A3A3A] border-l-2 border-l-[#C4F542]'
                         : 'bg-[#1F1F1F] border-l-2 border-l-[#6B7280]'
                     }`}
                   >
@@ -1849,7 +1849,7 @@ export default function JobDetailPage() {
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                             note.authorRole === 'dispatcher'
-                              ? 'bg-[#A3E635]/15 text-[#A3E635]'
+                              ? 'bg-[#C4F542]/15 text-[#C4F542]'
                               : 'bg-[#6B7280]/15 text-[#6B7280]'
                           }`}
                         >
@@ -1880,7 +1880,7 @@ export default function JobDetailPage() {
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}
                   placeholder="Add a note..."
-                  className="flex-1 bg-[#1F1F1F] border border-[#3A3A3A] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[#6B7280] focus:outline-none focus:border-[#A3E635] resize-none transition-colors"
+                  className="flex-1 bg-[#1F1F1F] border border-[#3A3A3A] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[#6B7280] focus:outline-none focus:border-[#C4F542] resize-none transition-colors"
                   rows={2}
                 />
                 <button
@@ -1902,8 +1902,8 @@ export default function JobDetailPage() {
 
         {/* Media Section - Only show when working or completed */}
         {canAddMedia && (
-        <div id="media-section" className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <div className="p-4 border-b border-zinc-800">
+        <div id="media-section" className="bg-[#1F1F1F] rounded-xl border border-[#2A2A2A] overflow-hidden">
+          <div className="p-4 border-b border-[#2A2A2A]">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Camera className="w-5 h-5" style={{ color: LIME_GREEN }} />
@@ -1928,7 +1928,7 @@ export default function JobDetailPage() {
                   <button
                     key={item.id}
                     onClick={() => setSelectedMedia(item)}
-                    className="aspect-square bg-zinc-800 rounded-lg overflow-hidden hover:opacity-80 transition-opacity"
+                    className="aspect-square bg-[#2A2A2A] rounded-lg overflow-hidden hover:opacity-80 transition-opacity"
                   >
                     {item.type === 'photo' ? (
                       <img
@@ -1951,7 +1951,7 @@ export default function JobDetailPage() {
                 {status !== 'completed' && (
                 <button
                   onClick={() => fileInputRef.current?.click()}
-                  className="mt-3 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-lg transition-colors"
+                  className="mt-3 px-4 py-2 bg-[#2A2A2A] hover:bg-[#3A3A3A] text-zinc-300 text-sm rounded-lg transition-colors"
                 >
                   Add Photos/Videos
                 </button>
@@ -1973,10 +1973,10 @@ export default function JobDetailPage() {
         {/* Customer History Button */}
         <button
           onClick={handleViewCustomerHistory}
-          className="w-full bg-zinc-900 rounded-xl border border-zinc-800 p-4 flex items-center justify-between hover:bg-zinc-800/50 transition-colors"
+          className="w-full bg-[#1F1F1F] rounded-xl border border-[#2A2A2A] p-4 flex items-center justify-between hover:bg-[#2A2A2A]/50 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-[#2A2A2A] flex items-center justify-center">
               <History className="w-5 h-5 text-zinc-400" />
             </div>
             <span className="font-medium text-white">View Customer History</span>
@@ -1986,7 +1986,7 @@ export default function JobDetailPage() {
       </div>
 
       {/* Fixed Bottom Action Bar */}
-      <div className="fixed bottom-16 left-0 right-0 bg-zinc-900 border-t border-zinc-800 p-4 z-40">
+      <div className="fixed bottom-16 left-0 right-0 bg-[#1F1F1F] border-t border-[#2A2A2A] p-4 z-40">
         <div className="max-w-lg mx-auto flex gap-3">
           {/* Navigate Button */}
           {timerState !== 'completed' && (
@@ -2023,7 +2023,7 @@ export default function JobDetailPage() {
         >
           <button
             onClick={() => setSelectedMedia(null)}
-            className="absolute top-4 right-4 p-2 bg-zinc-800 rounded-full"
+            className="absolute top-4 right-4 p-2 bg-[#2A2A2A] rounded-full"
           >
             <X className="w-6 h-6 text-white" />
           </button>
@@ -2046,16 +2046,16 @@ export default function JobDetailPage() {
       {/* Customer History Modal */}
       {showCustomerHistory && (
         <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-          <div className="bg-zinc-900 w-full max-w-md max-h-[85vh] rounded-2xl border border-zinc-800 flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-[#1F1F1F] w-full max-w-md max-h-[85vh] rounded-2xl border border-[#2A2A2A] flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
+            <div className="flex items-center justify-between p-4 border-b border-[#2A2A2A] shrink-0">
               <div>
                 <h2 className="text-lg font-semibold text-white">Customer History</h2>
                 <p className="text-sm text-zinc-500">{job?.customer.name}</p>
               </div>
               <button
                 onClick={() => setShowCustomerHistory(false)}
-                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                className="p-2 hover:bg-[#2A2A2A] rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-zinc-400" />
               </button>
@@ -2072,7 +2072,7 @@ export default function JobDetailPage() {
                   {customerJobs.map((cJob) => (
                     <div
                       key={cJob.id}
-                      className="bg-zinc-800/50 rounded-lg p-3 space-y-2"
+                      className="bg-[#2A2A2A]/50 rounded-lg p-3 space-y-2"
                     >
                       <div className="flex items-start justify-between">
                         <div>
@@ -2133,10 +2133,10 @@ export default function JobDetailPage() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-zinc-800 shrink-0">
+            <div className="p-4 border-t border-[#2A2A2A] shrink-0">
               <button
                 onClick={() => setShowCustomerHistory(false)}
-                className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+                className="w-full py-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] text-zinc-300 font-medium rounded-xl transition-colors"
               >
                 Close
               </button>
@@ -2148,7 +2148,7 @@ export default function JobDetailPage() {
       {/* Job Completion Confirmation Modal */}
       {showConfirmModal && job && (
         <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4">
-          <div className="bg-zinc-900 w-full max-w-md rounded-2xl border border-zinc-800 shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+          <div className="bg-[#1F1F1F] w-full max-w-md rounded-2xl border border-[#2A2A2A] shadow-2xl animate-in fade-in zoom-in-95 duration-200">
             {/* Modal Header */}
             <div className="p-6 pb-4 text-center">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: `${LIME_GREEN}20` }}>
@@ -2160,7 +2160,7 @@ export default function JobDetailPage() {
 
             {/* Job Summary */}
             <div className="px-6 pb-4 space-y-3">
-              <div className="bg-zinc-800/50 rounded-lg p-4 space-y-2">
+              <div className="bg-[#2A2A2A]/50 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-400">Service</span>
                   <span className="text-white font-medium">{job.serviceType}</span>
@@ -2189,7 +2189,7 @@ export default function JobDetailPage() {
                     <span className="text-white">${parseFloat(tipAmount).toFixed(2)}</span>
                   </div>
                 )}
-                <div className="pt-2 border-t border-zinc-700 flex justify-between">
+                <div className="pt-2 border-t border-[#3A3A3A] flex justify-between">
                   <span className="font-semibold text-white">Total</span>
                   <span className="font-bold text-lg" style={{ color: LIME_GREEN }}>
                     ${(totalPrice + (parseFloat(tipAmount) || 0)).toFixed(2)}
@@ -2207,10 +2207,10 @@ export default function JobDetailPage() {
             </div>
 
             {/* Modal Actions */}
-            <div className="p-4 border-t border-zinc-800 flex gap-3">
+            <div className="p-4 border-t border-[#2A2A2A] flex gap-3">
               <button
                 onClick={() => setShowConfirmModal(false)}
-                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+                className="flex-1 py-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] text-zinc-300 font-medium rounded-xl transition-colors"
               >
                 Go Back
               </button>

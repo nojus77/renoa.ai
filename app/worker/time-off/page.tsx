@@ -274,7 +274,7 @@ export default function WorkerSchedule() {
       case 'completed':
         return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
       case 'in_progress':
-        return 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30';
+        return 'bg-[#C4F542]/20 text-[#C4F542] border-[#C4F542]/30';
       case 'on_the_way':
         return 'bg-amber-500/20 text-amber-400 border-amber-500/30';
       default:
@@ -354,7 +354,7 @@ export default function WorkerSchedule() {
     switch (status) {
       case 'approved':
         return (
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-[#C4F542]/20 text-[#C4F542]">
             <CheckCircle className="w-3 h-3" />
             Approved
           </span>
@@ -419,7 +419,7 @@ export default function WorkerSchedule() {
     return (
       <WorkerLayout>
         <div className="flex items-center justify-center min-h-[60vh]">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+          <Loader2 className="w-8 h-8 animate-spin text-[#C4F542]" />
         </div>
       </WorkerLayout>
     );
@@ -432,16 +432,16 @@ export default function WorkerSchedule() {
         <h1 className="text-xl font-bold text-white">Schedule</h1>
 
         {/* Section 1: Job Schedule View */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800">
-          <div className="p-4 border-b border-zinc-800">
+        <div className="bg-[#1F1F1F] rounded-xl border border-[#2A2A2A]">
+          <div className="p-4 border-b border-[#2A2A2A]">
             <div className="flex items-center justify-between">
               <h2 className="font-semibold text-white">My Jobs</h2>
-              <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-1">
+              <div className="flex items-center gap-1 bg-[#2A2A2A] rounded-lg p-1">
                 <button
                   onClick={() => setViewMode('day')}
                   className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                     viewMode === 'day'
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-[#C4F542] text-white'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
@@ -451,7 +451,7 @@ export default function WorkerSchedule() {
                   onClick={() => setViewMode('week')}
                   className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
                     viewMode === 'week'
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-[#C4F542] text-white'
                       : 'text-zinc-400 hover:text-zinc-200'
                   }`}
                 >
@@ -464,7 +464,7 @@ export default function WorkerSchedule() {
             <div className="flex items-center justify-between mt-3">
               <button
                 onClick={() => navigateDate('prev')}
-                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg"
+                className="p-2 text-zinc-400 hover:text-white hover:bg-[#2A2A2A] rounded-lg"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -477,14 +477,14 @@ export default function WorkerSchedule() {
                 </p>
                 <button
                   onClick={goToToday}
-                  className="text-xs text-emerald-400 hover:text-emerald-300"
+                  className="text-xs text-[#C4F542] hover:text-[#B3E232]"
                 >
                   Go to Today
                 </button>
               </div>
               <button
                 onClick={() => navigateDate('next')}
-                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg"
+                className="p-2 text-zinc-400 hover:text-white hover:bg-[#2A2A2A] rounded-lg"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -494,7 +494,7 @@ export default function WorkerSchedule() {
           <div className="p-4">
             {loadingJobs ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                <Loader2 className="w-6 h-6 animate-spin text-[#C4F542]" />
               </div>
             ) : viewMode === 'day' ? (
               // Day View
@@ -509,7 +509,7 @@ export default function WorkerSchedule() {
                     <button
                       key={job.id}
                       onClick={() => router.push(`/worker/job/${job.id}`)}
-                      className={`w-full text-left p-3 rounded-lg border transition-colors hover:bg-zinc-800/50 ${getJobStatusColor(job.status)}`}
+                      className={`w-full text-left p-3 rounded-lg border transition-colors hover:bg-[#2A2A2A]/50 ${getJobStatusColor(job.status)}`}
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
@@ -538,11 +538,11 @@ export default function WorkerSchedule() {
 
                   return (
                     <div key={dateKey}>
-                      <div className={`flex items-center gap-2 mb-2 ${isToday ? 'text-emerald-400' : 'text-zinc-400'}`}>
+                      <div className={`flex items-center gap-2 mb-2 ${isToday ? 'text-[#C4F542]' : 'text-zinc-400'}`}>
                         <span className="text-sm font-medium">
                           {day.toLocaleDateString('en-US', { weekday: 'short' })}
                         </span>
-                        <span className={`text-sm ${isToday ? 'bg-emerald-600 text-white px-2 py-0.5 rounded-full' : ''}`}>
+                        <span className={`text-sm ${isToday ? 'bg-[#C4F542] text-white px-2 py-0.5 rounded-full' : ''}`}>
                           {day.getDate()}
                         </span>
                         {dayJobs.length > 0 && (
@@ -552,12 +552,12 @@ export default function WorkerSchedule() {
                         )}
                       </div>
                       {dayJobs.length > 0 ? (
-                        <div className="space-y-2 pl-2 border-l-2 border-zinc-800">
+                        <div className="space-y-2 pl-2 border-l-2 border-[#2A2A2A]">
                           {dayJobs.map((job) => (
                             <button
                               key={job.id}
                               onClick={() => router.push(`/worker/job/${job.id}`)}
-                              className={`w-full text-left p-2.5 rounded-lg border transition-colors hover:bg-zinc-800/50 ${getJobStatusColor(job.status)}`}
+                              className={`w-full text-left p-2.5 rounded-lg border transition-colors hover:bg-[#2A2A2A]/50 ${getJobStatusColor(job.status)}`}
                             >
                               <div className="flex items-center justify-between">
                                 <span className="font-medium text-sm text-white truncate">{job.serviceType}</span>
@@ -568,7 +568,7 @@ export default function WorkerSchedule() {
                           ))}
                         </div>
                       ) : (
-                        <p className="text-xs text-zinc-600 pl-2 border-l-2 border-zinc-800 py-2">
+                        <p className="text-xs text-zinc-600 pl-2 border-l-2 border-[#2A2A2A] py-2">
                           No jobs
                         </p>
                       )}
@@ -581,12 +581,12 @@ export default function WorkerSchedule() {
         </div>
 
         {/* Section 2: Time Off Requests */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800">
-          <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+        <div className="bg-[#1F1F1F] rounded-xl border border-[#2A2A2A]">
+          <div className="p-4 border-b border-[#2A2A2A] flex items-center justify-between">
             <h2 className="font-semibold text-white">Time Off Requests</h2>
             <button
               onClick={() => setShowForm(true)}
-              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 bg-[#C4F542] hover:bg-[#B3E232] text-white text-sm rounded-lg font-medium transition-colors"
             >
               <Plus className="w-4 h-4" />
               Request
@@ -602,7 +602,7 @@ export default function WorkerSchedule() {
               requests.map((request) => (
                 <div
                   key={request.id}
-                  className="bg-zinc-800/50 rounded-lg p-3"
+                  className="bg-[#2A2A2A]/50 rounded-lg p-3"
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -622,7 +622,7 @@ export default function WorkerSchedule() {
                     {request.status === 'pending' && (
                       <button
                         onClick={() => handleCancel(request.id)}
-                        className="p-2 text-zinc-500 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-colors"
+                        className="p-2 text-zinc-500 hover:text-red-400 hover:bg-[#2A2A2A] rounded-lg transition-colors"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -635,7 +635,7 @@ export default function WorkerSchedule() {
         </div>
 
         {/* Section 3: My Working Hours (Collapsible) */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800">
+        <div className="bg-[#1F1F1F] rounded-xl border border-[#2A2A2A]">
           <button
             onClick={() => setWorkingHoursExpanded(!workingHoursExpanded)}
             className="w-full p-4 flex items-center justify-between"
@@ -652,7 +652,7 @@ export default function WorkerSchedule() {
           </button>
 
           {workingHoursExpanded && (
-            <div className="px-4 pb-4 border-t border-zinc-800 pt-4 space-y-4">
+            <div className="px-4 pb-4 border-t border-[#2A2A2A] pt-4 space-y-4">
               {DAYS.map(({ key, label }) => (
                 <div key={key} className="flex items-center gap-4">
                   <div className="w-24 flex items-center gap-3">
@@ -662,7 +662,7 @@ export default function WorkerSchedule() {
                         ...scheduleForm,
                         [key]: { ...scheduleForm[key], enabled: checked }
                       })}
-                      className="data-[state=checked]:bg-emerald-600"
+                      className="data-[state=checked]:bg-[#C4F542]"
                     />
                     <span className={`text-sm font-medium ${scheduleForm[key]?.enabled ? 'text-white' : 'text-zinc-600'}`}>
                       {label.slice(0, 3)}
@@ -676,7 +676,7 @@ export default function WorkerSchedule() {
                           ...scheduleForm,
                           [key]: { ...scheduleForm[key], start: e.target.value }
                         })}
-                        className="h-9 px-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:border-emerald-500 focus:outline-none"
+                        className="h-9 px-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-sm text-white focus:border-[#C4F542] focus:outline-none"
                       >
                         {TIME_OPTIONS.map(t => (
                           <option key={t} value={t}>{t}</option>
@@ -689,7 +689,7 @@ export default function WorkerSchedule() {
                           ...scheduleForm,
                           [key]: { ...scheduleForm[key], end: e.target.value }
                         })}
-                        className="h-9 px-3 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white focus:border-emerald-500 focus:outline-none"
+                        className="h-9 px-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-sm text-white focus:border-[#C4F542] focus:outline-none"
                       >
                         {TIME_OPTIONS.map(t => (
                           <option key={t} value={t}>{t}</option>
@@ -705,7 +705,7 @@ export default function WorkerSchedule() {
               <button
                 onClick={handleSaveSchedule}
                 disabled={savingSchedule || !hasScheduleChanges}
-                className="w-full h-11 mt-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                className="w-full h-11 mt-4 bg-[#C4F542] hover:bg-[#B3E232] disabled:bg-[#2A2A2A] disabled:text-zinc-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
               >
                 {savingSchedule ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -730,13 +730,13 @@ export default function WorkerSchedule() {
             />
 
             {/* Modal */}
-            <div className="relative bg-zinc-900 w-full max-w-md rounded-xl max-h-[85vh] flex flex-col border border-zinc-800">
+            <div className="relative bg-[#1F1F1F] w-full max-w-md rounded-xl max-h-[85vh] flex flex-col border border-[#2A2A2A]">
               {/* Header */}
-              <div className="flex items-center justify-between p-4 border-b border-zinc-800 shrink-0">
+              <div className="flex items-center justify-between p-4 border-b border-[#2A2A2A] shrink-0">
                 <h2 className="text-lg font-semibold text-white">Request Time Off</h2>
                 <button
                   onClick={() => setShowForm(false)}
-                  className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                  className="p-2 hover:bg-[#2A2A2A] rounded-lg transition-colors"
                 >
                   <X className="w-5 h-5 text-zinc-400" />
                 </button>
@@ -756,7 +756,7 @@ export default function WorkerSchedule() {
                         onChange={(e) =>
                           setFormData((prev) => ({ ...prev, startDate: e.target.value }))
                         }
-                        className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full px-3 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white focus:outline-none focus:border-[#C4F542]"
                         style={{ fontSize: '16px' }}
                         required
                       />
@@ -771,7 +771,7 @@ export default function WorkerSchedule() {
                         onChange={(e) =>
                           setFormData((prev) => ({ ...prev, endDate: e.target.value }))
                         }
-                        className="w-full px-3 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                        className="w-full px-3 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white focus:outline-none focus:border-[#C4F542]"
                         style={{ fontSize: '16px' }}
                         required
                       />
@@ -787,7 +787,7 @@ export default function WorkerSchedule() {
                       onChange={(e) =>
                         setFormData((prev) => ({ ...prev, reason: e.target.value }))
                       }
-                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-emerald-500"
+                      className="w-full px-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white focus:outline-none focus:border-[#C4F542]"
                       style={{ fontSize: '16px' }}
                     >
                       {REASONS.map((reason) => (
@@ -809,18 +809,18 @@ export default function WorkerSchedule() {
                       }
                       placeholder="Any additional details..."
                       rows={3}
-                      className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-emerald-500 resize-none"
+                      className="w-full px-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C4F542] resize-none"
                       style={{ fontSize: '16px' }}
                     />
                   </div>
                 </div>
 
                 {/* Footer */}
-                <div className="p-4 border-t border-zinc-800 shrink-0">
+                <div className="p-4 border-t border-[#2A2A2A] shrink-0">
                   <button
                     type="submit"
                     disabled={submitting}
-                    className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"
+                    className="w-full py-4 bg-[#C4F542] hover:bg-[#B3E232] disabled:opacity-50 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"
                   >
                     {submitting ? (
                       <>

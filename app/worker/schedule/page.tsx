@@ -112,7 +112,7 @@ export default function WorkerSchedule() {
       case 'completed':
         return 'border-l-[#6B7280]';
       default:
-        return 'border-l-[#A3E635]';
+        return 'border-l-[#C4F542]';
     }
   };
 
@@ -127,7 +127,7 @@ export default function WorkerSchedule() {
           <div className="flex items-center gap-1">
             <button
               onClick={() => changeWeek(-1)}
-              className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700"
+              className="p-2 bg-[#2A2A2A] rounded-lg hover:bg-[#3A3A3A]"
             >
               <ChevronLeft className="w-5 h-5 text-zinc-400" />
             </button>
@@ -140,13 +140,13 @@ export default function WorkerSchedule() {
             </span>
             <button
               onClick={() => setShowCalendar(true)}
-              className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700"
+              className="p-2 bg-[#2A2A2A] rounded-lg hover:bg-[#3A3A3A]"
             >
-              <Calendar className="w-5 h-5 text-[#a3e635]" />
+              <Calendar className="w-5 h-5 text-[#C4F542]" />
             </button>
             <button
               onClick={() => changeWeek(1)}
-              className="p-2 bg-zinc-800 rounded-lg hover:bg-zinc-700"
+              className="p-2 bg-[#2A2A2A] rounded-lg hover:bg-[#3A3A3A]"
             >
               <ChevronRight className="w-5 h-5 text-zinc-400" />
             </button>
@@ -154,7 +154,7 @@ export default function WorkerSchedule() {
         </div>
 
         {/* Week Strip */}
-        <div className="grid grid-cols-7 gap-1 bg-zinc-900 rounded-xl p-2 border border-zinc-800">
+        <div className="grid grid-cols-7 gap-1 bg-[#1F1F1F] rounded-xl p-2 border border-[#2A2A2A]">
           {getWeekDays().map((day) => {
             const dateStr = day.toISOString().split('T')[0];
             const isSelected = selectedDay === dateStr;
@@ -166,10 +166,10 @@ export default function WorkerSchedule() {
                 onClick={() => setSelectedDay(dateStr)}
                 className={`flex flex-col items-center py-2 rounded-lg transition-colors ${
                   isSelected
-                    ? 'bg-[#a3e635] text-zinc-900'
+                    ? 'bg-[#C4F542] text-zinc-900'
                     : isToday(day)
-                    ? 'bg-zinc-800 text-white'
-                    : 'text-zinc-400 hover:bg-zinc-800'
+                    ? 'bg-[#2A2A2A] text-white'
+                    : 'text-zinc-400 hover:bg-[#2A2A2A]'
                 }`}
               >
                 <span className="text-[10px] font-medium uppercase">
@@ -179,7 +179,7 @@ export default function WorkerSchedule() {
                 {jobCount > 0 && (
                   <span
                     className={`text-[10px] px-1.5 rounded-full ${
-                      isSelected ? 'bg-[#8bc934] text-zinc-900' : 'bg-zinc-700'
+                      isSelected ? 'bg-[#B3E232] text-zinc-900' : 'bg-zinc-700'
                     }`}
                   >
                     {jobCount}
@@ -202,7 +202,7 @@ export default function WorkerSchedule() {
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-[#A3E635]" />
+              <Loader2 className="w-8 h-8 animate-spin text-[#C4F542]" />
             </div>
           ) : selectedJobs.length === 0 ? (
             <div className="bg-[#2D2D2D] rounded-xl p-8 text-center border border-[#3A3A3A]">
@@ -235,7 +235,7 @@ export default function WorkerSchedule() {
                         className={`px-2.5 py-1 rounded-full text-xs font-medium ${
                           completed
                             ? 'bg-[#6B7280]/15 text-[#6B7280]'
-                            : 'bg-[#A3E635]/15 text-[#A3E635]'
+                            : 'bg-[#C4F542]/15 text-[#C4F542]'
                         }`}
                       >
                         {completed ? 'Completed' : job.status === 'in_progress' ? 'In Progress' : 'Scheduled'}
@@ -269,18 +269,18 @@ export default function WorkerSchedule() {
           onClick={() => setShowCalendar(false)}
         >
           <div
-            className="bg-zinc-900 w-full max-w-sm rounded-2xl border border-zinc-800 shadow-2xl"
+            className="bg-[#1F1F1F] w-full max-w-sm rounded-2xl border border-[#2A2A2A] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+            <div className="flex items-center justify-between p-4 border-b border-[#2A2A2A]">
               <button
                 onClick={() => {
                   const newMonth = new Date(calendarMonth);
                   newMonth.setMonth(newMonth.getMonth() - 1);
                   setCalendarMonth(newMonth);
                 }}
-                className="p-2 hover:bg-zinc-800 rounded-lg"
+                className="p-2 hover:bg-[#2A2A2A] rounded-lg"
               >
                 <ChevronLeft className="w-5 h-5 text-zinc-400" />
               </button>
@@ -293,7 +293,7 @@ export default function WorkerSchedule() {
                   newMonth.setMonth(newMonth.getMonth() + 1);
                   setCalendarMonth(newMonth);
                 }}
-                className="p-2 hover:bg-zinc-800 rounded-lg"
+                className="p-2 hover:bg-[#2A2A2A] rounded-lg"
               >
                 <ChevronRight className="w-5 h-5 text-zinc-400" />
               </button>
@@ -349,15 +349,15 @@ export default function WorkerSchedule() {
                         }}
                         className={`aspect-square flex flex-col items-center justify-center rounded-lg text-sm transition-colors relative ${
                           isSelected
-                            ? 'bg-[#a3e635] text-zinc-900 font-bold'
+                            ? 'bg-[#C4F542] text-zinc-900 font-bold'
                             : isToday
-                            ? 'bg-zinc-800 text-white'
-                            : 'text-zinc-400 hover:bg-zinc-800'
+                            ? 'bg-[#2A2A2A] text-white'
+                            : 'text-zinc-400 hover:bg-[#2A2A2A]'
                         }`}
                       >
                         {day}
                         {hasJobs && !isSelected && (
-                          <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-[#a3e635]" />
+                          <span className="absolute bottom-1 w-1.5 h-1.5 rounded-full bg-[#C4F542]" />
                         )}
                       </button>
                     );
@@ -369,7 +369,7 @@ export default function WorkerSchedule() {
             </div>
 
             {/* Modal Footer */}
-            <div className="p-4 border-t border-zinc-800 flex gap-2">
+            <div className="p-4 border-t border-[#2A2A2A] flex gap-2">
               <button
                 onClick={() => {
                   const today = new Date();
@@ -384,13 +384,13 @@ export default function WorkerSchedule() {
                   setWeekStart(monday);
                   setShowCalendar(false);
                 }}
-                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+                className="flex-1 py-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] text-zinc-300 font-medium rounded-xl transition-colors"
               >
                 Today
               </button>
               <button
                 onClick={() => setShowCalendar(false)}
-                className="flex-1 py-3 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 font-medium rounded-xl transition-colors"
+                className="flex-1 py-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] text-zinc-300 font-medium rounded-xl transition-colors"
               >
                 Close
               </button>

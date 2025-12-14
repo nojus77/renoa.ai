@@ -48,7 +48,7 @@ function StatCard({
   label: string;
 }) {
   return (
-    <div className="bg-[#2D2D2D] rounded-2xl p-5 flex flex-col gap-2 border border-[#3A3A3A]">
+    <div className="bg-[#1F1F1F] rounded-2xl p-5 flex flex-col gap-2 border border-[#2A2A2A]">
       <Icon className={`w-8 h-8 ${iconColor}`} />
       <p className="text-[28px] font-bold text-white leading-none">{value}</p>
       <p className="text-sm text-[#9CA3AF]">{label}</p>
@@ -77,7 +77,7 @@ function WorkHistoryCard({
   return (
     <button
       onClick={onClick}
-      className="w-full text-left bg-[#2D2D2D] rounded-xl p-4 mb-3 border border-[#3A3A3A] hover:bg-[#3A3A3A] transition-colors active:scale-[0.99]"
+      className="w-full text-left bg-[#1F1F1F] rounded-xl p-4 mb-3 border border-[#2A2A2A] hover:bg-[#2A2A2A] transition-colors active:scale-[0.99]"
     >
       <div className="flex items-center justify-between">
         <div className="flex-1 min-w-0">
@@ -89,11 +89,11 @@ function WorkHistoryCard({
         </div>
         <div className="flex items-center gap-2 ml-3 shrink-0">
           <div className="text-right flex flex-col items-end gap-2">
-            <p className="text-lg font-bold text-[#A3E635]">{amount}</p>
+            <p className="text-lg font-bold text-[#C4F542]">{amount}</p>
             <span
               className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full font-semibold ${
                 isPaid
-                  ? 'bg-[#A3E635]/15 text-[#A3E635]'
+                  ? 'bg-[#C4F542]/15 text-[#C4F542]'
                   : 'bg-[#F59E0B]/15 text-[#F59E0B]'
               }`}
             >
@@ -182,12 +182,12 @@ export default function WorkerEarnings() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h1 className="text-[32px] font-bold text-white">Earnings</h1>
-          <div className="flex bg-[#2D2D2D] rounded-xl p-1 border border-[#3A3A3A]">
+          <div className="flex bg-[#1F1F1F] rounded-xl p-1 border border-[#2A2A2A]">
             <button
               onClick={() => setPeriod('week')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 period === 'week'
-                  ? 'bg-[#A3E635] text-zinc-900'
+                  ? 'bg-[#C4F542] text-zinc-900'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -197,7 +197,7 @@ export default function WorkerEarnings() {
               onClick={() => setPeriod('month')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 period === 'month'
-                  ? 'bg-[#A3E635] text-zinc-900'
+                  ? 'bg-[#C4F542] text-zinc-900'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -207,7 +207,7 @@ export default function WorkerEarnings() {
         </div>
 
         {/* Pay Rate Card */}
-        <div className="bg-[#2D2D2D] rounded-2xl p-6 border border-[#3A3A3A]">
+        <div className="bg-[#1F1F1F] rounded-2xl p-6 border border-[#2A2A2A]">
           <p className="text-sm text-gray-400">Your pay rate</p>
           <p className="text-[28px] font-bold text-white mt-1">{getPayRateDisplay()}</p>
           {getPayRateDisplay() === 'Not set' && (
@@ -219,25 +219,25 @@ export default function WorkerEarnings() {
         <div className="grid grid-cols-2 gap-3">
           <StatCard
             icon={DollarSign}
-            iconColor="text-[#A3E635]"
+            iconColor="text-[#C4F542]"
             value={`$${summary.totalEarnings.toFixed(2)}`}
             label="Total Earned"
           />
           <StatCard
             icon={Clock}
-            iconColor="text-[#A3E635]"
+            iconColor="text-[#C4F542]"
             value={`${summary.totalHours.toFixed(1)}h`}
             label="Hours Worked"
           />
           <StatCard
             icon={Briefcase}
-            iconColor="text-[#A3E635]"
+            iconColor="text-[#C4F542]"
             value={`${summary.jobsCompleted}`}
             label="Jobs Completed"
           />
           <StatCard
             icon={AlertCircle}
-            iconColor="text-[#A3E635]"
+            iconColor="text-[#C4F542]"
             value={`$${summary.pendingPay.toFixed(2)}`}
             label="Pending Pay"
           />
@@ -249,10 +249,10 @@ export default function WorkerEarnings() {
 
           {loading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="w-8 h-8 animate-spin text-[#A3E635]" />
+              <Loader2 className="w-8 h-8 animate-spin text-[#C4F542]" />
             </div>
           ) : Object.keys(byDate).length === 0 ? (
-            <div className="bg-[#2D2D2D] rounded-2xl p-10 text-center border border-[#3A3A3A]">
+            <div className="bg-[#1F1F1F] rounded-2xl p-10 text-center border border-[#2A2A2A]">
               <Briefcase className="w-12 h-12 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-400">No work logs for this period</p>
               <p className="text-gray-500 text-sm mt-1">Complete jobs to see your earnings here</p>
