@@ -1190,6 +1190,93 @@ export default function JobDetailPage() {
           <span className={`font-medium ${statusConfig.text}`}>{statusConfig.label}</span>
         </div>
 
+        {/* Time Tracking Summary - Only for Completed Jobs */}
+        {status === 'completed' && job.completedAt && (
+          <div className="bg-[#2D2D2D] rounded-xl border border-[#3A3A3A] overflow-hidden">
+            <div className="p-4 border-b border-[#3A3A3A]">
+              <div className="flex items-center gap-2">
+                <Timer className="w-5 h-5" style={{ color: LIME_GREEN }} />
+                <h3 className="font-medium text-white">Job Summary</h3>
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="space-y-3">
+                {/* Scheduled Time */}
+                <div className="flex justify-between items-center">
+                  <span className="text-[#9CA3AF] text-sm">Scheduled</span>
+                  <span className="text-white text-sm font-medium">
+                    {formatTime(job.startTime)} - {formatTime(job.endTime)}
+                  </span>
+                </div>
+
+                {/* Arrival Time */}
+                {job.arrivedAt && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#9CA3AF] text-sm">Arrived</span>
+                    <span className="text-white text-sm font-medium">
+                      {formatTime(job.arrivedAt)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Work Started (from work log clockIn) */}
+                {job.workLogs?.[0]?.clockIn && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-[#9CA3AF] text-sm">Started Work</span>
+                    <span className="text-white text-sm font-medium">
+                      {formatTime(job.workLogs[0].clockIn)}
+                    </span>
+                  </div>
+                )}
+
+                {/* Completion Time */}
+                <div className="flex justify-between items-center">
+                  <span className="text-[#9CA3AF] text-sm">Completed</span>
+                  <span className="text-white text-sm font-medium">
+                    {formatTime(job.completedAt)}
+                  </span>
+                </div>
+
+                {/* Divider */}
+                <div className="border-t border-[#3A3A3A] pt-3 mt-3">
+                  {/* Duration from work log */}
+                  {job.workLogs?.[0]?.hoursWorked && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-[#9CA3AF] text-sm">Work Duration</span>
+                      <span className="font-semibold" style={{ color: LIME_GREEN }}>
+                        {job.workLogs[0].hoursWorked >= 1
+                          ? `${Math.floor(job.workLogs[0].hoursWorked)}h ${Math.round((job.workLogs[0].hoursWorked % 1) * 60)}m`
+                          : `${Math.round(job.workLogs[0].hoursWorked * 60)}m`
+                        }
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Time on Site (arrival to completion) */}
+                  {job.arrivedAt && job.completedAt && (
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-[#9CA3AF] text-sm">Time on Site</span>
+                      <span className="text-white text-sm font-medium">
+                        {getDuration(job.arrivedAt, job.completedAt)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Earnings */}
+                  {job.workLogs?.[0]?.earnings && (
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-[#9CA3AF] text-sm">Earned</span>
+                      <span className="font-bold text-lg" style={{ color: LIME_GREEN }}>
+                        ${job.workLogs[0].earnings.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Main Job Info Card */}
         <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
           {/* Service Type Header */}
@@ -1257,21 +1344,10 @@ export default function JobDetailPage() {
             </div>
           </div>
 
-          {/* Customer Notes - only show if present */}
-          {job.customerNotes && (
-            <div className="p-4">
-              <div className="bg-amber-500/10 border border-amber-500/20 rounded-lg p-3">
-                <p className="text-xs text-amber-400 uppercase tracking-wider mb-1">
-                  Customer Request
-                </p>
-                <p className="text-zinc-300 text-sm">{job.customerNotes}</p>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Job Description Section - Show work scope from dispatcher */}
-        {job.internalNotes && (
+        {/* Job Description Section - Work scope set by dispatcher */}
+        {job.customerNotes && (
           <div className="bg-[#2D2D2D] rounded-xl border border-[#3A3A3A] overflow-hidden">
             <div className="p-4 border-b border-[#3A3A3A]">
               <div className="flex items-center gap-2">
@@ -1280,7 +1356,7 @@ export default function JobDetailPage() {
               </div>
             </div>
             <div className="p-4">
-              <p className="text-[#9CA3AF] text-sm whitespace-pre-wrap">{job.internalNotes}</p>
+              <p className="text-[#9CA3AF] text-sm whitespace-pre-wrap">{job.customerNotes}</p>
             </div>
           </div>
         )}
