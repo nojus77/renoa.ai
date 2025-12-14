@@ -109,12 +109,53 @@ interface MyCrew {
   memberCount: number;
 }
 
-// Common skills by category
-const AVAILABLE_SKILLS: Record<string, string[]> = {
-  'HVAC': ['AC Installation', 'AC Repair', 'Furnace Repair', 'Duct Cleaning', 'Heat Pump', 'Refrigerant Handling', 'Thermostat Install'],
-  'Plumbing': ['Pipe Repair', 'Drain Cleaning', 'Water Heater', 'Fixture Install', 'Sewer Line', 'Leak Detection'],
-  'Electrical': ['Wiring', 'Panel Upgrades', 'Lighting', 'Troubleshooting', 'Code Corrections', 'EV Charger'],
+// Skills organized by company category - filter shown based on company type
+const SKILLS_BY_CATEGORY: Record<string, string[]> = {
+  'HVAC': ['AC Installation', 'AC Repair', 'Furnace Repair', 'Duct Cleaning', 'Heat Pump', 'Refrigerant Handling', 'Thermostat Install', 'Air Quality', 'Maintenance Plans', 'Heating Repair'],
+  'Plumbing': ['Pipe Repair', 'Drain Cleaning', 'Water Heater', 'Fixture Install', 'Sewer Line', 'Leak Detection', 'Garbage Disposal', 'Bathroom Remodel', 'Water Filtration'],
+  'Electrical': ['Wiring', 'Panel Upgrades', 'Lighting', 'Troubleshooting', 'Code Corrections', 'EV Charger', 'Outlet Installation', 'Ceiling Fans', 'Generator Installation'],
+  'Roofing': ['Shingle Repair', 'Roof Replacement', 'Gutter Install', 'Gutter Cleaning', 'Roof Inspection', 'Leak Repair', 'Flat Roof', 'Metal Roofing', 'Skylight Install'],
+  'Painting': ['Interior Painting', 'Exterior Painting', 'Cabinet Painting', 'Deck Staining', 'Wallpaper', 'Pressure Washing', 'Drywall Repair', 'Color Consulting'],
+  'Landscaping & Lawn Care': ['Lawn Mowing', 'Leaf Removal', 'Tree Trimming', 'Landscape Design', 'Irrigation', 'Fertilization', 'Mulching', 'Snow Removal', 'Hedge Trimming'],
+  'Home Remodeling': ['Kitchen Remodel', 'Bathroom Remodel', 'Basement Finishing', 'Room Additions', 'Flooring', 'Tile Work', 'Custom Carpentry', 'Deck Building'],
+  'Fencing': ['Wood Fence', 'Vinyl Fence', 'Chain Link', 'Iron/Metal Fence', 'Gate Installation', 'Fence Repair', 'Privacy Fence'],
+  'Flooring': ['Hardwood Install', 'Laminate', 'Tile', 'Carpet', 'Vinyl/LVP', 'Floor Refinishing', 'Subfloor Repair'],
+  'Cleaning Services': ['Regular Cleaning', 'Deep Cleaning', 'Move-in/Move-out', 'Window Cleaning', 'Carpet Cleaning', 'Pressure Washing', 'Post-Construction'],
+  'General Contracting': ['Project Management', 'Permit Handling', 'Full Renovations', 'New Construction', 'Commercial Build-out'],
   'General': ['Customer Service', 'Heavy Lifting', 'Driving', 'Documentation', 'Safety Certified'],
+};
+
+// Function to get skills filtered by company category
+const getFilteredSkills = (companyCategory: string | null | undefined): Record<string, string[]> => {
+  // Always include General skills
+  const result: Record<string, string[]> = {
+    'General': SKILLS_BY_CATEGORY['General'],
+  };
+
+  // If no category, return all skills
+  if (!companyCategory) {
+    return SKILLS_BY_CATEGORY;
+  }
+
+  // Find matching category (case-insensitive partial match)
+  const normalizedCategory = companyCategory.toLowerCase();
+
+  for (const [category, skills] of Object.entries(SKILLS_BY_CATEGORY)) {
+    if (category === 'General') continue; // Already added
+
+    const normalizedCat = category.toLowerCase();
+    // Match if category contains the company type or vice versa
+    if (normalizedCat.includes(normalizedCategory) || normalizedCategory.includes(normalizedCat)) {
+      result[category] = skills;
+    }
+  }
+
+  // If only General was found, show all skills (fallback)
+  if (Object.keys(result).length === 1) {
+    return SKILLS_BY_CATEGORY;
+  }
+
+  return result;
 };
 
 // Common equipment items
@@ -496,78 +537,70 @@ export default function WorkerProfile() {
 
   return (
     <WorkerLayout>
-      <div className="min-h-screen bg-black pb-28">
-        {/* Header Card with Lime Green Glow */}
-        <div className="relative overflow-hidden bg-gradient-to-b from-zinc-900 to-black">
-          {/* Glow effect */}
-          <div
-            className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full blur-3xl opacity-30"
-            style={{ backgroundColor: LIME_GREEN }}
-          />
-
-          <div className="relative px-4 py-8">
-            <div className="flex flex-col items-center text-center">
-              {/* Profile Photo */}
-              <div className="relative group mb-4">
-                <div
-                  className="w-28 h-28 rounded-full bg-zinc-800 border-4 flex items-center justify-center overflow-hidden shadow-lg"
-                  style={{ borderColor: LIME_GREEN }}
-                >
-                  {profile.profilePhotoUrl ? (
-                    <img
-                      src={profile.profilePhotoUrl}
-                      alt={profile.firstName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <User className="w-12 h-12 text-zinc-500" />
-                  )}
-                </div>
-                <label
-                  className="absolute bottom-0 right-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-lg cursor-pointer"
-                  style={{ backgroundColor: LIME_GREEN }}
-                >
-                  {uploadingPhoto ? (
-                    <Loader2 className="w-4 h-4 text-black animate-spin" />
-                  ) : (
-                    <Camera className="w-4 h-4 text-black" />
-                  )}
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                    disabled={uploadingPhoto}
-                  />
-                </label>
-              </div>
-
-              {/* Name and Title */}
-              <h1 className="text-2xl font-bold text-white mb-1">
-                {profile.firstName} {profile.lastName}
-              </h1>
-              <p className="text-zinc-400 mb-3">
-                Field Worker at <span style={{ color: LIME_GREEN }} className="font-medium">Renoa</span>
-              </p>
-
-              {/* Status Badge */}
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
-                  profile.status === 'active'
-                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
-                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                }`}
+      <div className="min-h-screen bg-black">
+        {/* Header Section - Clean, no glow */}
+        <div className="bg-[#1F1F1F] px-4 py-8">
+          <div className="flex flex-col items-center text-center">
+            {/* Profile Photo */}
+            <div className="relative group mb-4">
+              <div
+                className="w-28 h-28 rounded-full bg-zinc-800 border-4 flex items-center justify-center overflow-hidden shadow-lg"
+                style={{ borderColor: LIME_GREEN }}
               >
-                <span className={`w-2 h-2 rounded-full ${profile.status === 'active' ? 'bg-green-400' : 'bg-red-400'}`} />
-                {profile.status === 'active' ? 'Active' : 'Inactive'}
-              </span>
+                {profile.profilePhotoUrl ? (
+                  <img
+                    src={profile.profilePhotoUrl}
+                    alt={profile.firstName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="w-12 h-12 text-zinc-500" />
+                )}
+              </div>
+              <label
+                className="absolute bottom-0 right-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-lg cursor-pointer"
+                style={{ backgroundColor: LIME_GREEN }}
+              >
+                {uploadingPhoto ? (
+                  <Loader2 className="w-4 h-4 text-black animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4 text-black" />
+                )}
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                  disabled={uploadingPhoto}
+                />
+              </label>
             </div>
+
+            {/* Name and Title */}
+            <h1 className="text-2xl font-bold text-white mb-1">
+              {profile.firstName} {profile.lastName}
+            </h1>
+            <p className="text-zinc-400 mb-3">
+              Field Worker at <span style={{ color: LIME_GREEN }} className="font-medium">Renoa</span>
+            </p>
+
+            {/* Status Badge */}
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
+                profile.status === 'active'
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${profile.status === 'active' ? 'bg-green-400' : 'bg-red-400'}`} />
+              {profile.status === 'active' ? 'Active' : 'Inactive'}
+            </span>
           </div>
         </div>
 
         {/* Stats Row */}
-        <div className="px-4 -mt-4">
+        <div className="px-4 pt-4">
           <div className="grid grid-cols-3 gap-3">
             {/* Jobs This Week */}
             <div className="bg-[#1F1F1F] rounded-[20px] p-4 border border-[#2A2A2A]">
@@ -795,7 +828,12 @@ export default function WorkerProfile() {
                     <ChevronRight className="w-5 h-5 text-zinc-600" />
                   </button>
 
-                  <button className="w-full flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors">
+                  <button
+                    onClick={() => {
+                      toast.info('Notification settings coming soon!');
+                    }}
+                    className="w-full flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 bg-zinc-800 rounded-lg flex items-center justify-center">
                         <Bell className="w-4 h-4 text-zinc-400" />
@@ -931,7 +969,7 @@ export default function WorkerProfile() {
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-6 border-t border-zinc-800 space-y-4">
+          <div className="pt-6 pb-6 border-t border-zinc-800 space-y-4">
             <button
               onClick={handleLogout}
               className="w-full h-12 border-2 border-red-500/50 hover:border-red-500 hover:bg-red-500/10 text-red-400 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
@@ -949,17 +987,22 @@ export default function WorkerProfile() {
           </div>
         </div>
 
-        {/* Skills Edit Modal */}
+        {/* Skills Edit Modal - Filtered by company category */}
         <Dialog open={skillsModalOpen} onOpenChange={setSkillsModalOpen}>
           <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md max-h-[85vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle className="text-white">Edit Skills</DialogTitle>
               <DialogDescription className="text-zinc-400">
                 Select the skills you have to help match you with the right jobs.
+                {profile.provider.primaryCategory && (
+                  <span className="block mt-1 text-xs" style={{ color: LIME_GREEN }}>
+                    Showing skills for: {profile.provider.primaryCategory}
+                  </span>
+                )}
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6 mt-4">
-              {Object.entries(AVAILABLE_SKILLS).map(([category, skills]) => (
+              {Object.entries(getFilteredSkills(profile.provider.primaryCategory)).map(([category, skills]) => (
                 <div key={category}>
                   <h3 className="text-sm font-semibold text-zinc-300 mb-3">{category}</h3>
                   <div className="flex flex-wrap gap-2">
