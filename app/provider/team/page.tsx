@@ -2297,8 +2297,7 @@ export default function TeamManagementPage() {
                               size="sm"
                               className="flex-1 bg-green-600 hover:bg-green-700"
                               onClick={() => {
-                                // TODO: Navigate to calendar with crew filter or open job assignment modal
-                                console.log('Assign jobs to crew:', crew.id);
+                                window.location.href = `/provider/calendar?crew=${crew.id}&mode=assign`;
                               }}
                             >
                               <CalendarPlus className="w-4 h-4 mr-1" />
@@ -2309,7 +2308,6 @@ export default function TeamManagementPage() {
                               variant="outline"
                               className="flex-1 border-zinc-600 hover:bg-zinc-800"
                               onClick={() => {
-                                // TODO: Navigate to calendar with crew filter
                                 window.location.href = `/provider/calendar?crew=${crew.id}`;
                               }}
                             >

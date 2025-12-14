@@ -25,6 +25,8 @@ import {
   Bell,
   Shield,
   Trash2,
+  Crown,
+  Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -80,6 +82,26 @@ interface UserProfile {
   };
 }
 
+interface CrewMember {
+  id: string;
+  name: string;
+  profilePhotoUrl: string | null;
+  role: string;
+}
+
+interface MyCrew {
+  id: string;
+  name: string;
+  color: string;
+  leader: {
+    id: string;
+    name: string;
+    profilePhotoUrl: string | null;
+  } | null;
+  members: CrewMember[];
+  memberCount: number;
+}
+
 export default function WorkerProfile() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -100,6 +122,9 @@ export default function WorkerProfile() {
 
   // Skills state
   const [workerSkills, setWorkerSkills] = useState<WorkerSkill[]>([]);
+
+  // Crew state
+  const [myCrew, setMyCrew] = useState<MyCrew | null>(null);
 
   // UI states
   const [savingProfile, setSavingProfile] = useState(false);
@@ -150,6 +175,16 @@ export default function WorkerProfile() {
       return;
     }
     fetchProfile(uid);
+
+    // Fetch crew data
+    fetch(`/api/worker/my-crew?userId=${uid}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.crew) {
+          setMyCrew(data.crew);
+        }
+      })
+      .catch((err) => console.error('Error fetching crew:', err));
   }, [router, fetchProfile]);
 
   // Track profile changes
@@ -582,6 +617,82 @@ export default function WorkerProfile() {
                     </div>
                     <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded">Coming Soon</span>
                   </div>
+                </div>
+              </div>
+
+              {/* My Crew Card */}
+              <div className="bg-zinc-900 rounded-xl border border-zinc-800">
+                <div className="p-6 border-b border-zinc-800">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-cyan-400" />
+                    <h2 className="text-lg font-semibold text-white">My Crew</h2>
+                  </div>
+                </div>
+                <div className="p-6">
+                  {myCrew ? (
+                    <div>
+                      <div className="flex items-center gap-2 mb-4">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: myCrew.color }}
+                        />
+                        <h3 className="font-semibold text-white">{myCrew.name}</h3>
+                        <span className="text-zinc-500 text-sm">
+                          ({myCrew.memberCount} {myCrew.memberCount === 1 ? 'member' : 'members'})
+                        </span>
+                      </div>
+
+                      {myCrew.leader && (
+                        <div className="flex items-center gap-2 mb-4 p-3 bg-zinc-800/50 rounded-lg">
+                          <Crown className="w-4 h-4 text-yellow-500" />
+                          <span className="text-zinc-400 text-sm">Leader:</span>
+                          <div className="flex items-center gap-2">
+                            {myCrew.leader.profilePhotoUrl ? (
+                              <img
+                                src={myCrew.leader.profilePhotoUrl}
+                                alt=""
+                                className="w-6 h-6 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-6 h-6 bg-zinc-700 rounded-full flex items-center justify-center">
+                                <User className="w-3 h-3 text-zinc-500" />
+                              </div>
+                            )}
+                            <span className="text-white font-medium text-sm">{myCrew.leader.name}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {myCrew.members.length > 0 && (
+                        <div>
+                          <span className="text-zinc-500 text-sm block mb-2">Crewmates:</span>
+                          <div className="space-y-2">
+                            {myCrew.members.map((member) => (
+                              <div key={member.id} className="flex items-center gap-2">
+                                {member.profilePhotoUrl ? (
+                                  <img
+                                    src={member.profilePhotoUrl}
+                                    alt=""
+                                    className="w-8 h-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center">
+                                    <User className="w-4 h-4 text-zinc-500" />
+                                  </div>
+                                )}
+                                <span className="text-white text-sm">{member.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <Users className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+                      <p className="text-zinc-500 text-sm">You&apos;re not assigned to a crew</p>
+                    </div>
+                  )}
                 </div>
               </div>
 

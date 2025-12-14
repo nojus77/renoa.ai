@@ -2,7 +2,7 @@
 
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { Clock, Home } from 'lucide-react';
+import { Clock, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { WeeklyJob } from './WeeklyTeamCalendar';
 
@@ -69,28 +69,53 @@ export default function JobPill({ job, workerId, date, color, onClick }: JobPill
       title={`${job.serviceType} - ${job.customerName}\n${job.startTime} - ${job.endTime}`}
     >
       <div
-        className="rounded-md px-2 py-1.5 border"
+        className="rounded-md px-2 py-1.5 border relative overflow-hidden"
         style={{
           backgroundColor: `${color}15`,
           borderColor: `${color}40`,
         }}
       >
+        {/* Crew color indicator bar */}
+        {job.crewColor && (
+          <div
+            className="absolute left-0 top-0 bottom-0 w-1"
+            style={{ backgroundColor: job.crewColor }}
+            title={`Crew: ${job.crewName}`}
+          />
+        )}
+
         {/* Service Type with Icon */}
-        <div className="flex items-center gap-1 text-xs font-medium text-zinc-200 truncate">
+        <div className={cn(
+          "flex items-center gap-1 text-xs font-medium text-zinc-200 truncate",
+          job.crewColor && "pl-1.5"
+        )}>
           <span>{icon}</span>
           <span className="truncate">{job.serviceType}</span>
         </div>
 
         {/* Customer + Duration */}
-        <div className="flex items-center justify-between gap-1 text-xs text-zinc-400 mt-0.5">
+        <div className={cn(
+          "flex items-center justify-between gap-1 text-xs text-zinc-400 mt-0.5",
+          job.crewColor && "pl-1.5"
+        )}>
           <span className="truncate">{job.customerName}</span>
           <span className="flex-shrink-0">({job.duration}h)</span>
         </div>
 
-        {/* Time */}
-        <div className="flex items-center gap-1 text-xs text-zinc-500 mt-0.5">
-          <Clock className="h-2.5 w-2.5" />
-          <span>{job.startTime}</span>
+        {/* Time and Crew info */}
+        <div className={cn(
+          "flex items-center justify-between gap-1 text-xs text-zinc-500 mt-0.5",
+          job.crewColor && "pl-1.5"
+        )}>
+          <div className="flex items-center gap-1">
+            <Clock className="h-2.5 w-2.5" />
+            <span>{job.startTime}</span>
+          </div>
+          {job.crewName && (
+            <div className="flex items-center gap-0.5" title={`Crew: ${job.crewName}`}>
+              <Users className="h-2.5 w-2.5" style={{ color: job.crewColor || undefined }} />
+            </div>
+          )}
         </div>
       </div>
     </div>

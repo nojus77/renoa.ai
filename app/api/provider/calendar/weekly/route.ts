@@ -14,6 +14,9 @@ interface DayJob {
   duration: number;
   status: string;
   estimatedValue: number | null;
+  assignedCrewId: string | null;
+  crewName: string | null;
+  crewColor: string | null;
 }
 
 interface WorkerDay {
@@ -113,6 +116,13 @@ export async function GET(request: NextRequest) {
       },
       include: {
         customer: true,
+        assignedCrew: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
       },
       orderBy: {
         startTime: 'asc',
@@ -191,6 +201,9 @@ export async function GET(request: NextRequest) {
             duration: (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60),
             status: job.status,
             estimatedValue: job.estimatedValue ? Number(job.estimatedValue) : null,
+            assignedCrewId: job.assignedCrewId,
+            crewName: job.assignedCrew?.name || null,
+            crewColor: job.assignedCrew?.color || null,
           })),
           conflicts,
         };

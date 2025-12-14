@@ -231,8 +231,21 @@ export async function scheduleJobsForDate(
     };
 
     // ─────────────────────────────────────────────────────────────────
-    // 3. SCHEDULE JOBS (GREEDY ALGORITHM)
+    // 3. SCHEDULE JOBS (GREEDY ALGORITHM WITH CREW PRE-PASS)
     // ─────────────────────────────────────────────────────────────────
+
+    // Load crews for crew-aware assignment
+    const crews = await prisma.crew.findMany({
+      where: { providerId },
+      select: {
+        id: true,
+        name: true,
+        userIds: true,
+        color: true,
+      },
+    });
+
+    console.log(`👥 Found ${crews.length} crews for crew-aware scheduling`);
 
     const assignments: ProposedAssignment[] = [];
     const unassignedJobs: JobWithDetails[] = [];
@@ -240,11 +253,18 @@ export async function scheduleJobsForDate(
     for (const job of jobs) {
       console.log(`\n🎯 Scheduling: ${job.serviceType} at ${new Date(job.startTime).toLocaleTimeString()}`);
 
-      const assignment = await assignJobToWorker(job, context);
+      // Try crew assignment first
+      let assignment = await tryCrewAssignment(job, crews, context);
+
+      // Fall back to individual worker assignment
+      if (!assignment) {
+        assignment = await assignJobToWorker(job, context);
+      }
 
       if (assignment) {
         assignments.push(assignment);
-        console.log(`✅ Assigned to worker(s): ${assignment.workerIds.join(', ')} (score: ${assignment.totalScore})`);
+        const assignType = assignment.workerIds.length > 1 ? 'crew' : 'worker';
+        console.log(`✅ Assigned to ${assignType}: ${assignment.workerIds.join(', ')} (score: ${assignment.totalScore})`);
       } else {
         unassignedJobs.push(job);
         console.log(`❌ Could not assign job ${job.id} (${job.serviceType}) - no viable workers found`);
@@ -459,4 +479,128 @@ async function assignJobToWorker(
     totalScore: primaryWorker.totalScore,
     scoreBreakdown: primaryWorker.breakdown
   };
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TRY CREW ASSIGNMENT
+// ═══════════════════════════════════════════════════════════════════
+
+interface CrewInfo {
+  id: string;
+  name: string;
+  userIds: string[];
+  color: string;
+}
+
+async function tryCrewAssignment(
+  job: JobWithDetails,
+  crews: CrewInfo[],
+  context: SchedulingContext
+): Promise<ProposedAssignment | null> {
+  const jobStart = new Date(job.startTime);
+  const jobEnd = new Date(job.endTime);
+  const jobDuration = (jobEnd.getTime() - jobStart.getTime()) / (1000 * 60);
+
+  // Skip crew assignment for single-person jobs
+  const crewSizeRequired = job.crewSizeRequired || 1;
+  if (crewSizeRequired < 2) {
+    return null;
+  }
+
+  console.log(`   👥 Trying crew assignment (requires ${crewSizeRequired} workers)...`);
+
+  for (const crew of crews) {
+    // Skip crews with fewer members than required
+    if (crew.userIds.length < crewSizeRequired) {
+      continue;
+    }
+
+    // Get active crew members from context
+    const activeCrewMembers = context.workers.filter(
+      w => crew.userIds.includes(w.id)
+    );
+
+    if (activeCrewMembers.length < crewSizeRequired) {
+      console.log(`   ❌ Crew "${crew.name}": Not enough active members (${activeCrewMembers.length}/${crewSizeRequired})`);
+      continue;
+    }
+
+    // Check if ALL crew members are available
+    const availabilityChecks = await Promise.all(
+      activeCrewMembers.map(async (member) => {
+        const available = await checkAvailability({
+          userId: member.id,
+          date: jobStart,
+          startTime: formatInProviderTz(job.startTime, 'HH:mm', 'America/Chicago'),
+          endTime: formatInProviderTz(job.endTime, 'HH:mm', 'America/Chicago'),
+          durationHours: jobDuration / 60
+        });
+        return { member, available: available.available };
+      })
+    );
+
+    const allAvailable = availabilityChecks.every(check => check.available);
+
+    if (!allAvailable) {
+      const unavailable = availabilityChecks
+        .filter(c => !c.available)
+        .map(c => `${c.member.firstName}`);
+      console.log(`   ❌ Crew "${crew.name}": Members unavailable: ${unavailable.join(', ')}`);
+      continue;
+    }
+
+    // All crew members are available! Assign the crew
+    console.log(`   ✅ Crew "${crew.name}" is available with all ${activeCrewMembers.length} members`);
+
+    const crewMemberIds = activeCrewMembers.map(m => m.id);
+
+    // Calculate drive time from first member's location
+    let driveTime = 0;
+    const primaryMember = activeCrewMembers[0];
+    const primarySchedule = context.existingAssignments.get(primaryMember.id);
+    if (primarySchedule?.currentLocation && job.latitude && job.longitude) {
+      const distance = calculateHaversineDistance(
+        primarySchedule.currentLocation,
+        { latitude: job.latitude, longitude: job.longitude }
+      );
+      driveTime = Math.ceil(distance.miles / 30 * 60);
+    }
+
+    // Update context for all crew members
+    for (const memberId of crewMemberIds) {
+      const schedule = context.existingAssignments.get(memberId);
+      if (schedule) {
+        schedule.jobs.push({
+          job,
+          startTime: jobStart,
+          endTime: jobEnd,
+          orderInRoute: schedule.jobs.length + 1
+        });
+        schedule.totalHours += jobDuration / 60;
+        schedule.totalDriveTime += driveTime;
+        if (job.latitude && job.longitude) {
+          schedule.currentLocation = { latitude: job.latitude, longitude: job.longitude };
+        }
+      }
+    }
+
+    return {
+      jobId: job.id,
+      workerIds: crewMemberIds,
+      suggestedStart: jobStart,
+      suggestedEnd: jobEnd,
+      orderInRoute: primarySchedule?.jobs.length || 1,
+      driveTimeFromPrev: driveTime,
+      totalScore: 85, // Crew assignments get a good base score
+      scoreBreakdown: {
+        sla: 90,
+        route: 80,
+        continuity: 85,
+        balance: 85
+      }
+    };
+  }
+
+  console.log(`   ℹ️ No available crews found, falling back to individual assignment`);
+  return null;
 }

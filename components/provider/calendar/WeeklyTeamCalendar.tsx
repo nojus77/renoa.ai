@@ -46,6 +46,9 @@ export interface WeeklyJob {
   duration: number;
   status: string;
   estimatedValue: number | null;
+  assignedCrewId?: string | null;
+  crewName?: string | null;
+  crewColor?: string | null;
 }
 
 export interface WorkerDay {

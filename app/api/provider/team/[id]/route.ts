@@ -4,6 +4,47 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 /**
+ * Remove a worker from all crews they belong to
+ * Also clears leaderId if they were the leader
+ */
+async function cleanupWorkerFromCrews(workerId: string, providerId: string): Promise<void> {
+  // Find all crews that contain this worker
+  const crewsWithWorker = await prisma.crew.findMany({
+    where: {
+      providerId,
+      userIds: { has: workerId },
+    },
+  });
+
+  // Update each crew to remove the worker
+  for (const crew of crewsWithWorker) {
+    const updatedUserIds = crew.userIds.filter(id => id !== workerId);
+    const updatedLeaderId = crew.leaderId === workerId ? null : crew.leaderId;
+
+    await prisma.crew.update({
+      where: { id: crew.id },
+      data: {
+        userIds: updatedUserIds,
+        leaderId: updatedLeaderId,
+      },
+    });
+
+    console.log(`🧹 Removed worker ${workerId} from crew "${crew.name}"`);
+  }
+
+  // Also clear leaderId for any crews where this worker was leader (belt and suspenders)
+  await prisma.crew.updateMany({
+    where: {
+      providerId,
+      leaderId: workerId,
+    },
+    data: {
+      leaderId: null,
+    },
+  });
+}
+
+/**
  * PATCH /api/provider/team/[id]
  * Update a team member's status, role, or hourly rate
  */
@@ -67,6 +108,11 @@ export async function PATCH(
         },
       });
       console.log(`📋 Status change logged: ${currentUser.status} → ${status} for user ${id}`);
+
+      // If worker is being deactivated, clean up their crew memberships
+      if (status === 'inactive' || status === 'terminated') {
+        await cleanupWorkerFromCrews(id, currentUser.providerId);
+      }
     }
 
     return NextResponse.json(updated);
@@ -98,6 +144,23 @@ export async function DELETE(
   try {
     const { id } = await params;
 
+    // Get the user's providerId before deletion for crew cleanup
+    const user = await prisma.providerUser.findUnique({
+      where: { id },
+      select: { providerId: true },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: 'Team member not found' },
+        { status: 404 }
+      );
+    }
+
+    // Clean up crew memberships before deleting
+    await cleanupWorkerFromCrews(id, user.providerId);
+
+    // Now delete the user
     await prisma.providerUser.delete({
       where: { id },
     });

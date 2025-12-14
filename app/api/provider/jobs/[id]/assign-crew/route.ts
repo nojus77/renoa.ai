@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import { getCrewAvailability, formatConflictMessage, getCrewMembers } from '@/lib/scheduling-utils';
+import { format } from 'date-fns';
 
 const prisma = new PrismaClient();
 
@@ -157,6 +158,24 @@ export async function POST(
         color: true,
       },
     });
+
+    // Create notifications for all crew members
+    const jobDate = format(new Date(job.startTime), 'EEEE, MMM d');
+    const jobTime = format(new Date(job.startTime), 'h:mm a');
+
+    await prisma.notification.createMany({
+      data: crewMemberIds.map((memberId) => ({
+        providerId,
+        userId: memberId,
+        type: 'crew_job_assigned',
+        title: 'New Job for Your Crew',
+        message: `Your crew "${crew.name}" has been assigned to ${job.serviceType} on ${jobDate} at ${jobTime}`,
+        link: `/worker/job/${jobId}`,
+        data: { jobId, crewId, crewName: crew.name },
+      })),
+    });
+
+    console.log(`📬 Created notifications for ${crewMemberIds.length} crew members`);
 
     return NextResponse.json({
       success: true,

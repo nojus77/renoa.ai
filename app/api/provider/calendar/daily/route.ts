@@ -12,6 +12,9 @@ interface WorkerJob {
   endTime: Date;
   status: string;
   address: string;
+  assignedCrewId: string | null;
+  crewName: string | null;
+  crewColor: string | null;
 }
 
 interface WorkerData {
@@ -95,6 +98,13 @@ export async function GET(request: NextRequest) {
             address: true,
           },
         },
+        assignedCrew: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
       },
       orderBy: { startTime: 'asc' },
     });
@@ -167,6 +177,9 @@ export async function GET(request: NextRequest) {
           endTime: job.endTime,
           status: job.status,
           address: job.address,
+          assignedCrewId: job.assignedCrewId,
+          crewName: job.assignedCrew?.name || null,
+          crewColor: job.assignedCrew?.color || null,
         })),
         capacity: {
           scheduled: Math.round(scheduledHours * 10) / 10,
