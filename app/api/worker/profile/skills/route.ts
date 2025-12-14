@@ -68,13 +68,13 @@ export async function PUT(request: NextRequest) {
     }
 
     // Remove existing worker skills
-    await prisma.workerSkill.deleteMany({
+    await prisma.providerUserSkill.deleteMany({
       where: { userId },
     });
 
     // Add new worker skills
     for (const skill of skillRecords) {
-      await prisma.workerSkill.create({
+      await prisma.providerUserSkill.create({
         data: {
           userId,
           skillId: skill.id,
