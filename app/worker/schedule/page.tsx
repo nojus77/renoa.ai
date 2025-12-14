@@ -264,8 +264,14 @@ export default function WorkerSchedule() {
 
       {/* Full Month Calendar Modal */}
       {showCalendar && (
-        <div className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4">
-          <div className="bg-zinc-900 w-full max-w-sm rounded-2xl border border-zinc-800 shadow-2xl">
+        <div
+          className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4"
+          onClick={() => setShowCalendar(false)}
+        >
+          <div
+            className="bg-zinc-900 w-full max-w-sm rounded-2xl border border-zinc-800 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Modal Header */}
             <div className="flex items-center justify-between p-4 border-b border-zinc-800">
               <button
