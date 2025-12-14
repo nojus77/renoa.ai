@@ -51,14 +51,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import SkillsCheckboxPicker, { WorkerSkill } from '@/components/provider/SkillsCheckboxPicker';
 
-// Renoa Design System Colors
-const COLORS = {
-  sageGreen: '#C8D5B9',
-  cream: '#F5F1E8',
-  teal: '#1A5F4F',
-  tealHover: '#164D40',
-  tealLight: '#1A5F4F20',
-};
+// Renoa Design System - Black + Lime Green Theme
+const LIME_GREEN = '#C4F542';
 
 interface Skill {
   skill: {
@@ -481,8 +475,8 @@ export default function WorkerProfile() {
   if (loading) {
     return (
       <WorkerLayout>
-        <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: COLORS.cream }}>
-          <Loader2 className="w-8 h-8 animate-spin" style={{ color: COLORS.teal }} />
+        <div className="flex items-center justify-center min-h-screen bg-black">
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: LIME_GREEN }} />
         </div>
       </WorkerLayout>
     );
@@ -491,8 +485,8 @@ export default function WorkerProfile() {
   if (!profile) {
     return (
       <WorkerLayout>
-        <div className="p-4 text-center" style={{ backgroundColor: COLORS.cream }}>
-          <p className="text-gray-600">Failed to load profile</p>
+        <div className="p-4 text-center bg-black min-h-screen">
+          <p className="text-zinc-400">Failed to load profile</p>
         </div>
       </WorkerLayout>
     );
@@ -502,25 +496,22 @@ export default function WorkerProfile() {
 
   return (
     <WorkerLayout>
-      <div className="min-h-screen pb-28" style={{ backgroundColor: COLORS.cream }}>
-        {/* Header Card with Sage Green Glow */}
-        <div
-          className="relative overflow-hidden"
-          style={{
-            background: `linear-gradient(135deg, ${COLORS.sageGreen} 0%, ${COLORS.cream} 100%)`,
-          }}
-        >
+      <div className="min-h-screen bg-black pb-28">
+        {/* Header Card with Lime Green Glow */}
+        <div className="relative overflow-hidden bg-gradient-to-b from-zinc-900 to-black">
+          {/* Glow effect */}
           <div
-            className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full blur-3xl opacity-60"
-            style={{ backgroundColor: COLORS.sageGreen }}
+            className="absolute top-0 left-1/2 -translate-x-1/2 w-96 h-96 rounded-full blur-3xl opacity-30"
+            style={{ backgroundColor: LIME_GREEN }}
           />
 
           <div className="relative px-4 py-8">
             <div className="flex flex-col items-center text-center">
+              {/* Profile Photo */}
               <div className="relative group mb-4">
                 <div
-                  className="w-28 h-28 rounded-full bg-white border-4 flex items-center justify-center overflow-hidden shadow-lg"
-                  style={{ borderColor: COLORS.teal }}
+                  className="w-28 h-28 rounded-full bg-zinc-800 border-4 flex items-center justify-center overflow-hidden shadow-lg"
+                  style={{ borderColor: LIME_GREEN }}
                 >
                   {profile.profilePhotoUrl ? (
                     <img
@@ -529,17 +520,17 @@ export default function WorkerProfile() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <User className="w-12 h-12 text-gray-400" />
+                    <User className="w-12 h-12 text-zinc-500" />
                   )}
                 </div>
                 <label
                   className="absolute bottom-0 right-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-lg cursor-pointer"
-                  style={{ backgroundColor: COLORS.teal }}
+                  style={{ backgroundColor: LIME_GREEN }}
                 >
                   {uploadingPhoto ? (
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
+                    <Loader2 className="w-4 h-4 text-black animate-spin" />
                   ) : (
-                    <Camera className="w-4 h-4 text-white" />
+                    <Camera className="w-4 h-4 text-black" />
                   )}
                   <input
                     ref={photoInputRef}
@@ -552,21 +543,23 @@ export default function WorkerProfile() {
                 </label>
               </div>
 
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">
+              {/* Name and Title */}
+              <h1 className="text-2xl font-bold text-white mb-1">
                 {profile.firstName} {profile.lastName}
               </h1>
-              <p className="text-gray-600 mb-3">
-                Field Worker at <span style={{ color: COLORS.teal }} className="font-medium">Renoa</span>
+              <p className="text-zinc-400 mb-3">
+                Field Worker at <span style={{ color: LIME_GREEN }} className="font-medium">Renoa</span>
               </p>
 
+              {/* Status Badge */}
               <span
                 className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
                   profile.status === 'active'
-                    ? 'bg-green-100 text-green-700 border border-green-200'
-                    : 'bg-red-100 text-red-700 border border-red-200'
+                    ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
                 }`}
               >
-                <span className={`w-2 h-2 rounded-full ${profile.status === 'active' ? 'bg-green-500' : 'bg-red-500'}`} />
+                <span className={`w-2 h-2 rounded-full ${profile.status === 'active' ? 'bg-green-400' : 'bg-red-400'}`} />
                 {profile.status === 'active' ? 'Active' : 'Inactive'}
               </span>
             </div>
@@ -576,34 +569,40 @@ export default function WorkerProfile() {
         {/* Stats Row */}
         <div className="px-4 -mt-4">
           <div className="grid grid-cols-3 gap-3">
-            <div className="bg-white rounded-[20px] p-4 shadow-sm">
+            {/* Jobs This Week */}
+            <div className="bg-[#1F1F1F] rounded-[20px] p-4 border border-[#2A2A2A]">
               <div
                 className="flex items-center justify-center w-10 h-10 rounded-lg mb-3 mx-auto"
-                style={{ backgroundColor: `${COLORS.teal}15` }}
+                style={{ backgroundColor: `${LIME_GREEN}20` }}
               >
-                <Briefcase className="w-5 h-5" style={{ color: COLORS.teal }} />
+                <Briefcase className="w-5 h-5" style={{ color: LIME_GREEN }} />
               </div>
-              <p className="text-2xl font-bold text-gray-900 text-center">{jobsThisWeek}</p>
-              <p className="text-xs text-gray-500 text-center">Jobs this week</p>
+              <p className="text-2xl font-bold text-white text-center">{jobsThisWeek}</p>
+              <p className="text-xs text-zinc-500 text-center">Jobs this week</p>
             </div>
 
-            <div className="bg-white rounded-[20px] p-4 shadow-sm">
+            {/* Pay Rate */}
+            <div className="bg-[#1F1F1F] rounded-[20px] p-4 border border-[#2A2A2A]">
               <div
                 className="flex items-center justify-center w-10 h-10 rounded-lg mb-3 mx-auto"
-                style={{ backgroundColor: `${COLORS.teal}15` }}
+                style={{ backgroundColor: `${LIME_GREEN}20` }}
               >
-                <DollarSign className="w-5 h-5" style={{ color: COLORS.teal }} />
+                <DollarSign className="w-5 h-5" style={{ color: LIME_GREEN }} />
               </div>
-              <p className="text-2xl font-bold text-gray-900 text-center">{payInfo.value}</p>
-              <p className="text-xs text-gray-500 text-center">{payInfo.subtitle || 'Pay rate'}</p>
+              <p className="text-2xl font-bold text-white text-center">{payInfo.value}</p>
+              <p className="text-xs text-zinc-500 text-center">{payInfo.subtitle || 'Pay rate'}</p>
             </div>
 
-            <div className="bg-white rounded-[20px] p-4 shadow-sm">
-              <div className="flex items-center justify-center w-10 h-10 bg-yellow-50 rounded-lg mb-3 mx-auto">
-                <Star className="w-5 h-5 text-yellow-500" />
+            {/* Rating */}
+            <div className="bg-[#1F1F1F] rounded-[20px] p-4 border border-[#2A2A2A]">
+              <div
+                className="flex items-center justify-center w-10 h-10 rounded-lg mb-3 mx-auto"
+                style={{ backgroundColor: `${LIME_GREEN}20` }}
+              >
+                <Star className="w-5 h-5" style={{ color: LIME_GREEN }} />
               </div>
-              <p className="text-2xl font-bold text-gray-900 text-center">--</p>
-              <p className="text-xs text-gray-500 text-center">No reviews yet</p>
+              <p className="text-2xl font-bold text-white text-center">--</p>
+              <p className="text-xs text-zinc-500 text-center">No reviews yet</p>
             </div>
           </div>
         </div>
@@ -614,57 +613,57 @@ export default function WorkerProfile() {
             {/* Left Column */}
             <div className="space-y-6">
               {/* Personal Information Card */}
-              <div className="bg-white rounded-[20px] shadow-sm">
-                <div className="p-6 border-b border-gray-100">
-                  <h2 className="text-lg font-semibold text-gray-900">Personal Information</h2>
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A]">
+                  <h2 className="text-lg font-semibold text-white">Personal Information</h2>
                 </div>
                 <div className="p-6 space-y-5">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-2">First Name</label>
+                      <label className="block text-sm font-medium text-zinc-400 mb-2">First Name</label>
                       <input
                         type="text"
                         value={profileForm.firstName}
                         onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
-                        className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-colors"
+                        className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:border-[#C4F542] focus:ring-1 focus:ring-[#C4F542] focus:outline-none transition-colors"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-600 mb-2">Last Name</label>
+                      <label className="block text-sm font-medium text-zinc-400 mb-2">Last Name</label>
                       <input
                         type="text"
                         value={profileForm.lastName}
                         onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
-                        className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-colors"
+                        className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:border-[#C4F542] focus:ring-1 focus:ring-[#C4F542] focus:outline-none transition-colors"
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-2">Phone Number</label>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Phone Number</label>
                     <input
                       type="tel"
                       value={profileForm.phone}
                       onChange={(e) => setProfileForm({ ...profileForm, phone: formatPhoneNumber(e.target.value) })}
                       placeholder="(555) 123-4567"
-                      className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:border-teal-500 focus:ring-1 focus:ring-teal-500 focus:outline-none transition-colors"
+                      className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:border-[#C4F542] focus:ring-1 focus:ring-[#C4F542] focus:outline-none transition-colors"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-600 mb-2">Email Address</label>
-                    <div className="flex items-center gap-3 h-11 px-4 bg-gray-100 border border-gray-200 rounded-xl">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-500">{profile.email}</span>
+                    <label className="block text-sm font-medium text-zinc-400 mb-2">Email Address</label>
+                    <div className="flex items-center gap-3 h-11 px-4 bg-zinc-800/50 border border-zinc-700/50 rounded-xl">
+                      <Mail className="w-4 h-4 text-zinc-500" />
+                      <span className="text-zinc-400">{profile.email}</span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1.5">Email cannot be changed</p>
+                    <p className="text-xs text-zinc-600 mt-1.5">Email cannot be changed</p>
                   </div>
 
                   <button
                     onClick={handleSaveProfile}
                     disabled={savingProfile || !hasProfileChanges}
-                    className="w-full h-11 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2 disabled:bg-gray-300 disabled:cursor-not-allowed"
-                    style={{ backgroundColor: hasProfileChanges ? COLORS.teal : undefined }}
+                    className="w-full h-11 text-black font-medium rounded-xl transition-colors flex items-center justify-center gap-2 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: hasProfileChanges ? LIME_GREEN : undefined }}
                   >
                     {savingProfile ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -679,16 +678,16 @@ export default function WorkerProfile() {
               </div>
 
               {/* My Skills Card */}
-              <div className="bg-white rounded-[20px] shadow-sm">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A] flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Award className="w-5 h-5" style={{ color: COLORS.teal }} />
-                    <h2 className="text-lg font-semibold text-gray-900">My Skills</h2>
+                    <Award className="w-5 h-5" style={{ color: LIME_GREEN }} />
+                    <h2 className="text-lg font-semibold text-white">My Skills</h2>
                   </div>
                   <button
                     onClick={() => setSkillsModalOpen(true)}
                     className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-                    style={{ color: COLORS.teal, backgroundColor: `${COLORS.teal}10` }}
+                    style={{ color: LIME_GREEN, backgroundColor: `${LIME_GREEN}15` }}
                   >
                     <Pencil className="w-3.5 h-3.5" />
                     Edit
@@ -700,11 +699,8 @@ export default function WorkerProfile() {
                       {selectedSkills.map((skill) => (
                         <span
                           key={skill}
-                          className="px-3 py-1.5 rounded-full text-sm font-medium"
-                          style={{
-                            backgroundColor: `${COLORS.teal}15`,
-                            color: COLORS.teal,
-                          }}
+                          className="px-3 py-1.5 rounded-full text-sm font-medium text-black"
+                          style={{ backgroundColor: LIME_GREEN }}
                         >
                           {skill}
                         </span>
@@ -712,14 +708,14 @@ export default function WorkerProfile() {
                     </div>
                   ) : (
                     <div className="text-center py-6">
-                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Award className="w-6 h-6 text-gray-400" />
+                      <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Award className="w-6 h-6 text-zinc-600" />
                       </div>
-                      <p className="text-gray-500 text-sm">No skills added yet</p>
+                      <p className="text-zinc-500 text-sm">No skills added yet</p>
                       <button
                         onClick={() => setSkillsModalOpen(true)}
                         className="mt-3 text-sm font-medium"
-                        style={{ color: COLORS.teal }}
+                        style={{ color: LIME_GREEN }}
                       >
                         + Add your skills
                       </button>
@@ -729,16 +725,16 @@ export default function WorkerProfile() {
               </div>
 
               {/* Equipment Card */}
-              <div className="bg-white rounded-[20px] shadow-sm">
-                <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A] flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Wrench className="w-5 h-5" style={{ color: COLORS.teal }} />
-                    <h2 className="text-lg font-semibold text-gray-900">Equipment</h2>
+                    <Wrench className="w-5 h-5" style={{ color: LIME_GREEN }} />
+                    <h2 className="text-lg font-semibold text-white">Equipment</h2>
                   </div>
                   <button
                     onClick={() => setEquipmentModalOpen(true)}
                     className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
-                    style={{ color: COLORS.teal, backgroundColor: `${COLORS.teal}10` }}
+                    style={{ color: LIME_GREEN, backgroundColor: `${LIME_GREEN}15` }}
                   >
                     <Pencil className="w-3.5 h-3.5" />
                     Edit
@@ -750,7 +746,7 @@ export default function WorkerProfile() {
                       {equipment.map((item) => (
                         <span
                           key={item}
-                          className="px-3 py-1.5 bg-gray-100 rounded-full text-sm text-gray-700"
+                          className="px-3 py-1.5 bg-zinc-800 rounded-full text-sm text-zinc-300"
                         >
                           {item}
                         </span>
@@ -758,14 +754,14 @@ export default function WorkerProfile() {
                     </div>
                   ) : (
                     <div className="text-center py-6">
-                      <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                        <Wrench className="w-6 h-6 text-gray-400" />
+                      <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Wrench className="w-6 h-6 text-zinc-600" />
                       </div>
-                      <p className="text-gray-500 text-sm">No equipment listed</p>
+                      <p className="text-zinc-500 text-sm">No equipment listed</p>
                       <button
                         onClick={() => setEquipmentModalOpen(true)}
                         className="mt-3 text-sm font-medium"
-                        style={{ color: COLORS.teal }}
+                        style={{ color: LIME_GREEN }}
                       >
                         + Add your equipment
                       </button>
@@ -778,55 +774,55 @@ export default function WorkerProfile() {
             {/* Right Column */}
             <div className="space-y-6">
               {/* Account & Security Card */}
-              <div className="bg-white rounded-[20px] shadow-sm">
-                <div className="p-6 border-b border-gray-100">
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A]">
                   <div className="flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-orange-500" />
-                    <h2 className="text-lg font-semibold text-gray-900">Account & Security</h2>
+                    <Shield className="w-5 h-5" style={{ color: LIME_GREEN }} />
+                    <h2 className="text-lg font-semibold text-white">Account & Security</h2>
                   </div>
                 </div>
-                <div className="divide-y divide-gray-100">
+                <div className="divide-y divide-[#2A2A2A]">
                   <button
                     onClick={() => setPasswordModalOpen(true)}
-                    className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors"
+                    className="w-full flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <Lock className="w-4 h-4 text-gray-500" />
+                      <div className="w-9 h-9 bg-zinc-800 rounded-lg flex items-center justify-center">
+                        <Lock className="w-4 h-4 text-zinc-400" />
                       </div>
-                      <span className="text-gray-900 font-medium">Change Password</span>
+                      <span className="text-white font-medium">Change Password</span>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                    <ChevronRight className="w-5 h-5 text-zinc-600" />
                   </button>
 
-                  <button className="w-full flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+                  <button className="w-full flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <Bell className="w-4 h-4 text-gray-500" />
+                      <div className="w-9 h-9 bg-zinc-800 rounded-lg flex items-center justify-center">
+                        <Bell className="w-4 h-4 text-zinc-400" />
                       </div>
-                      <span className="text-gray-900 font-medium">Notifications</span>
+                      <span className="text-white font-medium">Notifications</span>
                     </div>
-                    <ChevronRight className="w-5 h-5 text-gray-400" />
+                    <ChevronRight className="w-5 h-5 text-zinc-600" />
                   </button>
 
                   <div className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 bg-gray-100 rounded-lg flex items-center justify-center">
-                        <Shield className="w-4 h-4 text-gray-500" />
+                      <div className="w-9 h-9 bg-zinc-800 rounded-lg flex items-center justify-center">
+                        <Shield className="w-4 h-4 text-zinc-400" />
                       </div>
-                      <span className="text-gray-900 font-medium">Two-Factor Auth</span>
+                      <span className="text-white font-medium">Two-Factor Auth</span>
                     </div>
-                    <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">Coming Soon</span>
+                    <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded">Coming Soon</span>
                   </div>
                 </div>
               </div>
 
               {/* My Crew Card */}
-              <div className="bg-white rounded-[20px] shadow-sm">
-                <div className="p-6 border-b border-gray-100">
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A]">
                   <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-cyan-600" />
-                    <h2 className="text-lg font-semibold text-gray-900">My Crew</h2>
+                    <Users className="w-5 h-5" style={{ color: LIME_GREEN }} />
+                    <h2 className="text-lg font-semibold text-white">My Crew</h2>
                   </div>
                 </div>
                 <div className="p-6">
@@ -837,16 +833,16 @@ export default function WorkerProfile() {
                           className="w-3 h-3 rounded-full"
                           style={{ backgroundColor: myCrew.color }}
                         />
-                        <h3 className="font-semibold text-gray-900">{myCrew.name}</h3>
-                        <span className="text-gray-500 text-sm">
+                        <h3 className="font-semibold text-white">{myCrew.name}</h3>
+                        <span className="text-zinc-500 text-sm">
                           ({myCrew.memberCount} {myCrew.memberCount === 1 ? 'member' : 'members'})
                         </span>
                       </div>
 
                       {myCrew.leader && (
-                        <div className="flex items-center gap-2 mb-4 p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center gap-2 mb-4 p-3 bg-zinc-800/50 rounded-lg">
                           <Crown className="w-4 h-4 text-yellow-500" />
-                          <span className="text-gray-500 text-sm">Leader:</span>
+                          <span className="text-zinc-400 text-sm">Leader:</span>
                           <div className="flex items-center gap-2">
                             {myCrew.leader.profilePhotoUrl ? (
                               <img
@@ -855,18 +851,18 @@ export default function WorkerProfile() {
                                 className="w-6 h-6 rounded-full object-cover"
                               />
                             ) : (
-                              <div className="w-6 h-6 bg-gray-200 rounded-full flex items-center justify-center">
-                                <User className="w-3 h-3 text-gray-400" />
+                              <div className="w-6 h-6 bg-zinc-700 rounded-full flex items-center justify-center">
+                                <User className="w-3 h-3 text-zinc-500" />
                               </div>
                             )}
-                            <span className="text-gray-900 font-medium text-sm">{myCrew.leader.name}</span>
+                            <span className="text-white font-medium text-sm">{myCrew.leader.name}</span>
                           </div>
                         </div>
                       )}
 
                       {myCrew.members.length > 0 && (
                         <div>
-                          <span className="text-gray-500 text-sm block mb-2">Crewmates:</span>
+                          <span className="text-zinc-500 text-sm block mb-2">Crewmates:</span>
                           <div className="space-y-2">
                             {myCrew.members.map((member) => (
                               <div key={member.id} className="flex items-center gap-2">
@@ -877,11 +873,11 @@ export default function WorkerProfile() {
                                     className="w-8 h-8 rounded-full object-cover"
                                   />
                                 ) : (
-                                  <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
-                                    <User className="w-4 h-4 text-gray-400" />
+                                  <div className="w-8 h-8 bg-zinc-800 rounded-full flex items-center justify-center">
+                                    <User className="w-4 h-4 text-zinc-500" />
                                   </div>
                                 )}
-                                <span className="text-gray-900 text-sm">{member.name}</span>
+                                <span className="text-white text-sm">{member.name}</span>
                               </div>
                             ))}
                           </div>
@@ -890,41 +886,41 @@ export default function WorkerProfile() {
                     </div>
                   ) : (
                     <div className="text-center py-4">
-                      <Users className="w-8 h-8 text-gray-300 mx-auto mb-2" />
-                      <p className="text-gray-500 text-sm">You&apos;re not assigned to a crew</p>
+                      <Users className="w-8 h-8 text-zinc-700 mx-auto mb-2" />
+                      <p className="text-zinc-500 text-sm">You&apos;re not assigned to a crew</p>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Company Card */}
-              <div className="bg-white rounded-[20px] shadow-sm">
-                <div className="p-6 border-b border-gray-100">
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A]">
                   <div className="flex items-center gap-2">
-                    <Building className="w-5 h-5 text-purple-500" />
-                    <h2 className="text-lg font-semibold text-gray-900">Company</h2>
+                    <Building className="w-5 h-5" style={{ color: LIME_GREEN }} />
+                    <h2 className="text-lg font-semibold text-white">Company</h2>
                   </div>
                 </div>
                 <div className="p-6">
                   <div className="flex items-center gap-4 mb-4">
                     <div
                       className="w-12 h-12 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: `${COLORS.teal}15` }}
+                      style={{ backgroundColor: `${LIME_GREEN}20` }}
                     >
                       {profile.provider.logoUrl ? (
                         <img src={profile.provider.logoUrl} alt="" className="w-full h-full object-cover rounded-lg" />
                       ) : (
-                        <span className="text-xl font-bold" style={{ color: COLORS.teal }}>R</span>
+                        <span className="text-xl font-bold" style={{ color: LIME_GREEN }}>R</span>
                       )}
                     </div>
                     <div>
-                      <p className="text-gray-900 font-semibold">Renoa</p>
-                      <p className="text-gray-500 text-sm">{profile.provider.email}</p>
+                      <p className="text-white font-semibold">Renoa</p>
+                      <p className="text-zinc-500 text-sm">{profile.provider.email}</p>
                     </div>
                   </div>
                   <button
                     onClick={handleContactOffice}
-                    className="w-full h-11 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                    className="w-full h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                   >
                     <Phone className="w-4 h-4" />
                     Contact Office
@@ -935,10 +931,10 @@ export default function WorkerProfile() {
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-6 border-t border-gray-200 space-y-4">
+          <div className="pt-6 border-t border-zinc-800 space-y-4">
             <button
               onClick={handleLogout}
-              className="w-full h-12 border-2 border-red-300 hover:border-red-400 hover:bg-red-50 text-red-500 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+              className="w-full h-12 border-2 border-red-500/50 hover:border-red-500 hover:bg-red-500/10 text-red-400 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
             >
               <LogOut className="w-5 h-5" />
               Log Out
@@ -946,7 +942,7 @@ export default function WorkerProfile() {
 
             <button
               onClick={() => setDeleteAccountOpen(true)}
-              className="w-full text-sm text-gray-400 hover:text-red-500 transition-colors py-2"
+              className="w-full text-sm text-zinc-600 hover:text-red-400 transition-colors py-2"
             >
               Delete Account
             </button>
@@ -955,17 +951,17 @@ export default function WorkerProfile() {
 
         {/* Skills Edit Modal */}
         <Dialog open={skillsModalOpen} onOpenChange={setSkillsModalOpen}>
-          <DialogContent className="bg-white border-gray-200 max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-gray-900">Edit Skills</DialogTitle>
-              <DialogDescription className="text-gray-500">
+              <DialogTitle className="text-white">Edit Skills</DialogTitle>
+              <DialogDescription className="text-zinc-400">
                 Select the skills you have to help match you with the right jobs.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-6 mt-4">
               {Object.entries(AVAILABLE_SKILLS).map(([category, skills]) => (
                 <div key={category}>
-                  <h3 className="text-sm font-semibold text-gray-700 mb-3">{category}</h3>
+                  <h3 className="text-sm font-semibold text-zinc-300 mb-3">{category}</h3>
                   <div className="flex flex-wrap gap-2">
                     {skills.map((skill) => (
                       <button
@@ -973,10 +969,10 @@ export default function WorkerProfile() {
                         onClick={() => toggleSkill(skill)}
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                           selectedSkills.includes(skill)
-                            ? 'text-white'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            ? 'text-black'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                         }`}
-                        style={selectedSkills.includes(skill) ? { backgroundColor: COLORS.teal } : undefined}
+                        style={selectedSkills.includes(skill) ? { backgroundColor: LIME_GREEN } : undefined}
                       >
                         {selectedSkills.includes(skill) && <Check className="w-3 h-3 inline mr-1" />}
                         {skill}
@@ -986,18 +982,18 @@ export default function WorkerProfile() {
                 </div>
               ))}
 
-              <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 mt-6 pt-4 border-t border-zinc-800">
                 <button
                   onClick={() => setSkillsModalOpen(false)}
-                  className="flex-1 h-11 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
+                  className="flex-1 h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveSkills}
                   disabled={savingSkills}
-                  className="flex-1 h-11 text-white font-medium rounded-xl transition-colors flex items-center justify-center"
-                  style={{ backgroundColor: COLORS.teal }}
+                  className="flex-1 h-11 text-black font-medium rounded-xl transition-colors flex items-center justify-center"
+                  style={{ backgroundColor: LIME_GREEN }}
                 >
                   {savingSkills ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Skills'}
                 </button>
@@ -1008,10 +1004,10 @@ export default function WorkerProfile() {
 
         {/* Equipment Edit Modal */}
         <Dialog open={equipmentModalOpen} onOpenChange={setEquipmentModalOpen}>
-          <DialogContent className="bg-white border-gray-200 max-w-md max-h-[85vh] overflow-y-auto">
+          <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md max-h-[85vh] overflow-y-auto">
             <DialogHeader>
-              <DialogTitle className="text-gray-900">Edit Equipment</DialogTitle>
-              <DialogDescription className="text-gray-500">
+              <DialogTitle className="text-white">Edit Equipment</DialogTitle>
+              <DialogDescription className="text-zinc-400">
                 Select the equipment you have available for jobs.
               </DialogDescription>
             </DialogHeader>
@@ -1023,10 +1019,10 @@ export default function WorkerProfile() {
                     onClick={() => toggleEquipment(item)}
                     className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                       selectedEquipment.includes(item)
-                        ? 'text-white'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        ? 'text-black'
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
                     }`}
-                    style={selectedEquipment.includes(item) ? { backgroundColor: COLORS.teal } : undefined}
+                    style={selectedEquipment.includes(item) ? { backgroundColor: LIME_GREEN } : undefined}
                   >
                     {selectedEquipment.includes(item) && <Check className="w-3 h-3 inline mr-1" />}
                     {item}
@@ -1034,42 +1030,44 @@ export default function WorkerProfile() {
                 ))}
               </div>
 
-              <div className="pt-4 border-t border-gray-200">
-                <label className="block text-sm font-medium text-gray-600 mb-2">Add Custom Equipment</label>
+              {/* Custom Equipment */}
+              <div className="pt-4 border-t border-zinc-800">
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Add Custom Equipment</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     value={customEquipment}
                     onChange={(e) => setCustomEquipment(e.target.value)}
                     placeholder="e.g., Specialized tool..."
-                    className="flex-1 h-10 px-3 bg-gray-50 border border-gray-200 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-teal-500"
+                    className="flex-1 h-10 px-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-600 focus:outline-none focus:border-[#C4F542]"
                     onKeyDown={(e) => e.key === 'Enter' && handleAddCustomEquipment()}
                   />
                   <button
                     onClick={handleAddCustomEquipment}
                     disabled={!customEquipment.trim()}
-                    className="h-10 px-4 text-white font-medium rounded-lg disabled:bg-gray-300"
-                    style={{ backgroundColor: customEquipment.trim() ? COLORS.teal : undefined }}
+                    className="h-10 px-4 text-black font-medium rounded-lg disabled:bg-zinc-800 disabled:text-zinc-600"
+                    style={{ backgroundColor: customEquipment.trim() ? LIME_GREEN : undefined }}
                   >
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
+              {/* Selected custom items */}
               {selectedEquipment.filter(item => !AVAILABLE_EQUIPMENT.includes(item)).length > 0 && (
                 <div className="pt-2">
-                  <p className="text-xs text-gray-500 mb-2">Custom items:</p>
+                  <p className="text-xs text-zinc-500 mb-2">Custom items:</p>
                   <div className="flex flex-wrap gap-2">
                     {selectedEquipment.filter(item => !AVAILABLE_EQUIPMENT.includes(item)).map((item) => (
                       <span
                         key={item}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-white"
-                        style={{ backgroundColor: COLORS.teal }}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-black"
+                        style={{ backgroundColor: LIME_GREEN }}
                       >
                         {item}
                         <button
                           onClick={() => toggleEquipment(item)}
-                          className="ml-1 hover:bg-white/20 rounded-full p-0.5"
+                          className="ml-1 hover:bg-black/20 rounded-full p-0.5"
                         >
                           <X className="w-3 h-3" />
                         </button>
@@ -1079,18 +1077,18 @@ export default function WorkerProfile() {
                 </div>
               )}
 
-              <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
+              <div className="flex gap-3 mt-6 pt-4 border-t border-zinc-800">
                 <button
                   onClick={() => setEquipmentModalOpen(false)}
-                  className="flex-1 h-11 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
+                  className="flex-1 h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSaveEquipment}
                   disabled={savingEquipment}
-                  className="flex-1 h-11 text-white font-medium rounded-xl transition-colors flex items-center justify-center"
-                  style={{ backgroundColor: COLORS.teal }}
+                  className="flex-1 h-11 text-black font-medium rounded-xl transition-colors flex items-center justify-center"
+                  style={{ backgroundColor: LIME_GREEN }}
                 >
                   {savingEquipment ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Equipment'}
                 </button>
@@ -1101,27 +1099,27 @@ export default function WorkerProfile() {
 
         {/* Change Password Modal */}
         <Dialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen}>
-          <DialogContent className="bg-white border-gray-200 max-w-md">
+          <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-gray-900">Change Password</DialogTitle>
-              <DialogDescription className="text-gray-500">
+              <DialogTitle className="text-white">Change Password</DialogTitle>
+              <DialogDescription className="text-zinc-400">
                 Enter your current password and choose a new one.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">Current Password</label>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Current Password</label>
                 <div className="relative">
                   <input
                     type={showCurrentPassword ? 'text' : 'password'}
                     value={passwordForm.currentPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                    className="w-full h-11 px-4 pr-10 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:border-teal-500 focus:outline-none"
+                    className="w-full h-11 px-4 pr-10 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:border-[#C4F542] focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
                   >
                     {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -1129,18 +1127,18 @@ export default function WorkerProfile() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">New Password</label>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">New Password</label>
                 <div className="relative">
                   <input
                     type={showNewPassword ? 'text' : 'password'}
                     value={passwordForm.newPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                    className="w-full h-11 px-4 pr-10 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:border-teal-500 focus:outline-none"
+                    className="w-full h-11 px-4 pr-10 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:border-[#C4F542] focus:outline-none"
                   />
                   <button
                     type="button"
                     onClick={() => setShowNewPassword(!showNewPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300"
                   >
                     {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -1148,24 +1146,24 @@ export default function WorkerProfile() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-600 mb-2">Confirm New Password</label>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Confirm New Password</label>
                 <input
                   type="password"
                   value={passwordForm.confirmPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  className="w-full h-11 px-4 bg-gray-50 border border-gray-200 rounded-xl text-gray-900 focus:border-teal-500 focus:outline-none"
+                  className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:border-[#C4F542] focus:outline-none"
                 />
                 {passwordForm.newPassword && passwordForm.confirmPassword && (
                   <div className="flex items-center gap-1.5 mt-2">
                     {passwordForm.newPassword === passwordForm.confirmPassword ? (
                       <>
-                        <Check className="w-4 h-4 text-green-500" />
-                        <span className="text-sm text-green-500">Passwords match</span>
+                        <Check className="w-4 h-4" style={{ color: LIME_GREEN }} />
+                        <span className="text-sm" style={{ color: LIME_GREEN }}>Passwords match</span>
                       </>
                     ) : (
                       <>
-                        <X className="w-4 h-4 text-red-500" />
-                        <span className="text-sm text-red-500">Passwords do not match</span>
+                        <X className="w-4 h-4 text-red-400" />
+                        <span className="text-sm text-red-400">Passwords do not match</span>
                       </>
                     )}
                   </div>
@@ -1178,15 +1176,15 @@ export default function WorkerProfile() {
                     setPasswordModalOpen(false);
                     setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
                   }}
-                  className="flex-1 h-11 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-xl transition-colors"
+                  className="flex-1 h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleChangePassword}
                   disabled={savingPassword || !passwordForm.currentPassword || !passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmPassword}
-                  className="flex-1 h-11 text-white font-medium rounded-xl transition-colors flex items-center justify-center disabled:bg-gray-300"
-                  style={{ backgroundColor: !savingPassword && passwordForm.currentPassword && passwordForm.newPassword && passwordForm.newPassword === passwordForm.confirmPassword ? COLORS.teal : undefined }}
+                  className="flex-1 h-11 text-black font-medium rounded-xl transition-colors flex items-center justify-center disabled:bg-zinc-800 disabled:text-zinc-600"
+                  style={{ backgroundColor: !savingPassword && passwordForm.currentPassword && passwordForm.newPassword && passwordForm.newPassword === passwordForm.confirmPassword ? LIME_GREEN : undefined }}
                 >
                   {savingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update Password'}
                 </button>
@@ -1197,18 +1195,18 @@ export default function WorkerProfile() {
 
         {/* Delete Account Confirmation */}
         <AlertDialog open={deleteAccountOpen} onOpenChange={setDeleteAccountOpen}>
-          <AlertDialogContent className="bg-white border-gray-200">
+          <AlertDialogContent className="bg-zinc-900 border-zinc-800">
             <AlertDialogHeader>
-              <AlertDialogTitle className="text-gray-900 flex items-center gap-2">
-                <Trash2 className="w-5 h-5 text-red-500" />
+              <AlertDialogTitle className="text-white flex items-center gap-2">
+                <Trash2 className="w-5 h-5 text-red-400" />
                 Delete Account?
               </AlertDialogTitle>
-              <AlertDialogDescription className="text-gray-500">
+              <AlertDialogDescription className="text-zinc-400">
                 This action cannot be undone. Please contact your administrator to delete your account.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel className="bg-gray-100 border-gray-200 text-gray-700 hover:bg-gray-200">
+              <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">
                 Cancel
               </AlertDialogCancel>
               <AlertDialogAction
@@ -1216,7 +1214,7 @@ export default function WorkerProfile() {
                   toast.info('Please contact your administrator to delete your account.');
                   setDeleteAccountOpen(false);
                 }}
-                className="bg-red-500 hover:bg-red-600 text-white"
+                className="bg-red-600 hover:bg-red-500 text-white"
               >
                 I Understand
               </AlertDialogAction>
