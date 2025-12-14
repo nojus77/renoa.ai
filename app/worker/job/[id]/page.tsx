@@ -1270,6 +1270,21 @@ export default function JobDetailPage() {
           )}
         </div>
 
+        {/* Job Description Section - Show work scope from dispatcher */}
+        {job.internalNotes && (
+          <div className="bg-[#2D2D2D] rounded-xl border border-[#3A3A3A] overflow-hidden">
+            <div className="p-4 border-b border-[#3A3A3A]">
+              <div className="flex items-center gap-2">
+                <FileText className="w-5 h-5" style={{ color: LIME_GREEN }} />
+                <h3 className="font-medium text-white">Job Description</h3>
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="text-[#9CA3AF] text-sm whitespace-pre-wrap">{job.internalNotes}</p>
+            </div>
+          </div>
+        )}
+
         {/* JOB DETAILS SECTION - Only show when arrived/working */}
         {canEditJobDetails && (
         <div id="job-details-section" className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
@@ -1366,7 +1381,7 @@ export default function JobDetailPage() {
                     {/* Saved Custom Services - show first */}
                     {savedCustomServices.length > 0 && (
                       <div>
-                        <div className="px-3 py-2 text-xs font-semibold text-emerald-500 uppercase tracking-wider bg-zinc-900/50">
+                        <div className="px-3 py-2 text-xs font-semibold uppercase tracking-wider bg-zinc-900/50" style={{ color: LIME_GREEN }}>
                           Your Saved Services
                         </div>
                         {savedCustomServices.map((serviceName, index) => (
@@ -1652,7 +1667,7 @@ export default function JobDetailPage() {
                         />
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm text-emerald-400 flex items-center gap-1">
+                        <p className="text-sm flex items-center gap-1" style={{ color: LIME_GREEN }}>
                           <CheckCircle2 className="w-4 h-4" />
                           Check photo uploaded
                         </p>
@@ -1728,60 +1743,83 @@ export default function JobDetailPage() {
         )}
 
         {/* Notes Section */}
-        <div className="bg-zinc-900 rounded-xl border border-zinc-800 overflow-hidden">
-          <div className="p-4 border-b border-zinc-800">
+        <div className="bg-[#2D2D2D] rounded-xl border border-[#3A3A3A] overflow-hidden">
+          <div className="p-4 border-b border-[#3A3A3A]">
             <div className="flex items-center gap-2">
               <FileText className="w-5 h-5" style={{ color: LIME_GREEN }} />
               <h3 className="font-medium text-white">Notes</h3>
+              {notes.length > 0 && (
+                <span className="text-xs text-[#6B7280] bg-[#3A3A3A] px-2 py-0.5 rounded-full">
+                  {notes.length}
+                </span>
+              )}
             </div>
           </div>
           <div className="p-4 space-y-3">
             {notes.length > 0 ? (
-              <div className="space-y-3 max-h-48 overflow-y-auto">
+              <div className="space-y-3 max-h-64 overflow-y-auto">
                 {notes.map((note) => (
-                  <div key={note.id} className="bg-zinc-800/50 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-zinc-300">{note.author}</span>
+                  <div
+                    key={note.id}
+                    className={`rounded-lg p-3 ${
+                      note.authorRole === 'dispatcher'
+                        ? 'bg-[#3A3A3A] border-l-2 border-l-[#A3E635]'
+                        : 'bg-[#1F1F1F] border-l-2 border-l-[#6B7280]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-white">{note.author}</span>
+                        <span
+                          className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                            note.authorRole === 'dispatcher'
+                              ? 'bg-[#A3E635]/15 text-[#A3E635]'
+                              : 'bg-[#6B7280]/15 text-[#6B7280]'
+                          }`}
+                        >
+                          {note.authorRole === 'dispatcher' ? 'Dispatcher' : 'Worker'}
+                        </span>
+                      </div>
                       {formatShortDate(note.createdAt) && (
-                      <span className="text-xs text-zinc-500">
-                        {formatShortDate(note.createdAt)}
-                      </span>
+                        <span className="text-xs text-[#6B7280]">
+                          {formatShortDate(note.createdAt)}
+                        </span>
                       )}
                     </div>
-                    <p className="text-zinc-400 text-sm">{note.content}</p>
-                    <span className="text-xs text-zinc-600 mt-1 inline-block">
-                      {note.authorRole === 'dispatcher' ? 'Dispatcher' : 'Worker'}
-                    </span>
+                    <p className="text-[#9CA3AF] text-sm">{note.content}</p>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-zinc-500 text-sm text-center py-2">No notes yet</p>
+              <div className="text-center py-4">
+                <FileText className="w-8 h-8 text-[#4B5563] mx-auto mb-2" />
+                <p className="text-[#6B7280] text-sm">No notes yet</p>
+              </div>
             )}
 
             {/* Only show add note when working (not for scheduled/on_the_way/completed) */}
             {canEditJobDetails && (
-            <div className="flex gap-2">
-              <textarea
-                value={newNote}
-                onChange={(e) => setNewNote(e.target.value)}
-                placeholder="Add a note..."
-                className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none resize-none"
-                rows={2}
-              />
-              <button
-                onClick={handleAddNote}
-                disabled={!newNote.trim() || addingNote}
-                className="p-3 rounded-lg transition-colors disabled:bg-zinc-700 disabled:text-zinc-500"
-                style={{ backgroundColor: newNote.trim() ? LIME_GREEN : undefined }}
-              >
-                {addingNote ? (
-                  <Loader2 className="w-5 h-5 animate-spin text-white" />
-                ) : (
-                  <Send className="w-5 h-5 text-zinc-900" />
-                )}
-              </button>
-            </div>
+              <div className="flex gap-2 pt-2 border-t border-[#3A3A3A]">
+                <textarea
+                  value={newNote}
+                  onChange={(e) => setNewNote(e.target.value)}
+                  placeholder="Add a note..."
+                  className="flex-1 bg-[#1F1F1F] border border-[#3A3A3A] rounded-lg px-3 py-2 text-sm text-white placeholder:text-[#6B7280] focus:outline-none focus:border-[#A3E635] resize-none transition-colors"
+                  rows={2}
+                />
+                <button
+                  onClick={handleAddNote}
+                  disabled={!newNote.trim() || addingNote}
+                  className="p-3 rounded-lg transition-colors disabled:bg-[#3A3A3A] disabled:text-[#6B7280]"
+                  style={{ backgroundColor: newNote.trim() ? LIME_GREEN : undefined }}
+                >
+                  {addingNote ? (
+                    <Loader2 className="w-5 h-5 animate-spin text-white" />
+                  ) : (
+                    <Send className="w-5 h-5 text-zinc-900" />
+                  )}
+                </button>
+              </div>
             )}
           </div>
         </div>

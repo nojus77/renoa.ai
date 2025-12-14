@@ -89,11 +89,11 @@ function WorkHistoryCard({
         </div>
         <div className="flex items-center gap-2 ml-3 shrink-0">
           <div className="text-right flex flex-col items-end gap-2">
-            <p className="text-lg font-bold text-[#10B981]">{amount}</p>
+            <p className="text-lg font-bold text-[#A3E635]">{amount}</p>
             <span
               className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full font-semibold ${
                 isPaid
-                  ? 'bg-[#10B981]/15 text-[#10B981]'
+                  ? 'bg-[#A3E635]/15 text-[#A3E635]'
                   : 'bg-[#F59E0B]/15 text-[#F59E0B]'
               }`}
             >
@@ -187,7 +187,7 @@ export default function WorkerEarnings() {
               onClick={() => setPeriod('week')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 period === 'week'
-                  ? 'bg-[#10B981] text-white'
+                  ? 'bg-[#A3E635] text-zinc-900'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
@@ -197,7 +197,7 @@ export default function WorkerEarnings() {
               onClick={() => setPeriod('month')}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                 period === 'month'
-                  ? 'bg-[#10B981] text-white'
+                  ? 'bg-[#A3E635] text-zinc-900'
                   : 'text-gray-400 hover:text-white'
               }`}
             >
