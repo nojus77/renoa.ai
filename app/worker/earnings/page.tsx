@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import WorkerLayout from '@/components/worker/WorkerLayout';
-import { DollarSign, Clock, Briefcase, Loader2, CheckCircle, AlertCircle, ChevronRight } from 'lucide-react';
+import { DollarSign, Clock, Briefcase, Loader2, AlertCircle } from 'lucide-react';
 
 interface WorkLog {
   id: string;
@@ -48,10 +48,10 @@ function StatCard({
   label: string;
 }) {
   return (
-    <div className="bg-[#1F2937] rounded-2xl p-5">
-      <Icon className={`w-7 h-7 mb-3 ${iconColor}`} />
-      <p className="text-[32px] font-bold text-white leading-tight">{value}</p>
-      <p className="text-sm text-gray-400 mt-1">{label}</p>
+    <div className="bg-[#1F2937] rounded-2xl p-5 flex flex-col gap-2">
+      <Icon className={`w-8 h-8 ${iconColor}`} />
+      <p className="text-[28px] font-bold text-white leading-none">{value}</p>
+      <p className="text-sm text-[#9CA3AF]">{label}</p>
     </div>
   );
 }
@@ -79,40 +79,27 @@ function WorkHistoryCard({
       onClick={onClick}
       className="w-full text-left bg-[#1F2937] rounded-xl p-4 mb-3 hover:bg-[#2a3544] transition-colors active:scale-[0.99]"
     >
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
+      <div className="flex items-center justify-between">
+        <div className="flex-1 min-w-0">
           <p className="text-lg font-bold text-white">{jobType}</p>
-          <p className="text-sm text-gray-400 mt-0.5">{clientName}</p>
-          <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-            <span>{timeRange}</span>
-            <span className="w-1 h-1 rounded-full bg-gray-600" />
-            <span>{duration}</span>
-          </div>
+          <p className="text-sm text-[#9CA3AF] mt-1">{clientName}</p>
+          <p className="text-xs text-[#6B7280] mt-1.5">
+            {timeRange}  •  {duration}
+          </p>
         </div>
-        <div className="flex items-start gap-3">
+        <div className="flex items-center gap-2 ml-3 shrink-0">
           <div className="text-right flex flex-col items-end gap-2">
             <p className="text-lg font-bold text-[#10B981]">{amount}</p>
             <span
-              className={`inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium ${
+              className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full font-semibold ${
                 isPaid
-                  ? 'bg-[#10B981]/20 text-[#10B981]'
-                  : 'bg-[#F59E0B]/20 text-[#F59E0B]'
+                  ? 'bg-[#10B981]/15 text-[#10B981]'
+                  : 'bg-[#F59E0B]/15 text-[#F59E0B]'
               }`}
             >
-              {isPaid ? (
-                <>
-                  <CheckCircle className="w-3 h-3" />
-                  Paid
-                </>
-              ) : (
-                <>
-                  <AlertCircle className="w-3 h-3" />
-                  Pending
-                </>
-              )}
+              {isPaid ? 'Paid' : 'Pending'}
             </span>
           </div>
-          <ChevronRight className="w-5 h-5 text-gray-500 mt-1" />
         </div>
       </div>
     </button>

@@ -448,30 +448,28 @@ export default function WorkerDashboard() {
     <WorkerLayout>
       <div className="p-4 space-y-8">
         {/* Elegant Clock Header */}
-        <div className="flex items-start justify-between">
-          {/* Clock Display - Apple Watch Style */}
+        <div className="flex items-start justify-between mb-8">
+          {/* Clock Display - Large Elegant Style */}
           <div>
-            <div className="flex items-baseline gap-1">
-              <span className="text-5xl font-light text-[#a3e635]">
+            <div className="flex items-baseline gap-2">
+              <span
+                className="text-[#A3E635] tracking-[-2px] leading-none"
+                style={{ fontSize: '64px', fontWeight: 200 }}
+              >
                 {currentTime.toLocaleTimeString('en-US', {
                   hour: 'numeric',
                   minute: '2-digit',
-                  hour12: false,
-                }).split(':')[0]}
+                  hour12: true,
+                }).replace(/\s?(AM|PM)$/i, '')}
               </span>
-              <span className="text-5xl font-light text-[#a3e635]">:</span>
-              <span className="text-5xl font-light text-[#a3e635]">
-                {currentTime.toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: false,
-                }).split(':')[1]}
-              </span>
-              <span className="text-xl font-light text-[#a3e635]/80 ml-1">
+              <span
+                className="text-[#A3E635]/70 self-start"
+                style={{ fontSize: '24px', fontWeight: 300, marginTop: '8px' }}
+              >
                 {currentTime.getHours() >= 12 ? 'PM' : 'AM'}
               </span>
             </div>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-base text-[#9CA3AF] mt-1">
               {currentTime.toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
