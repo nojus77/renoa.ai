@@ -448,13 +448,13 @@ export default function WorkerDashboard() {
     <WorkerLayout>
       <div className="p-4 space-y-8">
         {/* Elegant Clock Header */}
-        <div className="flex items-start justify-between mb-8">
+        <div className="flex items-start justify-between mb-6">
           {/* Clock Display - Large Elegant Style */}
           <div>
-            <div className="flex items-baseline gap-2">
+            <div className="flex items-baseline gap-1.5">
               <span
-                className="text-[#A3E635] tracking-[-2px] leading-none"
-                style={{ fontSize: '64px', fontWeight: 200 }}
+                className="text-[#A3E635] tracking-[-3px] leading-none"
+                style={{ fontSize: '72px', fontWeight: 200 }}
               >
                 {currentTime.toLocaleTimeString('en-US', {
                   hour: 'numeric',
@@ -463,13 +463,13 @@ export default function WorkerDashboard() {
                 }).replace(/\s?(AM|PM)$/i, '')}
               </span>
               <span
-                className="text-[#A3E635]/70 self-start"
-                style={{ fontSize: '24px', fontWeight: 300, marginTop: '8px' }}
+                className="text-[#A3E635]/60 self-start"
+                style={{ fontSize: '20px', fontWeight: 400, marginTop: '12px' }}
               >
                 {currentTime.getHours() >= 12 ? 'PM' : 'AM'}
               </span>
             </div>
-            <p className="text-base text-[#9CA3AF] mt-1">
+            <p className="text-base text-[#6B7280] mt-0.5">
               {currentTime.toLocaleDateString('en-US', {
                 weekday: 'short',
                 month: 'short',
