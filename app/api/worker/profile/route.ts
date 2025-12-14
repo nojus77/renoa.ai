@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
         createdAt: true,
         canCreateJobs: true,
         jobsNeedApproval: true,
+        skills: true, // For equipment stored with EQUIP: prefix
         workerSkills: {
           include: {
             skill: {
@@ -63,6 +64,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
+    // Extract equipment from skills field (items with EQUIP: prefix)
+    const equipment = (user.skills || [])
+      .filter(s => s.startsWith('EQUIP:'))
+      .map(s => s.replace('EQUIP:', ''));
+
     // Calculate jobs this week
     const startOfWeek = new Date();
     startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
@@ -76,7 +82,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    return NextResponse.json({ user, stats: { jobsThisWeek } });
+    // Return user with equipment added
+    return NextResponse.json({
+      user: { ...user, equipment },
+      stats: { jobsThisWeek }
+    });
   } catch (error) {
     console.error('Error fetching worker profile:', error);
     return NextResponse.json(
