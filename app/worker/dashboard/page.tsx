@@ -214,11 +214,11 @@ export default function WorkerDashboard() {
     fetchWorkerPermissions(uid);
   }, [router, fetchJobs, fetchUpcomingJobs, fetchWorkerPermissions]);
 
-  // Live clock update every second
+  // Update date once per minute (for midnight rollover)
   useEffect(() => {
     const timer = setInterval(() => {
       setCurrentTime(new Date());
-    }, 1000);
+    }, 60000);
     return () => clearInterval(timer);
   }, []);
 
@@ -446,49 +446,17 @@ export default function WorkerDashboard() {
 
   return (
     <WorkerLayout>
-      <div className="p-4 space-y-8">
-        {/* Elegant Clock Header */}
-        <div className="flex items-start justify-between mb-6">
-          {/* Clock Display - Premium Minimalist Style */}
-          <div>
-            <div className="flex items-start">
-              <span
-                className="text-[#A3E635] leading-none"
-                style={{
-                  fontSize: '84px',
-                  fontWeight: 200,
-                  letterSpacing: '-4px',
-                }}
-              >
-                {currentTime.toLocaleTimeString('en-US', {
-                  hour: 'numeric',
-                  minute: '2-digit',
-                  hour12: true,
-                }).replace(/\s?(AM|PM)$/i, '')}
-              </span>
-              <span
-                className="text-[#A3E635] ml-1"
-                style={{
-                  fontSize: '18px',
-                  fontWeight: 400,
-                  opacity: 0.5,
-                  marginTop: '8px',
-                }}
-              >
-                {currentTime.getHours() >= 12 ? 'PM' : 'AM'}
-              </span>
-            </div>
-            <p
-              className="text-[#6B7280]"
-              style={{ fontSize: '15px', marginTop: '6px' }}
-            >
-              {currentTime.toLocaleDateString('en-US', {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-              })}
-            </p>
-          </div>
+      <div className="p-4 space-y-6">
+        {/* Header - Date and Actions */}
+        <div className="flex items-center justify-between">
+          {/* Date Display */}
+          <p className="text-[#9CA3AF] text-base font-medium">
+            {currentTime.toLocaleDateString('en-US', {
+              weekday: 'short',
+              month: 'short',
+              day: 'numeric',
+            })}
+          </p>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
