@@ -110,13 +110,13 @@ export default function WorkerSchedule() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'border-l-purple-500';
-      case 'in_progress':
-        return 'border-l-emerald-500';
+        return 'border-l-[#6B7280]';
       default:
-        return 'border-l-blue-500';
+        return 'border-l-[#A3E635]';
     }
   };
+
+  const isCompleted = (status: string) => status === 'completed';
 
   return (
     <WorkerLayout>
@@ -202,55 +202,62 @@ export default function WorkerSchedule() {
 
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+              <Loader2 className="w-8 h-8 animate-spin text-[#A3E635]" />
             </div>
           ) : selectedJobs.length === 0 ? (
-            <div className="bg-zinc-900 rounded-xl p-8 text-center border border-zinc-800">
-              <p className="text-zinc-400">No jobs scheduled</p>
+            <div className="bg-[#2D2D2D] rounded-xl p-8 text-center border border-[#3A3A3A]">
+              <Calendar className="w-10 h-10 text-[#6B7280] mx-auto mb-3" />
+              <p className="text-[#9CA3AF]">No jobs scheduled</p>
+              <p className="text-[#6B7280] text-sm mt-1">This day is free</p>
             </div>
           ) : (
-            selectedJobs.map((job) => (
-              <button
-                key={job.id}
-                onClick={() => router.push(`/worker/job/${job.id}`)}
-                className={`w-full text-left bg-zinc-900 rounded-xl border border-zinc-800 border-l-4 ${getStatusColor(
-                  job.status
-                )} p-4 hover:bg-zinc-800/50 transition-colors active:scale-[0.98]`}
-              >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-medium text-white">{job.serviceType}</p>
-                    <p className="text-zinc-400 text-sm">{job.customer.name}</p>
+            selectedJobs.map((job) => {
+              const completed = isCompleted(job.status);
+              return (
+                <button
+                  key={job.id}
+                  onClick={() => router.push(`/worker/job/${job.id}`)}
+                  className={`w-full text-left bg-[#2D2D2D] rounded-xl border border-[#3A3A3A] border-l-4 ${getStatusColor(
+                    job.status
+                  )} p-4 hover:bg-[#3A3A3A] transition-colors active:scale-[0.99]`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className={`font-semibold ${completed ? 'text-[#6B7280]' : 'text-white'}`}>
+                        {job.serviceType}
+                      </p>
+                      <p className={`text-sm ${completed ? 'text-[#4B5563]' : 'text-[#9CA3AF]'}`}>
+                        {job.customer.name}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                          completed
+                            ? 'bg-[#6B7280]/15 text-[#6B7280]'
+                            : 'bg-[#A3E635]/15 text-[#A3E635]'
+                        }`}
+                      >
+                        {completed ? 'Completed' : job.status === 'in_progress' ? 'In Progress' : 'Scheduled'}
+                      </span>
+                      <ChevronRight className={`w-5 h-5 ${completed ? 'text-[#4B5563]' : 'text-[#6B7280]'}`} />
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        job.status === 'completed'
-                          ? 'bg-purple-500/20 text-purple-400'
-                          : job.status === 'in_progress'
-                          ? 'bg-emerald-500/20 text-emerald-400'
-                          : 'bg-blue-500/20 text-blue-400'
-                      }`}
-                    >
-                      {job.status === 'in_progress' ? 'In Progress' : job.status}
-                    </span>
-                    <ChevronRight className="w-4 h-4 text-zinc-500" />
-                  </div>
-                </div>
 
-                <div className="mt-3 flex items-center gap-4 text-sm">
-                  <div className="flex items-center gap-1.5 text-zinc-400">
-                    <Clock className="w-4 h-4" />
-                    {formatTime(job.startTime)} - {formatTime(job.endTime)}
+                  <div className="mt-3 flex items-center gap-4 text-sm">
+                    <div className={`flex items-center gap-1.5 ${completed ? 'text-[#4B5563]' : 'text-[#9CA3AF]'}`}>
+                      <Clock className="w-4 h-4" />
+                      {formatTime(job.startTime)} - {formatTime(job.endTime)}
+                    </div>
                   </div>
-                </div>
 
-                <div className="mt-2 flex items-start gap-1.5 text-sm text-zinc-500">
-                  <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
-                  <span>{job.address}</span>
-                </div>
-              </button>
-            ))
+                  <div className={`mt-2 flex items-start gap-1.5 text-sm ${completed ? 'text-[#4B5563]' : 'text-[#6B7280]'}`}>
+                    <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                    <span>{job.address}</span>
+                  </div>
+                </button>
+              );
+            })
           )}
         </div>
       </div>
