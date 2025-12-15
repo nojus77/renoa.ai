@@ -4,25 +4,38 @@ import { startOfToday, endOfDay, addDays } from 'date-fns';
 
 export const dynamic = 'force-dynamic';
 
-// Simple geocode function
+// Simple geocode function with debug logging
 async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  // Use server-side key (GOOGLE_MAPS_API) or fall back to client key
   const apiKey = process.env.GOOGLE_MAPS_API || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-  if (!address || !apiKey) return null;
+
+  console.log('[Geocode] Address:', address);
+  console.log('[Geocode] API Key exists:', !!apiKey);
+
+  if (!address || !apiKey) {
+    console.log('[Geocode] Missing address or API key');
+    return null;
+  }
 
   try {
-    const response = await fetch(
-      `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`
-    );
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
+    console.log('[Geocode] URL:', url.replace(apiKey, 'API_KEY_HIDDEN'));
+
+    const response = await fetch(url);
     const data = await response.json();
 
-    if (data.results?.[0]?.geometry?.location) {
-      return {
-        lat: data.results[0].geometry.location.lat,
-        lng: data.results[0].geometry.location.lng,
-      };
+    console.log('[Geocode] Response status:', data.status);
+    console.log('[Geocode] Results count:', data.results?.length || 0);
+
+    if (data.status === 'OK' && data.results?.[0]?.geometry?.location) {
+      const { lat, lng } = data.results[0].geometry.location;
+      console.log('[Geocode] Got coordinates:', lat, lng);
+      return { lat, lng };
+    } else {
+      console.log('[Geocode] Failed:', data.status, data.error_message || '');
     }
   } catch (error) {
-    console.error('Geocoding error:', error);
+    console.error('[Geocode] Error:', error);
   }
 
   return null;
@@ -90,6 +103,13 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    console.log('[Map API] Found jobs:', jobs.length);
+    jobs.forEach(job => {
+      console.log('[Map API] Job:', job.id,
+        'Address:', job.address || job.customer?.address || 'NONE',
+        'Has coords:', !!(job.latitude || job.customer?.latitude));
+    });
+
     // Process jobs and geocode if needed
     const jobsWithCoords = await Promise.all(
       jobs.map(async (job) => {
@@ -99,17 +119,23 @@ export async function GET(request: NextRequest) {
 
         // If no coordinates but have address, geocode it
         if ((!lat || !lng) && address) {
+          console.log('[Map API] Need to geocode job:', job.id);
           const coords = await geocodeAddress(address);
           if (coords) {
             lat = coords.lat;
             lng = coords.lng;
 
             // Save coordinates to customer for future use (saves API calls)
-            if (job.customer?.id && !job.customer.latitude) {
-              await prisma.customer.update({
-                where: { id: job.customer.id },
-                data: { latitude: coords.lat, longitude: coords.lng },
-              }).catch(() => {}); // Ignore errors
+            if (job.customer?.id) {
+              try {
+                await prisma.customer.update({
+                  where: { id: job.customer.id },
+                  data: { latitude: coords.lat, longitude: coords.lng },
+                });
+                console.log('[Map API] Saved coords to customer:', job.customer.id);
+              } catch (e) {
+                console.log('[Map API] Failed to save coords:', e);
+              }
             }
           }
         }
@@ -133,13 +159,16 @@ export async function GET(request: NextRequest) {
       })
     );
 
+    const withLocation = jobsWithCoords.filter((j) => j.latitude && j.longitude);
+    console.log('[Map API] Jobs with location:', withLocation.length, 'of', jobs.length);
+
     return NextResponse.json({
       jobs: jobsWithCoords,
       total: jobs.length,
-      withLocation: jobsWithCoords.filter((j) => j.latitude && j.longitude).length,
+      withLocation: withLocation.length,
     });
   } catch (error) {
-    console.error('Error fetching jobs for map:', error);
+    console.error('[Map API] Error:', error);
     return NextResponse.json(
       { error: 'Failed to fetch jobs' },
       { status: 500 }
