@@ -301,15 +301,16 @@ export default function DispatchPage() {
 
   // Optimize routes for all workers
   const optimizeAllRoutes = async () => {
-    if (!isLoaded || !providerId) return;
+    if (!isLoaded || !providerId || workers.length === 0) return;
 
     setOptimizing(true);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const workerIds = workers.map(w => w.id);
       const res = await fetch('/api/provider/dispatch/optimize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ providerId, date: dateStr }),
+        body: JSON.stringify({ providerId, date: dateStr, workerIds }),
       });
 
       const data = await res.json();

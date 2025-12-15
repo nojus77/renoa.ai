@@ -21,14 +21,15 @@ export async function POST(req: Request) {
     let totalSavedMiles = 0;
     let totalSavedMinutes = 0;
 
-    // Get workers
+    // Get workers - either specific ones or all field workers
     const workers = await prisma.providerUser.findMany({
-      where: {
-        id: { in: workerIds },
-        providerId,
-      },
+      where: workerIds?.length > 0
+        ? { id: { in: workerIds }, providerId }
+        : { providerId, role: 'field', status: 'active' },
       select: { id: true, firstName: true, lastName: true },
     });
+
+    console.log('[Optimize API] Workers found:', workers.length, workers.map(w => w.firstName));
 
     for (let i = 0; i < workers.length; i++) {
       const worker = workers[i];

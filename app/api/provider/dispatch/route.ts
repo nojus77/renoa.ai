@@ -26,6 +26,13 @@ export async function GET(request: NextRequest) {
     const dayStart = startOfDay(targetDate);
     const dayEnd = endOfDay(targetDate);
 
+    console.log('[Dispatch API] Fetching jobs for:', {
+      providerId,
+      date: dateStr,
+      dayStart: dayStart.toISOString(),
+      dayEnd: dayEnd.toISOString(),
+    });
+
     // Fetch all jobs for the day
     const jobs = await prisma.job.findMany({
       where: {
@@ -78,6 +85,14 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { firstName: 'asc' },
     });
+
+    console.log('[Dispatch API] Total jobs found:', jobs.length);
+    console.log('[Dispatch API] Jobs:', jobs.map(j => ({
+      id: j.id,
+      service: j.serviceType,
+      assignedUserIds: j.assignedUserIds,
+      startTime: j.startTime,
+    })));
 
     // Process jobs - separate assigned from unassigned
     const assignedJobs: typeof jobs = [];
