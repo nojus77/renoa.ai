@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer, InfoWindow } from '@react-google-maps/api';
 import WorkerLayout from '@/components/worker/WorkerLayout';
-import { MapPin, Navigation, Clock, ChevronRight, Route, Loader2, Calendar } from 'lucide-react';
+import { MapPin, Navigation, Clock, ChevronRight, Route, Loader2, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import { format, parseISO, isToday, isTomorrow } from 'date-fns';
 
 // Renoa Design System
@@ -86,6 +86,15 @@ export default function WorkerMapPage() {
   const [totalDuration, setTotalDuration] = useState<string>('');
   const [center, setCenter] = useState({ lat: 41.8781, lng: -87.6298 }); // Default Chicago
   const [mapRef, setMapRef] = useState<google.maps.Map | null>(null);
+  const [notification, setNotification] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // Auto-dismiss notification
+  useEffect(() => {
+    if (notification) {
+      const timer = setTimeout(() => setNotification(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [notification]);
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -191,64 +200,94 @@ export default function WorkerMapPage() {
     }
   }, [showRoute, calculateRoute]);
 
-  // Optimize route
+  // Optimize route using Google's waypoint optimization
   const optimizeRoute = async () => {
-    if (!isLoaded || jobs.length < 3) return;
-
-    setOptimizing(true);
+    if (!isLoaded || jobs.length < 2) return;
 
     const jobsWithCoords = jobs.filter(j => j.latitude && j.longitude);
-    if (jobsWithCoords.length < 3) {
-      setOptimizing(false);
+    if (jobsWithCoords.length < 2) {
+      setNotification({ message: 'Need at least 2 jobs with locations to optimize', type: 'error' });
       return;
     }
 
-    const directionsService = new google.maps.DirectionsService();
-
-    const origin = { lat: jobsWithCoords[0].latitude!, lng: jobsWithCoords[0].longitude! };
-    const destination = { lat: jobsWithCoords[jobsWithCoords.length - 1].latitude!, lng: jobsWithCoords[jobsWithCoords.length - 1].longitude! };
-
-    const waypoints = jobsWithCoords.slice(1, -1).map(job => ({
-      location: { lat: job.latitude!, lng: job.longitude! },
-      stopover: true
-    }));
+    setOptimizing(true);
 
     try {
-      const result = await directionsService.route({
+      const directionsService = new google.maps.DirectionsService();
+
+      // Use first job as origin, last as destination, middle as waypoints
+      const origin = { lat: jobsWithCoords[0].latitude!, lng: jobsWithCoords[0].longitude! };
+      const destination = { lat: jobsWithCoords[jobsWithCoords.length - 1].latitude!, lng: jobsWithCoords[jobsWithCoords.length - 1].longitude! };
+
+      // All middle jobs are waypoints
+      const waypoints = jobsWithCoords.slice(1, -1).map(job => ({
+        location: { lat: job.latitude!, lng: job.longitude! },
+        stopover: true
+      }));
+
+      // Calculate current (non-optimized) route first
+      let currentDistance = 0;
+      if (waypoints.length > 0) {
+        const currentResult = await directionsService.route({
+          origin,
+          destination,
+          waypoints,
+          travelMode: google.maps.TravelMode.DRIVING,
+          optimizeWaypoints: false,
+        });
+        currentResult.routes[0].legs.forEach(leg => {
+          currentDistance += leg.distance?.value || 0;
+        });
+      }
+
+      // Now get optimized route
+      const optimizedResult = await directionsService.route({
         origin,
         destination,
         waypoints,
         travelMode: google.maps.TravelMode.DRIVING,
-        optimizeWaypoints: true,
+        optimizeWaypoints: true, // This is the magic!
       });
 
-      setDirections(result);
+      // Get the optimized order
+      const waypointOrder = optimizedResult.routes[0].waypoint_order || [];
 
-      // Reorder jobs based on optimized route
-      const waypointOrder = result.routes[0].waypoint_order;
+      // Reorder the jobs based on optimization
       const middleJobs = jobsWithCoords.slice(1, -1);
       const reorderedMiddle = waypointOrder.map(i => middleJobs[i]);
       const optimizedJobs = [
-        jobsWithCoords[0],
-        ...reorderedMiddle,
-        jobsWithCoords[jobsWithCoords.length - 1]
-      ].map((job, index) => ({ ...job, order: index + 1 }));
+        { ...jobsWithCoords[0], order: 1 },
+        ...reorderedMiddle.map((job, idx) => ({ ...job, order: idx + 2 })),
+        { ...jobsWithCoords[jobsWithCoords.length - 1], order: jobsWithCoords.length }
+      ];
 
-      setJobs(optimizedJobs);
-
-      // Recalculate totals
-      const route = result.routes[0];
-      let distance = 0;
-      let duration = 0;
-      route.legs.forEach(leg => {
-        distance += leg.distance?.value || 0;
-        duration += leg.duration?.value || 0;
+      // Calculate new distance
+      let newDistance = 0;
+      let newDuration = 0;
+      optimizedResult.routes[0].legs.forEach(leg => {
+        newDistance += leg.distance?.value || 0;
+        newDuration += leg.duration?.value || 0;
       });
 
-      setTotalDistance(`${(distance / 1609.34).toFixed(1)} mi`);
-      setTotalDuration(`${Math.round(duration / 60)} min`);
+      const savedDistance = currentDistance - newDistance;
+      const savedMiles = (savedDistance / 1609.34).toFixed(1);
+
+      // Update state
+      setJobs(optimizedJobs);
+      setDirections(optimizedResult);
+      setTotalDistance(`${(newDistance / 1609.34).toFixed(1)} mi`);
+      setTotalDuration(`${Math.round(newDuration / 60)} min`);
+
+      // Show savings
+      if (savedDistance > 100) { // More than 100 meters saved
+        setNotification({ message: `Route optimized! Saved ${savedMiles} mi`, type: 'success' });
+      } else {
+        setNotification({ message: 'Route is already optimal!', type: 'success' });
+      }
+
     } catch (error) {
       console.error('Optimize error:', error);
+      setNotification({ message: 'Failed to optimize route', type: 'error' });
     } finally {
       setOptimizing(false);
     }
@@ -268,7 +307,25 @@ export default function WorkerMapPage() {
 
   return (
     <WorkerLayout>
-      <div className="flex flex-col h-[calc(100vh-80px)] bg-black">
+      <div className="flex flex-col h-[calc(100vh-80px)] bg-black relative">
+        {/* Notification Toast */}
+        {notification && (
+          <div
+            className={`absolute top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg animate-in fade-in slide-in-from-top-2 duration-200 ${
+              notification.type === 'success'
+                ? 'bg-emerald-600 text-white'
+                : 'bg-red-600 text-white'
+            }`}
+          >
+            {notification.type === 'success' ? (
+              <CheckCircle className="w-5 h-5" />
+            ) : (
+              <XCircle className="w-5 h-5" />
+            )}
+            <span className="text-sm font-medium">{notification.message}</span>
+          </div>
+        )}
+
         {/* Header */}
         <div className="p-4 border-b border-zinc-800 bg-[#1F1F1F]">
           <div className="flex items-center justify-between mb-3">
@@ -277,7 +334,7 @@ export default function WorkerMapPage() {
               <p className="text-sm text-zinc-400">{jobsWithCoords.length} jobs with locations</p>
             </div>
 
-            {jobsWithCoords.length >= 3 && (
+            {jobsWithCoords.length >= 2 && (
               <button
                 onClick={optimizeRoute}
                 disabled={optimizing}
@@ -460,7 +517,10 @@ export default function WorkerMapPage() {
             {jobs.length === 0 ? (
               <p className="text-sm text-zinc-500 px-2">No jobs to display</p>
             ) : (
-              jobs.map((job, index) => (
+              [...jobs]
+                .filter(j => j.latitude && j.longitude)
+                .sort((a, b) => (a.order || 0) - (b.order || 0))
+                .map((job, index) => (
                 <div
                   key={job.id}
                   onClick={() => {
