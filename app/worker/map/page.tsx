@@ -137,7 +137,7 @@ export default function WorkerMapPage() {
 
   // Calculate route when jobs change
   const calculateRoute = useCallback(async () => {
-    if (!isLoaded || jobs.length < 2) {
+    if (!isLoaded) {
       setDirections(null);
       setTotalDistance('');
       setTotalDuration('');
@@ -147,15 +147,18 @@ export default function WorkerMapPage() {
     const jobsWithCoords = jobs.filter(j => j.latitude && j.longitude);
     if (jobsWithCoords.length < 2) {
       setDirections(null);
+      setTotalDistance('');
+      setTotalDuration('');
       return;
     }
 
     const directionsService = new google.maps.DirectionsService();
 
-    // Sort jobs by scheduled time
-    const sortedJobs = [...jobsWithCoords].sort((a, b) =>
-      new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
-    );
+    // Sort by order if available, otherwise by start time
+    const sortedJobs = [...jobsWithCoords].sort((a, b) => {
+      if (a.order && b.order) return a.order - b.order;
+      return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+    });
 
     const origin = { lat: sortedJobs[0].latitude!, lng: sortedJobs[0].longitude! };
     const destination = { lat: sortedJobs[sortedJobs.length - 1].latitude!, lng: sortedJobs[sortedJobs.length - 1].longitude! };
@@ -171,16 +174,14 @@ export default function WorkerMapPage() {
         destination,
         waypoints,
         travelMode: google.maps.TravelMode.DRIVING,
-        optimizeWaypoints: false,
       });
 
       setDirections(result);
 
       // Calculate totals
-      const route = result.routes[0];
       let distance = 0;
       let duration = 0;
-      route.legs.forEach(leg => {
+      result.routes[0].legs.forEach(leg => {
         distance += leg.distance?.value || 0;
         duration += leg.duration?.value || 0;
       });
@@ -200,12 +201,11 @@ export default function WorkerMapPage() {
     }
   }, [showRoute, calculateRoute]);
 
-  // Optimize route using Google's waypoint optimization
+  // Optimize route using Google's waypoint optimization - allows ALL jobs to be reordered
   const optimizeRoute = async () => {
-    if (!isLoaded || jobs.length < 2) return;
-
     const jobsWithCoords = jobs.filter(j => j.latitude && j.longitude);
-    if (jobsWithCoords.length < 2) {
+
+    if (!isLoaded || jobsWithCoords.length < 2) {
       setNotification({ message: 'Need at least 2 jobs with locations to optimize', type: 'error' });
       return;
     }
@@ -215,72 +215,104 @@ export default function WorkerMapPage() {
     try {
       const directionsService = new google.maps.DirectionsService();
 
-      // Use first job as origin, last as destination, middle as waypoints
+      // Use first job as origin for round-trip optimization
+      // This allows Google to optimize ALL stops including first and last
       const origin = { lat: jobsWithCoords[0].latitude!, lng: jobsWithCoords[0].longitude! };
-      const destination = { lat: jobsWithCoords[jobsWithCoords.length - 1].latitude!, lng: jobsWithCoords[jobsWithCoords.length - 1].longitude! };
 
-      // All middle jobs are waypoints
-      const waypoints = jobsWithCoords.slice(1, -1).map(job => ({
+      // ALL jobs become waypoints for true optimization
+      const waypoints = jobsWithCoords.map(job => ({
         location: { lat: job.latitude!, lng: job.longitude! },
         stopover: true
       }));
 
-      // Calculate current (non-optimized) route first
+      // Get current route distance (non-optimized, point-to-point)
       let currentDistance = 0;
-      if (waypoints.length > 0) {
+      const currentOrigin = { lat: jobsWithCoords[0].latitude!, lng: jobsWithCoords[0].longitude! };
+      const currentDest = { lat: jobsWithCoords[jobsWithCoords.length - 1].latitude!, lng: jobsWithCoords[jobsWithCoords.length - 1].longitude! };
+      const currentWaypoints = jobsWithCoords.slice(1, -1).map(job => ({
+        location: { lat: job.latitude!, lng: job.longitude! },
+        stopover: true
+      }));
+
+      try {
         const currentResult = await directionsService.route({
-          origin,
-          destination,
-          waypoints,
+          origin: currentOrigin,
+          destination: currentDest,
+          waypoints: currentWaypoints,
           travelMode: google.maps.TravelMode.DRIVING,
-          optimizeWaypoints: false,
         });
         currentResult.routes[0].legs.forEach(leg => {
           currentDistance += leg.distance?.value || 0;
         });
+      } catch {
+        // If current route fails, continue with optimization
       }
 
-      // Now get optimized route
+      // Get optimized route (round trip to allow full reordering)
       const optimizedResult = await directionsService.route({
         origin,
-        destination,
+        destination: origin, // Round trip back to start
         waypoints,
         travelMode: google.maps.TravelMode.DRIVING,
-        optimizeWaypoints: true, // This is the magic!
+        optimizeWaypoints: true,
       });
 
       // Get the optimized order
       const waypointOrder = optimizedResult.routes[0].waypoint_order || [];
 
-      // Reorder the jobs based on optimization
-      const middleJobs = jobsWithCoords.slice(1, -1);
-      const reorderedMiddle = waypointOrder.map(i => middleJobs[i]);
-      const optimizedJobs = [
-        { ...jobsWithCoords[0], order: 1 },
-        ...reorderedMiddle.map((job, idx) => ({ ...job, order: idx + 2 })),
-        { ...jobsWithCoords[jobsWithCoords.length - 1], order: jobsWithCoords.length }
-      ];
+      // Reorder jobs based on Google's optimization
+      const optimizedJobs = waypointOrder.map((originalIndex, newIndex) => ({
+        ...jobsWithCoords[originalIndex],
+        order: newIndex + 1
+      }));
 
-      // Calculate new distance
+      // Calculate new totals (exclude the return leg back to origin)
       let newDistance = 0;
       let newDuration = 0;
-      optimizedResult.routes[0].legs.forEach(leg => {
-        newDistance += leg.distance?.value || 0;
-        newDuration += leg.duration?.value || 0;
-      });
+      const legs = optimizedResult.routes[0].legs;
+      // Don't count the last leg (return to origin)
+      for (let i = 0; i < legs.length - 1; i++) {
+        newDistance += legs[i].distance?.value || 0;
+        newDuration += legs[i].duration?.value || 0;
+      }
 
       const savedDistance = currentDistance - newDistance;
       const savedMiles = (savedDistance / 1609.34).toFixed(1);
 
-      // Update state
+      // Update state with optimized jobs
       setJobs(optimizedJobs);
-      setDirections(optimizedResult);
-      setTotalDistance(`${(newDistance / 1609.34).toFixed(1)} mi`);
-      setTotalDuration(`${Math.round(newDuration / 60)} min`);
+
+      // Now calculate the actual route for display (point-to-point, not round trip)
+      const displayOrigin = { lat: optimizedJobs[0].latitude!, lng: optimizedJobs[0].longitude! };
+      const displayDest = { lat: optimizedJobs[optimizedJobs.length - 1].latitude!, lng: optimizedJobs[optimizedJobs.length - 1].longitude! };
+      const displayWaypoints = optimizedJobs.slice(1, -1).map(job => ({
+        location: { lat: job.latitude!, lng: job.longitude! },
+        stopover: true
+      }));
+
+      const displayResult = await directionsService.route({
+        origin: displayOrigin,
+        destination: displayDest,
+        waypoints: displayWaypoints,
+        travelMode: google.maps.TravelMode.DRIVING,
+      });
+
+      setDirections(displayResult);
+
+      // Calculate display totals
+      let displayDistance = 0;
+      let displayDuration = 0;
+      displayResult.routes[0].legs.forEach(leg => {
+        displayDistance += leg.distance?.value || 0;
+        displayDuration += leg.duration?.value || 0;
+      });
+
+      setTotalDistance(`${(displayDistance / 1609.34).toFixed(1)} mi`);
+      setTotalDuration(`${Math.round(displayDuration / 60)} min`);
 
       // Show savings
-      if (savedDistance > 100) { // More than 100 meters saved
-        setNotification({ message: `Route optimized! Saved ${savedMiles} mi`, type: 'success' });
+      if (parseFloat(savedMiles) > 0.1) {
+        setNotification({ message: `Saved ${savedMiles} miles! Route optimized.`, type: 'success' });
       } else {
         setNotification({ message: 'Route is already optimal!', type: 'success' });
       }
