@@ -110,9 +110,15 @@ async function seedDaliaJobs() {
     }
   }
 
-  // Helper to create specific dates
-  const createDate = (year: number, month: number, day: number, hour: number, minute: number = 0) => {
-    return new Date(year, month - 1, day, hour, minute, 0, 0);
+  // Helper to create dates relative to today
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const createDateRelative = (daysFromToday: number, hour: number, minute: number = 0) => {
+    const date = new Date(today);
+    date.setDate(date.getDate() + daysFromToday);
+    date.setHours(hour, minute, 0, 0);
+    return date;
   };
 
   // Format timestamp for notes
@@ -127,22 +133,22 @@ async function seedDaliaJobs() {
     });
   };
 
-  // Upcoming Jobs for Dalia
+  // Upcoming Jobs for Dalia (relative to today)
   const upcomingJobs = [
     {
       customerName: 'James Peterson',
       serviceType: 'Plumbing',
-      startTime: createDate(2024, 12, 17, 9, 0),
-      endTime: createDate(2024, 12, 17, 11, 0),
+      startTime: createDateRelative(0, 14, 0), // Today at 2pm
+      endTime: createDateRelative(0, 16, 0),   // Today at 4pm
       estimatedValue: 90,
       description: 'Kitchen faucet replacement and fix leaking pipe under bathroom sink',
-      notes: `[${formatTimestamp(new Date())}] System: Bring various size washers and pipe sealant\n\n[${formatTimestamp(new Date())}] Dispatcher: Customer works night shift, will be home in morning`,
+      notes: `[${formatTimestamp(new Date())}] System: Bring various size washers and pipe sealant\n\n[${formatTimestamp(new Date())}] Dispatcher: Customer works night shift, will be home in afternoon`,
     },
     {
       customerName: 'Maria Kowalski',
       serviceType: 'Snow Removal',
-      startTime: createDate(2024, 12, 18, 6, 30),
-      endTime: createDate(2024, 12, 18, 8, 0),
+      startTime: createDateRelative(1, 6, 30), // Tomorrow 6:30am
+      endTime: createDateRelative(1, 8, 0),    // Tomorrow 8:00am
       estimatedValue: 60,
       description: 'Clear driveway, front walkway, and sidewalk. Apply salt.',
       notes: `[${formatTimestamp(new Date())}] Dispatcher: Elderly customer, please be thorough with salting to prevent falls`,
@@ -150,8 +156,8 @@ async function seedDaliaJobs() {
     {
       customerName: 'Andrew Sullivan',
       serviceType: 'HVAC',
-      startTime: createDate(2024, 12, 19, 13, 0),
-      endTime: createDate(2024, 12, 19, 15, 30),
+      startTime: createDateRelative(1, 13, 0),  // Tomorrow 1pm
+      endTime: createDateRelative(1, 15, 30),   // Tomorrow 3:30pm
       estimatedValue: 125,
       description: 'Furnace making strange noises. Customer reports burning smell occasionally.',
       notes: `[${formatTimestamp(new Date())}] System: Possible blower motor issue - bring replacement parts\n\n[${formatTimestamp(new Date())}] Dispatcher: Call customer when 15 minutes away`,
@@ -159,37 +165,46 @@ async function seedDaliaJobs() {
     {
       customerName: 'Lisa Chang',
       serviceType: 'Electrical',
-      startTime: createDate(2024, 12, 20, 10, 0),
-      endTime: createDate(2024, 12, 20, 12, 0),
+      startTime: createDateRelative(2, 10, 0),  // Day after tomorrow 10am
+      endTime: createDateRelative(2, 12, 0),    // Day after tomorrow 12pm
       estimatedValue: 110,
       description: 'Multiple outlets not working in living room and kitchen. Circuit breaker keeps tripping.',
       notes: `[${formatTimestamp(new Date())}] Dispatcher: Customer has small children, please be mindful of tools/equipment`,
     },
-  ];
-
-  // Completed Jobs for Dalia
-  const completedJobs = [
     {
       customerName: 'Robert Williams',
+      serviceType: 'Furnace Repair',
+      startTime: createDateRelative(3, 9, 0),   // 3 days from now 9am
+      endTime: createDateRelative(3, 11, 30),   // 3 days from now 11:30am
+      estimatedValue: 150,
+      description: 'Furnace not producing heat. Pilot light keeps going out.',
+      notes: `[${formatTimestamp(new Date())}] System: May need new thermocouple - bring replacement\n\n[${formatTimestamp(new Date())}] Dispatcher: Urgent - customer has elderly parent at home`,
+    },
+  ];
+
+  // Completed Jobs for Dalia (yesterday and 2 days ago)
+  const completedJobs = [
+    {
+      customerName: 'Patricia Brown',
       serviceType: 'HVAC',
-      startTime: createDate(2024, 12, 13, 11, 0),
-      endTime: createDate(2024, 12, 13, 13, 0),
+      startTime: createDateRelative(-1, 11, 0), // Yesterday 11am
+      endTime: createDateRelative(-1, 13, 0),   // Yesterday 1pm
       hoursWorked: 2.0,
       isPaid: true,
       estimatedValue: 100,
       description: 'Annual furnace cleaning and filter replacement',
-      notes: `[${formatTimestamp(createDate(2024, 12, 13, 11, 0))}] Dispatcher: Regular maintenance customer\n\n[${formatTimestamp(createDate(2024, 12, 13, 13, 0))}] Dalia Grajauskas: Completed routine maintenance. System running well. Recommended new filter in 3 months.`,
+      notes: `[${formatTimestamp(createDateRelative(-1, 11, 0))}] Dispatcher: Regular maintenance customer\n\n[${formatTimestamp(createDateRelative(-1, 13, 0))}] Dalia Grajauskas: Completed routine maintenance. System running well. Recommended new filter in 3 months.`,
     },
     {
-      customerName: 'Patricia Brown',
+      customerName: 'James Peterson',
       serviceType: 'Plumbing',
-      startTime: createDate(2024, 12, 12, 16, 0),
-      endTime: createDate(2024, 12, 12, 18, 30),
+      startTime: createDateRelative(-2, 16, 0), // 2 days ago 4pm
+      endTime: createDateRelative(-2, 18, 30),  // 2 days ago 6:30pm
       hoursWorked: 2.5,
       isPaid: false,
       estimatedValue: 112.5,
       description: 'Clogged main drain line, water backing up in basement',
-      notes: `[${formatTimestamp(createDate(2024, 12, 12, 16, 0))}] System: Emergency call\n\n[${formatTimestamp(createDate(2024, 12, 12, 18, 30))}] Dalia Grajauskas: Used snake to clear blockage. Advised customer about tree roots. May need professional drain cleaning soon.`,
+      notes: `[${formatTimestamp(createDateRelative(-2, 16, 0))}] System: Emergency call\n\n[${formatTimestamp(createDateRelative(-2, 18, 30))}] Dalia Grajauskas: Used snake to clear blockage. Advised customer about tree roots. May need professional drain cleaning soon.`,
     },
   ];
 
@@ -298,6 +313,7 @@ async function seedDaliaJobs() {
   const totalHours = completedJobs.reduce((sum, j) => sum + j.hoursWorked, 0);
   const totalEarnings = totalHours * hourlyRate;
   const pendingPay = completedJobs.filter((j) => !j.isPaid).reduce((sum, j) => sum + j.hoursWorked * hourlyRate, 0);
+  const paidPay = completedJobs.filter((j) => j.isPaid).reduce((sum, j) => sum + j.hoursWorked * hourlyRate, 0);
 
   console.log('\n════════════════════════════════════════════');
   console.log('📊 SUMMARY FOR DALIA GRAJAUSKAS');
@@ -308,9 +324,15 @@ async function seedDaliaJobs() {
   console.log(`   Password: dalia123`);
   console.log('');
   console.log(`   📅 Upcoming Jobs: ${upcomingJobs.length}`);
+  console.log(`      - Today: 1 job (Plumbing @ 2pm)`);
+  console.log(`      - Tomorrow: 2 jobs (Snow Removal @ 6:30am, HVAC @ 1pm)`);
+  console.log(`      - In 2 days: 1 job (Electrical @ 10am)`);
+  console.log(`      - In 3 days: 1 job (Furnace Repair @ 9am)`);
+  console.log('');
   console.log(`   ✓ Completed Jobs: ${completedJobs.length}`);
-  console.log(`   ⏱️ Total Hours: ${totalHours.toFixed(1)}h`);
+  console.log(`   ⏱️ Total Hours Worked: ${totalHours.toFixed(1)}h`);
   console.log(`   💰 Total Earned: $${totalEarnings.toFixed(2)}`);
+  console.log(`   ✓ Paid: $${paidPay.toFixed(2)}`);
   console.log(`   ⏳ Pending Pay: $${pendingPay.toFixed(2)}`);
   console.log('════════════════════════════════════════════');
   console.log('\n✨ Done! Login as Dalia to see the data.');

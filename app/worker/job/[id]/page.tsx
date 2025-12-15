@@ -322,9 +322,11 @@ export default function JobDetailPage() {
 
   const fetchJob = useCallback(async (uid: string, jid: string) => {
     try {
+      console.log('Fetching job:', { jobId: jid, userId: uid });
       // Use direct job endpoint for reliable fetching
       const res = await fetch(`/api/worker/jobs/${jid}?userId=${uid}`);
       const data = await res.json();
+      console.log('Job fetch response:', { status: res.status, data });
 
       if (res.ok && data.job) {
         const foundJob = data.job;
@@ -343,8 +345,12 @@ export default function JobDetailPage() {
           setTravelStartTime(new Date(foundJob.onTheWayAt).getTime());
         }
       } else {
-        toast.error('Job not found');
-        router.push('/worker/schedule');
+        console.error('Job not found - API response:', data);
+        toast.error(data.error || 'Job not found');
+        // Stay on page to show error instead of redirecting immediately
+        setTimeout(() => {
+          router.push('/worker/dashboard');
+        }, 2000);
       }
     } catch (error) {
       console.error('Error fetching job:', error);

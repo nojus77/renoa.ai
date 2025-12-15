@@ -20,6 +20,9 @@ import {
   Phone,
   Mail,
   MapPin,
+  PhoneCall,
+  Play,
+  CheckCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -87,6 +90,9 @@ export default function WorkerDashboard() {
   const [canCreateJobs, setCanCreateJobs] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const scrollPositionRef = useRef(0);
+  const [activeJobDismissed, setActiveJobDismissed] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState<string>('00:00:00');
+  const [dispatchPhone, setDispatchPhone] = useState<string | null>(null);
 
   // Job creation modal state
   const [showCreateJob, setShowCreateJob] = useState(false);
@@ -169,6 +175,7 @@ export default function WorkerDashboard() {
       const res = await fetch(`/api/worker/jobs/upcoming?userId=${uid}&limit=3`);
       const data = await res.json();
       if (data.jobs) {
+        console.log('Fetched upcoming jobs:', data.jobs.map((j: UpcomingJob) => ({ id: j.id, serviceType: j.serviceType })));
         setUpcomingJobs(data.jobs);
       }
     } catch (error) {
@@ -183,6 +190,10 @@ export default function WorkerDashboard() {
       // Check provider-level permission (applies to ALL workers)
       if (data.user?.provider?.workersCanCreateJobs) {
         setCanCreateJobs(true);
+      }
+      // Store dispatch phone number
+      if (data.user?.provider?.phone) {
+        setDispatchPhone(data.user.provider.phone);
       }
     } catch (error) {
       console.error('Error fetching worker permissions:', error);
@@ -224,6 +235,52 @@ export default function WorkerDashboard() {
     }, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Find active job (in progress with clock-in)
+  const activeJob = jobs.find((job) => {
+    const hasActiveWorkLog = job.workLogs?.some((l) => l.clockIn && !l.clockOut);
+    return hasActiveWorkLog || job.status === 'in_progress';
+  });
+
+  // Calculate elapsed time for active job
+  useEffect(() => {
+    if (!activeJob) return;
+
+    const activeWorkLog = activeJob.workLogs?.find((l) => l.clockIn && !l.clockOut);
+    if (!activeWorkLog) return;
+
+    const calculateElapsed = () => {
+      const clockInTime = new Date(activeWorkLog.clockIn).getTime();
+      const now = Date.now();
+      const diff = now - clockInTime;
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setElapsedTime(
+        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      );
+    };
+
+    calculateElapsed();
+    const timer = setInterval(calculateElapsed, 1000);
+    return () => clearInterval(timer);
+  }, [activeJob]);
+
+  // Reset dismissed state when active job changes
+  useEffect(() => {
+    setActiveJobDismissed(false);
+  }, [activeJob?.id]);
+
+  // Handle call dispatch
+  const handleCallDispatch = () => {
+    if (dispatchPhone) {
+      window.location.href = `tel:${dispatchPhone.replace(/\D/g, '')}`;
+    } else {
+      toast.error('Dispatch phone number not available');
+    }
+  };
 
   // Customer search with debounce
   useEffect(() => {
@@ -390,7 +447,19 @@ export default function WorkerDashboard() {
 
   // Navigate to job details
   const handleJobClick = (jobId: string) => {
-    router.push(`/worker/job/${jobId}`);
+    console.log('handleJobClick called with jobId:', jobId);
+    if (!jobId) {
+      console.error('No job ID provided!');
+      return;
+    }
+    const url = `/worker/job/${jobId}`;
+    console.log('Attempting to navigate to:', url);
+    try {
+      router.push(url);
+      console.log('router.push called successfully');
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
   };
 
   // Get left border color based on status
@@ -449,9 +518,9 @@ export default function WorkerDashboard() {
 
   return (
     <WorkerLayout>
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-4">
         {/* Header - Date and Actions */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-1">
           {/* Date Display */}
           <p className="text-[#9CA3AF] text-base font-medium">
             {currentTime.toLocaleDateString('en-US', {
@@ -502,6 +571,16 @@ export default function WorkerDashboard() {
             <p className="text-xs text-gray-500">Earned</p>
           </div>
         </div>
+
+        {/* Call Dispatch Button */}
+        <button
+          onClick={handleCallDispatch}
+          className="w-full py-4 rounded-[20px] font-semibold text-black flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
+          style={{ backgroundColor: LIME_GREEN }}
+        >
+          <PhoneCall className="w-5 h-5" />
+          Call Dispatch
+        </button>
 
         {/* Today's Jobs Section */}
         <div className="space-y-4">
@@ -558,8 +637,16 @@ export default function WorkerDashboard() {
               {upcomingJobs.map((job) => (
                 <button
                   key={job.id}
-                  onClick={() => handleJobClick(job.id)}
-                  className="w-full bg-[#1F1F1F] rounded-[20px] py-4 px-5 text-left border-l-[3px] border-l-[#C4F542] hover:bg-[#2A2A2A] transition-colors active:scale-[0.99] border border-[#2A2A2A]"
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Upcoming job clicked:', { id: job.id, serviceType: job.serviceType, customer: job.customer.name });
+                    toast.info(`Opening ${job.serviceType}...`);
+                    handleJobClick(job.id);
+                  }}
+                  style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+                  className="w-full bg-[#1F1F1F] rounded-[20px] py-4 px-5 text-left border-l-[3px] border-l-[#C4F542] hover:bg-[#2A2A2A] transition-colors active:scale-[0.99] active:bg-[#3A3A3A] border border-[#2A2A2A] cursor-pointer select-none"
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-1 flex-1 min-w-0">
@@ -582,6 +669,75 @@ export default function WorkerDashboard() {
           )}
         </div>
       </div>
+
+      {/* Active Job Popup */}
+      {activeJob && !activeJobDismissed && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center p-4 pointer-events-none">
+          <div className="bg-[#1F1F1F] rounded-[20px] w-full max-w-md border border-[#2A2A2A] shadow-2xl pointer-events-auto animate-in slide-in-from-bottom-4 duration-300">
+            {/* Header with dismiss */}
+            <div className="flex items-center justify-between p-4 border-b border-[#2A2A2A]">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#C4F542] animate-pulse" />
+                <span className="text-sm font-medium text-[#C4F542]">Active Job</span>
+              </div>
+              <button
+                onClick={() => setActiveJobDismissed(true)}
+                className="p-1 hover:bg-[#2A2A2A] rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4 text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Job Details */}
+            <div className="p-4 space-y-3">
+              {/* Timer */}
+              <div className="text-center">
+                <p className="text-3xl font-bold font-mono" style={{ color: LIME_GREEN }}>
+                  {elapsedTime}
+                </p>
+                <p className="text-xs text-zinc-500 mt-1">Time Elapsed</p>
+              </div>
+
+              {/* Job Info */}
+              <div className="bg-[#2A2A2A] rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-zinc-400">Customer</span>
+                  <span className="text-sm font-medium text-white">{activeJob.customer.name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-zinc-400">Service</span>
+                  <span className="text-sm font-medium text-white">{activeJob.serviceType}</span>
+                </div>
+                <div className="flex items-start justify-between">
+                  <span className="text-sm text-zinc-400">Address</span>
+                  <span className="text-sm font-medium text-white text-right max-w-[180px] truncate">
+                    {activeJob.address}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => router.push(`/worker/job/${activeJob.id}`)}
+                  className="flex-1 py-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] rounded-xl font-medium text-white flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Play className="w-4 h-4" />
+                  View Details
+                </button>
+                <button
+                  onClick={() => router.push(`/worker/job/${activeJob.id}`)}
+                  className="flex-1 py-3 rounded-xl font-medium text-black flex items-center justify-center gap-2 transition-colors"
+                  style={{ backgroundColor: LIME_GREEN }}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Complete Job
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Create Job Modal */}
       {showCreateJob && (
