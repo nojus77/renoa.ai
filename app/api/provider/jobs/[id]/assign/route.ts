@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 /**
  * POST /api/provider/jobs/[id]/assign
@@ -84,6 +83,45 @@ export async function POST(
         profilePhotoUrl: true,
       },
     });
+
+    // Find newly assigned workers (not previously assigned)
+    const previouslyAssigned = job.assignedUserIds || [];
+    const newlyAssigned = userIds.filter((id: string) => !previouslyAssigned.includes(id));
+
+    // Send notifications to newly assigned workers
+    if (newlyAssigned.length > 0) {
+      const jobDate = updatedJob.startTime.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+      const jobTime = updatedJob.startTime.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      console.log('📨 Sending job assignment notifications to newly assigned workers:', newlyAssigned);
+
+      for (const workerId of newlyAssigned) {
+        await createNotification({
+          providerId,
+          userId: workerId,
+          type: 'job_assigned',
+          title: 'New Job Assigned',
+          message: `You've been assigned to ${updatedJob.serviceType} on ${jobDate} at ${jobTime}`,
+          link: `/worker/job/${updatedJob.id}`,
+          data: {
+            jobId: updatedJob.id,
+            serviceType: updatedJob.serviceType,
+            startTime: updatedJob.startTime.toISOString(),
+            address: updatedJob.address,
+          },
+        });
+      }
+
+      console.log('✅ Job assignment notifications sent to', newlyAssigned.length, 'workers');
+    }
 
     return NextResponse.json({
       success: true,

@@ -236,6 +236,19 @@ export default function WorkerDashboard() {
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-poll for new jobs every 30 seconds
+  useEffect(() => {
+    if (!userId) return;
+
+    const pollInterval = setInterval(() => {
+      console.log('Auto-polling for job updates...');
+      fetchJobs(userId);
+      fetchUpcomingJobs(userId);
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(pollInterval);
+  }, [userId, fetchJobs, fetchUpcomingJobs]);
+
   // Find active job (in progress with clock-in)
   const activeJob = jobs.find((job) => {
     const hasActiveWorkLog = job.workLogs?.some((l) => l.clockIn && !l.clockOut);

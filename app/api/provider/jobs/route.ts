@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: NextRequest) {
   try {
@@ -122,6 +123,41 @@ export async function POST(request: NextRequest) {
       assignedUserIds: job.assignedUserIds,
       hasCustomer: !!job.customer,
     });
+
+    // Send notifications to assigned workers
+    if (assignedUserIds && assignedUserIds.length > 0) {
+      const jobDate = startDate.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+      const jobTime = startDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      console.log('📨 Sending job assignment notifications to workers:', assignedUserIds);
+
+      for (const workerId of assignedUserIds) {
+        await createNotification({
+          providerId,
+          userId: workerId,
+          type: 'job_assigned',
+          title: 'New Job Assigned',
+          message: `You've been assigned to ${serviceType} on ${jobDate} at ${jobTime}`,
+          link: `/worker/job/${job.id}`,
+          data: {
+            jobId: job.id,
+            serviceType,
+            startTime: startDate.toISOString(),
+            address: customerAddress || '',
+          },
+        });
+      }
+
+      console.log('✅ Job assignment notifications sent');
+    }
 
     const response = { success: true, job };
     console.log('📤 Returning response with job data:', {

@@ -1,0 +1,27 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\Users\\simon\\renoa.ai\" -Filter \".env*\" -Force)",
+      "Bash(Select-Object Name)",
+      "Bash(npx tsc:*)",
+      "Bash(npm run lint)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(git pull:*)",
+      "Bash(git diff:*)",
+      "Bash(git push:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: complete UI overhaul for earnings page\n\n- Redesigned header with 32px bold title and teal toggle buttons\n- Created reusable StatCard component with colored icons\n- Built 2x2 stats grid: Total Earned, Hours, Jobs, Pending Pay\n- Added gradient pay rate card with border\n- Created WorkHistoryCard component with job details layout\n- Applied consistent color scheme (#1F2937 cards, #10B981 teal accent)\n- Larger typography (32px values, 28px pay rate)\n- Proper spacing with rounded-2xl corners\n- Status badges: teal for paid, yellow for pending\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git rebase:*)",
+      "Bash(npx ts-node:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(git checkout:*)",
+      "Bash(git fetch:*)",
+      "Bash(git reset:*)",
+      "Bash(git stash:*)",
+      "Bash(node -e:*)",
+      "Bash(npx prisma db pull:*)",
+      "Bash(curl:*)"
+    ]
+  }
+}

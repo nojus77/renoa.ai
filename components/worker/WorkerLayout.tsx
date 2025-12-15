@@ -2,8 +2,8 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Calendar, DollarSign, User, MessageSquare, MapPin } from 'lucide-react';
-import { useEffect } from 'react';
+import { Home, Calendar, DollarSign, User, Bell, MapPin } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
 
 // Renoa Design System Colors
 const LIME_GREEN = '#C4F542';
@@ -22,6 +22,41 @@ const navItems = [
 
 export default function WorkerLayout({ children }: WorkerLayoutProps) {
   const pathname = usePathname();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [providerId, setProviderId] = useState<string | null>(null);
+
+  // Fetch notification count
+  const fetchNotificationCount = useCallback(async () => {
+    if (!providerId || !userId) return;
+
+    try {
+      const res = await fetch(`/api/provider/notifications?providerId=${providerId}&userId=${userId}&unreadOnly=true&limit=1`);
+      const data = await res.json();
+      if (data.unreadCount !== undefined) {
+        setUnreadCount(data.unreadCount);
+      }
+    } catch (error) {
+      console.error('Error fetching notification count:', error);
+    }
+  }, [providerId, userId]);
+
+  // Get user IDs from localStorage
+  useEffect(() => {
+    const uid = localStorage.getItem('workerUserId');
+    const pid = localStorage.getItem('workerProviderId');
+    setUserId(uid);
+    setProviderId(pid);
+  }, []);
+
+  // Fetch notifications on mount and poll every 30 seconds
+  useEffect(() => {
+    if (userId && providerId) {
+      fetchNotificationCount();
+      const interval = setInterval(fetchNotificationCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [userId, providerId, fetchNotificationCount]);
 
   // Apply saved theme on mount
   useEffect(() => {
@@ -35,6 +70,24 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
 
   return (
     <div className="min-h-screen bg-black text-white pb-20">
+      {/* Notification Bell - Fixed in top right */}
+      {unreadCount > 0 && (
+        <Link
+          href="/worker/notifications"
+          className="fixed top-4 right-4 z-50 p-2 bg-[#1F1F1F] rounded-full border border-[#2A2A2A] shadow-lg"
+        >
+          <div className="relative">
+            <Bell className="w-5 h-5 text-white" />
+            <span
+              className="absolute -top-2 -right-2 min-w-[18px] h-[18px] flex items-center justify-center text-[10px] font-bold text-black rounded-full px-1"
+              style={{ backgroundColor: LIME_GREEN }}
+            >
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          </div>
+        </Link>
+      )}
+
       {/* Main Content */}
       <main className="max-w-lg mx-auto">
         {children}

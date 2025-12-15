@@ -8,7 +8,8 @@ export type NotificationType =
   | 'payment_received'
   | 'worker_clocked_in'
   | 'job_created_by_worker'
-  | 'new_team_member';
+  | 'new_team_member'
+  | 'job_assigned';
 
 interface CreateNotificationParams {
   providerId: string;
