@@ -145,6 +145,18 @@ export async function POST(request: NextRequest) {
       earnings: Math.round(totalEarnings * 100) / 100, // Includes tip
       baseEarnings: Math.round(earnings * 100) / 100,
       tip: tipValue,
+      // Earnings breakdown for display
+      earningsBreakdown: {
+        payType: user?.payType || 'hourly',
+        hourlyRate: user?.hourlyRate || null,
+        commissionRate: user?.commissionRate || null,
+        totalJobValue: Math.round(totalJobValue * 100) / 100,
+        numWorkers,
+        workerShareOfJob: Math.round(workerShareOfJob * 100) / 100,
+        baseEarnings: Math.round(earnings * 100) / 100,
+        tipAmount: tipValue,
+        totalEarnings: Math.round(totalEarnings * 100) / 100,
+      },
     });
   } catch (error) {
     console.error('Error clocking out:', error);

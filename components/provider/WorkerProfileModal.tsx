@@ -336,6 +336,16 @@ export default function WorkerProfileModal({
 
   const savePay = async () => {
     if (!workerId) return;
+
+    // Validate commission rate before saving
+    if (payForm.payType === 'commission' && payForm.commissionRate) {
+      const rate = parseFloat(payForm.commissionRate);
+      if (isNaN(rate) || rate < 0 || rate > 100) {
+        toast.error('Commission rate must be between 0 and 100%');
+        return;
+      }
+    }
+
     setSavingPay(true);
     try {
       const res = await fetch(`/api/provider/team/${workerId}`, {
@@ -858,6 +868,8 @@ export default function WorkerProfileModal({
                               <label className="text-xs text-zinc-500 mb-1 block">Commission Rate (%)</label>
                               <Input
                                 type="number"
+                                min="0"
+                                max="100"
                                 value={payForm.commissionRate}
                                 onChange={(e) => setPayForm({ ...payForm, commissionRate: e.target.value })}
                                 placeholder="0"

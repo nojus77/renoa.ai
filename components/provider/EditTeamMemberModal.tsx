@@ -159,6 +159,14 @@ export default function EditTeamMemberModal({
       errors.push('Color must be a valid hex code');
     }
 
+    // Commission rate validation
+    if (formData.commissionRate) {
+      const rate = parseFloat(formData.commissionRate);
+      if (isNaN(rate) || rate < 0 || rate > 100) {
+        errors.push('Commission rate must be between 0 and 100%');
+      }
+    }
+
     return errors;
   };
 

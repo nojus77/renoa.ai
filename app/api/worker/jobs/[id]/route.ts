@@ -49,6 +49,13 @@ export async function GET(
             earnings: true,
           },
         },
+        assignedCrew: {
+          select: {
+            id: true,
+            name: true,
+            color: true,
+          },
+        },
       },
     });
 
@@ -59,7 +66,48 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ job });
+    // Get coworkers (other assigned users, excluding current user)
+    let coworkers: { id: string; name: string; profilePhotoUrl: string | null }[] = [];
+    if (job.assignedUserIds.length > 1) {
+      const otherUserIds = job.assignedUserIds.filter(uid => uid !== userId);
+      const users = await prisma.providerUser.findMany({
+        where: {
+          id: { in: otherUserIds },
+          status: 'active',
+        },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          profilePhotoUrl: true,
+          profilePhotoBlobPath: true,
+        },
+      });
+      coworkers = users.map(u => ({
+        id: u.id,
+        name: `${u.firstName} ${u.lastName}`,
+        profilePhotoUrl: u.profilePhotoBlobPath || u.profilePhotoUrl,
+      }));
+    }
+
+    // Get user's pay info for earnings breakdown display
+    const userPayInfo = await prisma.providerUser.findUnique({
+      where: { id: userId },
+      select: {
+        payType: true,
+        hourlyRate: true,
+        commissionRate: true,
+      },
+    });
+
+    return NextResponse.json({
+      job: {
+        ...job,
+        coworkers,
+        numWorkers: job.assignedUserIds.length,
+        userPayInfo,
+      },
+    });
   } catch (error) {
     console.error('Error fetching job:', error);
     return NextResponse.json(

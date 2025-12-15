@@ -13,6 +13,7 @@ import {
   Loader2,
   Calendar,
   User,
+  Users,
   FileText,
   AlertCircle,
   XCircle,
@@ -86,6 +87,12 @@ const SERVICES_BY_CATEGORY: Record<string, string[]> = {
   ],
 };
 
+interface Coworker {
+  id: string;
+  name: string;
+  profilePhotoUrl: string | null;
+}
+
 interface Job {
   id: string;
   serviceType: string;
@@ -112,6 +119,18 @@ interface Job {
     hoursWorked: number | null;
     earnings: number | null;
   }[];
+  assignedCrew?: {
+    id: string;
+    name: string;
+    color: string;
+  } | null;
+  coworkers?: Coworker[];
+  numWorkers?: number;
+  userPayInfo?: {
+    payType: 'hourly' | 'commission' | null;
+    hourlyRate: number | null;
+    commissionRate: number | null;
+  } | null;
 }
 
 interface JobNote {
@@ -284,6 +303,27 @@ export default function JobDetailPage() {
       }
     }
   }, [jobId]);
+
+  // Pre-fill services from job estimate (only if no draft and no services selected)
+  useEffect(() => {
+    if (job && selectedServices.length === 0 && job.status !== 'completed') {
+      // Check if there's an existing draft
+      const savedDraft = localStorage.getItem(`jobDraft_${jobId}`);
+      if (!savedDraft) {
+        // Pre-fill with job's serviceType and estimatedValue
+        const prefillService: SelectedService = {
+          id: `prefill-${Date.now()}`,
+          serviceId: null,
+          serviceName: job.serviceType,
+          price: job.estimatedValue || 0,
+          customNotes: '',
+          isCustom: false,
+          showNotes: false,
+        };
+        setSelectedServices([prefillService]);
+      }
+    }
+  }, [job, jobId, selectedServices.length]);
 
   // Format current time for display
   const formatCurrentTime = () => {
@@ -1262,13 +1302,40 @@ export default function JobDetailPage() {
                     </div>
                   )}
 
-                  {/* Earnings */}
-                  {job.workLogs?.[0]?.earnings && (
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-[#9CA3AF] text-sm">Earned</span>
-                      <span className="font-bold text-lg" style={{ color: LIME_GREEN }}>
-                        ${job.workLogs[0].earnings.toFixed(2)}
-                      </span>
+                  {/* Earnings Breakdown */}
+                  {job.workLogs?.[0]?.earnings !== undefined && job.workLogs?.[0]?.earnings !== null && (
+                    <div className="mt-2 space-y-2">
+                      {/* Pay type indicator */}
+                      {job.userPayInfo && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-[#9CA3AF] text-sm">Pay Type</span>
+                          <span className="text-white text-sm capitalize">
+                            {job.userPayInfo.payType === 'commission'
+                              ? `${job.userPayInfo.commissionRate}% Commission`
+                              : job.userPayInfo.hourlyRate
+                                ? `$${job.userPayInfo.hourlyRate}/hr`
+                                : 'Hourly'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Multi-worker split info */}
+                      {(job.numWorkers ?? 1) > 1 && job.userPayInfo?.payType === 'commission' && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-[#9CA3AF] text-sm">Workers on Job</span>
+                          <span className="text-amber-400 text-sm">
+                            {job.numWorkers} (split evenly)
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Total earned */}
+                      <div className="flex justify-between items-center pt-2 border-t border-[#3A3A3A]">
+                        <span className="text-[#9CA3AF] text-sm font-medium">Your Earnings</span>
+                        <span className="font-bold text-lg" style={{ color: LIME_GREEN }}>
+                          ${job.workLogs[0].earnings.toFixed(2)}
+                        </span>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1345,6 +1412,61 @@ export default function JobDetailPage() {
           </div>
 
         </div>
+
+        {/* Crew / Coworkers Section */}
+        {(job.assignedCrew || (job.coworkers && job.coworkers.length > 0)) && (
+          <div className="bg-[#2D2D2D] rounded-xl border border-[#3A3A3A] overflow-hidden">
+            <div className="p-4 border-b border-[#3A3A3A]">
+              <div className="flex items-center gap-2">
+                <Users className="w-5 h-5" style={{ color: job.assignedCrew?.color || LIME_GREEN }} />
+                <h3 className="font-medium text-white">
+                  {job.assignedCrew ? job.assignedCrew.name : 'Working With'}
+                </h3>
+                {job.assignedCrew && (
+                  <span
+                    className="px-2 py-0.5 rounded-full text-xs font-medium"
+                    style={{
+                      backgroundColor: `${job.assignedCrew.color}20`,
+                      color: job.assignedCrew.color
+                    }}
+                  >
+                    Crew
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="p-4">
+              {job.coworkers && job.coworkers.length > 0 ? (
+                <div className="flex flex-wrap gap-3">
+                  {job.coworkers.map((coworker) => (
+                    <div
+                      key={coworker.id}
+                      className="flex items-center gap-2 bg-zinc-800/50 rounded-full px-3 py-2"
+                    >
+                      {coworker.profilePhotoUrl ? (
+                        <img
+                          src={coworker.profilePhotoUrl}
+                          alt={coworker.name}
+                          className="w-6 h-6 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium"
+                          style={{ backgroundColor: job.assignedCrew?.color || LIME_GREEN }}
+                        >
+                          {coworker.name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                      )}
+                      <span className="text-sm text-zinc-300">{coworker.name}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-zinc-500 text-sm">You are the only worker assigned to this job.</p>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Job Description Section - Work scope set by dispatcher */}
         {job.customerNotes && (

@@ -102,31 +102,26 @@ export default function WorkerSchedule() {
   const fetchJobs = useCallback(async (uid: string, date: Date) => {
     setLoadingJobs(true);
     try {
-      if (viewMode === 'week') {
-        // Get Monday of the selected week
-        const monday = new Date(date);
-        const day = monday.getDay();
-        const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
-        monday.setDate(diff);
-        monday.setHours(0, 0, 0, 0);
+      // Always use the week endpoint - it supports any date range
+      // For day view, we'll filter client-side to just the selected day
+      const monday = new Date(date);
+      const day = monday.getDay();
+      const diff = monday.getDate() - day + (day === 0 ? -6 : 1);
+      monday.setDate(diff);
+      monday.setHours(0, 0, 0, 0);
 
-        const res = await fetch(`/api/worker/jobs/week?userId=${uid}&startDate=${monday.toISOString()}`);
-        const data = await res.json();
-        if (data.jobs) {
+      const res = await fetch(`/api/worker/jobs/week?userId=${uid}&startDate=${monday.toISOString()}`);
+      const data = await res.json();
+      if (data.jobs) {
+        setJobsByDay(data.jobsByDay || {});
+
+        if (viewMode === 'week') {
           setJobs(data.jobs);
-          setJobsByDay(data.jobsByDay || {});
-        }
-      } else {
-        // Day view - fetch today's jobs
-        const res = await fetch(`/api/worker/jobs/today?userId=${uid}`);
-        const data = await res.json();
-        if (data.jobs) {
-          // Filter for selected date
+        } else {
+          // Day view - filter for selected date only
           const dateStr = date.toISOString().split('T')[0];
-          const filteredJobs = data.jobs.filter((job: Job) =>
-            job.startTime.split('T')[0] === dateStr
-          );
-          setJobs(filteredJobs);
+          const dayJobs = data.jobsByDay?.[dateStr] || [];
+          setJobs(dayJobs);
         }
       }
     } catch (error) {

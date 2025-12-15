@@ -72,6 +72,14 @@ export async function PATCH(
       );
     }
 
+    // Validate commission rate (must be between 0 and 100)
+    if (commissionRate !== undefined && (commissionRate < 0 || commissionRate > 100)) {
+      return NextResponse.json(
+        { error: 'Commission rate must be between 0 and 100%' },
+        { status: 400 }
+      );
+    }
+
     // Build update data object
     const updateData: Record<string, unknown> = {};
     if (status !== undefined) updateData.status = status;
