@@ -60,6 +60,17 @@ export async function GET(
     });
 
     if (!job) {
+      // Debug: Try to find the job without the userId check
+      const jobWithoutUserCheck = await prisma.job.findUnique({
+        where: { id },
+        select: { id: true, assignedUserIds: true, status: true },
+      });
+      console.error('Job not found for worker:', {
+        jobId: id,
+        userId,
+        jobExists: !!jobWithoutUserCheck,
+        assignedUserIds: jobWithoutUserCheck?.assignedUserIds,
+      });
       return NextResponse.json(
         { error: 'Job not found or not assigned to you' },
         { status: 404 }

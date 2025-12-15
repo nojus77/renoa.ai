@@ -20,8 +20,14 @@ import {
   Phone,
   Mail,
   MapPin,
+  PhoneCall,
+  Play,
+  CheckCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
+
+// Renoa Design System Colors
+const LIME_GREEN = '#C4F542';
 
 interface Job {
   id: string;
@@ -84,6 +90,9 @@ export default function WorkerDashboard() {
   const [canCreateJobs, setCanCreateJobs] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const scrollPositionRef = useRef(0);
+  const [activeJobDismissed, setActiveJobDismissed] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState<string>('00:00:00');
+  const [dispatchPhone, setDispatchPhone] = useState<string | null>(null);
 
   // Job creation modal state
   const [showCreateJob, setShowCreateJob] = useState(false);
@@ -166,6 +175,7 @@ export default function WorkerDashboard() {
       const res = await fetch(`/api/worker/jobs/upcoming?userId=${uid}&limit=3`);
       const data = await res.json();
       if (data.jobs) {
+        console.log('Fetched upcoming jobs:', data.jobs.map((j: UpcomingJob) => ({ id: j.id, serviceType: j.serviceType })));
         setUpcomingJobs(data.jobs);
       }
     } catch (error) {
@@ -180,6 +190,10 @@ export default function WorkerDashboard() {
       // Check provider-level permission (applies to ALL workers)
       if (data.user?.provider?.workersCanCreateJobs) {
         setCanCreateJobs(true);
+      }
+      // Store dispatch phone number
+      if (data.user?.provider?.phone) {
+        setDispatchPhone(data.user.provider.phone);
       }
     } catch (error) {
       console.error('Error fetching worker permissions:', error);
@@ -221,6 +235,52 @@ export default function WorkerDashboard() {
     }, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Find active job (in progress with clock-in)
+  const activeJob = jobs.find((job) => {
+    const hasActiveWorkLog = job.workLogs?.some((l) => l.clockIn && !l.clockOut);
+    return hasActiveWorkLog || job.status === 'in_progress';
+  });
+
+  // Calculate elapsed time for active job
+  useEffect(() => {
+    if (!activeJob) return;
+
+    const activeWorkLog = activeJob.workLogs?.find((l) => l.clockIn && !l.clockOut);
+    if (!activeWorkLog) return;
+
+    const calculateElapsed = () => {
+      const clockInTime = new Date(activeWorkLog.clockIn).getTime();
+      const now = Date.now();
+      const diff = now - clockInTime;
+
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+
+      setElapsedTime(
+        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`
+      );
+    };
+
+    calculateElapsed();
+    const timer = setInterval(calculateElapsed, 1000);
+    return () => clearInterval(timer);
+  }, [activeJob]);
+
+  // Reset dismissed state when active job changes
+  useEffect(() => {
+    setActiveJobDismissed(false);
+  }, [activeJob?.id]);
+
+  // Handle call dispatch
+  const handleCallDispatch = () => {
+    if (dispatchPhone) {
+      window.location.href = `tel:${dispatchPhone.replace(/\D/g, '')}`;
+    } else {
+      toast.error('Dispatch phone number not available');
+    }
+  };
 
   // Customer search with debounce
   useEffect(() => {
@@ -387,7 +447,19 @@ export default function WorkerDashboard() {
 
   // Navigate to job details
   const handleJobClick = (jobId: string) => {
-    router.push(`/worker/job/${jobId}`);
+    console.log('handleJobClick called with jobId:', jobId);
+    if (!jobId) {
+      console.error('No job ID provided!');
+      return;
+    }
+    const url = `/worker/job/${jobId}`;
+    console.log('Attempting to navigate to:', url);
+    try {
+      router.push(url);
+      console.log('router.push called successfully');
+    } catch (error) {
+      console.error('Navigation error:', error);
+    }
   };
 
   // Get left border color based on status
@@ -397,12 +469,12 @@ export default function WorkerDashboard() {
       case 'completed':
         return 'border-l-purple-500';
       case 'working':
-        return 'border-l-[#a3e635]';
+        return 'border-l-[#C4F542]';
       case 'on_the_way':
       case 'arrived':
         return 'border-l-blue-500';
       default:
-        return 'border-l-[#a3e635]';
+        return 'border-l-[#C4F542]';
     }
   };
 
@@ -418,7 +490,7 @@ export default function WorkerDashboard() {
     }
     if (status === 'working') {
       return (
-        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[#a3e635]/20 text-[#a3e635]">
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[#C4F542]/20 text-[#C4F542]">
           in progress
         </span>
       );
@@ -438,7 +510,7 @@ export default function WorkerDashboard() {
     return (
       <WorkerLayout>
         <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="w-8 h-8 animate-spin text-[#a3e635]" />
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: LIME_GREEN }} />
         </div>
       </WorkerLayout>
     );
@@ -446,9 +518,9 @@ export default function WorkerDashboard() {
 
   return (
     <WorkerLayout>
-      <div className="p-4 space-y-6">
+      <div className="p-4 space-y-4">
         {/* Header - Date and Actions */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between pt-1">
           {/* Date Display */}
           <p className="text-[#9CA3AF] text-base font-medium">
             {currentTime.toLocaleDateString('en-US', {
@@ -463,9 +535,10 @@ export default function WorkerDashboard() {
             {canCreateJobs && (
               <button
                 onClick={() => setShowCreateJob(true)}
-                className="p-2.5 bg-[#a3e635] hover:bg-[#8bc934] rounded-xl transition-colors"
+                className="p-2.5 rounded-[20px] transition-colors"
+                style={{ backgroundColor: LIME_GREEN }}
               >
-                <Plus className="w-5 h-5 text-zinc-900" />
+                <Plus className="w-5 h-5 text-black" />
               </button>
             )}
             <button
@@ -473,7 +546,7 @@ export default function WorkerDashboard() {
                 fetchJobs(userId);
                 fetchUpcomingJobs(userId);
               }}
-              className="p-2.5 bg-[#2a2a2a] rounded-xl hover:bg-zinc-700 transition-colors"
+              className="p-2.5 bg-[#1F1F1F] rounded-[20px] hover:bg-[#2A2A2A] transition-colors border border-[#2A2A2A]"
             >
               <RefreshCw className="w-5 h-5 text-gray-400" />
             </button>
@@ -482,29 +555,39 @@ export default function WorkerDashboard() {
 
         {/* Refined Stat Cards */}
         <div className="grid grid-cols-3 gap-4">
-          <div className="bg-[#2a2a2a] rounded-xl p-4 text-center">
-            <Briefcase className="w-6 h-6 text-[#a3e635] mx-auto mb-2" />
+          <div className="bg-[#1F1F1F] rounded-[20px] p-4 text-center border border-[#2A2A2A]">
+            <Briefcase className="w-6 h-6 mx-auto mb-2" style={{ color: LIME_GREEN }} />
             <p className="text-2xl font-bold text-white">{stats.jobsCount}</p>
             <p className="text-xs text-gray-500">Jobs Today</p>
           </div>
-          <div className="bg-[#2a2a2a] rounded-xl p-4 text-center">
-            <Clock className="w-6 h-6 text-[#a3e635] mx-auto mb-2" />
+          <div className="bg-[#1F1F1F] rounded-[20px] p-4 text-center border border-[#2A2A2A]">
+            <Clock className="w-6 h-6 mx-auto mb-2" style={{ color: LIME_GREEN }} />
             <p className="text-2xl font-bold text-white">{stats.hoursWorked}h</p>
             <p className="text-xs text-gray-500">Hours</p>
           </div>
-          <div className="bg-[#2a2a2a] rounded-xl p-4 text-center">
-            <DollarSign className="w-6 h-6 text-[#a3e635] mx-auto mb-2" />
+          <div className="bg-[#1F1F1F] rounded-[20px] p-4 text-center border border-[#2A2A2A]">
+            <DollarSign className="w-6 h-6 mx-auto mb-2" style={{ color: LIME_GREEN }} />
             <p className="text-2xl font-bold text-white">${stats.earnings}</p>
             <p className="text-xs text-gray-500">Earned</p>
           </div>
         </div>
+
+        {/* Call Dispatch Button */}
+        <button
+          onClick={handleCallDispatch}
+          className="w-full py-4 rounded-[20px] font-semibold text-black flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
+          style={{ backgroundColor: LIME_GREEN }}
+        >
+          <PhoneCall className="w-5 h-5" />
+          Call Dispatch
+        </button>
 
         {/* Today's Jobs Section */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold text-white">Today&apos;s Jobs</h2>
 
           {jobs.length === 0 ? (
-            <div className="bg-[#2a2a2a] rounded-xl py-12 text-center">
+            <div className="bg-[#1F1F1F] rounded-[20px] py-12 text-center border border-[#2A2A2A]">
               <CalendarX className="w-12 h-12 text-gray-600 mx-auto mb-3" />
               <p className="text-gray-400">No jobs scheduled for today</p>
               <p className="text-gray-500 text-sm mt-1">Enjoy your day off!</p>
@@ -515,12 +598,12 @@ export default function WorkerDashboard() {
                 <button
                   key={job.id}
                   onClick={() => handleJobClick(job.id)}
-                  className={`w-full bg-[#2a2a2a] rounded-xl py-4 px-5 text-left border-l-[3px] ${getLeftBorderColor(job)} hover:bg-zinc-700/50 transition-colors active:scale-[0.99]`}
+                  className={`w-full bg-[#1F1F1F] rounded-[20px] py-4 px-5 text-left border-l-[3px] ${getLeftBorderColor(job)} hover:bg-[#2A2A2A] transition-colors active:scale-[0.99] border border-[#2A2A2A]`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-1 flex-1 min-w-0">
                       {/* Time - Lime green */}
-                      <p className="text-sm font-medium text-[#a3e635]">
+                      <p className="text-sm font-medium" style={{ color: LIME_GREEN }}>
                         {formatTime(job.startTime)} - {formatTime(job.endTime)}
                       </p>
                       {/* Service Type + Customer */}
@@ -546,7 +629,7 @@ export default function WorkerDashboard() {
           <h2 className="text-xl font-semibold text-white">Upcoming Jobs</h2>
 
           {upcomingJobs.length === 0 ? (
-            <div className="bg-[#2a2a2a] rounded-xl py-8 text-center">
+            <div className="bg-[#1F1F1F] rounded-[20px] py-8 text-center border border-[#2A2A2A]">
               <p className="text-gray-500">No upcoming jobs scheduled</p>
             </div>
           ) : (
@@ -554,13 +637,21 @@ export default function WorkerDashboard() {
               {upcomingJobs.map((job) => (
                 <button
                   key={job.id}
-                  onClick={() => handleJobClick(job.id)}
-                  className="w-full bg-[#2a2a2a] rounded-xl py-4 px-5 text-left border-l-[3px] border-l-[#a3e635] hover:bg-zinc-700/50 transition-colors active:scale-[0.99]"
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Upcoming job clicked:', { id: job.id, serviceType: job.serviceType, customer: job.customer.name });
+                    toast.info(`Opening ${job.serviceType}...`);
+                    handleJobClick(job.id);
+                  }}
+                  style={{ WebkitTapHighlightColor: 'transparent', touchAction: 'manipulation' }}
+                  className="w-full bg-[#1F1F1F] rounded-[20px] py-4 px-5 text-left border-l-[3px] border-l-[#C4F542] hover:bg-[#2A2A2A] transition-colors active:scale-[0.99] active:bg-[#3A3A3A] border border-[#2A2A2A] cursor-pointer select-none"
                 >
                   <div className="flex items-start justify-between">
                     <div className="space-y-1 flex-1 min-w-0">
                       {/* Date/Time - Lime green */}
-                      <p className="text-sm font-medium text-[#a3e635]">
+                      <p className="text-sm font-medium" style={{ color: LIME_GREEN }}>
                         {formatUpcomingDate(job.startTime)}
                       </p>
                       {/* Service Type + Customer */}
@@ -579,6 +670,75 @@ export default function WorkerDashboard() {
         </div>
       </div>
 
+      {/* Active Job Popup */}
+      {activeJob && !activeJobDismissed && (
+        <div className="fixed inset-0 z-40 flex items-end justify-center p-4 pointer-events-none">
+          <div className="bg-[#1F1F1F] rounded-[20px] w-full max-w-md border border-[#2A2A2A] shadow-2xl pointer-events-auto animate-in slide-in-from-bottom-4 duration-300">
+            {/* Header with dismiss */}
+            <div className="flex items-center justify-between p-4 border-b border-[#2A2A2A]">
+              <div className="flex items-center gap-2">
+                <div className="w-3 h-3 rounded-full bg-[#C4F542] animate-pulse" />
+                <span className="text-sm font-medium text-[#C4F542]">Active Job</span>
+              </div>
+              <button
+                onClick={() => setActiveJobDismissed(true)}
+                className="p-1 hover:bg-[#2A2A2A] rounded-lg transition-colors"
+              >
+                <X className="w-4 h-4 text-zinc-400" />
+              </button>
+            </div>
+
+            {/* Job Details */}
+            <div className="p-4 space-y-3">
+              {/* Timer */}
+              <div className="text-center">
+                <p className="text-3xl font-bold font-mono" style={{ color: LIME_GREEN }}>
+                  {elapsedTime}
+                </p>
+                <p className="text-xs text-zinc-500 mt-1">Time Elapsed</p>
+              </div>
+
+              {/* Job Info */}
+              <div className="bg-[#2A2A2A] rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-zinc-400">Customer</span>
+                  <span className="text-sm font-medium text-white">{activeJob.customer.name}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-zinc-400">Service</span>
+                  <span className="text-sm font-medium text-white">{activeJob.serviceType}</span>
+                </div>
+                <div className="flex items-start justify-between">
+                  <span className="text-sm text-zinc-400">Address</span>
+                  <span className="text-sm font-medium text-white text-right max-w-[180px] truncate">
+                    {activeJob.address}
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => router.push(`/worker/job/${activeJob.id}`)}
+                  className="flex-1 py-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] rounded-xl font-medium text-white flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Play className="w-4 h-4" />
+                  View Details
+                </button>
+                <button
+                  onClick={() => router.push(`/worker/job/${activeJob.id}`)}
+                  className="flex-1 py-3 rounded-xl font-medium text-black flex items-center justify-center gap-2 transition-colors"
+                  style={{ backgroundColor: LIME_GREEN }}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  Complete Job
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Create Job Modal */}
       {showCreateJob && (
         <div
@@ -589,13 +749,13 @@ export default function WorkerDashboard() {
           <div className="absolute inset-0 bg-black/60" onClick={closeModal} />
 
           {/* Modal container */}
-          <div className="relative bg-zinc-900 rounded-2xl w-full max-w-md max-h-[85vh] flex flex-col border border-zinc-800 shadow-2xl">
+          <div className="relative bg-[#1F1F1F] rounded-[20px] w-full max-w-md max-h-[85vh] flex flex-col border border-[#2A2A2A] shadow-2xl">
             {/* Header - shrink-0 keeps it fixed */}
-            <div className="shrink-0 p-4 border-b border-zinc-800 flex justify-between items-center">
+            <div className="shrink-0 p-4 border-b border-[#2A2A2A] flex justify-between items-center">
               <h2 className="text-lg font-semibold text-white">Add New Job</h2>
               <button
                 onClick={closeModal}
-                className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
+                className="p-2 hover:bg-[#2A2A2A] rounded-lg transition-colors"
               >
                 <X className="w-5 h-5 text-zinc-400" />
               </button>
@@ -607,7 +767,7 @@ export default function WorkerDashboard() {
               onTouchMove={(e) => e.stopPropagation()}
             >
               {/* Customer Type Toggle */}
-              <div className="flex gap-2 p-1 bg-zinc-800 rounded-lg">
+              <div className="flex gap-2 p-1 bg-[#2A2A2A] rounded-lg">
                 <button
                   onClick={() => {
                     setIsNewCustomer(false);
@@ -615,9 +775,10 @@ export default function WorkerDashboard() {
                   }}
                   className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-colors ${
                     !isNewCustomer
-                      ? 'bg-[#a3e635] text-zinc-900'
+                      ? 'text-black'
                       : 'text-zinc-400 hover:text-white'
                   }`}
+                  style={!isNewCustomer ? { backgroundColor: LIME_GREEN } : undefined}
                 >
                   <User className="w-4 h-4 inline mr-1.5" />
                   Existing Customer
@@ -630,9 +791,10 @@ export default function WorkerDashboard() {
                   }}
                   className={`flex-1 py-2.5 rounded-md text-sm font-medium transition-colors ${
                     isNewCustomer
-                      ? 'bg-[#a3e635] text-zinc-900'
+                      ? 'text-black'
                       : 'text-zinc-400 hover:text-white'
                   }`}
+                  style={isNewCustomer ? { backgroundColor: LIME_GREEN } : undefined}
                 >
                   <UserPlus className="w-4 h-4 inline mr-1.5" />
                   New Customer
@@ -654,7 +816,7 @@ export default function WorkerDashboard() {
                         value={newCustomer.name}
                         onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
                         placeholder="John Smith"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
+                        className="w-full pl-10 pr-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C4F542]"
                         style={{ fontSize: '16px' }}
                       />
                     </div>
@@ -672,7 +834,7 @@ export default function WorkerDashboard() {
                         value={newCustomer.phone}
                         onChange={(e) => setNewCustomer({ ...newCustomer, phone: formatPhoneNumber(e.target.value) })}
                         placeholder="(555) 123-4567"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
+                        className="w-full pl-10 pr-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C4F542]"
                         style={{ fontSize: '16px' }}
                       />
                     </div>
@@ -688,7 +850,7 @@ export default function WorkerDashboard() {
                         value={newCustomer.email}
                         onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
                         placeholder="john@example.com"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
+                        className="w-full pl-10 pr-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C4F542]"
                         style={{ fontSize: '16px' }}
                       />
                     </div>
@@ -706,7 +868,7 @@ export default function WorkerDashboard() {
                         value={newCustomer.address}
                         onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
                         placeholder="123 Main St, City, ST 12345"
-                        className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
+                        className="w-full pl-10 pr-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C4F542]"
                         style={{ fontSize: '16px' }}
                       />
                     </div>
@@ -716,10 +878,10 @@ export default function WorkerDashboard() {
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-zinc-300">Select Customer</label>
                   {selectedCustomer ? (
-                    <div className="flex items-center justify-between p-3 bg-zinc-800 rounded-lg border border-[#a3e635]/30">
+                    <div className="flex items-center justify-between p-3 bg-[#2A2A2A] rounded-lg border border-[#C4F542]/30">
                       <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#a3e635]/20 flex items-center justify-center">
-                          <User className="w-5 h-5 text-[#a3e635]" />
+                        <div className="w-10 h-10 rounded-full bg-[#C4F542]/20 flex items-center justify-center">
+                          <User className="w-5 h-5 text-[#C4F542]" />
                         </div>
                         <div>
                           <p className="text-white font-medium">{selectedCustomer.name}</p>
@@ -728,7 +890,7 @@ export default function WorkerDashboard() {
                       </div>
                       <button
                         onClick={() => setSelectedCustomer(null)}
-                        className="p-1 hover:bg-zinc-700 rounded"
+                        className="p-1 hover:bg-[#3A3A3A] rounded"
                       >
                         <X className="w-4 h-4 text-zinc-400" />
                       </button>
@@ -742,12 +904,12 @@ export default function WorkerDashboard() {
                           value={customerSearch}
                           onChange={(e) => setCustomerSearch(e.target.value)}
                           placeholder="Search customers..."
-                          className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
+                          className="w-full pl-10 pr-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C4F542]"
                           style={{ fontSize: '16px' }}
                         />
                       </div>
                       {customers.length > 0 && (
-                        <div className="bg-zinc-800 rounded-lg border border-zinc-700 max-h-48 overflow-y-auto">
+                        <div className="bg-[#2A2A2A] rounded-lg border border-[#3A3A3A] max-h-48 overflow-y-auto">
                           {customers.map((customer) => (
                             <button
                               key={customer.id}
@@ -755,7 +917,7 @@ export default function WorkerDashboard() {
                                 setSelectedCustomer(customer);
                                 setCustomerSearch('');
                               }}
-                              className="w-full p-3 text-left hover:bg-zinc-700 border-b border-zinc-700 last:border-b-0 transition-colors"
+                              className="w-full p-3 text-left hover:bg-[#3A3A3A] border-b border-[#3A3A3A] last:border-b-0 transition-colors"
                             >
                               <p className="text-white font-medium">{customer.name}</p>
                               <p className="text-zinc-400 text-sm truncate">{customer.address}</p>
@@ -776,7 +938,7 @@ export default function WorkerDashboard() {
                   value={newJob.serviceType}
                   onChange={(e) => setNewJob({ ...newJob, serviceType: e.target.value })}
                   placeholder="e.g. Window Cleaning, Lawn Care"
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635]"
+                  className="w-full px-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C4F542]"
                   style={{ fontSize: '16px' }}
                 />
               </div>
@@ -790,7 +952,7 @@ export default function WorkerDashboard() {
                     type="date"
                     value={newJob.date}
                     onChange={(e) => setNewJob({ ...newJob, date: e.target.value })}
-                    className="w-full pl-10 pr-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white focus:outline-none focus:border-[#a3e635]"
+                    className="w-full pl-10 pr-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white focus:outline-none focus:border-[#C4F542]"
                     style={{ fontSize: '16px' }}
                   />
                 </div>
@@ -820,7 +982,7 @@ export default function WorkerDashboard() {
                         }
                         setNewJob({ ...newJob, startTime: `${hr24.toString().padStart(2, '0')}:${mins}` });
                       }}
-                      className="h-12 w-20 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
+                      className="h-12 w-20 text-center text-lg bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#C4F542] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (
@@ -834,7 +996,7 @@ export default function WorkerDashboard() {
                         const hrs = newJob.startTime.split(':')[0] || '09';
                         setNewJob({ ...newJob, startTime: `${hrs}:${e.target.value}` });
                       }}
-                      className="h-12 w-20 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
+                      className="h-12 w-20 text-center text-lg bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#C4F542] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       {['00', '15', '30', '45'].map((m) => (
@@ -858,7 +1020,7 @@ export default function WorkerDashboard() {
                         }
                         setNewJob({ ...newJob, startTime: `${newHrs.toString().padStart(2, '0')}:${mins}` });
                       }}
-                      className="h-12 w-24 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
+                      className="h-12 w-24 text-center text-lg bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#C4F542] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       <option value="AM">AM</option>
@@ -889,7 +1051,7 @@ export default function WorkerDashboard() {
                         }
                         setNewJob({ ...newJob, endTime: `${hr24.toString().padStart(2, '0')}:${mins}` });
                       }}
-                      className="h-12 w-20 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
+                      className="h-12 w-20 text-center text-lg bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#C4F542] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       {[12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].map((h) => (
@@ -903,7 +1065,7 @@ export default function WorkerDashboard() {
                         const hrs = newJob.endTime.split(':')[0] || '10';
                         setNewJob({ ...newJob, endTime: `${hrs}:${e.target.value}` });
                       }}
-                      className="h-12 w-20 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
+                      className="h-12 w-20 text-center text-lg bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#C4F542] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       {['00', '15', '30', '45'].map((m) => (
@@ -927,7 +1089,7 @@ export default function WorkerDashboard() {
                         }
                         setNewJob({ ...newJob, endTime: `${newHrs.toString().padStart(2, '0')}:${mins}` });
                       }}
-                      className="h-12 w-24 text-center text-lg bg-zinc-800 border border-zinc-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#a3e635] focus:border-transparent"
+                      className="h-12 w-24 text-center text-lg bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-[#C4F542] focus:border-transparent"
                       style={{ fontSize: '16px' }}
                     >
                       <option value="AM">AM</option>
@@ -945,18 +1107,19 @@ export default function WorkerDashboard() {
                   onChange={(e) => setNewJob({ ...newJob, notes: e.target.value })}
                   placeholder="Any additional notes..."
                   rows={3}
-                  className="w-full px-4 py-3 bg-zinc-800 border border-zinc-700 rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#a3e635] resize-none"
+                  className="w-full px-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-base text-white placeholder:text-zinc-500 focus:outline-none focus:border-[#C4F542] resize-none"
                   style={{ fontSize: '16px' }}
                 />
               </div>
             </div>
 
             {/* Footer - shrink-0 keeps it fixed */}
-            <div className="shrink-0 p-4 border-t border-zinc-800">
+            <div className="shrink-0 p-4 border-t border-[#2A2A2A]">
               <button
                 onClick={handleCreateJob}
                 disabled={creatingJob || !isFormValid()}
-                className="w-full py-4 bg-[#a3e635] hover:bg-[#8bc934] disabled:bg-zinc-700 disabled:text-zinc-500 text-zinc-900 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors"
+                className="w-full py-4 disabled:bg-[#3A3A3A] disabled:text-zinc-500 text-black font-semibold rounded-[20px] flex items-center justify-center gap-2 transition-colors"
+                style={{ backgroundColor: creatingJob || !isFormValid() ? undefined : LIME_GREEN }}
               >
                 {creatingJob ? (
                   <>

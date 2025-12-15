@@ -27,6 +27,9 @@ import {
   Trash2,
   Crown,
   Users,
+  Wrench,
+  Plus,
+  Pencil,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -47,6 +50,9 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import SkillsCheckboxPicker, { WorkerSkill } from '@/components/provider/SkillsCheckboxPicker';
+
+// Renoa Design System - Black + Lime Green Theme
+const LIME_GREEN = '#C4F542';
 
 interface Skill {
   skill: {
@@ -70,6 +76,7 @@ interface UserProfile {
   workingHours: Record<string, { start: string; end: string }> | null;
   homeAddress: string | null;
   workerSkills: Skill[];
+  equipment?: string[];
   provider: {
     id: string;
     businessName: string;
@@ -102,6 +109,71 @@ interface MyCrew {
   memberCount: number;
 }
 
+// Skills organized by company category - filter shown based on company type
+const SKILLS_BY_CATEGORY: Record<string, string[]> = {
+  'HVAC': ['AC Installation', 'AC Repair', 'Furnace Repair', 'Duct Cleaning', 'Heat Pump', 'Refrigerant Handling', 'Thermostat Install', 'Air Quality', 'Maintenance Plans', 'Heating Repair'],
+  'Plumbing': ['Pipe Repair', 'Drain Cleaning', 'Water Heater', 'Fixture Install', 'Sewer Line', 'Leak Detection', 'Garbage Disposal', 'Bathroom Remodel', 'Water Filtration'],
+  'Electrical': ['Wiring', 'Panel Upgrades', 'Lighting', 'Troubleshooting', 'Code Corrections', 'EV Charger', 'Outlet Installation', 'Ceiling Fans', 'Generator Installation'],
+  'Roofing': ['Shingle Repair', 'Roof Replacement', 'Gutter Install', 'Gutter Cleaning', 'Roof Inspection', 'Leak Repair', 'Flat Roof', 'Metal Roofing', 'Skylight Install'],
+  'Painting': ['Interior Painting', 'Exterior Painting', 'Cabinet Painting', 'Deck Staining', 'Wallpaper', 'Pressure Washing', 'Drywall Repair', 'Color Consulting'],
+  'Landscaping & Lawn Care': ['Lawn Mowing', 'Leaf Removal', 'Tree Trimming', 'Landscape Design', 'Irrigation', 'Fertilization', 'Mulching', 'Snow Removal', 'Hedge Trimming'],
+  'Home Remodeling': ['Kitchen Remodel', 'Bathroom Remodel', 'Basement Finishing', 'Room Additions', 'Flooring', 'Tile Work', 'Custom Carpentry', 'Deck Building'],
+  'Fencing': ['Wood Fence', 'Vinyl Fence', 'Chain Link', 'Iron/Metal Fence', 'Gate Installation', 'Fence Repair', 'Privacy Fence'],
+  'Flooring': ['Hardwood Install', 'Laminate', 'Tile', 'Carpet', 'Vinyl/LVP', 'Floor Refinishing', 'Subfloor Repair'],
+  'Cleaning Services': ['Regular Cleaning', 'Deep Cleaning', 'Move-in/Move-out', 'Window Cleaning', 'Carpet Cleaning', 'Pressure Washing', 'Post-Construction'],
+  'General Contracting': ['Project Management', 'Permit Handling', 'Full Renovations', 'New Construction', 'Commercial Build-out'],
+  'General': ['Customer Service', 'Heavy Lifting', 'Driving', 'Documentation', 'Safety Certified'],
+};
+
+// Function to get skills filtered by company category
+const getFilteredSkills = (companyCategory: string | null | undefined): Record<string, string[]> => {
+  // Always include General skills
+  const result: Record<string, string[]> = {
+    'General': SKILLS_BY_CATEGORY['General'],
+  };
+
+  // If no category, return all skills
+  if (!companyCategory) {
+    return SKILLS_BY_CATEGORY;
+  }
+
+  // Find matching category (case-insensitive partial match)
+  const normalizedCategory = companyCategory.toLowerCase();
+
+  for (const [category, skills] of Object.entries(SKILLS_BY_CATEGORY)) {
+    if (category === 'General') continue; // Already added
+
+    const normalizedCat = category.toLowerCase();
+    // Match if category contains the company type or vice versa
+    if (normalizedCat.includes(normalizedCategory) || normalizedCategory.includes(normalizedCat)) {
+      result[category] = skills;
+    }
+  }
+
+  // If only General was found, show all skills (fallback)
+  if (Object.keys(result).length === 1) {
+    return SKILLS_BY_CATEGORY;
+  }
+
+  return result;
+};
+
+// Common equipment items
+const AVAILABLE_EQUIPMENT = [
+  'Work Vehicle',
+  'Basic Hand Tools',
+  'Power Tools',
+  'Multimeter',
+  'Refrigerant Gauges',
+  'Pipe Wrench Set',
+  'Drain Snake',
+  'Ladder (6ft)',
+  'Ladder (Extension)',
+  'Safety Gear',
+  'Torch Kit',
+  'Vacuum Pump',
+];
+
 export default function WorkerProfile() {
   const router = useRouter();
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -122,6 +194,16 @@ export default function WorkerProfile() {
 
   // Skills state
   const [workerSkills, setWorkerSkills] = useState<WorkerSkill[]>([]);
+  const [selectedSkills, setSelectedSkills] = useState<string[]>([]);
+  const [skillsModalOpen, setSkillsModalOpen] = useState(false);
+  const [savingSkills, setSavingSkills] = useState(false);
+
+  // Equipment state
+  const [equipment, setEquipment] = useState<string[]>([]);
+  const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
+  const [equipmentModalOpen, setEquipmentModalOpen] = useState(false);
+  const [savingEquipment, setSavingEquipment] = useState(false);
+  const [customEquipment, setCustomEquipment] = useState('');
 
   // Crew state
   const [myCrew, setMyCrew] = useState<MyCrew | null>(null);
@@ -159,6 +241,13 @@ export default function WorkerProfile() {
             skillId: ws.skill.id,
             skill: ws.skill,
           })));
+          setSelectedSkills(data.user.workerSkills.map((ws: Skill) => ws.skill.name));
+        }
+
+        // Initialize equipment
+        if (data.user.equipment) {
+          setEquipment(data.user.equipment);
+          setSelectedEquipment(data.user.equipment);
         }
       }
     } catch (error) {
@@ -240,14 +329,12 @@ export default function WorkerProfile() {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
 
-    // Validate file type
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
     if (!validTypes.includes(file.type)) {
       toast.error('Please upload a JPG, PNG, or WebP image');
       return;
     }
 
-    // Validate file size (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       toast.error('Photo too large. Max 5MB.');
       return;
@@ -275,10 +362,73 @@ export default function WorkerProfile() {
       toast.error('Upload failed');
     } finally {
       setUploadingPhoto(false);
-      // Reset file input
       if (photoInputRef.current) {
         photoInputRef.current.value = '';
       }
+    }
+  };
+
+  const handleSaveSkills = async () => {
+    if (!profile) return;
+    setSavingSkills(true);
+
+    try {
+      const res = await fetch('/api/worker/profile/skills', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: profile.id,
+          skills: selectedSkills,
+        }),
+      });
+
+      if (res.ok) {
+        setProfile({ ...profile });
+        toast.success('Skills updated!');
+        setSkillsModalOpen(false);
+      } else {
+        toast.error('Failed to update skills');
+      }
+    } catch {
+      toast.error('Connection error');
+    } finally {
+      setSavingSkills(false);
+    }
+  };
+
+  const handleSaveEquipment = async () => {
+    if (!profile) return;
+    setSavingEquipment(true);
+
+    try {
+      const res = await fetch('/api/worker/profile/equipment', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: profile.id,
+          equipment: selectedEquipment,
+        }),
+      });
+
+      if (res.ok) {
+        setEquipment(selectedEquipment);
+        setProfile({ ...profile, equipment: selectedEquipment });
+        toast.success('Equipment updated!');
+        setEquipmentModalOpen(false);
+      } else {
+        toast.error('Failed to update equipment');
+      }
+    } catch {
+      toast.error('Connection error');
+    } finally {
+      setSavingEquipment(false);
+    }
+  };
+
+  const handleAddCustomEquipment = () => {
+    if (customEquipment.trim() && !selectedEquipment.includes(customEquipment.trim())) {
+      setSelectedEquipment([...selectedEquipment, customEquipment.trim()]);
+      setCustomEquipment('');
     }
   };
 
@@ -347,11 +497,27 @@ export default function WorkerProfile() {
     return { value: 'Not set', subtitle: '' };
   };
 
+  const toggleSkill = (skill: string) => {
+    setSelectedSkills(prev =>
+      prev.includes(skill)
+        ? prev.filter(s => s !== skill)
+        : [...prev, skill]
+    );
+  };
+
+  const toggleEquipment = (item: string) => {
+    setSelectedEquipment(prev =>
+      prev.includes(item)
+        ? prev.filter(e => e !== item)
+        : [...prev, item]
+    );
+  };
+
   if (loading) {
     return (
       <WorkerLayout>
-        <div className="flex items-center justify-center min-h-screen">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
+        <div className="flex items-center justify-center min-h-screen bg-black">
+          <Loader2 className="w-8 h-8 animate-spin" style={{ color: LIME_GREEN }} />
         </div>
       </WorkerLayout>
     );
@@ -360,7 +526,7 @@ export default function WorkerProfile() {
   if (!profile) {
     return (
       <WorkerLayout>
-        <div className="p-4 text-center">
+        <div className="p-4 text-center bg-black min-h-screen">
           <p className="text-zinc-400">Failed to load profile</p>
         </div>
       </WorkerLayout>
@@ -371,89 +537,102 @@ export default function WorkerProfile() {
 
   return (
     <WorkerLayout>
-      <div className="min-h-screen bg-zinc-950 pb-28">
-        {/* Header Card with Gradient */}
-        <div className="bg-gradient-to-br from-emerald-600/20 via-zinc-900 to-zinc-950 border-b border-zinc-800">
-          <div className="px-4 py-8">
-            <div className="flex flex-col items-center text-center">
-              {/* Profile Photo */}
-              <div className="relative group mb-4">
-                <div className="w-28 h-28 rounded-full bg-zinc-800 border-4 border-zinc-700 flex items-center justify-center overflow-hidden">
-                  {profile.profilePhotoUrl ? (
-                    <img
-                      src={profile.profilePhotoUrl}
-                      alt={profile.firstName}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <User className="w-12 h-12 text-zinc-500" />
-                  )}
-                </div>
-                <label className="absolute bottom-0 right-0 w-9 h-9 bg-emerald-600 hover:bg-emerald-500 rounded-full flex items-center justify-center transition-colors shadow-lg cursor-pointer">
-                  {uploadingPhoto ? (
-                    <Loader2 className="w-4 h-4 text-white animate-spin" />
-                  ) : (
-                    <Camera className="w-4 h-4 text-white" />
-                  )}
-                  <input
-                    ref={photoInputRef}
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handlePhotoUpload}
-                    className="hidden"
-                    disabled={uploadingPhoto}
-                  />
-                </label>
-              </div>
-
-              {/* Name and Title */}
-              <h1 className="text-2xl font-bold text-white mb-1">
-                {profile.firstName} {profile.lastName}
-              </h1>
-              <p className="text-zinc-400 mb-3">
-                Field Worker at <span className="text-emerald-400">{profile.provider.businessName}</span>
-              </p>
-
-              {/* Status Badge */}
-              <span
-                className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
-                  profile.status === 'active'
-                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                    : 'bg-red-500/20 text-red-400 border border-red-500/30'
-                }`}
+      <div className="min-h-screen bg-black">
+        {/* Header Section - Clean, no glow */}
+        <div className="bg-[#1F1F1F] px-4 py-8">
+          <div className="flex flex-col items-center text-center">
+            {/* Profile Photo */}
+            <div className="relative group mb-4">
+              <div
+                className="w-28 h-28 rounded-full bg-zinc-800 border-4 flex items-center justify-center overflow-hidden shadow-lg"
+                style={{ borderColor: LIME_GREEN }}
               >
-                <span className={`w-2 h-2 rounded-full ${profile.status === 'active' ? 'bg-emerald-400' : 'bg-red-400'}`} />
-                {profile.status === 'active' ? 'Active' : 'Inactive'}
-              </span>
+                {profile.profilePhotoUrl ? (
+                  <img
+                    src={profile.profilePhotoUrl}
+                    alt={profile.firstName}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="w-12 h-12 text-zinc-500" />
+                )}
+              </div>
+              <label
+                className="absolute bottom-0 right-0 w-9 h-9 rounded-full flex items-center justify-center transition-colors shadow-lg cursor-pointer"
+                style={{ backgroundColor: LIME_GREEN }}
+              >
+                {uploadingPhoto ? (
+                  <Loader2 className="w-4 h-4 text-black animate-spin" />
+                ) : (
+                  <Camera className="w-4 h-4 text-black" />
+                )}
+                <input
+                  ref={photoInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handlePhotoUpload}
+                  className="hidden"
+                  disabled={uploadingPhoto}
+                />
+              </label>
             </div>
+
+            {/* Name and Title */}
+            <h1 className="text-2xl font-bold text-white mb-1">
+              {profile.firstName} {profile.lastName}
+            </h1>
+            <p className="text-zinc-400 mb-3">
+              Field Worker at <span style={{ color: LIME_GREEN }} className="font-medium">Renoa</span>
+            </p>
+
+            {/* Status Badge */}
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${
+                profile.status === 'active'
+                  ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                  : 'bg-red-500/20 text-red-400 border border-red-500/30'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full ${profile.status === 'active' ? 'bg-green-400' : 'bg-red-400'}`} />
+              {profile.status === 'active' ? 'Active' : 'Inactive'}
+            </span>
           </div>
         </div>
 
         {/* Stats Row */}
-        <div className="px-4 -mt-4">
+        <div className="px-4 pt-4">
           <div className="grid grid-cols-3 gap-3">
-            {/* This Week */}
-            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-              <div className="flex items-center justify-center w-10 h-10 bg-blue-500/20 rounded-lg mb-3 mx-auto">
-                <Briefcase className="w-5 h-5 text-blue-400" />
+            {/* Jobs This Week */}
+            <div className="bg-[#1F1F1F] rounded-[20px] p-4 border border-[#2A2A2A]">
+              <div
+                className="flex items-center justify-center w-10 h-10 rounded-lg mb-3 mx-auto"
+                style={{ backgroundColor: `${LIME_GREEN}20` }}
+              >
+                <Briefcase className="w-5 h-5" style={{ color: LIME_GREEN }} />
               </div>
               <p className="text-2xl font-bold text-white text-center">{jobsThisWeek}</p>
               <p className="text-xs text-zinc-500 text-center">Jobs this week</p>
             </div>
 
             {/* Pay Rate */}
-            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-              <div className="flex items-center justify-center w-10 h-10 bg-emerald-500/20 rounded-lg mb-3 mx-auto">
-                <DollarSign className="w-5 h-5 text-emerald-400" />
+            <div className="bg-[#1F1F1F] rounded-[20px] p-4 border border-[#2A2A2A]">
+              <div
+                className="flex items-center justify-center w-10 h-10 rounded-lg mb-3 mx-auto"
+                style={{ backgroundColor: `${LIME_GREEN}20` }}
+              >
+                <DollarSign className="w-5 h-5" style={{ color: LIME_GREEN }} />
               </div>
               <p className="text-2xl font-bold text-white text-center">{payInfo.value}</p>
               <p className="text-xs text-zinc-500 text-center">{payInfo.subtitle || 'Pay rate'}</p>
             </div>
 
             {/* Rating */}
-            <div className="bg-zinc-900 rounded-xl p-4 border border-zinc-800">
-              <div className="flex items-center justify-center w-10 h-10 bg-yellow-500/20 rounded-lg mb-3 mx-auto">
-                <Star className="w-5 h-5 text-yellow-400" />
+            <div className="bg-[#1F1F1F] rounded-[20px] p-4 border border-[#2A2A2A]">
+              <div
+                className="flex items-center justify-center w-10 h-10 rounded-lg mb-3 mx-auto"
+                style={{ backgroundColor: `${LIME_GREEN}20` }}
+              >
+                <Star className="w-5 h-5" style={{ color: LIME_GREEN }} />
               </div>
               <p className="text-2xl font-bold text-white text-center">--</p>
               <p className="text-xs text-zinc-500 text-center">No reviews yet</p>
@@ -463,13 +642,12 @@ export default function WorkerProfile() {
 
         {/* Main Content */}
         <div className="px-4 mt-6 space-y-6">
-          {/* Two Column Layout for Desktop */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Left Column */}
             <div className="space-y-6">
               {/* Personal Information Card */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800">
-                <div className="p-6 border-b border-zinc-800">
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A]">
                   <h2 className="text-lg font-semibold text-white">Personal Information</h2>
                 </div>
                 <div className="p-6 space-y-5">
@@ -480,7 +658,7 @@ export default function WorkerProfile() {
                         type="text"
                         value={profileForm.firstName}
                         onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
-                        className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors"
+                        className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:border-[#C4F542] focus:ring-1 focus:ring-[#C4F542] focus:outline-none transition-colors"
                       />
                     </div>
                     <div>
@@ -489,7 +667,7 @@ export default function WorkerProfile() {
                         type="text"
                         value={profileForm.lastName}
                         onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
-                        className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors"
+                        className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:border-[#C4F542] focus:ring-1 focus:ring-[#C4F542] focus:outline-none transition-colors"
                       />
                     </div>
                   </div>
@@ -501,13 +679,13 @@ export default function WorkerProfile() {
                       value={profileForm.phone}
                       onChange={(e) => setProfileForm({ ...profileForm, phone: formatPhoneNumber(e.target.value) })}
                       placeholder="(555) 123-4567"
-                      className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-600 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 focus:outline-none transition-colors"
+                      className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:border-[#C4F542] focus:ring-1 focus:ring-[#C4F542] focus:outline-none transition-colors"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-medium text-zinc-400 mb-2">Email Address</label>
-                    <div className="flex items-center gap-3 h-11 px-4 bg-zinc-800/50 border border-zinc-700/50 rounded-lg">
+                    <div className="flex items-center gap-3 h-11 px-4 bg-zinc-800/50 border border-zinc-700/50 rounded-xl">
                       <Mail className="w-4 h-4 text-zinc-500" />
                       <span className="text-zinc-400">{profile.email}</span>
                     </div>
@@ -517,7 +695,8 @@ export default function WorkerProfile() {
                   <button
                     onClick={handleSaveProfile}
                     disabled={savingProfile || !hasProfileChanges}
-                    className="w-full h-11 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                    className="w-full h-11 text-black font-medium rounded-xl transition-colors flex items-center justify-center gap-2 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed"
+                    style={{ backgroundColor: hasProfileChanges ? LIME_GREEN : undefined }}
                   >
                     {savingProfile ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
@@ -531,44 +710,95 @@ export default function WorkerProfile() {
                 </div>
               </div>
 
-              {/* Skills Card */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800">
-                <div className="p-6 border-b border-zinc-800 flex items-center justify-between">
-                  <h2 className="text-lg font-semibold text-white">My Skills & Equipment</h2>
-                  {!profile.provider.workersCanEditSkills && (
-                    <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded">Set by admin</span>
-                  )}
+              {/* My Skills Card */}
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Award className="w-5 h-5" style={{ color: LIME_GREEN }} />
+                    <h2 className="text-lg font-semibold text-white">My Skills</h2>
+                  </div>
+                  <button
+                    onClick={() => setSkillsModalOpen(true)}
+                    className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ color: LIME_GREEN, backgroundColor: `${LIME_GREEN}15` }}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
                 </div>
                 <div className="p-6">
-                  {profile.provider.workersCanEditSkills ? (
-                    <SkillsCheckboxPicker
-                      workerId={profile.id}
-                      workerSkills={workerSkills}
-                      onSkillsChange={setWorkerSkills}
-                      providerCategory={profile.provider.primaryCategory || undefined}
-                      providerId={profile.provider.id}
-                    />
+                  {selectedSkills.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {selectedSkills.map((skill) => (
+                        <span
+                          key={skill}
+                          className="px-3 py-1.5 rounded-full text-sm font-medium text-black"
+                          style={{ backgroundColor: LIME_GREEN }}
+                        >
+                          {skill}
+                        </span>
+                      ))}
+                    </div>
                   ) : (
-                    // Read-only view
-                    profile.workerSkills.length > 0 ? (
-                      <div className="flex flex-wrap gap-2">
-                        {profile.workerSkills.map((ws) => (
-                          <span
-                            key={ws.skill.id}
-                            className="px-3 py-1.5 bg-gradient-to-r from-emerald-500/20 to-teal-500/20 border border-emerald-500/30 rounded-full text-sm text-emerald-300 font-medium"
-                          >
-                            {ws.skill.name}
-                          </span>
-                        ))}
+                    <div className="text-center py-6">
+                      <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Award className="w-6 h-6 text-zinc-600" />
                       </div>
-                    ) : (
-                      <div className="text-center py-6">
-                        <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-3">
-                          <Award className="w-6 h-6 text-zinc-600" />
-                        </div>
-                        <p className="text-zinc-500 text-sm">Your admin will assign skills to you</p>
+                      <p className="text-zinc-500 text-sm">No skills added yet</p>
+                      <button
+                        onClick={() => setSkillsModalOpen(true)}
+                        className="mt-3 text-sm font-medium"
+                        style={{ color: LIME_GREEN }}
+                      >
+                        + Add your skills
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Equipment Card */}
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wrench className="w-5 h-5" style={{ color: LIME_GREEN }} />
+                    <h2 className="text-lg font-semibold text-white">Equipment</h2>
+                  </div>
+                  <button
+                    onClick={() => setEquipmentModalOpen(true)}
+                    className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ color: LIME_GREEN, backgroundColor: `${LIME_GREEN}15` }}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                </div>
+                <div className="p-6">
+                  {equipment.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {equipment.map((item) => (
+                        <span
+                          key={item}
+                          className="px-3 py-1.5 bg-zinc-800 rounded-full text-sm text-zinc-300"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Wrench className="w-6 h-6 text-zinc-600" />
                       </div>
-                    )
+                      <p className="text-zinc-500 text-sm">No equipment listed</p>
+                      <button
+                        onClick={() => setEquipmentModalOpen(true)}
+                        className="mt-3 text-sm font-medium"
+                        style={{ color: LIME_GREEN }}
+                      >
+                        + Add your equipment
+                      </button>
+                    </div>
                   )}
                 </div>
               </div>
@@ -577,14 +807,14 @@ export default function WorkerProfile() {
             {/* Right Column */}
             <div className="space-y-6">
               {/* Account & Security Card */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800">
-                <div className="p-6 border-b border-zinc-800">
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A]">
                   <div className="flex items-center gap-2">
-                    <Shield className="w-5 h-5 text-orange-400" />
+                    <Shield className="w-5 h-5" style={{ color: LIME_GREEN }} />
                     <h2 className="text-lg font-semibold text-white">Account & Security</h2>
                   </div>
                 </div>
-                <div className="divide-y divide-zinc-800">
+                <div className="divide-y divide-[#2A2A2A]">
                   <button
                     onClick={() => setPasswordModalOpen(true)}
                     className="w-full flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors"
@@ -598,7 +828,12 @@ export default function WorkerProfile() {
                     <ChevronRight className="w-5 h-5 text-zinc-600" />
                   </button>
 
-                  <button className="w-full flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors">
+                  <button
+                    onClick={() => {
+                      toast.info('Notification settings coming soon!');
+                    }}
+                    className="w-full flex items-center justify-between p-4 hover:bg-zinc-800/50 transition-colors"
+                  >
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 bg-zinc-800 rounded-lg flex items-center justify-center">
                         <Bell className="w-4 h-4 text-zinc-400" />
@@ -621,10 +856,10 @@ export default function WorkerProfile() {
               </div>
 
               {/* My Crew Card */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800">
-                <div className="p-6 border-b border-zinc-800">
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A]">
                   <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-cyan-400" />
+                    <Users className="w-5 h-5" style={{ color: LIME_GREEN }} />
                     <h2 className="text-lg font-semibold text-white">My Crew</h2>
                   </div>
                 </div>
@@ -697,30 +932,33 @@ export default function WorkerProfile() {
               </div>
 
               {/* Company Card */}
-              <div className="bg-zinc-900 rounded-xl border border-zinc-800">
-                <div className="p-6 border-b border-zinc-800">
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A]">
                   <div className="flex items-center gap-2">
-                    <Building className="w-5 h-5 text-purple-400" />
+                    <Building className="w-5 h-5" style={{ color: LIME_GREEN }} />
                     <h2 className="text-lg font-semibold text-white">Company</h2>
                   </div>
                 </div>
                 <div className="p-6">
                   <div className="flex items-center gap-4 mb-4">
-                    <div className="w-12 h-12 bg-zinc-800 rounded-lg flex items-center justify-center">
+                    <div
+                      className="w-12 h-12 rounded-lg flex items-center justify-center"
+                      style={{ backgroundColor: `${LIME_GREEN}20` }}
+                    >
                       {profile.provider.logoUrl ? (
                         <img src={profile.provider.logoUrl} alt="" className="w-full h-full object-cover rounded-lg" />
                       ) : (
-                        <Building className="w-6 h-6 text-zinc-600" />
+                        <span className="text-xl font-bold" style={{ color: LIME_GREEN }}>R</span>
                       )}
                     </div>
                     <div>
-                      <p className="text-white font-semibold">{profile.provider.businessName}</p>
+                      <p className="text-white font-semibold">Renoa</p>
                       <p className="text-zinc-500 text-sm">{profile.provider.email}</p>
                     </div>
                   </div>
                   <button
                     onClick={handleContactOffice}
-                    className="w-full h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
+                    className="w-full h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
                   >
                     <Phone className="w-4 h-4" />
                     Contact Office
@@ -731,7 +969,7 @@ export default function WorkerProfile() {
           </div>
 
           {/* Footer Actions */}
-          <div className="pt-6 border-t border-zinc-800 space-y-4">
+          <div className="pt-6 pb-6 border-t border-zinc-800 space-y-4">
             <button
               onClick={handleLogout}
               className="w-full h-12 border-2 border-red-500/50 hover:border-red-500 hover:bg-red-500/10 text-red-400 font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
@@ -748,6 +986,159 @@ export default function WorkerProfile() {
             </button>
           </div>
         </div>
+
+        {/* Skills Edit Modal - Filtered by company category */}
+        <Dialog open={skillsModalOpen} onOpenChange={setSkillsModalOpen}>
+          <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-white">Edit Skills</DialogTitle>
+              <DialogDescription className="text-zinc-400">
+                Select the skills you have to help match you with the right jobs.
+                {profile.provider.primaryCategory && (
+                  <span className="block mt-1 text-xs" style={{ color: LIME_GREEN }}>
+                    Showing skills for: {profile.provider.primaryCategory}
+                  </span>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-6 mt-4">
+              {Object.entries(getFilteredSkills(profile.provider.primaryCategory)).map(([category, skills]) => (
+                <div key={category}>
+                  <h3 className="text-sm font-semibold text-zinc-300 mb-3">{category}</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {skills.map((skill) => (
+                      <button
+                        key={skill}
+                        onClick={() => toggleSkill(skill)}
+                        className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                          selectedSkills.includes(skill)
+                            ? 'text-black'
+                            : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                        }`}
+                        style={selectedSkills.includes(skill) ? { backgroundColor: LIME_GREEN } : undefined}
+                      >
+                        {selectedSkills.includes(skill) && <Check className="w-3 h-3 inline mr-1" />}
+                        {skill}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+              <div className="flex gap-3 mt-6 pt-4 border-t border-zinc-800">
+                <button
+                  onClick={() => setSkillsModalOpen(false)}
+                  className="flex-1 h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveSkills}
+                  disabled={savingSkills}
+                  className="flex-1 h-11 text-black font-medium rounded-xl transition-colors flex items-center justify-center"
+                  style={{ backgroundColor: LIME_GREEN }}
+                >
+                  {savingSkills ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Skills'}
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Equipment Edit Modal */}
+        <Dialog open={equipmentModalOpen} onOpenChange={setEquipmentModalOpen}>
+          <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-white">Edit Equipment</DialogTitle>
+              <DialogDescription className="text-zinc-400">
+                Select the equipment you have available for jobs.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div className="flex flex-wrap gap-2">
+                {AVAILABLE_EQUIPMENT.map((item) => (
+                  <button
+                    key={item}
+                    onClick={() => toggleEquipment(item)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                      selectedEquipment.includes(item)
+                        ? 'text-black'
+                        : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                    }`}
+                    style={selectedEquipment.includes(item) ? { backgroundColor: LIME_GREEN } : undefined}
+                  >
+                    {selectedEquipment.includes(item) && <Check className="w-3 h-3 inline mr-1" />}
+                    {item}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Equipment */}
+              <div className="pt-4 border-t border-zinc-800">
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Add Custom Equipment</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={customEquipment}
+                    onChange={(e) => setCustomEquipment(e.target.value)}
+                    placeholder="e.g., Specialized tool..."
+                    className="flex-1 h-10 px-3 bg-zinc-800 border border-zinc-700 rounded-lg text-white placeholder-zinc-600 focus:outline-none focus:border-[#C4F542]"
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCustomEquipment()}
+                  />
+                  <button
+                    onClick={handleAddCustomEquipment}
+                    disabled={!customEquipment.trim()}
+                    className="h-10 px-4 text-black font-medium rounded-lg disabled:bg-zinc-800 disabled:text-zinc-600"
+                    style={{ backgroundColor: customEquipment.trim() ? LIME_GREEN : undefined }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Selected custom items */}
+              {selectedEquipment.filter(item => !AVAILABLE_EQUIPMENT.includes(item)).length > 0 && (
+                <div className="pt-2">
+                  <p className="text-xs text-zinc-500 mb-2">Custom items:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedEquipment.filter(item => !AVAILABLE_EQUIPMENT.includes(item)).map((item) => (
+                      <span
+                        key={item}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium text-black"
+                        style={{ backgroundColor: LIME_GREEN }}
+                      >
+                        {item}
+                        <button
+                          onClick={() => toggleEquipment(item)}
+                          className="ml-1 hover:bg-black/20 rounded-full p-0.5"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-6 pt-4 border-t border-zinc-800">
+                <button
+                  onClick={() => setEquipmentModalOpen(false)}
+                  className="flex-1 h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveEquipment}
+                  disabled={savingEquipment}
+                  className="flex-1 h-11 text-black font-medium rounded-xl transition-colors flex items-center justify-center"
+                  style={{ backgroundColor: LIME_GREEN }}
+                >
+                  {savingEquipment ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Equipment'}
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Change Password Modal */}
         <Dialog open={passwordModalOpen} onOpenChange={setPasswordModalOpen}>
@@ -766,7 +1157,7 @@ export default function WorkerProfile() {
                     type={showCurrentPassword ? 'text' : 'password'}
                     value={passwordForm.currentPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                    className="w-full h-11 px-4 pr-10 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:border-emerald-500 focus:outline-none"
+                    className="w-full h-11 px-4 pr-10 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:border-[#C4F542] focus:outline-none"
                   />
                   <button
                     type="button"
@@ -785,7 +1176,7 @@ export default function WorkerProfile() {
                     type={showNewPassword ? 'text' : 'password'}
                     value={passwordForm.newPassword}
                     onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                    className="w-full h-11 px-4 pr-10 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:border-emerald-500 focus:outline-none"
+                    className="w-full h-11 px-4 pr-10 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:border-[#C4F542] focus:outline-none"
                   />
                   <button
                     type="button"
@@ -803,14 +1194,14 @@ export default function WorkerProfile() {
                   type="password"
                   value={passwordForm.confirmPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-lg text-white focus:border-emerald-500 focus:outline-none"
+                  className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white focus:border-[#C4F542] focus:outline-none"
                 />
                 {passwordForm.newPassword && passwordForm.confirmPassword && (
                   <div className="flex items-center gap-1.5 mt-2">
                     {passwordForm.newPassword === passwordForm.confirmPassword ? (
                       <>
-                        <Check className="w-4 h-4 text-emerald-400" />
-                        <span className="text-sm text-emerald-400">Passwords match</span>
+                        <Check className="w-4 h-4" style={{ color: LIME_GREEN }} />
+                        <span className="text-sm" style={{ color: LIME_GREEN }}>Passwords match</span>
                       </>
                     ) : (
                       <>
@@ -828,14 +1219,15 @@ export default function WorkerProfile() {
                     setPasswordModalOpen(false);
                     setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
                   }}
-                  className="flex-1 h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-lg transition-colors"
+                  className="flex-1 h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleChangePassword}
                   disabled={savingPassword || !passwordForm.currentPassword || !passwordForm.newPassword || passwordForm.newPassword !== passwordForm.confirmPassword}
-                  className="flex-1 h-11 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-800 disabled:text-zinc-600 text-white font-medium rounded-lg transition-colors flex items-center justify-center"
+                  className="flex-1 h-11 text-black font-medium rounded-xl transition-colors flex items-center justify-center disabled:bg-zinc-800 disabled:text-zinc-600"
+                  style={{ backgroundColor: !savingPassword && passwordForm.currentPassword && passwordForm.newPassword && passwordForm.newPassword === passwordForm.confirmPassword ? LIME_GREEN : undefined }}
                 >
                   {savingPassword ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Update Password'}
                 </button>
