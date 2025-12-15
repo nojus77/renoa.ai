@@ -99,15 +99,38 @@ export async function POST(request: NextRequest) {
     const tipValue = tipAmount ? Math.round(tipAmount * 100) / 100 : 0;
     const totalEarnings = earnings + tipValue;
 
-    console.log('Calculated earnings:', { baseEarnings: earnings, tip: tipValue, totalEarnings });
+    // Calculate payment direction and amounts based on payment method
+    // Cash/Check: Worker collected money, owes business the difference
+    // Card/Invoice: Business collects, owes worker their earnings
+    const isCashOrCheck = paymentMethod && ['cash', 'check'].includes(paymentMethod);
+    const paymentDirection = isCashOrCheck ? 'worker_owes_business' : 'business_owes_worker';
 
-    // Update work log (includes tip in earnings)
+    // For cash/check, worker collected their share of the job value (plus tip)
+    // They owe the business: collected amount - their earnings
+    const collectedAmount = isCashOrCheck ? workerShareOfJob + tipValue : null;
+    const businessOwedAmount = isCashOrCheck
+      ? Math.round((workerShareOfJob - earnings) * 100) / 100 // worker keeps earnings, owes rest to business
+      : null;
+
+    console.log('Calculated earnings:', {
+      baseEarnings: earnings,
+      tip: tipValue,
+      totalEarnings,
+      paymentDirection,
+      collectedAmount,
+      businessOwedAmount,
+    });
+
+    // Update work log (includes tip in earnings + payment direction info)
     const updatedWorkLog = await prisma.workLog.update({
       where: { id: workLog.id },
       data: {
         clockOut,
         hoursWorked: Math.round(hoursWorked * 100) / 100, // Round to 2 decimals
         earnings: Math.round(totalEarnings * 100) / 100, // Includes tip
+        paymentDirection,
+        collectedAmount,
+        businessOwedAmount,
       },
     });
 
@@ -126,6 +149,81 @@ export async function POST(request: NextRequest) {
         tipAmount: tipAmount ? Math.round(tipAmount * 100) / 100 : null,
       },
     });
+
+    // Create work logs for other assigned workers who didn't clock in
+    // This ensures all workers appear in payroll for multi-worker jobs
+    if (job && job.assignedUserIds && job.assignedUserIds.length > 1) {
+      const otherWorkerIds = job.assignedUserIds.filter(id => id !== userId);
+
+      // Get pay info for all other workers
+      const otherWorkers = await prisma.providerUser.findMany({
+        where: { id: { in: otherWorkerIds } },
+        select: {
+          id: true,
+          payType: true,
+          hourlyRate: true,
+          commissionRate: true,
+        },
+      });
+
+      // Check which workers already have work logs for this job
+      const existingLogs = await prisma.workLog.findMany({
+        where: {
+          jobId,
+          userId: { in: otherWorkerIds },
+        },
+        select: { userId: true },
+      });
+      const workersWithLogs = new Set(existingLogs.map(log => log.userId));
+
+      // Create work logs for workers without existing logs
+      for (const otherWorker of otherWorkers) {
+        if (workersWithLogs.has(otherWorker.id)) {
+          continue; // Already has a work log
+        }
+
+        // Calculate earnings for this worker
+        let otherWorkerEarnings = 0;
+        if (otherWorker.payType === 'hourly' && otherWorker.hourlyRate) {
+          // Use same hours as completing worker
+          otherWorkerEarnings = hoursWorked * otherWorker.hourlyRate;
+        } else if (otherWorker.payType === 'commission' && otherWorker.commissionRate) {
+          otherWorkerEarnings = workerShareOfJob * (otherWorker.commissionRate / 100);
+        }
+
+        // For other workers, tips are split equally (if any)
+        const otherWorkerTip = tipValue / numWorkers;
+        const otherWorkerTotalEarnings = otherWorkerEarnings + otherWorkerTip;
+
+        // Calculate payment direction for other worker
+        const otherWorkerBusinessOwedAmount = isCashOrCheck
+          ? Math.round((workerShareOfJob - otherWorkerEarnings) * 100) / 100
+          : null;
+        const otherWorkerCollectedAmount = isCashOrCheck ? workerShareOfJob + otherWorkerTip : null;
+
+        // Create work log for other worker
+        await prisma.workLog.create({
+          data: {
+            jobId,
+            userId: otherWorker.id,
+            providerId: job.providerId,
+            clockIn: workLog.clockIn, // Same clock in time
+            clockOut,
+            hoursWorked: Math.round(hoursWorked * 100) / 100,
+            earnings: Math.round(otherWorkerTotalEarnings * 100) / 100,
+            paymentDirection,
+            collectedAmount: otherWorkerCollectedAmount,
+            businessOwedAmount: otherWorkerBusinessOwedAmount,
+          },
+        });
+
+        console.log('Created work log for other worker:', {
+          workerId: otherWorker.id,
+          earnings: otherWorkerTotalEarnings,
+          paymentDirection,
+        });
+      }
+    }
 
     // Create notification for job completion
     if (user && job) {
@@ -156,6 +254,11 @@ export async function POST(request: NextRequest) {
         baseEarnings: Math.round(earnings * 100) / 100,
         tipAmount: tipValue,
         totalEarnings: Math.round(totalEarnings * 100) / 100,
+        // Payment direction info
+        paymentDirection,
+        collectedAmount: collectedAmount ? Math.round(collectedAmount * 100) / 100 : null,
+        businessOwedAmount: businessOwedAmount || null,
+        isCashOrCheck,
       },
     });
   } catch (error) {

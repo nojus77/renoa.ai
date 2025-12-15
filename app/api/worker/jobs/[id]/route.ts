@@ -78,7 +78,7 @@ export async function GET(
     }
 
     // Get coworkers (other assigned users, excluding current user)
-    let coworkers: { id: string; name: string; profilePhotoUrl: string | null }[] = [];
+    let coworkers: { id: string; name: string; phone: string | null; profilePhotoUrl: string | null }[] = [];
     if (job.assignedUserIds.length > 1) {
       const otherUserIds = job.assignedUserIds.filter(uid => uid !== userId);
       const users = await prisma.providerUser.findMany({
@@ -90,6 +90,7 @@ export async function GET(
           id: true,
           firstName: true,
           lastName: true,
+          phone: true,
           profilePhotoUrl: true,
           profilePhotoBlobPath: true,
         },
@@ -97,6 +98,7 @@ export async function GET(
       coworkers = users.map(u => ({
         id: u.id,
         name: `${u.firstName} ${u.lastName}`,
+        phone: u.phone,
         profilePhotoUrl: u.profilePhotoBlobPath || u.profilePhotoUrl,
       }));
     }

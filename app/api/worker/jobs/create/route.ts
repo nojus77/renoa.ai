@@ -46,6 +46,8 @@ export async function POST(request: NextRequest) {
         providerId: true,
         role: true,
         status: true,
+        canCreateJobs: true,
+        jobsNeedApproval: true,
         provider: {
           select: {
             workersCanCreateJobs: true,
@@ -67,8 +69,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Your account is not active' }, { status: 403 });
     }
 
-    // Check provider-level permission (applies to all workers)
-    if (!worker.provider.workersCanCreateJobs) {
+    // Check permission: either provider-level (all workers) OR individual worker permission
+    if (!worker.provider.workersCanCreateJobs && !worker.canCreateJobs) {
       return NextResponse.json(
         { error: 'You do not have permission to create jobs' },
         { status: 403 }
@@ -90,8 +92,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Customer not found' }, { status: 404 });
     }
 
-    // Determine job status based on provider-level approval settings
-    const jobStatus = worker.provider.workerJobsNeedApproval ? 'pending_approval' : 'scheduled';
+    // Determine job status based on approval settings
+    // Individual worker setting overrides provider default if set
+    const needsApproval = worker.jobsNeedApproval !== null
+      ? worker.jobsNeedApproval
+      : worker.provider.workerJobsNeedApproval;
+    const jobStatus = needsApproval ? 'pending_approval' : 'scheduled';
 
     // Create the job
     const job = await prisma.job.create({
@@ -121,7 +127,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Create notification if job needs approval
-    if (worker.provider.workerJobsNeedApproval) {
+    if (needsApproval) {
       await createNotification({
         providerId,
         type: 'job_created_by_worker',
@@ -134,8 +140,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       job,
-      needsApproval: worker.provider.workerJobsNeedApproval,
-      message: worker.provider.workerJobsNeedApproval
+      needsApproval,
+      message: needsApproval
         ? 'Job created and pending approval from your manager'
         : 'Job created and scheduled successfully',
     });

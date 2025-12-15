@@ -36,7 +36,9 @@ export async function GET(
       );
     }
 
-    // Parse notes from internal notes field (stored as timestamped entries)
+    // Parse notes from internal notes field
+    // Notes are stored as: [timestamp] Author Name: content
+    // Original dispatcher instructions are plain text without the timestamp format
     const notes: Array<{
       id: string;
       content: string;
@@ -44,6 +46,9 @@ export async function GET(
       authorRole: 'worker' | 'dispatcher';
       createdAt: string;
     }> = [];
+
+    // Also extract dispatcher instructions (non-timestamped content)
+    let dispatcherInstructions = '';
 
     if (job.internalNotes) {
       // Split by double newlines to get individual notes
@@ -54,6 +59,7 @@ export async function GET(
         // Parse notes that follow the format: [timestamp] author: content (content can be multiline)
         const match = block.match(/^\[([^\]]+)\]\s*([^:]+):\s*([\s\S]+)/);
         if (match) {
+          // This is a timestamped note - add to notes list
           notes.push({
             id: `note-${index++}`,
             createdAt: match[1],
@@ -62,36 +68,20 @@ export async function GET(
             authorRole: match[2].toLowerCase().includes('dispatcher') ? 'dispatcher' : 'worker',
           });
         } else {
-          // Handle notes that don't match the standard format
-          // Try "[Created by Name]" or other patterns
-          const createdByMatch = block.match(/\[Created by ([^\]]+)\]/);
-          if (createdByMatch) {
-            // Extract content after the "[Created by Name]" part
-            const contentAfter = block.replace(/\[Created by [^\]]+\]\s*/, '').trim();
-            if (contentAfter) {
-              notes.push({
-                id: `note-${index++}`,
-                createdAt: 'Unknown',
-                author: createdByMatch[1].trim(),
-                content: contentAfter,
-                authorRole: 'dispatcher',
-              });
+          // This is dispatcher instructions (plain text without timestamp format)
+          // Accumulate all non-timestamped text as dispatcher instructions
+          if (block.trim()) {
+            if (dispatcherInstructions) {
+              dispatcherInstructions += '\n\n' + block.trim();
+            } else {
+              dispatcherInstructions = block.trim();
             }
-          } else if (block.trim()) {
-            // Plain text note without metadata
-            notes.push({
-              id: `note-${index++}`,
-              createdAt: 'Unknown',
-              author: 'System',
-              content: block.trim(),
-              authorRole: 'dispatcher',
-            });
           }
         }
       }
     }
 
-    return NextResponse.json({ notes });
+    return NextResponse.json({ notes, dispatcherInstructions });
   } catch (error) {
     console.error('Error fetching notes:', error);
     return NextResponse.json(

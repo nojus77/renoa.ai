@@ -423,6 +423,7 @@ model Provider {
   paymentTerms               String                       @default("net_30")
   acceptedPaymentMethods     String[]                     @default(["cash", "check", "credit_card"])
   autoInvoiceOnCompletion    Boolean                      @default(true)
+  customerNoteTemplates      String[]                     @default([]) @map("customer_note_templates")
   // Worker Permission Settings
   workersCanCreateJobs       Boolean                      @default(false) @map("workers_can_create_jobs")
   workerJobsNeedApproval     Boolean                      @default(true) @map("worker_jobs_need_approval")
@@ -631,12 +632,20 @@ model Job {
   longitude             Float? // For distance calculations
   zone                  String? // ZIP code or service area
   estimatedDuration     Float?                 @map("estimated_duration") // hours
+  // Dispatch/Route fields
+  appointmentType       String                 @default("anytime") @map("appointment_type") // "fixed", "anytime", "window"
+  routeOrder            Int?                   @map("route_order") // Position in worker's route for the day
+  estimatedArrival      DateTime?              @map("estimated_arrival") // Calculated ETA
   // Payment fields
   paymentMethod         String?                @map("payment_method") // cash, check, card
   paymentStatus         String?                @map("payment_status") // paid, pending
   tipAmount             Float?                 @map("tip_amount")
   stripeSessionId       String?                @map("stripe_session_id")
   stripePaymentUrl      String?                @map("stripe_payment_url")
+  // Cancellation fields
+  cancellationReason    String?                @map("cancellation_reason")
+  cancelledAt           DateTime?              @map("cancelled_at")
+  cancelledBy           String?                @map("cancelled_by")
   invoices              Invoice?
   photos                JobPhoto[]             @relation("JobPhotos")
   customer              Customer               @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
@@ -1522,21 +1531,26 @@ model PasswordResetToken {
 
 // Work logs - track time and earnings per job
 model WorkLog {
-  id          String       @id @default(cuid())
-  jobId       String       @map("job_id")
-  userId      String       @map("user_id")
-  providerId  String       @map("provider_id")
-  clockIn     DateTime     @map("clock_in")
-  clockOut    DateTime?    @map("clock_out")
-  hoursWorked Float?       @map("hours_worked")
-  earnings    Float?
-  isPaid      Boolean      @default(false) @map("is_paid")
-  paidAt      DateTime?    @map("paid_at")
-  createdAt   DateTime     @default(now()) @map("created_at")
-  updatedAt   DateTime     @updatedAt @map("updated_at")
-  job         Job          @relation("JobWorkLogs", fields: [jobId], references: [id], onDelete: Cascade)
-  user        ProviderUser @relation("UserWorkLogs", fields: [userId], references: [id], onDelete: Cascade)
-  provider    Provider     @relation("ProviderWorkLogs", fields: [providerId], references: [id], onDelete: Cascade)
+  id                  String       @id @default(cuid())
+  jobId               String       @map("job_id")
+  userId              String       @map("user_id")
+  providerId          String       @map("provider_id")
+  clockIn             DateTime     @map("clock_in")
+  clockOut            DateTime?    @map("clock_out")
+  hoursWorked         Float?       @map("hours_worked")
+  earnings            Float?       // Worker's earnings for this job
+  isPaid              Boolean      @default(false) @map("is_paid")
+  paidAt              DateTime?    @map("paid_at")
+  // Payment direction: for cash/check, worker collected money and owes business
+  // For card/invoice, business collects and owes worker
+  paymentDirection    String?      @map("payment_direction") // 'business_owes_worker' | 'worker_owes_business'
+  collectedAmount     Float?       @map("collected_amount") // Total amount worker collected (for cash/check)
+  businessOwedAmount  Float?       @map("business_owed_amount") // Amount worker owes business (collected - earnings)
+  createdAt           DateTime     @default(now()) @map("created_at")
+  updatedAt           DateTime     @updatedAt @map("updated_at")
+  job                 Job          @relation("JobWorkLogs", fields: [jobId], references: [id], onDelete: Cascade)
+  user                ProviderUser @relation("UserWorkLogs", fields: [userId], references: [id], onDelete: Cascade)
+  provider            Provider     @relation("ProviderWorkLogs", fields: [providerId], references: [id], onDelete: Cascade)
 
   @@index([jobId])
   @@index([userId])

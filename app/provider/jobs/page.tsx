@@ -275,7 +275,7 @@ export default function ProviderJobs() {
           </div>
         </div>
 
-        {/* Jobs List */}
+        {/* Jobs Table */}
         <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-3 md:py-6">
           {filteredJobs.length === 0 ? (
             <div className="text-center py-12">
@@ -299,15 +299,29 @@ export default function ProviderJobs() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3 md:gap-4">
-              {filteredJobs.map(job => (
-                <JobCard
-                  key={job.id}
-                  job={job}
-                  onDelete={handleDeleteJob}
-                  onView={() => router.push(`/provider/jobs/${job.id}`)}
-                />
-              ))}
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
+              {/* Table Header - hidden on mobile */}
+              <div className="hidden md:grid md:grid-cols-[1fr_120px_140px_120px_100px_80px_40px] gap-2 p-3 bg-zinc-800/50 text-xs text-zinc-400 font-medium border-b border-zinc-800">
+                <div>Customer / Service</div>
+                <div>Date & Time</div>
+                <div>Assigned</div>
+                <div>Status</div>
+                <div className="text-right">Value</div>
+                <div></div>
+                <div></div>
+              </div>
+
+              {/* Table Body */}
+              <div className="divide-y divide-zinc-800">
+                {filteredJobs.map(job => (
+                  <JobRow
+                    key={job.id}
+                    job={job}
+                    onDelete={handleDeleteJob}
+                    onView={() => router.push(`/provider/jobs/${job.id}`)}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -328,8 +342,8 @@ export default function ProviderJobs() {
   );
 }
 
-// Job Card Component
-function JobCard({ job, onDelete, onView }: {
+// Compact Job Row Component
+function JobRow({ job, onDelete, onView }: {
   job: Job;
   onDelete: (id: string) => void;
   onView: () => void;
@@ -340,7 +354,7 @@ function JobCard({ job, onDelete, onView }: {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const formatTime = (dateString: string) => {
@@ -349,134 +363,136 @@ function JobCard({ job, onDelete, onView }: {
   };
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 md:p-5 hover:bg-zinc-900/70 transition-all hover:border-emerald-500/50 relative group">
-      <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-4">
-        {/* Customer Info */}
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-3">
-            <div className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-400 flex items-center justify-center text-white text-lg md:text-xl font-bold flex-shrink-0">
-              {job.customerName.charAt(0).toUpperCase()}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-base md:text-lg font-semibold text-zinc-100 mb-1 truncate">{job.customerName}</h3>
-              <p className="text-sm font-medium text-emerald-400 mb-1">{job.serviceType}</p>
-              <div className="flex items-center gap-2 text-xs text-zinc-400">
-                <MapPin className="h-3 w-3 flex-shrink-0" />
-                <span className="truncate">{job.customerAddress}</span>
-              </div>
-            </div>
-          </div>
+    <div
+      onClick={onView}
+      className="p-3 hover:bg-zinc-800/50 cursor-pointer transition-colors md:grid md:grid-cols-[1fr_120px_140px_120px_100px_80px_40px] gap-2 items-center"
+    >
+      {/* Customer & Service - combined */}
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-400 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+          {job.customerName.charAt(0).toUpperCase()}
         </div>
-
-        {/* Date & Time */}
-        <div className="flex items-center gap-2 md:min-w-[180px]">
-          <Calendar className="h-4 w-4 text-zinc-500 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-medium text-zinc-200">{formatDate(job.startTime)}</p>
-            <p className="text-xs text-zinc-500">{formatTime(job.startTime)} • {job.duration}h</p>
-          </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-zinc-100 truncate">{job.customerName}</p>
+          <p className="text-xs text-emerald-400 truncate">{job.serviceType}</p>
         </div>
+      </div>
 
-        {/* Status */}
-        <div className="md:min-w-[140px]">
-          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full ${statusConfig.bg} border border-${statusConfig.text.replace('text-', '')}/30`}>
-            <StatusIcon className={`h-4 w-4 ${statusConfig.text}`} />
-            <span className={`text-sm font-medium ${statusConfig.text} capitalize`}>
-              {job.status.replace('-', ' ')}
-            </span>
-          </div>
-        </div>
+      {/* Date & Time */}
+      <div className="hidden md:block">
+        <p className="text-sm text-zinc-200">{formatDate(job.startTime)}</p>
+        <p className="text-xs text-zinc-500">{formatTime(job.startTime)}</p>
+      </div>
 
-        {/* Assigned Users */}
-        <div className="md:min-w-[140px]">
-          {job.assignedUsers && job.assignedUsers.length > 0 ? (
-            <div className="flex items-center gap-2">
-              <Users className="h-4 w-4 text-zinc-500" />
-              <div className="flex -space-x-2">
-                {job.assignedUsers.slice(0, 3).map((user, idx) => (
-                  <div
-                    key={user.id}
-                    className="h-8 w-8 rounded-full bg-emerald-500/20 border-2 border-zinc-900 flex items-center justify-center"
-                    title={`${user.firstName} ${user.lastName}`}
-                  >
-                    {user.profilePhotoUrl ? (
-                      <img
-                        src={user.profilePhotoUrl}
-                        alt={`${user.firstName} ${user.lastName}`}
-                        className="h-full w-full rounded-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-xs font-medium text-emerald-400">
-                        {user.firstName[0]}{user.lastName[0]}
-                      </span>
-                    )}
-                  </div>
-                ))}
-                {job.assignedUsers.length > 3 && (
-                  <div className="h-8 w-8 rounded-full bg-zinc-800 border-2 border-zinc-900 flex items-center justify-center">
-                    <span className="text-xs font-medium text-zinc-400">+{job.assignedUsers.length - 3}</span>
-                  </div>
+      {/* Assigned Users */}
+      <div className="hidden md:block">
+        {job.assignedUsers && job.assignedUsers.length > 0 ? (
+          <div className="flex -space-x-1.5">
+            {job.assignedUsers.slice(0, 3).map((user) => (
+              <div
+                key={user.id}
+                className="h-6 w-6 rounded-full bg-emerald-500/20 border border-zinc-900 flex items-center justify-center"
+                title={`${user.firstName} ${user.lastName}`}
+              >
+                {user.profilePhotoUrl ? (
+                  <img
+                    src={user.profilePhotoUrl}
+                    alt={`${user.firstName} ${user.lastName}`}
+                    className="h-full w-full rounded-full object-cover"
+                  />
+                ) : (
+                  <span className="text-[10px] font-medium text-emerald-400">
+                    {user.firstName[0]}{user.lastName[0]}
+                  </span>
                 )}
               </div>
-            </div>
-          ) : (
-            <p className="text-sm text-zinc-500 flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Unassigned
-            </p>
-          )}
-        </div>
-
-        {/* Value */}
-        <div className="md:min-w-[100px]">
-          <p className="text-lg font-bold text-emerald-400">
-            ${Math.round(job.actualValue || job.estimatedValue || 0)}
-          </p>
-          <p className="text-xs text-zinc-500">
-            {job.actualValue ? 'Actual' : 'Estimated'}
-          </p>
-        </div>
-
-        {/* Actions */}
-        <div className="relative md:min-w-[40px]">
-          <button
-            onClick={() => setShowActions(!showActions)}
-            className="p-2 hover:bg-zinc-800 rounded-lg transition-colors"
-          >
-            <MoreVertical className="h-5 w-5 text-zinc-400" />
-          </button>
-
-          {showActions && (
-            <>
-              <div
-                className="fixed inset-0 z-10"
-                onClick={() => setShowActions(false)}
-              />
-              <div className="absolute right-0 top-full mt-2 w-48 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl py-2 z-20">
-                <button
-                  onClick={() => {
-                    setShowActions(false);
-                    onView();
-                  }}
-                  className="flex items-center gap-3 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800 w-full text-left"
-                >
-                  <Eye className="h-4 w-4" />
-                  View Details
-                </button>
-                <button
-                  onClick={() => {
-                    setShowActions(false);
-                    onDelete(job.id);
-                  }}
-                  className="flex items-center gap-3 px-4 py-2 text-sm text-red-400 hover:bg-zinc-800 w-full text-left"
-                >
-                  <Trash2 className="h-4 w-4" />
-                  Delete Job
-                </button>
+            ))}
+            {job.assignedUsers.length > 3 && (
+              <div className="h-6 w-6 rounded-full bg-zinc-700 border border-zinc-900 flex items-center justify-center">
+                <span className="text-[10px] font-medium text-zinc-400">+{job.assignedUsers.length - 3}</span>
               </div>
-            </>
-          )}
+            )}
+          </div>
+        ) : (
+          <span className="text-xs text-zinc-500">Unassigned</span>
+        )}
+      </div>
+
+      {/* Status */}
+      <div className="hidden md:block">
+        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs ${statusConfig.bg}`}>
+          <StatusIcon className={`h-3 w-3 ${statusConfig.text}`} />
+          <span className={`font-medium ${statusConfig.text} capitalize`}>
+            {job.status.replace('-', ' ')}
+          </span>
         </div>
+      </div>
+
+      {/* Value */}
+      <div className="hidden md:block text-right">
+        <span className={`text-sm font-semibold ${job.status === 'completed' ? 'text-emerald-400' : 'text-zinc-100'}`}>
+          ${Math.round(job.actualValue || job.estimatedValue || 0)}
+        </span>
+      </div>
+
+      {/* Mobile: Show status & value inline */}
+      <div className="flex items-center justify-between mt-2 md:hidden">
+        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs ${statusConfig.bg}`}>
+          <StatusIcon className={`h-3 w-3 ${statusConfig.text}`} />
+          <span className={`font-medium ${statusConfig.text} capitalize`}>
+            {job.status.replace('-', ' ')}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-zinc-400">{formatDate(job.startTime)}</span>
+          <span className={`text-sm font-semibold ${job.status === 'completed' ? 'text-emerald-400' : 'text-zinc-100'}`}>
+            ${Math.round(job.actualValue || job.estimatedValue || 0)}
+          </span>
+        </div>
+      </div>
+
+      {/* Empty spacer for alignment */}
+      <div className="hidden md:block"></div>
+
+      {/* Actions */}
+      <div className="relative hidden md:block" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => setShowActions(!showActions)}
+          className="p-1.5 hover:bg-zinc-700 rounded-lg transition-colors"
+        >
+          <MoreVertical className="h-4 w-4 text-zinc-400" />
+        </button>
+
+        {showActions && (
+          <>
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setShowActions(false)}
+            />
+            <div className="absolute right-0 top-full mt-1 w-40 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 z-20">
+              <button
+                onClick={() => {
+                  setShowActions(false);
+                  onView();
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 w-full text-left"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                View Details
+              </button>
+              <button
+                onClick={() => {
+                  setShowActions(false);
+                  onDelete(job.id);
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-zinc-800 w-full text-left"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete Job
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
