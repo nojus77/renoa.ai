@@ -105,6 +105,7 @@ export default function AddJobModal({
     internalNotes: '',
     customerNotes: '',
     status: 'scheduled' as 'scheduled' | 'in_progress' | 'completed',
+    appointmentType: 'anytime' as 'fixed' | 'anytime' | 'window', // Scheduling flexibility
     isRecurring: false,
     recurringFrequency: '',
     recurringEndDate: '',
@@ -246,10 +247,12 @@ export default function AddJobModal({
     }
   }, [jobDetails.startTime, jobDetails.duration]);
 
-  // Check for conflicts when date/time/duration changes
+  // Check for conflicts when date/time/duration/workers changes
+  // Only check conflicts when workers are assigned
   useEffect(() => {
     const checkConflicts = async () => {
-      if (!jobDetails.date || !jobDetails.startTime || !jobDetails.duration) {
+      // Only check for conflicts if workers are assigned
+      if (!jobDetails.date || !jobDetails.startTime || !jobDetails.duration || selectedUserIds.length === 0) {
         setConflict(null);
         return;
       }
@@ -259,25 +262,27 @@ export default function AddJobModal({
         const startDateTime = new Date(`${jobDetails.date}T${jobDetails.startTime}`);
         const durationMinutes = parseFloat(jobDetails.duration) * 60;
 
-        const res = await fetch('/api/provider/jobs/validate', {
+        const res = await fetch('/api/provider/jobs/check-conflicts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             providerId,
             startTime: startDateTime.toISOString(),
-            duration: durationMinutes
+            duration: durationMinutes,
+            workerIds: selectedUserIds,
           })
         });
 
         const result = await res.json();
 
-        if (!result.available) {
-          setConflict(result.reason);
+        if (result.hasConflict) {
+          setConflict(result.message);
         } else {
           setConflict(null);
         }
       } catch (error) {
         console.error('Error checking conflicts:', error);
+        setConflict(null); // Don't block on error
       } finally {
         setCheckingConflict(false);
       }
@@ -285,7 +290,7 @@ export default function AddJobModal({
 
     const timeoutId = setTimeout(checkConflicts, 500); // Debounce
     return () => clearTimeout(timeoutId);
-  }, [jobDetails.date, jobDetails.startTime, jobDetails.duration, providerId]);
+  }, [jobDetails.date, jobDetails.startTime, jobDetails.duration, selectedUserIds, providerId]);
 
   // Load team members and crews when modal opens
   useEffect(() => {
@@ -487,6 +492,7 @@ export default function AddJobModal({
         internalNotes: jobDetails.internalNotes || null,
         customerNotes: jobDetails.customerNotes || null,
         status: jobDetails.status,
+        appointmentType: jobDetails.appointmentType,
         isRecurring: jobDetails.isRecurring,
         recurringFrequency: jobDetails.isRecurring ? jobDetails.recurringFrequency : null,
         recurringEndDate: jobDetails.isRecurring && jobDetails.recurringEndDate ? jobDetails.recurringEndDate : null,
@@ -555,6 +561,7 @@ export default function AddJobModal({
       internalNotes: '',
       customerNotes: '',
       status: 'scheduled',
+      appointmentType: 'anytime',
       isRecurring: false,
       recurringFrequency: '',
       recurringEndDate: '',
@@ -1027,6 +1034,42 @@ export default function AddJobModal({
                       End time: {jobDetails.endTime || 'Calculating...'}
                     </p>
                   )}
+                </div>
+
+                {/* Appointment Type - Scheduling Flexibility */}
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-3">
+                    Appointment Type
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'fixed', label: 'Fixed Time', icon: '📌', desc: 'Must start at exact time' },
+                      { value: 'anytime', label: 'Anytime', icon: '🔄', desc: 'Flexible within the day' },
+                      { value: 'window', label: 'Time Window', icon: '⏰', desc: 'Arrival window range' },
+                    ].map((type) => (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => setJobDetails(prev => ({ ...prev, appointmentType: type.value as 'fixed' | 'anytime' | 'window' }))}
+                        className={`
+                          p-3 rounded-lg border-2 transition-all text-left active:scale-95
+                          ${jobDetails.appointmentType === type.value
+                            ? 'border-emerald-500 bg-emerald-500/10'
+                            : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600 hover:bg-zinc-800/50'
+                          }
+                        `}
+                      >
+                        <div className="text-xl mb-1">{type.icon}</div>
+                        <div className="text-xs font-medium text-zinc-200">{type.label}</div>
+                        <div className="text-[10px] text-zinc-500 mt-0.5">{type.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-xs text-zinc-500 mt-2">
+                    {jobDetails.appointmentType === 'fixed' && 'Fixed appointments must start at the scheduled time.'}
+                    {jobDetails.appointmentType === 'anytime' && 'Anytime jobs can be reordered for route optimization.'}
+                    {jobDetails.appointmentType === 'window' && 'Window appointments give customers an arrival range.'}
+                  </p>
                 </div>
 
                 {/* Recurring Job Options */}

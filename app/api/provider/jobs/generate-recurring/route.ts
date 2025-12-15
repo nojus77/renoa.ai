@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
           endTime: nextEndTime,
           status: 'scheduled',
           source: parentJob.source,
+          appointmentType: parentJob.appointmentType || 'anytime', // Copy from parent
           estimatedValue: parentJob.estimatedValue,
           internalNotes: parentJob.internalNotes,
           customerNotes: parentJob.customerNotes,

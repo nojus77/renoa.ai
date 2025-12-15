@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
       internalNotes,
       customerNotes,
       status = 'scheduled',
+      appointmentType = 'anytime', // 'fixed', 'anytime', 'window'
       isRecurring = false,
       recurringFrequency,
       recurringEndDate,
@@ -103,6 +104,7 @@ export async function POST(request: NextRequest) {
         endTime: endDate,
         status,
         source: 'own', // Provider manually created this job
+        appointmentType, // 'fixed', 'anytime', 'window'
         estimatedValue: estimatedValue ? parseFloat(estimatedValue) : null,
         internalNotes: internalNotes || null,
         customerNotes: customerNotes || null,

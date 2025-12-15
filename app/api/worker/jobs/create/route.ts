@@ -110,6 +110,7 @@ export async function POST(request: NextRequest) {
         endTime: new Date(endTime),
         status: jobStatus,
         source: 'worker',
+        appointmentType: 'anytime', // Worker-created jobs default to anytime (flexible)
         internalNotes: notes
           ? `[Created by ${worker.firstName} ${worker.lastName}] ${notes}`
           : `[Created by ${worker.firstName} ${worker.lastName}]`,
