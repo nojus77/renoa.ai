@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from 'react';
-import { X, Plus, Search, User, Sparkles, Users } from 'lucide-react';
+import { X, Plus, Search, User, Sparkles, Users, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import AddressAutocomplete from '@/components/ui/AddressAutocomplete';
 import { toast } from 'sonner';
@@ -69,6 +69,12 @@ export default function AddJobModal({
   const [selectedCrew, setSelectedCrew] = useState<Crew | null>(null);
   const [loadingTeam, setLoadingTeam] = useState(false);
 
+  // Customer note templates
+  const [noteTemplates, setNoteTemplates] = useState<string[]>([]);
+  const [showManageTemplates, setShowManageTemplates] = useState(false);
+  const [newTemplate, setNewTemplate] = useState('');
+  const [savingTemplates, setSavingTemplates] = useState(false);
+
   // New customer fields
   const [newCustomer, setNewCustomer] = useState({
     name: '',
@@ -76,6 +82,16 @@ export default function AddJobModal({
     email: '',
     address: '',
   });
+
+  // Edit customer state
+  const [showEditCustomerModal, setShowEditCustomerModal] = useState(false);
+  const [editCustomerData, setEditCustomerData] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    address: '',
+  });
+  const [savingCustomer, setSavingCustomer] = useState(false);
 
   // Job details - NO auto-fill, user must choose everything
   const [jobDetails, setJobDetails] = useState({
@@ -146,6 +162,72 @@ export default function AddJobModal({
       setTimeout(() => searchInputRef.current?.focus(), 100);
     }
   }, [isOpen]);
+
+  // Fetch customer note templates
+  useEffect(() => {
+    if (isOpen && providerId) {
+      const fetchTemplates = async () => {
+        try {
+          const res = await fetch(`/api/provider/settings/note-templates?providerId=${providerId}`);
+          const data = await res.json();
+          if (data.templates && data.templates.length > 0) {
+            setNoteTemplates(data.templates);
+          } else {
+            // Default templates if none saved
+            setNoteTemplates([
+              "We'll arrive within your scheduled time window. Please ensure access to the work area.",
+              "Payment is due upon completion of service.",
+              "Please secure pets before our arrival.",
+              "Gate code required - please provide before appointment.",
+              "We'll text when our technician is on the way.",
+            ]);
+          }
+        } catch (error) {
+          console.error('Failed to fetch note templates:', error);
+          // Use defaults on error
+          setNoteTemplates([
+            "We'll arrive within your scheduled time window. Please ensure access to the work area.",
+            "Payment is due upon completion of service.",
+            "Please secure pets before our arrival.",
+          ]);
+        }
+      };
+      fetchTemplates();
+    }
+  }, [isOpen, providerId]);
+
+  // Save templates
+  const handleSaveTemplates = async () => {
+    setSavingTemplates(true);
+    try {
+      const res = await fetch('/api/provider/settings/note-templates', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerId, templates: noteTemplates }),
+      });
+      if (res.ok) {
+        toast.success('Templates saved');
+        setShowManageTemplates(false);
+      } else {
+        toast.error('Failed to save templates');
+      }
+    } catch (error) {
+      toast.error('Failed to save templates');
+    } finally {
+      setSavingTemplates(false);
+    }
+  };
+
+  const handleAddTemplate = () => {
+    if (newTemplate.trim() && noteTemplates.length < 20) {
+      setNoteTemplates([...noteTemplates, newTemplate.trim()]);
+      setNewTemplate('');
+    }
+  };
+
+  const handleRemoveTemplate = (index: number) => {
+    setNoteTemplates(noteTemplates.filter((_, i) => i !== index));
+  };
 
   // Calculate end time when start time or duration changes
   useEffect(() => {
@@ -262,6 +344,56 @@ export default function AddJobModal({
     const timeoutId = setTimeout(fetchCustomers, 300); // Debounce
     return () => clearTimeout(timeoutId);
   }, [searchQuery, providerId]);
+
+  // Handle edit customer
+  const openEditCustomerModal = () => {
+    if (selectedCustomer) {
+      setEditCustomerData({
+        name: selectedCustomer.name || '',
+        phone: selectedCustomer.phone || '',
+        email: selectedCustomer.email || '',
+        address: '', // Will need to fetch if stored
+      });
+      setShowEditCustomerModal(true);
+    }
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!selectedCustomer) return;
+
+    setSavingCustomer(true);
+    try {
+      const res = await fetch(`/api/provider/customers/${selectedCustomer.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId,
+          name: editCustomerData.name,
+          phone: editCustomerData.phone,
+          email: editCustomerData.email,
+          address: editCustomerData.address || undefined,
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to update customer');
+
+      // Update the selected customer with new data
+      setSelectedCustomer({
+        ...selectedCustomer,
+        name: editCustomerData.name,
+        phone: editCustomerData.phone,
+        email: editCustomerData.email,
+      });
+
+      toast.success('Customer updated');
+      setShowEditCustomerModal(false);
+    } catch (error) {
+      console.error('Error updating customer:', error);
+      toast.error('Failed to update customer');
+    } finally {
+      setSavingCustomer(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -613,18 +745,29 @@ export default function AddJobModal({
                         <p className="text-sm font-medium text-emerald-400">{selectedCustomer.name}</p>
                         <p className="text-xs text-zinc-400">{selectedCustomer.phone} {selectedCustomer.email && `• ${selectedCustomer.email}`}</p>
                       </div>
-                      <Button
-                        type="button"
-                        onClick={() => {
-                          setSelectedCustomer(null);
-                          setSearchQuery('');
-                        }}
-                        variant="ghost"
-                        size="sm"
-                        className="text-zinc-400 hover:text-zinc-100"
-                      >
-                        Change
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          type="button"
+                          onClick={openEditCustomerModal}
+                          variant="ghost"
+                          size="sm"
+                          className="text-zinc-400 hover:text-zinc-100 px-2"
+                        >
+                          <Pencil className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setSelectedCustomer(null);
+                            setSearchQuery('');
+                          }}
+                          variant="ghost"
+                          size="sm"
+                          className="text-zinc-400 hover:text-zinc-100"
+                        >
+                          Change
+                        </Button>
+                      </div>
                     </div>
                   )}
 
@@ -846,7 +989,7 @@ export default function AddJobModal({
                 {/* Duration - Visual Button Picker */}
                 <div>
                   <label className="block text-sm font-medium text-zinc-300 mb-3">
-                    Duration
+                    Estimated Duration
                   </label>
                   <div className="grid grid-cols-4 gap-2">
                     {[1, 2, 3, 4].map(hours => (
@@ -1158,6 +1301,33 @@ export default function AddJobModal({
                   <span className="text-zinc-500 group-open:rotate-180 transition-transform">▼</span>
                 </summary>
                 <div className="px-4 pb-4 pt-2">
+                  {/* Quick-select templates header */}
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-xs text-zinc-500">Quick templates:</span>
+                    <button
+                      type="button"
+                      onClick={() => setShowManageTemplates(true)}
+                      className="text-xs text-emerald-500 hover:text-emerald-400 hover:underline"
+                    >
+                      Manage
+                    </button>
+                  </div>
+                  {/* Quick-select templates */}
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {noteTemplates.map((template, i) => (
+                      <button
+                        key={i}
+                        type="button"
+                        onClick={() => setJobDetails(prev => ({
+                          ...prev,
+                          customerNotes: prev.customerNotes ? `${prev.customerNotes}\n${template}` : template
+                        }))}
+                        className="text-xs px-2 py-1 bg-zinc-700/50 hover:bg-zinc-600/50 rounded text-zinc-400 hover:text-zinc-300 transition-colors"
+                      >
+                        + {template.slice(0, 20)}...
+                      </button>
+                    ))}
+                  </div>
                   <textarea
                     value={jobDetails.customerNotes}
                     onChange={(e) => setJobDetails(prev => ({ ...prev, customerNotes: e.target.value }))}
@@ -1239,6 +1409,164 @@ export default function AddJobModal({
           </div>
         </form>
       </div>
+
+      {/* Edit Customer Modal */}
+      {showEditCustomerModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowEditCustomerModal(false)} />
+          <div className="relative bg-zinc-900 w-full max-w-md rounded-xl border border-zinc-800 overflow-hidden">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <h2 className="text-lg font-semibold text-white">Edit Customer</h2>
+              <button onClick={() => setShowEditCustomerModal(false)} className="p-1 hover:bg-zinc-800 rounded">
+                <X className="w-5 h-5 text-zinc-400" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Name</label>
+                <input
+                  type="text"
+                  value={editCustomerData.name}
+                  onChange={(e) => setEditCustomerData({ ...editCustomerData, name: e.target.value })}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Phone</label>
+                <input
+                  type="tel"
+                  value={editCustomerData.phone}
+                  onChange={(e) => setEditCustomerData({ ...editCustomerData, phone: e.target.value })}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Email</label>
+                <input
+                  type="email"
+                  value={editCustomerData.email}
+                  onChange={(e) => setEditCustomerData({ ...editCustomerData, email: e.target.value })}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Address</label>
+                <input
+                  type="text"
+                  value={editCustomerData.address}
+                  onChange={(e) => setEditCustomerData({ ...editCustomerData, address: e.target.value })}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm"
+                  placeholder="Optional"
+                />
+              </div>
+            </div>
+            <div className="flex gap-3 p-4 border-t border-zinc-800">
+              <Button
+                variant="outline"
+                className="flex-1 border-zinc-700"
+                onClick={() => setShowEditCustomerModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+                onClick={handleSaveCustomer}
+                disabled={savingCustomer || !editCustomerData.name}
+              >
+                {savingCustomer ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Templates Modal */}
+      {showManageTemplates && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setShowManageTemplates(false)} />
+          <div
+            className="relative bg-zinc-900 w-full max-w-lg rounded-xl border border-zinc-800 overflow-hidden max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <h2 className="text-lg font-semibold text-white">Manage Note Templates</h2>
+              <button onClick={() => setShowManageTemplates(false)} className="p-1 hover:bg-zinc-800 rounded">
+                <X className="w-5 h-5 text-zinc-400" />
+              </button>
+            </div>
+            <div className="p-4 space-y-4 overflow-y-auto flex-1">
+              <p className="text-sm text-zinc-400">
+                Add custom templates that will appear as quick-select options when creating jobs.
+              </p>
+
+              {/* Add new template */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={newTemplate}
+                  onChange={(e) => setNewTemplate(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAddTemplate()}
+                  placeholder="Enter a new template message..."
+                  className="flex-1 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm"
+                />
+                <Button
+                  type="button"
+                  onClick={handleAddTemplate}
+                  disabled={!newTemplate.trim() || noteTemplates.length >= 20}
+                  className="bg-emerald-600 hover:bg-emerald-500"
+                >
+                  <Plus className="w-4 h-4" />
+                </Button>
+              </div>
+
+              {/* Existing templates */}
+              <div className="space-y-2">
+                {noteTemplates.length === 0 ? (
+                  <p className="text-sm text-zinc-500 text-center py-4">
+                    No templates yet. Add your first template above.
+                  </p>
+                ) : (
+                  noteTemplates.map((template, index) => (
+                    <div
+                      key={index}
+                      className="flex items-start gap-2 p-3 bg-zinc-800/50 border border-zinc-700 rounded-lg"
+                    >
+                      <span className="flex-1 text-sm text-zinc-200">{template}</span>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveTemplate(index)}
+                        className="p-1 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {noteTemplates.length >= 20 && (
+                <p className="text-xs text-amber-400">Maximum of 20 templates reached.</p>
+              )}
+            </div>
+            <div className="flex gap-3 p-4 border-t border-zinc-800">
+              <Button
+                variant="outline"
+                className="flex-1 border-zinc-700"
+                onClick={() => setShowManageTemplates(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+                onClick={handleSaveTemplates}
+                disabled={savingTemplates}
+              >
+                {savingTemplates ? 'Saving...' : 'Save Templates'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

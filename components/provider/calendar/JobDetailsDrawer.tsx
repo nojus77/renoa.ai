@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
 import { formatInProviderTz } from '@/lib/utils/timezone';
 import { Sheet, SheetContent } from '@/components/ui/sheet';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -15,14 +16,26 @@ import {
   MoreHorizontal,
   Trash2,
   Calendar,
+  CalendarDays,
   Clock,
   MapPin,
   CheckCircle,
   Circle,
+  X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import WorkerSuggestionSelector from './WorkerSuggestionSelector';
+
+// Cancellation reasons
+const CANCELLATION_REASONS = [
+  'Customer requested cancellation',
+  'Customer no-show',
+  'Weather conditions',
+  'Scheduling conflict',
+  'Worker unavailable',
+  'Other',
+];
 
 interface Job {
   id: string;
@@ -53,6 +66,35 @@ interface JobDetailsDrawerProps {
 export function JobDetailsDrawer({ job, isOpen, onClose, onDelete }: JobDetailsDrawerProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [showRescheduleModal, setShowRescheduleModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelDetails, setCancelDetails] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+  const [rescheduleData, setRescheduleData] = useState({
+    date: '',
+    startTime: '',
+    endTime: '',
+    notifyCustomer: true,
+    notifyWorkers: true,
+  });
+  const [rescheduling, setRescheduling] = useState(false);
+
+  // Reset modal state when job changes to prevent state persisting across different jobs
+  useEffect(() => {
+    setShowCancelModal(false);
+    setShowRescheduleModal(false);
+    setShowAssignModal(false);
+    setCancelReason('');
+    setCancelDetails('');
+    setRescheduleData({
+      date: '',
+      startTime: '',
+      endTime: '',
+      notifyCustomer: true,
+      notifyWorkers: true,
+    });
+  }, [job?.id]);
 
   if (!job) return null;
 
@@ -75,10 +117,101 @@ export function JobDetailsDrawer({ job, isOpen, onClose, onDelete }: JobDetailsD
   };
 
   const handleDelete = () => {
-    if (confirm(`Delete job for ${job.customerName}?`)) {
+    // Show cancellation modal instead of confirm
+    setShowCancelModal(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!cancelReason) {
+      toast.error('Please select a cancellation reason');
+      return;
+    }
+
+    setCancelling(true);
+    try {
+      const providerId = localStorage.getItem('providerId');
+      const userId = localStorage.getItem('userId');
+      const fullReason = cancelDetails ? `${cancelReason}: ${cancelDetails}` : cancelReason;
+
+      const res = await fetch(
+        `/api/provider/jobs/${job.id}?providerId=${providerId}&cancellationReason=${encodeURIComponent(fullReason)}&cancelledBy=${userId}&softDelete=true`,
+        { method: 'DELETE' }
+      );
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Failed to cancel job');
+      }
+
+      toast.success('Job cancelled successfully');
+      setShowCancelModal(false);
       onDelete(job.id);
       onClose();
+    } catch (error) {
+      console.error('Error cancelling job:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to cancel job');
+    } finally {
+      setCancelling(false);
     }
+  };
+
+  const handleReschedule = async () => {
+    if (!rescheduleData.date || !rescheduleData.startTime || !rescheduleData.endTime) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    setRescheduling(true);
+    try {
+      const providerId = localStorage.getItem('providerId');
+
+      // Combine date and time into ISO strings
+      const startDateTime = new Date(`${rescheduleData.date}T${rescheduleData.startTime}`);
+      const endDateTime = new Date(`${rescheduleData.date}T${rescheduleData.endTime}`);
+
+      const res = await fetch(`/api/provider/jobs/${job.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId,
+          startTime: startDateTime.toISOString(),
+          endTime: endDateTime.toISOString(),
+        }),
+      });
+
+      if (!res.ok) throw new Error('Failed to reschedule job');
+
+      // TODO: Send notifications if checkboxes are checked
+      if (rescheduleData.notifyCustomer) {
+        // Send customer notification
+      }
+      if (rescheduleData.notifyWorkers) {
+        // Send worker notifications
+      }
+
+      toast.success('Job rescheduled successfully');
+      setShowRescheduleModal(false);
+      window.location.reload();
+    } catch (error) {
+      console.error('Error rescheduling job:', error);
+      toast.error('Failed to reschedule job');
+    } finally {
+      setRescheduling(false);
+    }
+  };
+
+  const openRescheduleModal = () => {
+    // Pre-fill with current values
+    const startDate = new Date(job.startTime);
+    const endDate = new Date(job.endTime);
+    setRescheduleData({
+      date: format(startDate, 'yyyy-MM-dd'),
+      startTime: format(startDate, 'HH:mm'),
+      endTime: format(endDate, 'HH:mm'),
+      notifyCustomer: true,
+      notifyWorkers: true,
+    });
+    setShowRescheduleModal(true);
   };
 
   const handleStatusChange = async (newStatus: string) => {
@@ -308,7 +441,7 @@ export function JobDetailsDrawer({ job, isOpen, onClose, onDelete }: JobDetailsD
                   <InfoField label="Email" value={job.email} />
                   <InfoField label="Service" value={job.serviceType} />
                   <InfoField
-                    label="Duration"
+                    label="Estimated Duration"
                     value={`${getDuration(job.startTime, job.endTime)}h`}
                   />
 
@@ -435,7 +568,16 @@ export function JobDetailsDrawer({ job, isOpen, onClose, onDelete }: JobDetailsD
 
         {/* FOOTER */}
         <div className="border-t border-zinc-800 p-6 bg-zinc-900">
-          <div className="flex justify-end">
+          <div className="flex justify-between">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-zinc-700 hover:border-zinc-600"
+              onClick={openRescheduleModal}
+            >
+              <CalendarDays className="w-4 h-4 mr-2" />
+              Reschedule
+            </Button>
             <Button
               variant="ghost"
               size="sm"
@@ -443,7 +585,7 @@ export function JobDetailsDrawer({ job, isOpen, onClose, onDelete }: JobDetailsD
               onClick={handleDelete}
             >
               <Trash2 className="w-4 h-4 mr-2" />
-              Delete Job
+              Cancel Job
             </Button>
           </div>
         </div>
@@ -459,6 +601,158 @@ export function JobDetailsDrawer({ job, isOpen, onClose, onDelete }: JobDetailsD
           onAssign={handleAssignWorker}
         />
       )}
+
+      {/* Cancellation Modal */}
+      <Dialog open={showCancelModal} onOpenChange={setShowCancelModal}>
+        <DialogContent className="sm:max-w-md bg-zinc-900 border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className="text-white">Cancel Job</DialogTitle>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <p className="text-sm text-zinc-400">
+              Cancel job for <span className="text-white font-medium">{job?.customerName}</span>?
+            </p>
+
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">Cancellation Reason</label>
+              <div className="space-y-2">
+                {CANCELLATION_REASONS.map((reason) => (
+                  <label
+                    key={reason}
+                    className={cn(
+                      'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors',
+                      cancelReason === reason
+                        ? 'border-red-500 bg-red-500/10'
+                        : 'border-zinc-700 hover:border-zinc-600'
+                    )}
+                  >
+                    <input
+                      type="radio"
+                      name="cancelReason"
+                      value={reason}
+                      checked={cancelReason === reason}
+                      onChange={(e) => setCancelReason(e.target.value)}
+                      className="text-red-500 focus:ring-red-500"
+                    />
+                    <span className="text-sm text-zinc-200">{reason}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {cancelReason === 'Other' && (
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Details (optional)</label>
+                <textarea
+                  value={cancelDetails}
+                  onChange={(e) => setCancelDetails(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm resize-none"
+                  rows={3}
+                  placeholder="Additional details..."
+                />
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="flex gap-3 sm:gap-3">
+            <Button
+              variant="outline"
+              className="flex-1 border-zinc-700"
+              onClick={() => setShowCancelModal(false)}
+            >
+              Keep Job
+            </Button>
+            <Button
+              className="flex-1 bg-red-600 hover:bg-red-500 text-white"
+              onClick={() => handleConfirmCancel()}
+              disabled={cancelling || !cancelReason}
+            >
+              {cancelling ? 'Cancelling...' : 'Cancel Job'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule Modal */}
+      <Dialog open={showRescheduleModal} onOpenChange={setShowRescheduleModal}>
+        <DialogContent className="sm:max-w-md bg-zinc-900 border-zinc-800">
+          <DialogHeader>
+            <DialogTitle className="text-white">Reschedule Job</DialogTitle>
+          </DialogHeader>
+
+          <div className="py-4 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-zinc-300 mb-2">Date</label>
+              <input
+                type="date"
+                value={rescheduleData.date}
+                onChange={(e) => setRescheduleData({ ...rescheduleData, date: e.target.value })}
+                className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Start Time</label>
+                <input
+                  type="time"
+                  value={rescheduleData.startTime}
+                  onChange={(e) => setRescheduleData({ ...rescheduleData, startTime: e.target.value })}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">End Time</label>
+                <input
+                  type="time"
+                  value={rescheduleData.endTime}
+                  onChange={(e) => setRescheduleData({ ...rescheduleData, endTime: e.target.value })}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-3 pt-2">
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rescheduleData.notifyCustomer}
+                  onChange={(e) => setRescheduleData({ ...rescheduleData, notifyCustomer: e.target.checked })}
+                  className="rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500"
+                />
+                <span className="text-sm text-zinc-300">Notify customer</span>
+              </label>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rescheduleData.notifyWorkers}
+                  onChange={(e) => setRescheduleData({ ...rescheduleData, notifyWorkers: e.target.checked })}
+                  className="rounded border-zinc-600 bg-zinc-800 text-emerald-500 focus:ring-emerald-500"
+                />
+                <span className="text-sm text-zinc-300">Notify assigned workers</span>
+              </label>
+            </div>
+          </div>
+
+          <DialogFooter className="flex gap-3 sm:gap-3">
+            <Button
+              variant="outline"
+              className="flex-1 border-zinc-700"
+              onClick={() => setShowRescheduleModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white"
+              onClick={() => handleReschedule()}
+              disabled={rescheduling}
+            >
+              {rescheduling ? 'Saving...' : 'Save'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Sheet>
   );
 }

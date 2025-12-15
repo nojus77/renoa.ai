@@ -187,8 +187,10 @@ export default function WorkerDashboard() {
     try {
       const res = await fetch(`/api/worker/profile?userId=${uid}`);
       const data = await res.json();
-      // Check provider-level permission (applies to ALL workers)
-      if (data.user?.provider?.workersCanCreateJobs) {
+      // Check if worker can create jobs:
+      // Either provider-level permission (applies to ALL workers)
+      // OR individual worker permission
+      if (data.user?.provider?.workersCanCreateJobs || data.user?.canCreateJobs) {
         setCanCreateJobs(true);
       }
       // Store dispatch phone number

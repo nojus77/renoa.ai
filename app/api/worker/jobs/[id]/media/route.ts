@@ -41,10 +41,11 @@ export async function GET(
     });
 
     // Transform to media format for frontend
+    // Preserve check type for filtering in payment section
     const media = photos.map(photo => ({
       id: photo.id,
       url: photo.url,
-      type: photo.type === 'video' ? 'video' : 'photo',
+      type: photo.type === 'video' ? 'video' : (photo.type === 'check' ? 'check' : 'photo'),
       createdAt: photo.createdAt.toISOString(),
     }));
 

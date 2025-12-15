@@ -32,6 +32,8 @@ import {
   Timer,
   Banknote,
   CreditCard,
+  MessageSquare,
+  Mail,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PropertyPhoto } from '@/components/PropertyPhoto';
@@ -90,6 +92,7 @@ const SERVICES_BY_CATEGORY: Record<string, string[]> = {
 interface Coworker {
   id: string;
   name: string;
+  phone: string | null;
   profilePhotoUrl: string | null;
 }
 
@@ -111,6 +114,7 @@ interface Job {
     name: string;
     phone: string | null;
     email: string | null;
+    address: string | null;
   };
   workLogs: {
     id: string;
@@ -178,6 +182,7 @@ interface Part {
   name: string;
   quantity: number;
   unitPrice: number;
+  paidBy: 'office' | 'worker';
 }
 
 type TimerState = 'idle' | 'traveling' | 'working' | 'completed';
@@ -207,6 +212,7 @@ export default function JobDetailPage() {
 
   // Notes state
   const [notes, setNotes] = useState<JobNote[]>([]);
+  const [dispatcherInstructions, setDispatcherInstructions] = useState<string>('');
   const [newNote, setNewNote] = useState('');
   const [addingNote, setAddingNote] = useState(false);
 
@@ -234,8 +240,9 @@ export default function JobDetailPage() {
   const [parts, setParts] = useState<Part[]>([]);
   const [showAddPart, setShowAddPart] = useState(false);
   const [newPartName, setNewPartName] = useState('');
-  const [newPartQty, setNewPartQty] = useState(1);
-  const [newPartPrice, setNewPartPrice] = useState(0);
+  const [newPartQty, setNewPartQty] = useState('1');
+  const [newPartPrice, setNewPartPrice] = useState('');
+  const [partQtyInputs, setPartQtyInputs] = useState<Record<string, string>>({});
 
   // Payment state
   const [paymentMethod, setPaymentMethod] = useState<string>('');
@@ -243,6 +250,9 @@ export default function JobDetailPage() {
 
   // Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Customer info modal state
+  const [showCustomerModal, setShowCustomerModal] = useState(false);
 
   // Update current time every minute
   useEffect(() => {
@@ -406,6 +416,7 @@ export default function JobDetailPage() {
       if (res.ok) {
         const data = await res.json();
         setNotes(data.notes || []);
+        setDispatcherInstructions(data.dispatcherInstructions || '');
       }
     } catch (error) {
       console.error('Error fetching notes:', error);
@@ -681,13 +692,13 @@ export default function JobDetailPage() {
             if (paymentData.success) {
               toast.success('Job completed! Payment link sent to customer.');
             } else {
-              toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`);
-              toast.error('Failed to send payment link to customer');
+              // Job completed but payment link failed - just show warning, not both success and error
+              toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}. Note: Payment link could not be sent.`);
             }
           } catch (paymentError) {
             console.error('Error sending payment link:', paymentError);
-            toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`);
-            toast.error('Failed to send payment link');
+            // Job completed but payment link failed - just show warning, not both success and error
+            toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}. Note: Payment link could not be sent.`);
           }
         } else {
           toast.success(`Job completed! Earned $${data.earnings?.toFixed(2) || '0.00'}`);
@@ -789,21 +800,38 @@ export default function JobDetailPage() {
   const handleAddPart = () => {
     if (!newPartName.trim()) return;
 
+    const qty = parseInt(newPartQty, 10) || 1;
+    const price = parseFloat(newPartPrice) || 0;
+
     const newPart: Part = {
       id: `part-${Date.now()}`,
       name: newPartName.trim(),
-      quantity: Math.max(1, newPartQty),
-      unitPrice: Math.max(0, newPartPrice),
+      quantity: Math.max(1, qty),
+      unitPrice: Math.max(0, price),
+      paidBy: 'office',
     };
     setParts([...parts, newPart]);
+    setPartQtyInputs(prev => ({ ...prev, [newPart.id]: String(newPart.quantity) }));
     setNewPartName('');
-    setNewPartQty(1);
-    setNewPartPrice(0);
+    setNewPartQty('1');
+    setNewPartPrice('');
     setShowAddPart(false);
   };
 
   const handleRemovePart = (partId: string) => {
     setParts(parts.filter(p => p.id !== partId));
+    setPartQtyInputs(prev => {
+      const { [partId]: _, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const updatePartQuantity = (partId: string, quantity: number) => {
+    setParts(parts.map(p => p.id === partId ? { ...p, quantity } : p));
+  };
+
+  const updatePartPaidBy = (partId: string, paidBy: 'office' | 'worker') => {
+    setParts(parts.map(p => p.id === partId ? { ...p, paidBy } : p));
   };
 
   // Price calculations
@@ -1228,152 +1256,139 @@ export default function JobDetailPage() {
           </div>
         </div>
 
-        {/* Status Badge */}
-        <div
-          className={`inline-flex items-center gap-2 px-3 py-2 rounded-lg ${statusConfig.bg}`}
-        >
-          <span className={statusConfig.text}>{statusConfig.icon}</span>
-          <span className={`font-medium ${statusConfig.text}`}>{statusConfig.label}</span>
-        </div>
-
-        {/* Time Tracking Summary - Only for Completed Jobs */}
+        {/* Compact Job Summary - Only for Completed Jobs */}
         {status === 'completed' && job.completedAt && (
-          <div className="bg-[#2D2D2D] rounded-xl border border-[#3A3A3A] overflow-hidden">
-            <div className="p-4 border-b border-[#3A3A3A]">
-              <div className="flex items-center gap-2">
-                <Timer className="w-5 h-5" style={{ color: LIME_GREEN }} />
-                <h3 className="font-medium text-white">Job Summary</h3>
-              </div>
+          <div className="bg-[#2D2D2D] rounded-xl border border-[#3A3A3A] p-4">
+            {/* Header with scheduled time */}
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                Job Summary
+              </h3>
+              <span className="text-zinc-400 text-sm">
+                {formatTime(job.startTime)} - {formatTime(job.endTime)}
+              </span>
             </div>
-            <div className="p-4">
-              <div className="space-y-3">
-                {/* Scheduled Time */}
-                <div className="flex justify-between items-center">
-                  <span className="text-[#9CA3AF] text-sm">Scheduled</span>
-                  <span className="text-white text-sm font-medium">
-                    {formatTime(job.startTime)} - {formatTime(job.endTime)}
+
+            {/* Time stats - horizontal compact */}
+            <div className="flex gap-4 text-sm mb-3 pb-3 border-b border-[#3A3A3A]">
+              {job.workLogs?.[0]?.hoursWorked && (
+                <div>
+                  <span className="text-zinc-500">Duration:</span>
+                  <span className="text-white ml-1">
+                    {job.workLogs[0].hoursWorked >= 1
+                      ? `${Math.floor(job.workLogs[0].hoursWorked)}h ${Math.round((job.workLogs[0].hoursWorked % 1) * 60)}m`
+                      : `${Math.round(job.workLogs[0].hoursWorked * 60)}m`
+                    }
                   </span>
                 </div>
-
-                {/* Arrival Time */}
-                {job.arrivedAt && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[#9CA3AF] text-sm">Arrived</span>
-                    <span className="text-white text-sm font-medium">
-                      {formatTime(job.arrivedAt)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Work Started (from work log clockIn) */}
-                {job.workLogs?.[0]?.clockIn && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-[#9CA3AF] text-sm">Started Work</span>
-                    <span className="text-white text-sm font-medium">
-                      {formatTime(job.workLogs[0].clockIn)}
-                    </span>
-                  </div>
-                )}
-
-                {/* Completion Time */}
-                <div className="flex justify-between items-center">
-                  <span className="text-[#9CA3AF] text-sm">Completed</span>
-                  <span className="text-white text-sm font-medium">
-                    {formatTime(job.completedAt)}
-                  </span>
+              )}
+              {job.arrivedAt && job.completedAt && (
+                <div>
+                  <span className="text-zinc-500">On Site:</span>
+                  <span className="text-white ml-1">{getDuration(job.arrivedAt, job.completedAt)}</span>
                 </div>
+              )}
+            </div>
 
-                {/* Divider */}
-                <div className="border-t border-[#3A3A3A] pt-3 mt-3">
-                  {/* Duration from work log */}
-                  {job.workLogs?.[0]?.hoursWorked && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-[#9CA3AF] text-sm">Work Duration</span>
-                      <span className="font-semibold" style={{ color: LIME_GREEN }}>
-                        {job.workLogs[0].hoursWorked >= 1
-                          ? `${Math.floor(job.workLogs[0].hoursWorked)}h ${Math.round((job.workLogs[0].hoursWorked % 1) * 60)}m`
-                          : `${Math.round(job.workLogs[0].hoursWorked * 60)}m`
-                        }
-                      </span>
-                    </div>
-                  )}
+            {/* Financial breakdown - compact */}
+            <div className="space-y-1.5 text-sm">
+              {/* Services */}
+              <div className="flex justify-between">
+                <span className="text-zinc-400">Services</span>
+                <span className="text-white">${totalPrice.toFixed(2)}</span>
+              </div>
 
-                  {/* Time on Site (arrival to completion) */}
-                  {job.arrivedAt && job.completedAt && (
-                    <div className="flex justify-between items-center mt-2">
-                      <span className="text-[#9CA3AF] text-sm">Time on Site</span>
-                      <span className="text-white text-sm font-medium">
-                        {getDuration(job.arrivedAt, job.completedAt)}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Earnings Breakdown */}
-                  {job.workLogs?.[0]?.earnings !== undefined && job.workLogs?.[0]?.earnings !== null && (
-                    <div className="mt-2 space-y-2">
-                      {/* Pay type indicator */}
-                      {job.userPayInfo && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#9CA3AF] text-sm">Pay Type</span>
-                          <span className="text-white text-sm capitalize">
-                            {job.userPayInfo.payType === 'commission'
-                              ? `${job.userPayInfo.commissionRate}% Commission`
-                              : job.userPayInfo.hourlyRate
-                                ? `$${job.userPayInfo.hourlyRate}/hr`
-                                : 'Hourly'}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Multi-worker split info */}
-                      {(job.numWorkers ?? 1) > 1 && job.userPayInfo?.payType === 'commission' && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-[#9CA3AF] text-sm">Workers on Job</span>
-                          <span className="text-amber-400 text-sm">
-                            {job.numWorkers} (split evenly)
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Total earned */}
-                      <div className="flex justify-between items-center pt-2 border-t border-[#3A3A3A]">
-                        <span className="text-[#9CA3AF] text-sm font-medium">Your Earnings</span>
-                        <span className="font-bold text-lg" style={{ color: LIME_GREEN }}>
-                          ${job.workLogs[0].earnings.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  )}
+              {/* Parts - only show if exists */}
+              {parts.length > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Parts ({parts.length})</span>
+                  <span className="text-white">${parts.reduce((sum, p) => sum + p.quantity * p.unitPrice, 0).toFixed(2)}</span>
                 </div>
+              )}
+
+              {/* Tip - only show if exists */}
+              {parseFloat(tipAmount) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Tip</span>
+                  <span className="text-emerald-500">+${parseFloat(tipAmount).toFixed(2)}</span>
+                </div>
+              )}
+
+              {/* Total */}
+              <div className="flex justify-between pt-2 border-t border-[#3A3A3A]">
+                <span className="text-white font-medium">Total</span>
+                <span className="text-white font-medium">
+                  ${(totalPrice + parts.reduce((sum, p) => sum + p.quantity * p.unitPrice, 0) + (parseFloat(tipAmount) || 0)).toFixed(2)}
+                </span>
               </div>
             </div>
+
+            {/* Your earnings - highlighted */}
+            {job.workLogs?.[0]?.earnings !== undefined && job.workLogs?.[0]?.earnings !== null && (
+              <div className="mt-3 pt-3 border-t border-[#3A3A3A] flex justify-between items-center">
+                <div>
+                  <span className="text-zinc-400 text-sm">Your Earnings</span>
+                  {job.userPayInfo && (
+                    <span className="text-xs text-zinc-500 ml-2">
+                      ({job.userPayInfo.payType === 'commission'
+                        ? `${job.userPayInfo.commissionRate}%`
+                        : job.userPayInfo.hourlyRate
+                          ? `$${job.userPayInfo.hourlyRate}/hr`
+                          : 'Hourly'})
+                    </span>
+                  )}
+                </div>
+                <span className="font-bold text-lg" style={{ color: LIME_GREEN }}>
+                  ${job.workLogs[0].earnings.toFixed(2)}
+                </span>
+              </div>
+            )}
           </div>
         )}
 
         {/* Main Job Info Card */}
         <div className="bg-[#1F1F1F] rounded-xl border border-[#2A2A2A] overflow-hidden">
-          {/* Service Type Header */}
+          {/* Service Type Header with Status Badge */}
           <div className="p-4 border-b border-[#2A2A2A]">
-            <h2 className="text-lg font-semibold text-white">{job.serviceType}</h2>
-            {job.estimatedValue && (
-              <p className="text-sm mt-1" style={{ color: LIME_GREEN }}>
-                ${job.estimatedValue.toFixed(2)} estimated
-              </p>
-            )}
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">{job.serviceType}</h2>
+                {job.estimatedValue && (
+                  <p className="text-sm mt-1" style={{ color: LIME_GREEN }}>
+                    ${job.estimatedValue.toFixed(2)} estimated
+                  </p>
+                )}
+              </div>
+              <div
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-sm ${statusConfig.bg}`}
+              >
+                <span className={statusConfig.text}>{statusConfig.icon}</span>
+                <span className={`font-medium ${statusConfig.text}`}>{statusConfig.label}</span>
+              </div>
+            </div>
           </div>
 
-          {/* Property Photo with Customer Info Overlay */}
-          <div className="relative rounded-lg overflow-hidden h-48">
+          {/* Property Photo with Customer Info Overlay - Clickable for customer info */}
+          <button
+            onClick={() => setShowCustomerModal(true)}
+            className="relative rounded-lg overflow-hidden h-48 w-full text-left"
+          >
             <PropertyPhoto
-              address={job.address}
+              address={job.address || job.customer.address || ''}
               customerId={job.customer.id}
               className="w-full h-full"
             />
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-4">
-              <p className="text-white font-medium">{job.customer.name}</p>
-              <p className="text-white/70 text-sm">{job.address}</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-white font-medium">{job.customer.name}</p>
+                  <p className="text-white/70 text-sm">{job.address || job.customer.address || 'No address'}</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-white/70" />
+              </div>
             </div>
-          </div>
+          </button>
 
           {/* Quick Actions */}
           <div className="p-4 border-b border-[#2A2A2A] flex gap-2">
@@ -1388,7 +1403,7 @@ export default function JobDetailPage() {
               </button>
             )}
             <button
-              onClick={() => openMaps(job.address)}
+              onClick={() => openMaps(job.address || job.customer.address || '')}
               className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#2A2A2A] hover:bg-[#3A3A3A] rounded-lg transition-colors"
             >
               <Navigation className="w-4 h-4" style={{ color: LIME_GREEN }} />
@@ -1411,7 +1426,7 @@ export default function JobDetailPage() {
                   {formatTime(job.startTime)} - {formatTime(job.endTime)}
                 </p>
                 <p className="text-zinc-500 text-sm">
-                  Duration: {getDuration(job.startTime, job.endTime)}
+                  Estimated Duration: {getDuration(job.startTime, job.endTime)}
                 </p>
               </div>
             </div>
@@ -1443,27 +1458,49 @@ export default function JobDetailPage() {
             </div>
             <div className="p-4">
               {job.coworkers && job.coworkers.length > 0 ? (
-                <div className="flex flex-wrap gap-3">
+                <div className="space-y-2">
                   {job.coworkers.map((coworker) => (
                     <div
                       key={coworker.id}
-                      className="flex items-center gap-2 bg-zinc-800/50 rounded-full px-3 py-2"
+                      className="flex items-center justify-between bg-zinc-800/50 rounded-xl px-3 py-2"
                     >
-                      {coworker.profilePhotoUrl ? (
-                        <img
-                          src={coworker.profilePhotoUrl}
-                          alt={coworker.name}
-                          className="w-6 h-6 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div
-                          className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium"
-                          style={{ backgroundColor: job.assignedCrew?.color || LIME_GREEN }}
-                        >
-                          {coworker.name.split(' ').map(n => n[0]).join('')}
-                        </div>
-                      )}
-                      <span className="text-sm text-zinc-300">{coworker.name}</span>
+                      <div className="flex items-center gap-2">
+                        {coworker.profilePhotoUrl ? (
+                          <img
+                            src={coworker.profilePhotoUrl}
+                            alt={coworker.name}
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium"
+                            style={{ backgroundColor: job.assignedCrew?.color || LIME_GREEN }}
+                          >
+                            {coworker.name.split(' ').map(n => n[0]).join('')}
+                          </div>
+                        )}
+                        <span className="text-sm text-zinc-300">{coworker.name}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {coworker.phone && (
+                          <>
+                            <a
+                              href={`sms:${coworker.phone}`}
+                              className="p-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MessageSquare className="w-4 h-4 text-zinc-300" />
+                            </a>
+                            <a
+                              href={`tel:${coworker.phone}`}
+                              className="p-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <Phone className="w-4 h-4 text-zinc-300" />
+                            </a>
+                          </>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1474,17 +1511,17 @@ export default function JobDetailPage() {
           </div>
         )}
 
-        {/* Job Description Section - Work scope set by dispatcher */}
-        {job.customerNotes && (
+        {/* Job Instructions Section - Dispatcher notes for workers */}
+        {dispatcherInstructions && (
           <div className="bg-[#2D2D2D] rounded-xl border border-[#3A3A3A] overflow-hidden">
             <div className="p-4 border-b border-[#3A3A3A]">
               <div className="flex items-center gap-2">
                 <FileText className="w-5 h-5" style={{ color: LIME_GREEN }} />
-                <h3 className="font-medium text-white">Job Description</h3>
+                <h3 className="font-medium text-white">Job Instructions</h3>
               </div>
             </div>
             <div className="p-4">
-              <p className="text-[#9CA3AF] text-sm whitespace-pre-wrap">{job.customerNotes}</p>
+              <p className="text-[#9CA3AF] text-sm whitespace-pre-wrap">{dispatcherInstructions}</p>
             </div>
           </div>
         )}
@@ -1693,17 +1730,62 @@ export default function JobDetailPage() {
               {parts.length > 0 && (
                 <div className="space-y-2 mb-3">
                   {parts.map((part) => (
-                    <div key={part.id} className="flex items-center justify-between bg-[#2A2A2A] rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <Package className="w-4 h-4 text-zinc-500" />
-                        <span className="text-sm text-white">{part.name}</span>
-                        <span className="text-xs text-zinc-500">x{part.quantity}</span>
+                    <div key={part.id} className="bg-[#2A2A2A] rounded-lg p-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-2 flex-1">
+                          <Package className="w-4 h-4 text-zinc-500" />
+                          <span className="text-sm text-white">{part.name}</span>
+                        </div>
+                        <span className="text-sm text-zinc-300">${(part.quantity * part.unitPrice).toFixed(2)}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm text-zinc-300">${(part.quantity * part.unitPrice).toFixed(2)}</span>
+                        {/* Qty Input */}
+                        <div className="flex items-center gap-1">
+                          <span className="text-xs text-zinc-500">Qty:</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            value={partQtyInputs[part.id] ?? String(part.quantity)}
+                            onChange={(e) => {
+                              const val = e.target.value.replace(/[^0-9]/g, '');
+                              setPartQtyInputs(prev => ({ ...prev, [part.id]: val }));
+                            }}
+                            onBlur={(e) => {
+                              const qty = parseInt(e.target.value, 10);
+                              if (isNaN(qty) || qty < 1) {
+                                setPartQtyInputs(prev => ({ ...prev, [part.id]: '1' }));
+                                updatePartQuantity(part.id, 1);
+                              } else {
+                                updatePartQuantity(part.id, qty);
+                              }
+                            }}
+                            className="w-12 h-7 text-center bg-zinc-700 border border-zinc-600 rounded text-sm text-white focus:outline-none focus:border-[#C4F542]"
+                          />
+                        </div>
+
+                        {/* Who Paid Toggle */}
+                        <div className="flex text-xs rounded-lg overflow-hidden border border-zinc-700">
+                          <button
+                            type="button"
+                            onClick={() => updatePartPaidBy(part.id, 'office')}
+                            className={`px-2 py-1 transition-colors ${part.paidBy === 'office' ? 'bg-emerald-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}
+                          >
+                            Office
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => updatePartPaidBy(part.id, 'worker')}
+                            className={`px-2 py-1 transition-colors ${part.paidBy === 'worker' ? 'bg-amber-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}
+                          >
+                            I Paid
+                          </button>
+                        </div>
+
+                        {/* Delete */}
                         <button
                           onClick={() => handleRemovePart(part.id)}
-                          className="p-1 text-zinc-500 hover:text-red-400"
+                          className="p-1 text-zinc-500 hover:text-red-400 ml-auto"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -1727,10 +1809,15 @@ export default function JobDetailPage() {
                     <div className="flex-1">
                       <label className="text-xs text-zinc-500">Qty</label>
                       <input
-                        type="number"
-                        min="1"
+                        type="text"
+                        inputMode="numeric"
+                        pattern="[0-9]*"
                         value={newPartQty}
-                        onChange={(e) => setNewPartQty(parseInt(e.target.value) || 1)}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => {
+                          const val = e.target.value.replace(/[^0-9]/g, '');
+                          setNewPartQty(val);
+                        }}
                         className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none"
                       />
                     </div>
@@ -1739,11 +1826,14 @@ export default function JobDetailPage() {
                       <div className="relative">
                         <DollarSign className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-zinc-500" />
                         <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={newPartPrice || ''}
-                          onChange={(e) => setNewPartPrice(parseFloat(e.target.value) || 0)}
+                          type="text"
+                          inputMode="decimal"
+                          value={newPartPrice}
+                          onChange={(e) => {
+                            const val = e.target.value.replace(/[^0-9.]/g, '');
+                            setNewPartPrice(val);
+                          }}
+                          placeholder="0.00"
                           className="w-full bg-zinc-700 border border-zinc-600 rounded-lg pl-6 pr-3 py-2 text-sm text-white focus:outline-none"
                         />
                       </div>
@@ -1762,8 +1852,8 @@ export default function JobDetailPage() {
                       onClick={() => {
                         setShowAddPart(false);
                         setNewPartName('');
-                        setNewPartQty(1);
-                        setNewPartPrice(0);
+                        setNewPartQty('1');
+                        setNewPartPrice('');
                       }}
                       className="px-4 py-2 bg-zinc-700 rounded-lg text-sm text-zinc-400"
                     >
@@ -2050,9 +2140,10 @@ export default function JobDetailPage() {
             </div>
           </div>
           <div className="p-4">
-            {media.length > 0 ? (
+            {/* Filter out check photos - they appear in payment section */}
+            {media.filter(m => m.type !== 'check').length > 0 ? (
               <div className="grid grid-cols-2 gap-2">
-                {media.map((item) => (
+                {media.filter(m => m.type !== 'check').map((item) => (
                   <button
                     key={item.id}
                     onClick={() => setSelectedMedia(item)}
@@ -2119,7 +2210,7 @@ export default function JobDetailPage() {
           {/* Navigate Button */}
           {timerState !== 'completed' && (
             <button
-              onClick={() => openMaps(job.address)}
+              onClick={() => openMaps(job.address || job.customer.address || '')}
               className="p-4 rounded-xl transition-colors"
               style={{ backgroundColor: LIME_GREEN }}
             >
@@ -2273,6 +2364,109 @@ export default function JobDetailPage() {
         </div>
       )}
 
+      {/* Customer Info Modal */}
+      {showCustomerModal && job && (
+        <div
+          className="fixed inset-0 bg-black/80 z-[70] flex items-end justify-center"
+          onClick={() => setShowCustomerModal(false)}
+        >
+          <div
+            className="bg-[#1F1F1F] w-full max-w-md rounded-t-2xl border-t border-x border-[#2A2A2A] shadow-2xl animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Handle */}
+            <div className="flex justify-center pt-3 pb-2">
+              <div className="w-10 h-1 bg-zinc-600 rounded-full" />
+            </div>
+
+            {/* Header */}
+            <div className="px-6 pb-4 border-b border-[#2A2A2A]">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-zinc-700 flex items-center justify-center">
+                  <User className="w-6 h-6 text-zinc-400" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">{job.customer.name}</h2>
+                  <p className="text-zinc-400 text-sm">Customer</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Contact Info */}
+            <div className="p-4 space-y-3">
+              {job.customer.phone && (
+                <div className="flex items-center justify-between p-3 bg-[#2A2A2A]/50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-5 h-5 text-zinc-400" />
+                    <div>
+                      <p className="text-zinc-400 text-xs">Phone</p>
+                      <p className="text-white">{job.customer.phone}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <a
+                      href={`sms:${job.customer.phone}`}
+                      className="p-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors"
+                    >
+                      <MessageSquare className="w-4 h-4 text-zinc-300" />
+                    </a>
+                    <a
+                      href={`tel:${job.customer.phone}`}
+                      className="p-2 rounded-lg transition-colors"
+                      style={{ backgroundColor: LIME_GREEN }}
+                    >
+                      <Phone className="w-4 h-4 text-zinc-900" />
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              {job.customer.email && (
+                <div className="flex items-center justify-between p-3 bg-[#2A2A2A]/50 rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <Mail className="w-5 h-5 text-zinc-400" />
+                    <div>
+                      <p className="text-zinc-400 text-xs">Email</p>
+                      <p className="text-white text-sm">{job.customer.email}</p>
+                    </div>
+                  </div>
+                  <a
+                    href={`mailto:${job.customer.email}`}
+                    className="p-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors"
+                  >
+                    <Mail className="w-4 h-4 text-zinc-300" />
+                  </a>
+                </div>
+              )}
+
+              <div className="flex items-start gap-3 p-3 bg-[#2A2A2A]/50 rounded-xl">
+                <MapPin className="w-5 h-5 text-zinc-400 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-zinc-400 text-xs">Address</p>
+                  <p className="text-white text-sm">{job.address || job.customer.address || 'No address'}</p>
+                </div>
+                <button
+                  onClick={() => openMaps(job.address || job.customer.address || '')}
+                  className="p-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg transition-colors"
+                >
+                  <Navigation className="w-4 h-4" style={{ color: LIME_GREEN }} />
+                </button>
+              </div>
+            </div>
+
+            {/* Close Button */}
+            <div className="p-4 border-t border-[#2A2A2A]">
+              <button
+                onClick={() => setShowCustomerModal(false)}
+                className="w-full py-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] text-zinc-300 font-medium rounded-xl transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Job Completion Confirmation Modal */}
       {showConfirmModal && job && (
         <div className="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-4">
@@ -2288,38 +2482,71 @@ export default function JobDetailPage() {
 
             {/* Job Summary */}
             <div className="px-6 pb-4 space-y-3">
-              <div className="bg-[#2A2A2A]/50 rounded-lg p-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Service</span>
-                  <span className="text-white font-medium">{job.serviceType}</span>
+              <div className="bg-[#2A2A2A]/50 rounded-lg p-4 space-y-3">
+                {/* Customer & Job Type */}
+                <div className="flex justify-between text-sm pb-2 border-b border-[#3A3A3A]">
+                  <div>
+                    <p className="text-zinc-400 text-xs">Customer</p>
+                    <p className="text-white font-medium">{job.customer.name}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-zinc-400 text-xs">Service Type</p>
+                    <p className="text-white font-medium">{job.serviceType}</p>
+                  </div>
                 </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Customer</span>
-                  <span className="text-white">{job.customer.name}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Services ({selectedServices.length})</span>
-                  <span className="text-white">${servicesSubtotal.toFixed(2)}</span>
-                </div>
-                {partsSubtotal > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Parts ({parts.length})</span>
-                    <span className="text-white">${partsSubtotal.toFixed(2)}</span>
+
+                {/* Services Performed */}
+                {selectedServices.length > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-zinc-400 text-xs font-medium">Services Performed</p>
+                    {selectedServices.map((service, idx) => (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span className="text-zinc-300">{service.serviceName}</span>
+                        <span className="text-white">${service.price.toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-sm pt-1">
+                      <span className="text-zinc-400">Subtotal</span>
+                      <span className="text-white font-medium">${servicesSubtotal.toFixed(2)}</span>
+                    </div>
                   </div>
                 )}
-                <div className="flex justify-between text-sm">
-                  <span className="text-zinc-400">Payment</span>
-                  <span className="text-white capitalize">{paymentMethod}</span>
-                </div>
-                {parseFloat(tipAmount) > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-zinc-400">Tip</span>
-                    <span className="text-white">${parseFloat(tipAmount).toFixed(2)}</span>
+
+                {/* Parts Added */}
+                {parts.length > 0 && (
+                  <div className="space-y-1 pt-2 border-t border-[#3A3A3A]">
+                    <p className="text-zinc-400 text-xs font-medium">Parts</p>
+                    {parts.map((part, idx) => (
+                      <div key={idx} className="flex justify-between text-sm">
+                        <span className="text-zinc-300">{part.name} x{part.quantity}</span>
+                        <span className="text-white">${(part.quantity * part.unitPrice).toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between text-sm pt-1">
+                      <span className="text-zinc-400">Subtotal</span>
+                      <span className="text-white font-medium">${partsSubtotal.toFixed(2)}</span>
+                    </div>
                   </div>
                 )}
-                <div className="pt-2 border-t border-[#3A3A3A] flex justify-between">
-                  <span className="font-semibold text-white">Total</span>
-                  <span className="font-bold text-lg" style={{ color: LIME_GREEN }}>
+
+                {/* Payment & Tip */}
+                <div className="pt-2 border-t border-[#3A3A3A] space-y-1">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Payment Method</span>
+                    <span className="text-white capitalize">{paymentMethod}</span>
+                  </div>
+                  {parseFloat(tipAmount) > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-zinc-400">Tip</span>
+                      <span className="text-white">${parseFloat(tipAmount).toFixed(2)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Grand Total */}
+                <div className="pt-3 border-t border-[#3A3A3A] flex justify-between items-center">
+                  <span className="font-semibold text-white">Grand Total</span>
+                  <span className="font-bold text-xl" style={{ color: LIME_GREEN }}>
                     ${(totalPrice + (parseFloat(tipAmount) || 0)).toFixed(2)}
                   </span>
                 </div>

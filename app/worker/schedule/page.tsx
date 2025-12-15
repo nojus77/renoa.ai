@@ -110,9 +110,41 @@ export default function WorkerSchedule() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'border-l-[#6B7280]';
+        return 'bg-zinc-800/50 border-l-[#6B7280]';
+      case 'in_progress':
+        return 'bg-amber-500/10 border-l-amber-500';
+      case 'on_the_way':
+        return 'bg-blue-500/10 border-l-blue-500';
+      case 'scheduled':
+        return 'bg-emerald-500/10 border-l-emerald-500';
       default:
-        return 'border-l-[#C4F542]';
+        return 'bg-[#2D2D2D] border-l-[#C4F542]';
+    }
+  };
+
+  const getStatusBadgeClass = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-[#6B7280]/15 text-[#6B7280]';
+      case 'in_progress':
+        return 'bg-amber-500/15 text-amber-500';
+      case 'on_the_way':
+        return 'bg-blue-500/15 text-blue-500';
+      case 'scheduled':
+        return 'bg-emerald-500/15 text-emerald-500';
+      default:
+        return 'bg-[#C4F542]/15 text-[#C4F542]';
+    }
+  };
+
+  const formatStatusLabel = (status: string) => {
+    switch (status) {
+      case 'in_progress':
+        return 'In Progress';
+      case 'on_the_way':
+        return 'On The Way';
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
     }
   };
 
@@ -217,9 +249,9 @@ export default function WorkerSchedule() {
                 <button
                   key={job.id}
                   onClick={() => router.push(`/worker/job/${job.id}`)}
-                  className={`w-full text-left bg-[#2D2D2D] rounded-xl border border-[#3A3A3A] border-l-4 ${getStatusColor(
+                  className={`w-full text-left rounded-xl border border-[#3A3A3A] border-l-4 ${getStatusColor(
                     job.status
-                  )} p-4 hover:bg-[#3A3A3A] transition-colors active:scale-[0.99]`}
+                  )} p-4 hover:brightness-110 transition-all active:scale-[0.99]`}
                 >
                   <div className="flex items-start justify-between">
                     <div>
@@ -231,14 +263,8 @@ export default function WorkerSchedule() {
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                          completed
-                            ? 'bg-[#6B7280]/15 text-[#6B7280]'
-                            : 'bg-[#C4F542]/15 text-[#C4F542]'
-                        }`}
-                      >
-                        {completed ? 'Completed' : job.status === 'in_progress' ? 'In Progress' : 'Scheduled'}
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(job.status)}`}>
+                        {formatStatusLabel(job.status)}
                       </span>
                       <ChevronRight className={`w-5 h-5 ${completed ? 'text-[#4B5563]' : 'text-[#6B7280]'}`} />
                     </div>

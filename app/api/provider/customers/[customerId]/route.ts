@@ -106,6 +106,45 @@ export async function PUT(
   }
 }
 
+// PATCH - Update customer (alias for PUT)
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: { customerId: string } }
+) {
+  try {
+    const body = await request.json();
+    const {
+      name,
+      email,
+      phone,
+      address,
+      tags,
+      notes,
+    } = body;
+
+    const updateData: any = {};
+    if (name !== undefined) updateData.name = name;
+    if (email !== undefined) updateData.email = email || null;
+    if (phone !== undefined) updateData.phone = phone;
+    if (address !== undefined) updateData.address = address;
+    if (tags !== undefined) updateData.tags = tags;
+    if (notes !== undefined) updateData.notes = notes;
+
+    const customer = await prisma.customer.update({
+      where: { id: params.customerId },
+      data: updateData,
+    });
+
+    return NextResponse.json({ success: true, customer });
+  } catch (error) {
+    console.error('Error updating customer:', error);
+    return NextResponse.json(
+      { error: 'Failed to update customer' },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE - Delete customer with comprehensive safety checks
 export async function DELETE(
   request: NextRequest,

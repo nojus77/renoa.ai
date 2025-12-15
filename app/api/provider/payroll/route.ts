@@ -72,6 +72,8 @@ export async function GET(request: NextRequest) {
             payType: true,
             hourlyRate: true,
             commissionRate: true,
+            color: true,
+            profilePhotoUrl: true,
           },
         },
         job: {
@@ -81,6 +83,8 @@ export async function GET(request: NextRequest) {
             paymentMethod: true,
             tipAmount: true,
             assignedUserIds: true,
+            actualValue: true,
+            estimatedValue: true,
             customer: {
               select: { name: true },
             },
@@ -93,9 +97,27 @@ export async function GET(request: NextRequest) {
     const formattedLogs = workLogs.map((log) => {
       const recordedTip = log.job?.tipAmount || 0;
       const paymentMethod = log.job?.paymentMethod?.toLowerCase();
+      const isCashOrCheck = paymentMethod === 'cash' || paymentMethod === 'check';
       const tipEligible = paymentMethod === 'cash' ? 0 : recordedTip;
-      const payoutAmount = roundCurrency(((log.earnings || 0) - recordedTip + tipEligible));
       const baseEarnings = roundCurrency((log.earnings || 0) - recordedTip);
+
+      // Get payment direction info from work log (if stored) or calculate
+      const paymentDirection = log.paymentDirection || (isCashOrCheck ? 'worker_owes_business' : 'business_owes_worker');
+      const businessOwedAmount = log.businessOwedAmount || null;
+      const collectedAmount = log.collectedAmount || null;
+
+      // For cash/check: worker owes business (businessOwedAmount)
+      // For card/invoice: business owes worker (earnings)
+      // payoutAmount = what business pays worker (negative if worker owes business)
+      let payoutAmount: number;
+      if (paymentDirection === 'worker_owes_business') {
+        // Worker collected money and owes business
+        // Payout is negative (worker owes), or we show it as a separate "owes" amount
+        payoutAmount = businessOwedAmount ? -businessOwedAmount : 0;
+      } else {
+        // Business owes worker their earnings (minus already-received tip if cash)
+        payoutAmount = roundCurrency((log.earnings || 0) - (paymentMethod === 'cash' ? recordedTip : 0));
+      }
 
       return {
         ...log,
@@ -104,6 +126,12 @@ export async function GET(request: NextRequest) {
         baseEarnings,
         payoutAmount,
         tipExcludedReason: paymentMethod === 'cash' && recordedTip > 0 ? 'cash' : null,
+        // Payment direction info
+        paymentDirection,
+        isCashOrCheck,
+        businessOwedAmount: roundCurrency(businessOwedAmount || 0),
+        collectedAmount: roundCurrency(collectedAmount || 0),
+        workerOwes: paymentDirection === 'worker_owes_business',
       };
     });
 
@@ -111,16 +139,19 @@ export async function GET(request: NextRequest) {
       user: (typeof formattedLogs)[number]['user'];
       logs: typeof formattedLogs;
       totalHours: number;
-      totalOwed: number;
+      totalOwed: number; // What business owes worker
+      totalWorkerOwes: number; // What worker owes business
       totalTips: number;
       cashTipsKept: number;
-      unpaidTotal: number;
+      unpaidTotal: number; // Unpaid amount business owes worker
+      unpaidWorkerOwes: number; // Unsettled amount worker owes business
       totalBase: number;
       unpaidBase: number;
       unpaidTips: number;
       unpaidJobs: number;
       totalJobs: number;
       unpaidHours: number;
+      netBalance: number; // Positive = business owes worker, negative = worker owes business
     }> = {};
 
     formattedLogs.forEach((log) => {
@@ -130,15 +161,18 @@ export async function GET(request: NextRequest) {
           logs: [],
           totalHours: 0,
           totalOwed: 0,
+          totalWorkerOwes: 0,
           totalTips: 0,
           cashTipsKept: 0,
           unpaidTotal: 0,
+          unpaidWorkerOwes: 0,
           totalBase: 0,
           unpaidBase: 0,
           unpaidTips: 0,
           unpaidJobs: 0,
           totalJobs: 0,
           unpaidHours: 0,
+          netBalance: 0,
         };
       }
 
@@ -147,13 +181,28 @@ export async function GET(request: NextRequest) {
       workerGroup.totalHours += log.hoursWorked || 0;
       workerGroup.totalJobs += 1;
 
-      const payoutAmount = log.payoutAmount || 0;
       const tipEligible = log.tipEligible || 0;
       const basePay = typeof log.baseEarnings === 'number'
         ? Math.max(log.baseEarnings, 0)
-        : Math.max(payoutAmount - tipEligible, 0);
+        : Math.max((log.earnings || 0) - tipEligible, 0);
 
-      workerGroup.totalOwed += payoutAmount;
+      // Track amounts based on payment direction
+      if (log.workerOwes) {
+        // Worker owes business (cash/check jobs)
+        const owedAmount = log.businessOwedAmount || 0;
+        workerGroup.totalWorkerOwes += owedAmount;
+        if (!log.isPaid) {
+          workerGroup.unpaidWorkerOwes += owedAmount;
+        }
+      } else {
+        // Business owes worker (card/invoice jobs)
+        const payoutAmount = log.payoutAmount || 0;
+        workerGroup.totalOwed += payoutAmount;
+        if (!log.isPaid) {
+          workerGroup.unpaidTotal += payoutAmount;
+        }
+      }
+
       workerGroup.totalTips += tipEligible;
       workerGroup.totalBase += basePay;
 
@@ -163,7 +212,6 @@ export async function GET(request: NextRequest) {
       }
 
       if (!log.isPaid) {
-        workerGroup.unpaidTotal += payoutAmount;
         workerGroup.unpaidTips += tipEligible;
         workerGroup.unpaidBase += basePay;
         workerGroup.unpaidJobs += 1;
@@ -171,21 +219,51 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Calculate net balance for each worker
+    Object.values(byWorkerMap).forEach((workerGroup) => {
+      // Net balance: positive = business owes worker, negative = worker owes business
+      workerGroup.netBalance = roundCurrency(workerGroup.unpaidTotal - workerGroup.unpaidWorkerOwes);
+    });
+
     const totalHours = formattedLogs.reduce((sum, log) => sum + (log.hoursWorked || 0), 0);
-    const totalEarnings = formattedLogs.reduce((sum, log) => sum + (log.payoutAmount || 0), 0);
     const totalTipsEligible = formattedLogs.reduce((sum, log) => sum + (log.tipEligible || 0), 0);
     const totalTipsRecorded = formattedLogs.reduce((sum, log) => sum + (log.recordedTip || 0), 0);
-    const totalUnpaid = formattedLogs.filter((log) => !log.isPaid).reduce((sum, log) => sum + (log.payoutAmount || 0), 0);
-    const totalPaid = totalEarnings - totalUnpaid;
+
+    // Calculate totals with payment direction awareness
+    const businessOwesWorker = formattedLogs
+      .filter(log => !log.workerOwes)
+      .reduce((sum, log) => sum + (log.payoutAmount || 0), 0);
+    const workerOwesBusiness = formattedLogs
+      .filter(log => log.workerOwes)
+      .reduce((sum, log) => sum + (log.businessOwedAmount || 0), 0);
+
+    const unpaidBusinessOwes = formattedLogs
+      .filter(log => !log.isPaid && !log.workerOwes)
+      .reduce((sum, log) => sum + (log.payoutAmount || 0), 0);
+    const unpaidWorkerOwes = formattedLogs
+      .filter(log => !log.isPaid && log.workerOwes)
+      .reduce((sum, log) => sum + (log.businessOwedAmount || 0), 0);
+
+    // Net balance: positive = business owes workers, negative = workers owe business
+    const netBalance = businessOwesWorker - workerOwesBusiness;
+    const unpaidNetBalance = unpaidBusinessOwes - unpaidWorkerOwes;
 
     return NextResponse.json({
       workLogs: formattedLogs,
       byWorker: Object.values(byWorkerMap),
       summary: {
         totalHours: roundCurrency(totalHours),
-        totalEarnings: roundCurrency(totalEarnings),
-        totalUnpaid: roundCurrency(totalUnpaid),
-        totalPaid: roundCurrency(totalPaid),
+        // Legacy fields for backwards compatibility
+        totalEarnings: roundCurrency(businessOwesWorker),
+        totalUnpaid: roundCurrency(unpaidBusinessOwes),
+        totalPaid: roundCurrency(businessOwesWorker - unpaidBusinessOwes),
+        // New payment direction fields
+        businessOwesWorker: roundCurrency(businessOwesWorker),
+        workerOwesBusiness: roundCurrency(workerOwesBusiness),
+        unpaidBusinessOwes: roundCurrency(unpaidBusinessOwes),
+        unpaidWorkerOwes: roundCurrency(unpaidWorkerOwes),
+        netBalance: roundCurrency(netBalance),
+        unpaidNetBalance: roundCurrency(unpaidNetBalance),
         totalTipsEligible: roundCurrency(totalTipsEligible),
         totalTipsRecorded: roundCurrency(totalTipsRecorded),
         workersCount: Object.keys(byWorkerMap).length,

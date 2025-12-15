@@ -10,10 +10,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { UserPlus, Mail, User, Shield, Eye, EyeOff, Loader2, Users, Edit2, Trash2, X, RefreshCw, Pencil, Award, Star, Wrench, Monitor, Crown, DollarSign, Plus, Search, Library, ChevronDown, CalendarPlus, Calendar, Settings, Lightbulb, Clock } from 'lucide-react';
+import { UserPlus, Mail, User, Shield, Eye, EyeOff, Loader2, Users, Edit2, Trash2, X, RefreshCw, Pencil, Award, Star, Wrench, Monitor, Crown, DollarSign, Plus, Search, Library, ChevronDown, CalendarPlus, Calendar, Settings, Lightbulb, Clock, LayoutGrid, List, MoreHorizontal, Palette, TrendingUp, TrendingDown, BarChart3, Trophy } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import DeleteMemberDialog from '@/components/provider/DeleteMemberDialog';
 import WorkerProfileModal from '@/components/provider/WorkerProfileModal';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -105,6 +112,13 @@ const EMPTY_PAYROLL_SUMMARY = {
   totalTipsRecorded: 0,
   workersCount: 0,
   logsCount: 0,
+  // New payment direction fields
+  businessOwesWorker: 0,
+  workerOwesBusiness: 0,
+  unpaidBusinessOwes: 0,
+  unpaidWorkerOwes: 0,
+  netBalance: 0,
+  unpaidNetBalance: 0,
 };
 
 const getRecordedTip = (log: any) => {
@@ -139,7 +153,19 @@ export default function TeamManagementPage() {
   const [crews, setCrews] = useState<Crew[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingCrews, setLoadingCrews] = useState(false);
-  const [activeTab, setActiveTab] = useState<'members' | 'crews' | 'time-off' | 'payroll'>('members');
+  const [activeTab, setActiveTab] = useState<'members' | 'crews' | 'productivity' | 'time-off' | 'payroll'>('members');
+
+  // Productivity state
+  const [productivityPeriod, setProductivityPeriod] = useState('month');
+  const [productivityData, setProductivityData] = useState<any[]>([]);
+  const [productivitySummary, setProductivitySummary] = useState({
+    totalRevenue: 0,
+    totalHours: 0,
+    totalJobs: 0,
+    avgProductivity: 0
+  });
+  const [mostImproved, setMostImproved] = useState<any>(null);
+  const [loadingProductivity, setLoadingProductivity] = useState(false);
 
   // Invite dialog state
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
@@ -167,6 +193,12 @@ export default function TeamManagementPage() {
 
   // Delete confirmation state
   const [deletingCrew, setDeletingCrew] = useState<Crew | null>(null);
+
+  // Crew search/filter/view state
+  const [crewSearch, setCrewSearch] = useState('');
+  const [crewFilter, setCrewFilter] = useState('all');
+  const [crewView, setCrewView] = useState<'grid' | 'list'>('grid');
+  const [expandedSkillsCrew, setExpandedSkillsCrew] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   // Team member delete state
@@ -270,6 +302,15 @@ export default function TeamManagementPage() {
       }, 0),
     [unpaidWorkLogs]
   );
+  // Split work logs into "pay out" (business owes workers) and "collect" (workers owe business) items
+  const payOutItems = useMemo(() => {
+    return workLogs.filter(log => !log.workerOwes && !log.isPaid);
+  }, [workLogs]);
+
+  const collectItems = useMemo(() => {
+    return workLogs.filter(log => log.workerOwes && !log.isPaid);
+  }, [workLogs]);
+
   const workerSummaries = useMemo(() => {
     return (payrollByWorker || [])
       .map(worker => {
@@ -302,6 +343,11 @@ export default function TeamManagementPage() {
             ? worker.totalTips
             : (worker?.logs || []).reduce((sum: number, log: any) => sum + getTipEligible(log), 0);
 
+        // New: track amounts by payment direction
+        const owedByBusiness = worker?.unpaidTotal || 0;
+        const owesToBusiness = worker?.unpaidWorkerOwes || 0;
+        const netBalance = owesToBusiness - owedByBusiness; // Positive = worker owes us
+
         return {
           worker,
           workerId,
@@ -314,10 +360,14 @@ export default function TeamManagementPage() {
           totalDue,
           cashTips: worker?.cashTipsKept || 0,
           totalTips,
+          // New payment direction fields
+          owedByBusiness,
+          owesToBusiness,
+          netBalance,
         };
       })
-      .filter(summary => summary.totalDue > 0)
-      .sort((a, b) => b.totalDue - a.totalDue);
+      .filter(summary => summary.totalDue > 0 || summary.owesToBusiness > 0)
+      .sort((a, b) => Math.abs(b.netBalance) - Math.abs(a.netBalance));
   }, [payrollByWorker]);
 
   useEffect(() => {
@@ -355,6 +405,41 @@ export default function TeamManagementPage() {
       fetchPayroll();
     }
   }, [activeTab, payrollDateRange]);
+
+  // Fetch productivity when tab changes to productivity or period changes
+  useEffect(() => {
+    if (activeTab === 'productivity') {
+      fetchProductivity();
+    }
+  }, [activeTab, productivityPeriod]);
+
+  const fetchProductivity = async () => {
+    setLoadingProductivity(true);
+    try {
+      const providerId = localStorage.getItem('providerId');
+      if (!providerId) return;
+
+      const res = await fetch(`/api/provider/team/productivity?providerId=${providerId}&period=${productivityPeriod}`);
+      const data = await res.json();
+
+      if (res.ok) {
+        setProductivityData(data.workers || []);
+        setProductivitySummary(data.summary || { totalRevenue: 0, totalHours: 0, totalJobs: 0, avgProductivity: 0 });
+        setMostImproved(data.mostImproved);
+      }
+    } catch (error) {
+      console.error('Error fetching productivity:', error);
+    } finally {
+      setLoadingProductivity(false);
+    }
+  };
+
+  // Helper function for formatting duration
+  const formatDuration = (minutes: number) => {
+    const hours = Math.floor(minutes / 60);
+    const mins = Math.round(minutes % 60);
+    return `${hours}h ${mins.toString().padStart(2, '0')}m`;
+  };
 
   const fetchTeamMembers = async () => {
     setLoading(true);
@@ -579,6 +664,27 @@ export default function TeamManagementPage() {
       toast.error('Failed to mark worker as paid');
     } finally {
       setProcessingWorkerPay(null);
+    }
+  };
+
+  // Mark a cash/check job as collected (worker turned in cash)
+  const handleMarkCollected = async (workLogId: string) => {
+    setProcessingPay(workLogId);
+    try {
+      const res = await fetch(`/api/provider/payroll/${workLogId}/pay`, {
+        method: 'PATCH',
+      });
+
+      if (res.ok) {
+        toast.success('Marked as collected');
+        fetchPayroll();
+      } else {
+        toast.error('Failed to mark as collected');
+      }
+    } catch (error) {
+      toast.error('Failed to mark as collected');
+    } finally {
+      setProcessingPay(null);
     }
   };
 
@@ -1547,6 +1653,16 @@ export default function TeamManagementPage() {
               Crews
             </button>
             <button
+              onClick={() => setActiveTab('productivity')}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                activeTab === 'productivity'
+                  ? 'bg-emerald-600 text-white'
+                  : 'text-zinc-400 hover:text-zinc-100'
+              }`}
+            >
+              Productivity
+            </button>
+            <button
               onClick={() => setActiveTab('time-off')}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 activeTab === 'time-off'
@@ -1959,12 +2075,76 @@ export default function TeamManagementPage() {
           {/* Crews Tab */}
           {activeTab === 'crews' && (
             <div className="space-y-4">
-              {/* Header */}
+              {/* Search, Filters, View Toggle */}
+              {crews.length > 0 && (
+                <div className="flex flex-wrap gap-4 mb-2">
+                  {/* Search */}
+                  <div className="relative flex-1 min-w-[200px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+                    <input
+                      type="text"
+                      placeholder="Search crews..."
+                      value={crewSearch}
+                      onChange={(e) => setCrewSearch(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    />
+                  </div>
+
+                  {/* Filter */}
+                  <Select value={crewFilter} onValueChange={setCrewFilter}>
+                    <SelectTrigger className="w-[180px] bg-zinc-800 border-zinc-700">
+                      <SelectValue placeholder="Filter crews" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-800 border-zinc-700">
+                      <SelectItem value="all">All Crews</SelectItem>
+                      <SelectItem value="has-jobs">Has Jobs Today</SelectItem>
+                      <SelectItem value="needs-attention">Needs Attention</SelectItem>
+                      <SelectItem value="available">Available Now</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {/* View Toggle */}
+                  <div className="flex bg-zinc-800 border border-zinc-700 rounded-lg p-1">
+                    <button
+                      onClick={() => setCrewView('grid')}
+                      className={`p-2 rounded ${crewView === 'grid' ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:text-zinc-100'}`}
+                    >
+                      <LayoutGrid className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => setCrewView('list')}
+                      className={`p-2 rounded ${crewView === 'list' ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:text-zinc-100'}`}
+                    >
+                      <List className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Filter and count summary */}
               <div className="flex items-center justify-between">
-                <p className="text-zinc-400 text-sm">{crews.length} crews configured</p>
+                <p className="text-zinc-400 text-sm">
+                  {(() => {
+                    const filtered = crews.filter(crew => {
+                      const matchesSearch = !crewSearch ||
+                        crew.name.toLowerCase().includes(crewSearch.toLowerCase()) ||
+                        crew.users.some(u => `${u.firstName} ${u.lastName}`.toLowerCase().includes(crewSearch.toLowerCase()));
+
+                      const matchesFilter = crewFilter === 'all' ||
+                        (crewFilter === 'has-jobs' && crew.nextJob) ||
+                        (crewFilter === 'needs-attention' && crew.unassignedToday && crew.unassignedToday > 0) ||
+                        (crewFilter === 'available' && !crew.nextJob);
+
+                      return matchesSearch && matchesFilter;
+                    });
+                    return filtered.length === crews.length
+                      ? `${crews.length} crews configured`
+                      : `${filtered.length} of ${crews.length} crews`;
+                  })()}
+                </p>
               </div>
 
-              {/* Crews Grid */}
+              {/* Crews Content */}
               {loadingCrews ? (
                 <div className="flex items-center justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-zinc-400" />
@@ -2036,28 +2216,193 @@ export default function TeamManagementPage() {
                     )}
                   </div>
                 </div>
-              ) : crews.length <= 2 ? (
-                /* SUGGESTION FOR FEW CREWS */
-                <div className="mb-4">
-                  <div className="p-4 bg-blue-600/10 border border-blue-600/30 rounded-lg flex items-start gap-3">
-                    <Lightbulb className="w-5 h-5 text-blue-400 mt-0.5 flex-shrink-0" />
-                    <div className="flex-1">
-                      <p className="text-sm text-blue-200 font-medium mb-1">Tip: Organize More Crews</p>
-                      <p className="text-xs text-blue-300/80">
-                        Having multiple crews helps with workload distribution and scheduling flexibility. Consider organizing by geography, specialization, or equipment.
+              ) : (() => {
+                // Filter crews based on search and filter
+                const filteredCrews = crews.filter(crew => {
+                  const matchesSearch = !crewSearch ||
+                    crew.name.toLowerCase().includes(crewSearch.toLowerCase()) ||
+                    crew.users.some(u => `${u.firstName} ${u.lastName}`.toLowerCase().includes(crewSearch.toLowerCase()));
+
+                  const matchesFilter = crewFilter === 'all' ||
+                    (crewFilter === 'has-jobs' && crew.nextJob) ||
+                    (crewFilter === 'needs-attention' && crew.unassignedToday && crew.unassignedToday > 0) ||
+                    (crewFilter === 'available' && !crew.nextJob);
+
+                  return matchesSearch && matchesFilter;
+                });
+
+                if (filteredCrews.length === 0) {
+                  return (
+                    <div className="text-center py-12 px-6 bg-zinc-900 border border-zinc-800 rounded-lg">
+                      <Search className="h-8 w-8 text-zinc-600 mx-auto mb-3" />
+                      <h3 className="text-lg font-medium text-zinc-300 mb-2">No crews found</h3>
+                      <p className="text-sm text-zinc-500">
+                        {crewSearch ? `No crews match "${crewSearch}"` : 'No crews match the selected filter'}
                       </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="mt-4 border-zinc-600"
+                        onClick={() => { setCrewSearch(''); setCrewFilter('all'); }}
+                      >
+                        Clear filters
+                      </Button>
                     </div>
-                  </div>
-                  {/* Render crew cards (same as normal grid) */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-                    {crews.map((crew) => {
-                      const crewSkills = crew.skills || [];
+                  );
+                }
+
+                // LIST VIEW
+                if (crewView === 'list') {
+                  return (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-zinc-800">
+                            <th className="text-left py-3 px-4 text-xs font-medium text-zinc-500 uppercase">Crew</th>
+                            <th className="text-left py-3 px-4 text-xs font-medium text-zinc-500 uppercase">Leader</th>
+                            <th className="text-center py-3 px-4 text-xs font-medium text-zinc-500 uppercase">Members</th>
+                            <th className="text-center py-3 px-4 text-xs font-medium text-zinc-500 uppercase">Jobs Today</th>
+                            <th className="text-center py-3 px-4 text-xs font-medium text-zinc-500 uppercase">Status</th>
+                            <th className="text-right py-3 px-4 text-xs font-medium text-zinc-500 uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {filteredCrews.map((crew) => {
+                            const leader = crew.users.find(m => m.id === crew.leaderId);
+                            const totalHours = crew.users.reduce((sum, m) => sum + (m.hoursThisWeek || 0), 0);
+
+                            return (
+                              <tr key={crew.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/50">
+                                {/* Crew Name with Color */}
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className="w-3 h-3 rounded-full flex-shrink-0"
+                                      style={{ backgroundColor: crew.color || '#10b981' }}
+                                    />
+                                    <div>
+                                      <div className="font-medium text-zinc-100">{crew.name}</div>
+                                      <div className="text-xs text-zinc-500">{totalHours}h this week</div>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                {/* Leader */}
+                                <td className="py-3 px-4">
+                                  {leader ? (
+                                    <div className="flex items-center gap-2">
+                                      <Avatar className="w-6 h-6">
+                                        <AvatarFallback className="text-xs" style={{ backgroundColor: leader.color || '#10b981' }}>
+                                          {leader.firstName[0]}{leader.lastName[0]}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-sm text-zinc-300">{leader.firstName} {leader.lastName}</span>
+                                    </div>
+                                  ) : (
+                                    <span className="text-sm text-zinc-500">No leader</span>
+                                  )}
+                                </td>
+
+                                {/* Members Count */}
+                                <td className="py-3 px-4 text-center">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <Users className="w-4 h-4 text-zinc-500" />
+                                    <span className="text-sm text-zinc-300">{crew.memberCount}</span>
+                                  </div>
+                                </td>
+
+                                {/* Jobs Today */}
+                                <td className="py-3 px-4 text-center">
+                                  <span className="text-sm text-zinc-300">{crew.jobsThisWeek || 0}</span>
+                                </td>
+
+                                {/* Status */}
+                                <td className="py-3 px-4 text-center">
+                                  {crew.unassignedToday && crew.unassignedToday > 0 ? (
+                                    <Badge className="bg-yellow-600/20 text-yellow-400 border-yellow-600/30">
+                                      {crew.unassignedToday} unassigned
+                                    </Badge>
+                                  ) : crew.nextJob ? (
+                                    <Badge className="bg-emerald-600/20 text-emerald-400 border-emerald-600/30">
+                                      Active
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="border-zinc-600 text-zinc-400">
+                                      Available
+                                    </Badge>
+                                  )}
+                                </td>
+
+                                {/* Actions */}
+                                <td className="py-3 px-4 text-right">
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <Button variant="ghost" size="icon" className="h-8 w-8">
+                                        <MoreHorizontal className="w-4 h-4 text-zinc-400" />
+                                      </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end" className="bg-zinc-800 border-zinc-700">
+                                      <DropdownMenuItem
+                                        onClick={() => window.location.href = `/provider/calendar?crew=${crew.id}`}
+                                        className="text-zinc-200 hover:bg-zinc-700"
+                                      >
+                                        <Calendar className="w-4 h-4 mr-2" />
+                                        View Schedule
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => window.location.href = `/provider/calendar?crew=${crew.id}&mode=assign`}
+                                        className="text-zinc-200 hover:bg-zinc-700"
+                                      >
+                                        <CalendarPlus className="w-4 h-4 mr-2" />
+                                        Assign Jobs
+                                      </DropdownMenuItem>
+                                      {isOwner && (
+                                        <>
+                                          <DropdownMenuSeparator className="bg-zinc-700" />
+                                          <DropdownMenuItem
+                                            onClick={() => handleOpenCrewDialog(crew)}
+                                            className="text-zinc-200 hover:bg-zinc-700"
+                                          >
+                                            <Pencil className="w-4 h-4 mr-2" />
+                                            Edit Crew
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            onClick={() => setDeletingCrew(crew)}
+                                            className="text-red-400 hover:bg-zinc-700"
+                                          >
+                                            <Trash2 className="w-4 h-4 mr-2" />
+                                            Delete
+                                          </DropdownMenuItem>
+                                        </>
+                                      )}
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  );
+                }
+
+                // GRID VIEW
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {filteredCrews.map((crew) => {
+                      const crewSkills = crew.skills || Array.from(new Set(crew.users.flatMap(m => m.workerSkills?.map(ws => ws.skill.name) || [])));
                       const leader = crew.users.find(m => m.id === crew.leaderId);
+                      const totalHours = crew.users.reduce((sum, m) => sum + (m.hoursThisWeek || 0), 0);
+                      const showAllSkills = expandedSkillsCrew === crew.id;
 
                       return (
                         <div key={crew.id} className="bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden">
+                          {/* Color bar */}
                           <div className="h-2" style={{ backgroundColor: crew.color || '#10b981' }} />
+
                           <div className="p-4">
+                            {/* Header with name and actions */}
                             <div className="flex items-center justify-between mb-3">
                               <div className="flex items-center gap-2">
                                 <h3 className="font-semibold text-lg text-zinc-100">{crew.name}</h3>
@@ -2066,17 +2411,33 @@ export default function TeamManagementPage() {
                                 </Badge>
                               </div>
                               {isOwner && (
-                                <div className="flex items-center gap-1">
-                                  <Button variant="ghost" size="icon" className="w-7 h-7 hover:bg-zinc-700" onClick={() => handleOpenCrewDialog(crew)}>
-                                    <Pencil className="w-4 h-4 text-zinc-400" />
-                                  </Button>
-                                  <Button variant="ghost" size="icon" className="w-7 h-7 hover:bg-zinc-700" onClick={() => setDeletingCrew(crew)}>
-                                    <Trash2 className="w-4 h-4 text-red-400" />
-                                  </Button>
-                                </div>
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7">
+                                      <MoreHorizontal className="w-4 h-4 text-zinc-400" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="bg-zinc-800 border-zinc-700">
+                                    <DropdownMenuItem
+                                      onClick={() => handleOpenCrewDialog(crew)}
+                                      className="text-zinc-200 hover:bg-zinc-700"
+                                    >
+                                      <Pencil className="w-4 h-4 mr-2" />
+                                      Edit Crew
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => setDeletingCrew(crew)}
+                                      className="text-red-400 hover:bg-zinc-700"
+                                    >
+                                      <Trash2 className="w-4 h-4 mr-2" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               )}
                             </div>
 
+                            {/* Crew Leader */}
                             {leader && (
                               <div className="flex items-center gap-2 mb-3 p-2 bg-zinc-700/50 rounded">
                                 <Crown className="w-4 h-4 text-yellow-400" />
@@ -2086,83 +2447,90 @@ export default function TeamManagementPage() {
                                   </AvatarFallback>
                                 </Avatar>
                                 <span className="text-sm text-zinc-200">{leader.firstName} {leader.lastName}</span>
-                                <Badge className="text-xs ml-auto bg-yellow-600">Leader</Badge>
                               </div>
                             )}
 
-                            <div className="grid grid-cols-2 gap-2 mb-4 p-3 bg-zinc-700/30 rounded-lg">
-                              <div>
-                                <div className="text-xs text-zinc-500 mb-1">Next Job</div>
-                                {crew.nextJob ? (
-                                  <div>
-                                    <div className="text-sm font-medium text-zinc-200">{format(new Date(crew.nextJob.startTime), 'EEE, MMM d')}</div>
-                                    <div className="text-xs text-zinc-400">{format(new Date(crew.nextJob.startTime), 'h:mm a')}</div>
-                                  </div>
-                                ) : (
-                                  <div className="text-sm text-zinc-500">No jobs scheduled</div>
-                                )}
+                            {/* Stats Grid */}
+                            <div className="grid grid-cols-3 gap-2 mb-4 p-3 bg-zinc-700/30 rounded-lg">
+                              <div className="text-center">
+                                <div className="text-lg font-semibold text-zinc-100">{crew.jobsThisWeek || 0}</div>
+                                <div className="text-xs text-zinc-500">Jobs/week</div>
                               </div>
-                              <div>
-                                <div className="text-xs text-zinc-500 mb-1">Needs Attention</div>
+                              <div className="text-center">
+                                <div className="text-lg font-semibold text-zinc-100">{totalHours}</div>
+                                <div className="text-xs text-zinc-500">Hours</div>
+                              </div>
+                              <div className="text-center">
                                 {crew.unassignedToday && crew.unassignedToday > 0 ? (
-                                  <div className="text-sm font-medium text-yellow-400">{crew.unassignedToday} unassigned today</div>
+                                  <>
+                                    <div className="text-lg font-semibold text-yellow-400">{crew.unassignedToday}</div>
+                                    <div className="text-xs text-yellow-500">Unassigned</div>
+                                  </>
                                 ) : (
-                                  <div className="text-sm text-green-400">All assigned ✓</div>
+                                  <>
+                                    <div className="text-lg font-semibold text-green-400">✓</div>
+                                    <div className="text-xs text-green-500">All set</div>
+                                  </>
                                 )}
                               </div>
                             </div>
 
-                            <div className="space-y-2 mb-4">
-                              <div className="text-xs text-zinc-500 uppercase mb-2">Members ({crew.users.length})</div>
-                              <div className="space-y-1">
-                                {crew.users.map(member => (
-                                  <div key={member.id} className="flex items-center justify-between p-2 rounded bg-zinc-700/30 hover:bg-zinc-700/50">
-                                    <div className="flex items-center gap-2">
-                                      <Avatar className="w-7 h-7">
-                                        <AvatarFallback className="text-xs" style={{ backgroundColor: member.color || '#10b981' }}>
-                                          {member.firstName[0]}{member.lastName[0]}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <div>
-                                        <div className="text-sm font-medium text-zinc-200 flex items-center gap-1">
-                                          {member.firstName} {member.lastName}
-                                          {member.id === crew.leaderId && <Crown className="w-3 h-3 text-yellow-400" />}
-                                        </div>
-                                        <div className="text-xs text-zinc-500 capitalize">
-                                          {member.role === 'field' ? 'Field Worker' :
-                                           member.role === 'office' ? 'Office' :
-                                           member.role === 'owner' ? 'Owner' : member.role}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <span className="text-xs font-medium text-zinc-400">{member.hoursThisWeek || 0}h</span>
-                                  </div>
+                            {/* Members - Compact */}
+                            <div className="mb-4">
+                              <div className="text-xs text-zinc-500 uppercase mb-2">Members</div>
+                              <div className="flex flex-wrap gap-1">
+                                {crew.users.slice(0, 5).map(member => (
+                                  <Avatar key={member.id} className="w-8 h-8 border-2 border-zinc-800">
+                                    <AvatarFallback className="text-xs" style={{ backgroundColor: member.color || '#10b981' }}>
+                                      {member.firstName[0]}{member.lastName[0]}
+                                    </AvatarFallback>
+                                  </Avatar>
                                 ))}
+                                {crew.users.length > 5 && (
+                                  <div className="w-8 h-8 rounded-full bg-zinc-700 border-2 border-zinc-800 flex items-center justify-center">
+                                    <span className="text-xs text-zinc-400">+{crew.users.length - 5}</span>
+                                  </div>
+                                )}
                               </div>
                             </div>
 
+                            {/* Action Buttons */}
                             <div className="flex gap-2 mb-3">
-                              <Button size="sm" className="flex-1 bg-green-600 hover:bg-green-700" onClick={() => console.log('Assign jobs to crew:', crew.id)}>
+                              <Button
+                                size="sm"
+                                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                                onClick={() => window.location.href = `/provider/calendar?crew=${crew.id}&mode=assign`}
+                              >
                                 <CalendarPlus className="w-4 h-4 mr-1" />
-                                Assign Jobs
+                                Assign
                               </Button>
-                              <Button size="sm" variant="outline" className="flex-1 border-zinc-600 hover:bg-zinc-800" onClick={() => window.location.href = `/provider/calendar?crew=${crew.id}`}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="flex-1 border-zinc-600 hover:bg-zinc-800"
+                                onClick={() => window.location.href = `/provider/calendar?crew=${crew.id}`}
+                              >
                                 <Calendar className="w-4 h-4 mr-1" />
                                 Schedule
                               </Button>
-                              <Button size="sm" variant="ghost" className="hover:bg-zinc-700" onClick={() => handleOpenCrewDialog(crew)}>
-                                <Settings className="w-4 h-4" />
-                              </Button>
                             </div>
 
+                            {/* Skills */}
                             {crewSkills.length > 0 && (
                               <div className="pt-3 border-t border-zinc-700">
                                 <div className="flex flex-wrap gap-1">
-                                  {crewSkills.slice(0, 4).map(skill => (
-                                    <Badge key={skill} variant="secondary" className="text-xs bg-zinc-700/50 border-zinc-600">{skill}</Badge>
+                                  {(showAllSkills ? crewSkills : crewSkills.slice(0, 3)).map(skill => (
+                                    <Badge key={skill} variant="secondary" className="text-xs bg-zinc-700/50 border-zinc-600">
+                                      {skill}
+                                    </Badge>
                                   ))}
-                                  {crewSkills.length > 4 && (
-                                    <Badge variant="outline" className="text-xs border-zinc-600 text-zinc-400">+{crewSkills.length - 4}</Badge>
+                                  {crewSkills.length > 3 && (
+                                    <button
+                                      onClick={() => setExpandedSkillsCrew(showAllSkills ? null : crew.id)}
+                                      className="text-xs text-emerald-400 hover:text-emerald-300"
+                                    >
+                                      {showAllSkills ? 'Show less' : `+${crewSkills.length - 3} more`}
+                                    </button>
                                   )}
                                 </div>
                               </div>
@@ -2172,180 +2540,205 @@ export default function TeamManagementPage() {
                       );
                     })}
                   </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* Productivity Tab */}
+          {activeTab === 'productivity' && (
+            <div className="space-y-6">
+              {/* Header with date filter */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Team Productivity</h2>
+                  <p className="text-sm text-zinc-400">Track performance and reward top performers</p>
+                </div>
+                <select
+                  value={productivityPeriod}
+                  onChange={(e) => setProductivityPeriod(e.target.value)}
+                  className="px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm"
+                >
+                  <option value="week">This Week</option>
+                  <option value="month">This Month</option>
+                  <option value="quarter">This Quarter</option>
+                  <option value="year">This Year</option>
+                  <option value="all">All Time</option>
+                </select>
+              </div>
+
+              {loadingProductivity ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-emerald-500" />
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {crews.map((crew) => {
-                    const isExpanded = expandedCrews[crew.id];
-                    const totalHoursThisWeek = crew.users.reduce((sum, m) => sum + (m.hoursThisWeek || 0), 0);
-                    const crewSkills = Array.from(new Set(crew.users.flatMap(m => m.workerSkills?.map(ws => ws.skill.name) || [])));
-                    const leader = crew.users.find(m => m.id === crew.leaderId);
+                <>
+                  {/* Summary Cards */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <DollarSign className="h-4 w-4 text-zinc-500" />
+                        <p className="text-zinc-400 text-sm">Total Revenue</p>
+                      </div>
+                      <p className="text-2xl font-bold text-white">${productivitySummary.totalRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</p>
+                    </div>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Clock className="h-4 w-4 text-zinc-500" />
+                        <p className="text-zinc-400 text-sm">Total Hours</p>
+                      </div>
+                      <p className="text-2xl font-bold text-white">{productivitySummary.totalHours.toFixed(1)}h</p>
+                    </div>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <BarChart3 className="h-4 w-4 text-zinc-500" />
+                        <p className="text-zinc-400 text-sm">Avg Productivity</p>
+                      </div>
+                      <p className="text-2xl font-bold text-emerald-500">${productivitySummary.avgProductivity.toFixed(2)}/hr</p>
+                    </div>
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="h-4 w-4 text-zinc-500" />
+                        <p className="text-zinc-400 text-sm">Jobs Completed</p>
+                      </div>
+                      <p className="text-2xl font-bold text-white">{productivitySummary.totalJobs}</p>
+                    </div>
+                  </div>
 
-                    return (
-                      <div key={crew.id} className="bg-zinc-800 border border-zinc-700 rounded-lg overflow-hidden">
-                        {/* Color bar */}
-                        <div className="h-2" style={{ backgroundColor: crew.color || '#10b981' }} />
-
-                        <div className="p-4">
-                          {/* Crew name + actions */}
-                          <div className="flex items-center justify-between mb-3">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-semibold text-lg text-zinc-100">{crew.name}</h3>
-                              <Badge variant="outline" className="text-xs border-zinc-600 text-zinc-400">
-                                {crew.memberCount} members
-                              </Badge>
-                            </div>
-                            {isOwner && (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="w-7 h-7 hover:bg-zinc-700"
-                                  onClick={() => handleOpenCrewDialog(crew)}
-                                >
-                                  <Pencil className="w-4 h-4 text-zinc-400" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="w-7 h-7 hover:bg-zinc-700"
-                                  onClick={() => setDeletingCrew(crew)}
-                                >
-                                  <Trash2 className="w-4 h-4 text-red-400" />
-                                </Button>
-                              </div>
-                            )}
+                  {/* Insights Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Top Performer Card */}
+                    {productivityData[0] && (
+                      <div className="bg-gradient-to-r from-emerald-500/10 to-emerald-600/5 border border-emerald-500/20 rounded-xl p-5">
+                        <div className="flex items-center gap-4">
+                          <div className="text-4xl">🏆</div>
+                          <div>
+                            <p className="text-emerald-400 text-sm font-medium">Top Performer</p>
+                            <p className="text-xl font-bold text-white">{productivityData[0].name}</p>
+                            <p className="text-zinc-400 text-sm">
+                              ${productivityData[0].productivity?.toFixed(2)}/hr • {productivityData[0].jobsCompleted} jobs
+                            </p>
                           </div>
-
-                          {/* Crew Leader */}
-                          {leader && (
-                            <div className="flex items-center gap-2 mb-3 p-2 bg-zinc-700/50 rounded">
-                              <Crown className="w-4 h-4 text-yellow-400" />
-                              <Avatar className="w-6 h-6">
-                                <AvatarFallback className="text-xs" style={{ backgroundColor: leader.color || '#10b981' }}>
-                                  {leader.firstName[0]}{leader.lastName[0]}
-                                </AvatarFallback>
-                              </Avatar>
-                              <span className="text-sm text-zinc-200">{leader.firstName} {leader.lastName}</span>
-                              <Badge className="text-xs ml-auto bg-yellow-600">Leader</Badge>
-                            </div>
-                          )}
-
-                          {/* Better Metrics - Actionable Info */}
-                          <div className="grid grid-cols-2 gap-2 mb-4 p-3 bg-zinc-700/30 rounded-lg">
-                            {/* Next Job */}
-                            <div>
-                              <div className="text-xs text-zinc-500 mb-1">Next Job</div>
-                              {crew.nextJob ? (
-                                <div>
-                                  <div className="text-sm font-medium text-zinc-200">{format(new Date(crew.nextJob.startTime), 'EEE, MMM d')}</div>
-                                  <div className="text-xs text-zinc-400">{format(new Date(crew.nextJob.startTime), 'h:mm a')}</div>
-                                </div>
-                              ) : (
-                                <div className="text-sm text-zinc-500">No jobs scheduled</div>
-                              )}
-                            </div>
-
-                            {/* Unassigned */}
-                            <div>
-                              <div className="text-xs text-zinc-500 mb-1">Needs Attention</div>
-                              {crew.unassignedToday && crew.unassignedToday > 0 ? (
-                                <div className="text-sm font-medium text-yellow-400">
-                                  {crew.unassignedToday} unassigned today
-                                </div>
-                              ) : (
-                                <div className="text-sm text-green-400">All assigned ✓</div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Members List - Always Visible */}
-                          <div className="space-y-2 mb-4">
-                            <div className="text-xs text-zinc-500 uppercase mb-2">Members ({crew.users.length})</div>
-                            <div className="space-y-1">
-                              {crew.users.map(member => (
-                                <div key={member.id} className="flex items-center justify-between p-2 rounded bg-zinc-700/30 hover:bg-zinc-700/50">
-                                  <div className="flex items-center gap-2">
-                                    <Avatar className="w-7 h-7">
-                                      <AvatarFallback className="text-xs" style={{ backgroundColor: member.color || '#10b981' }}>
-                                        {member.firstName[0]}{member.lastName[0]}
-                                      </AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                      <div className="text-sm font-medium text-zinc-200 flex items-center gap-1">
-                                        {member.firstName} {member.lastName}
-                                        {member.id === crew.leaderId && (
-                                          <Crown className="w-3 h-3 text-yellow-400" />
-                                        )}
-                                      </div>
-                                      <div className="text-xs text-zinc-500 capitalize">
-                                        {member.role === 'field' ? 'Field Worker' :
-                                         member.role === 'office' ? 'Office' :
-                                         member.role === 'owner' ? 'Owner' : member.role}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <span className="text-xs font-medium text-zinc-400">{member.hoursThisWeek || 0}h</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Primary Action Buttons */}
-                          <div className="flex gap-2 mb-3">
-                            <Button
-                              size="sm"
-                              className="flex-1 bg-green-600 hover:bg-green-700"
-                              onClick={() => {
-                                window.location.href = `/provider/calendar?crew=${crew.id}&mode=assign`;
-                              }}
-                            >
-                              <CalendarPlus className="w-4 h-4 mr-1" />
-                              Assign Jobs
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="flex-1 border-zinc-600 hover:bg-zinc-800"
-                              onClick={() => {
-                                window.location.href = `/provider/calendar?crew=${crew.id}`;
-                              }}
-                            >
-                              <Calendar className="w-4 h-4 mr-1" />
-                              Schedule
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="hover:bg-zinc-700"
-                              onClick={() => handleOpenCrewDialog(crew)}
-                            >
-                              <Settings className="w-4 h-4" />
-                            </Button>
-                          </div>
-
-                          {/* Skills coverage */}
-                          {crewSkills.length > 0 && (
-                            <div className="pt-3 border-t border-zinc-700">
-                              <div className="flex flex-wrap gap-1">
-                                {crewSkills.slice(0, 4).map(skill => (
-                                  <Badge key={skill} variant="secondary" className="text-xs bg-zinc-700/50 border-zinc-600">
-                                    {skill}
-                                  </Badge>
-                                ))}
-                                {crewSkills.length > 4 && (
-                                  <Badge variant="outline" className="text-xs border-zinc-600 text-zinc-400">
-                                    +{crewSkills.length - 4}
-                                  </Badge>
-                                )}
-                              </div>
-                            </div>
-                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+                    )}
+
+                    {/* Most Improved Card */}
+                    {mostImproved && (
+                      <div className="bg-gradient-to-r from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-xl p-5">
+                        <div className="flex items-center gap-4">
+                          <div className="text-4xl">📈</div>
+                          <div>
+                            <p className="text-blue-400 text-sm font-medium">Most Improved</p>
+                            <p className="text-xl font-bold text-white">{mostImproved.name}</p>
+                            <p className="text-zinc-400 text-sm">
+                              +{mostImproved.trend?.toFixed(0)}% vs last period
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Productivity Table */}
+                  {productivityData.length === 0 ? (
+                    <Card className="bg-zinc-800 border-zinc-700">
+                      <CardContent className="p-8 text-center">
+                        <BarChart3 className="h-12 w-12 mx-auto mb-4 text-zinc-500" />
+                        <h3 className="text-lg font-medium text-zinc-200 mb-2">No Productivity Data</h3>
+                        <p className="text-sm text-zinc-400">
+                          When team members complete jobs with time tracking, their productivity will appear here.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  ) : (
+                    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-zinc-800/50">
+                          <tr className="text-left text-sm text-zinc-400">
+                            <th className="p-4 font-medium">Rank</th>
+                            <th className="p-4 font-medium">Name</th>
+                            <th className="p-4 font-medium">Jobs</th>
+                            <th className="p-4 font-medium">Revenue</th>
+                            <th className="p-4 font-medium">Time Tracked</th>
+                            <th className="p-4 font-medium">Productivity</th>
+                            <th className="p-4 font-medium">Trend</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-800">
+                          {productivityData.map((worker, index) => (
+                            <tr key={worker.id} className="hover:bg-zinc-800/50">
+                              {/* Rank */}
+                              <td className="p-4">
+                                {index === 0 && <span className="text-2xl">🥇</span>}
+                                {index === 1 && <span className="text-2xl">🥈</span>}
+                                {index === 2 && <span className="text-2xl">🥉</span>}
+                                {index > 2 && <span className="text-zinc-500 font-medium">{index + 1}</span>}
+                              </td>
+
+                              {/* Name */}
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarImage src={worker.profilePhotoUrl} />
+                                    <AvatarFallback className="bg-zinc-700 text-zinc-300">
+                                      {worker.name?.charAt(0) || '?'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div>
+                                    <p className="text-white font-medium">{worker.name}</p>
+                                    <p className="text-xs text-zinc-500 capitalize">{worker.role}</p>
+                                  </div>
+                                </div>
+                              </td>
+
+                              {/* Jobs */}
+                              <td className="p-4 text-white">{worker.jobsCompleted}</td>
+
+                              {/* Revenue */}
+                              <td className="p-4">
+                                <span className="text-white font-medium">
+                                  ${worker.revenue?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </span>
+                              </td>
+
+                              {/* Time */}
+                              <td className="p-4 text-white">
+                                {formatDuration(worker.minutesWorked || 0)}
+                              </td>
+
+                              {/* Productivity */}
+                              <td className="p-4">
+                                <span className={`font-bold ${
+                                  worker.productivity >= productivitySummary.avgProductivity ? 'text-emerald-500' : 'text-white'
+                                }`}>
+                                  ${worker.productivity?.toFixed(2)}/hr
+                                </span>
+                              </td>
+
+                              {/* Trend */}
+                              <td className="p-4">
+                                {worker.trend > 0 ? (
+                                  <span className="flex items-center gap-1 text-emerald-500 text-sm">
+                                    <TrendingUp className="w-4 h-4" />
+                                    +{worker.trend?.toFixed(0)}%
+                                  </span>
+                                ) : worker.trend < 0 ? (
+                                  <span className="flex items-center gap-1 text-red-500 text-sm">
+                                    <TrendingDown className="w-4 h-4" />
+                                    {worker.trend?.toFixed(0)}%
+                                  </span>
+                                ) : (
+                                  <span className="text-zinc-500 text-sm">—</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -2509,8 +2902,9 @@ export default function TeamManagementPage() {
 
           {/* Payroll Tab */}
           {activeTab === 'payroll' && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between mb-4">
+            <div className="space-y-6">
+              {/* Header with controls */}
+              <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-zinc-100">Payroll</h2>
                 <div className="flex items-center gap-2">
                   <Select value={payrollDateRange} onValueChange={(v: any) => setPayrollDateRange(v)}>
@@ -2550,221 +2944,397 @@ export default function TeamManagementPage() {
                   </CardContent>
                 </Card>
               ) : (
-                <div className="space-y-4">
-                  {/* Summary Cards */}
+                <div className="space-y-6">
+                  {/* NEW: Summary Cards - Money In/Out at a glance */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <Card className="bg-zinc-800 border-zinc-700">
+                    {/* Card 1: You Owe Workers (from card/invoice jobs) */}
+                    <Card className="bg-zinc-900 border-zinc-800">
                       <CardContent className="p-4">
-                        <div className="text-sm text-zinc-400">Total Hours</div>
-                        <div className="text-2xl font-bold text-zinc-100">
+                        <p className="text-sm text-zinc-400">You Owe Workers</p>
+                        <p className="text-2xl font-bold text-red-400">
+                          ${(payrollSummary.unpaidBusinessOwes || 0).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">From card/invoice payments</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Card 2: Workers Owe You (from cash/check jobs) */}
+                    <Card className="bg-zinc-900 border-zinc-800">
+                      <CardContent className="p-4">
+                        <p className="text-sm text-zinc-400">Workers Owe You</p>
+                        <p className="text-2xl font-bold text-emerald-400">
+                          ${(payrollSummary.unpaidWorkerOwes || 0).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">From cash/check payments</p>
+                      </CardContent>
+                    </Card>
+
+                    {/* Card 3: Net Balance */}
+                    <Card className="bg-zinc-900 border-zinc-800">
+                      <CardContent className="p-4">
+                        <p className="text-sm text-zinc-400">Net Balance</p>
+                        {(() => {
+                          const net = (payrollSummary.unpaidWorkerOwes || 0) - (payrollSummary.unpaidBusinessOwes || 0);
+                          const isPositive = net >= 0;
+                          return (
+                            <>
+                              <p className={`text-2xl font-bold ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                                {isPositive ? '+' : '-'}${Math.abs(net).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-zinc-500 mt-1">
+                                {isPositive ? 'Workers owe you net' : 'You owe workers net'}
+                              </p>
+                            </>
+                          );
+                        })()}
+                      </CardContent>
+                    </Card>
+
+                    {/* Card 4: Period Stats */}
+                    <Card className="bg-zinc-900 border-zinc-800">
+                      <CardContent className="p-4">
+                        <p className="text-sm text-zinc-400">Pay Period</p>
+                        <p className="text-2xl font-bold text-zinc-100">
                           {(payrollSummary.totalHours || 0).toFixed(1)}h
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-zinc-800 border-zinc-700">
-                      <CardContent className="p-4">
-                        <div className="text-sm text-zinc-400">Total Earnings</div>
-                        <div className="text-2xl font-bold text-emerald-400">
-                          ${(payrollSummary.totalEarnings || 0).toFixed(2)}
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-zinc-800 border-zinc-700">
-                      <CardContent className="p-4">
-                        <div className="text-sm text-zinc-400">Unpaid</div>
-                        <div className="text-2xl font-bold text-amber-400">
-                          ${(payrollSummary.totalUnpaid || 0).toFixed(2)}
-                        </div>
-                      </CardContent>
-                    </Card>
-                    <Card className="bg-zinc-800 border-zinc-700">
-                      <CardContent className="p-4">
-                        <div className="text-sm text-zinc-400">Tips to Pay</div>
-                        <div className="text-2xl font-bold text-emerald-300">
-                          ${(payrollSummary.totalTipsEligible || 0).toFixed(2)}
-                        </div>
-                        {(payrollSummary.totalTipsRecorded || 0) > (payrollSummary.totalTipsEligible || 0) && (
-                          <p className="text-xs text-zinc-500 mt-2">
-                            Cash tips recorded: ${((payrollSummary.totalTipsRecorded || 0) - (payrollSummary.totalTipsEligible || 0)).toFixed(2)}
-                          </p>
-                        )}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-1">
+                          {payrollSummary.logsCount || 0} jobs • {payrollSummary.workersCount || 0} workers
+                        </p>
                       </CardContent>
                     </Card>
                   </div>
 
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {/* Worker Summary Cards - Quick settle up per worker */}
+                  {workerSummaries.length > 0 && (
                     <Card className="bg-zinc-800 border-zinc-700">
                       <CardHeader className="pb-2">
-                        <CardTitle className="text-zinc-100 text-base">Bulk Payout</CardTitle>
+                        <CardTitle className="text-zinc-100 text-base flex items-center gap-2">
+                          <Users className="h-4 w-4" />
+                          Worker Balances
+                        </CardTitle>
                         <CardDescription className="text-zinc-400">
-                          Select multiple jobs below or pay everything owed at once.
+                          Net balance per worker. Positive = they owe you, Negative = you owe them.
                         </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-3">
-                        {selectedTotals.count > 0 ? (
-                          <div className="text-xs text-emerald-400 font-medium space-y-1">
-                            <div>
-                              {selectedTotals.count} job{selectedTotals.count !== 1 ? 's' : ''} •{' '}
-                              {selectedTotals.workerCount} worker{selectedTotals.workerCount !== 1 ? 's' : ''} •{' '}
-                              {selectedTotals.hours.toFixed(1)}h • ${selectedTotals.amount.toFixed(2)}
-                            </div>
-                            {selectedTotals.tips > 0 && (
-                              <div className="text-emerald-300">
-                                Includes ${selectedTotals.tips.toFixed(2)} in tips owed
+                      <CardContent>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {workerSummaries.map(summary => {
+                            const workerId = summary.workerId;
+                            const worker = summary.worker;
+                            const netBalance = summary.netBalance;
+                            const isPositive = netBalance >= 0;
+
+                            return (
+                              <div
+                                key={workerId || summary.worker?.logs?.[0]?.id}
+                                className={cn(
+                                  "p-4 rounded-lg border",
+                                  isPositive
+                                    ? "bg-emerald-950/30 border-emerald-800/50"
+                                    : "bg-red-950/30 border-red-800/50"
+                                )}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <button
+                                    onClick={() => workerId && setProfileWorkerId(workerId)}
+                                    className="flex items-center gap-3 hover:opacity-80 transition-opacity"
+                                  >
+                                    <Avatar className="h-10 w-10">
+                                      {worker?.user?.profilePhotoUrl && (
+                                        <AvatarImage src={worker.user.profilePhotoUrl} alt={`${worker.user.firstName} ${worker.user.lastName}`} />
+                                      )}
+                                      <AvatarFallback style={{ backgroundColor: worker?.user?.color || '#10b981' }}>
+                                        {worker?.user?.firstName?.[0] ?? '?'}
+                                        {worker?.user?.lastName?.[0] ?? ''}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="text-left">
+                                      <div className="text-sm font-medium text-zinc-100">
+                                        {worker?.user
+                                          ? `${worker.user.firstName} ${worker.user.lastName}`
+                                          : 'Worker'}
+                                      </div>
+                                      <div className="text-xs text-zinc-500">
+                                        {summary.unpaidJobs} unpaid job{summary.unpaidJobs === 1 ? '' : 's'}
+                                      </div>
+                                    </div>
+                                  </button>
+                                  <div className="text-right">
+                                    <div className={cn(
+                                      "text-lg font-bold",
+                                      isPositive ? "text-emerald-400" : "text-red-400"
+                                    )}>
+                                      {isPositive ? '+' : '-'}${Math.abs(netBalance).toFixed(2)}
+                                    </div>
+                                    <div className="text-xs text-zinc-500">
+                                      {isPositive ? 'They owe you' : 'You owe them'}
+                                    </div>
+                                  </div>
+                                </div>
+                                {summary.unpaidJobs > 0 && (
+                                  <div className="mt-3 pt-3 border-t border-zinc-700/50 flex items-center justify-between text-xs">
+                                    <div className="text-zinc-400">
+                                      {summary.owedByBusiness > 0 && (
+                                        <span className="mr-3">Pay out: <span className="text-red-400">${summary.owedByBusiness.toFixed(2)}</span></span>
+                                      )}
+                                      {summary.owesToBusiness > 0 && (
+                                        <span>Collect: <span className="text-emerald-400">${summary.owesToBusiness.toFixed(2)}</span></span>
+                                      )}
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      className={cn(
+                                        "h-7 text-xs",
+                                        isPositive
+                                          ? "bg-emerald-600 hover:bg-emerald-500"
+                                          : "bg-red-600 hover:bg-red-500"
+                                      )}
+                                      disabled={!workerId || processingWorkerPay === workerId}
+                                      onClick={() => workerId && handleMarkWorkerPaid(workerId)}
+                                    >
+                                      {processingWorkerPay === workerId ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                      ) : (
+                                        'Settle Up'
+                                      )}
+                                    </Button>
+                                  </div>
+                                )}
                               </div>
-                            )}
+                            );
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* PAY OUT Section - Business owes workers (card/invoice jobs) */}
+                  {payOutItems.length > 0 && (
+                    <Card className="bg-zinc-800 border-zinc-700">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-zinc-100 text-base flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full bg-red-500" />
+                              Pay Out to Workers
+                            </CardTitle>
+                            <CardDescription className="text-zinc-400">
+                              Jobs paid by card/invoice - you owe workers their earnings
+                            </CardDescription>
                           </div>
-                        ) : (
-                          <div className="text-xs text-zinc-400">
-                            Select rows in the table to build a payout batch.
-                          </div>
-                        )}
-                        <div className="flex flex-col gap-2">
-                          <Button
-                            onClick={handleMarkSelectedPaid}
-                            disabled={selectedTotals.count === 0 || bulkPayLoading}
-                            className="bg-emerald-600 hover:bg-emerald-500"
-                          >
-                            {bulkPayLoading ? (
-                              <span className="flex items-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                Processing...
-                              </span>
-                            ) : (
-                              `Pay Selected Jobs${selectedTotals.count > 0 ? ` (${selectedTotals.count})` : ''}`
-                            )}
-                          </Button>
                           <Button
                             variant="outline"
+                            size="sm"
                             onClick={handleMarkAllPaid}
-                            disabled={unpaidWorkLogs.length === 0 || bulkPayLoading}
-                            className="border-emerald-600 text-emerald-400 hover:bg-emerald-600/10"
+                            disabled={payOutItems.length === 0 || bulkPayLoading}
+                            className="border-red-600 text-red-400 hover:bg-red-600/10"
                           >
                             {bulkPayLoading ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              `Pay All (${unpaidWorkLogs.length} jobs • ${unpaidWorkerCount} workers • $${totalUnpaidAmount.toFixed(2)})`
+                              `Pay All (${payOutItems.length})`
                             )}
                           </Button>
                         </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card className="bg-zinc-800 border-zinc-700 lg:col-span-2">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-zinc-100 text-base">Workers Owed</CardTitle>
-                        <CardDescription className="text-zinc-400">
-                          Pay each worker&apos;s outstanding jobs with a single click.
-                        </CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-3">
-                        {workerSummaries.length === 0 ? (
-                          <p className="text-sm text-zinc-400">Everyone is caught up. 🎉</p>
-                        ) : (
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="text-xs uppercase tracking-wide text-zinc-400 border-b border-zinc-700/60">
-                                  <th className="text-left py-2">Worker</th>
-                                  <th className="text-left py-2">Jobs</th>
-                                  <th className="text-left py-2">Hours</th>
-                                  <th className="text-left py-2">Base Pay</th>
-                                  <th className="text-left py-2">Tips Due</th>
-                                  <th className="text-left py-2">Total Owed</th>
-                                  <th className="text-right py-2">Action</th>
+                      <CardContent className="p-0">
+                        <table className="w-full">
+                          <thead className="bg-zinc-900/50">
+                            <tr>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Worker</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Job</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Date</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Hours</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Earnings</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Status</th>
+                              <th className="text-right p-4 text-sm font-medium text-zinc-400">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-700">
+                            {payOutItems.map(log => {
+                              const payoutAmount = getPayoutAmount(log);
+                              return (
+                                <tr key={log.id} className="hover:bg-zinc-700/30">
+                                  <td className="p-4">
+                                    <button
+                                      onClick={() => log.userId && setProfileWorkerId(log.userId)}
+                                      className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                                    >
+                                      <Avatar className="h-8 w-8">
+                                        {log.user?.profilePhotoUrl && (
+                                          <AvatarImage src={log.user.profilePhotoUrl} alt={`${log.user.firstName} ${log.user.lastName}`} />
+                                        )}
+                                        <AvatarFallback style={{ backgroundColor: log.user?.color || '#10b981' }}>
+                                          {log.user?.firstName?.[0]}{log.user?.lastName?.[0]}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-sm text-zinc-200 hover:text-emerald-400 transition-colors">
+                                        {log.user?.firstName} {log.user?.lastName}
+                                      </span>
+                                    </button>
+                                  </td>
+                                  <td className="p-4 text-sm text-zinc-300">
+                                    {log.job?.serviceType || 'Unknown'}
+                                  </td>
+                                  <td className="p-4 text-sm text-zinc-400">
+                                    {format(new Date(log.clockIn), 'MMM d, h:mm a')}
+                                  </td>
+                                  <td className="p-4 text-sm text-zinc-300">
+                                    {log.hoursWorked?.toFixed(1) || '-'}h
+                                  </td>
+                                  <td className="p-4 text-sm font-medium text-red-400">
+                                    ${payoutAmount.toFixed(2)}
+                                  </td>
+                                  <td className="p-4">
+                                    <Badge className="bg-amber-600/20 text-amber-400 border-amber-600/30">
+                                      Unpaid
+                                    </Badge>
+                                  </td>
+                                  <td className="p-4 text-right">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-red-600 text-red-400 hover:bg-red-600/20"
+                                      onClick={() => handleMarkPaid(log.id)}
+                                      disabled={processingPay === log.id}
+                                    >
+                                      {processingPay === log.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        'Mark Paid'
+                                      )}
+                                    </Button>
+                                  </td>
                                 </tr>
-                              </thead>
-                              <tbody className="divide-y divide-zinc-700/50">
-                                {workerSummaries.map(summary => {
-                                  const workerId = summary.workerId;
-                                  const worker = summary.worker;
-                                  return (
-                                    <tr key={workerId || summary.worker?.logs?.[0]?.id} className="hover:bg-zinc-900/40">
-                                      <td className="py-3 pr-3">
-                                        <div className="flex items-center gap-3">
-                                          <Avatar className="h-10 w-10">
-                                            <AvatarFallback style={{ backgroundColor: worker?.user?.color || '#10b981' }}>
-                                              {worker?.user?.firstName?.[0] ?? '?'}
-                                              {worker?.user?.lastName?.[0] ?? ''}
-                                            </AvatarFallback>
-                                          </Avatar>
-                                          <div>
-                                            <div className="text-sm font-medium text-zinc-100">
-                                              {worker?.user
-                                                ? `${worker.user.firstName} ${worker.user.lastName}`
-                                                : 'Worker'}
-                                            </div>
-                                            <div className="text-xs text-zinc-500">
-                                              {summary.totalJobs} job{summary.totalJobs === 1 ? '' : 's'} this period
-                                            </div>
-                                          </div>
-                                        </div>
-                                      </td>
-                                      <td className="py-3 text-zinc-300">
-                                        <div className="font-medium text-zinc-100">
-                                          {summary.unpaidJobs} unpaid
-                                        </div>
-                                        <div className="text-xs text-zinc-500">
-                                          of {summary.totalJobs} total
-                                        </div>
-                                      </td>
-                                      <td className="py-3 text-zinc-300">
-                                        <div className="font-medium text-zinc-100">
-                                          {summary.hoursDue.toFixed(1)}h
-                                        </div>
-                                        <div className="text-xs text-zinc-500">
-                                          {summary.totalHours.toFixed(1)}h worked
-                                        </div>
-                                      </td>
-                                      <td className="py-3 text-zinc-300">
-                                        <div className="font-medium text-zinc-100">
-                                          ${summary.baseDue.toFixed(2)}
-                                        </div>
-                                        <div className="text-xs text-zinc-500">Base pay</div>
-                                      </td>
-                                      <td className="py-3 text-zinc-300">
-                                        <div className="font-medium text-emerald-300">
-                                          ${summary.tipsDue.toFixed(2)}
-                                        </div>
-                                        <div className="text-xs text-zinc-500">
-                                          Tips to send
-                                          {summary.cashTips > 0 && (
-                                            <span className="ml-1 text-amber-400">
-                                              (+ ${summary.cashTips.toFixed(2)} cash)
-                                            </span>
-                                          )}
-                                        </div>
-                                      </td>
-                                      <td className="py-3 text-emerald-400 font-semibold">
-                                        ${summary.totalDue.toFixed(2)}
-                                      </td>
-                                      <td className="py-3 text-right">
-                                        <Button
-                                          size="sm"
-                                          className="bg-emerald-600 hover:bg-emerald-500"
-                                          disabled={!workerId || processingWorkerPay === workerId}
-                                          onClick={() => workerId && handleMarkWorkerPaid(workerId)}
-                                        >
-                                          {processingWorkerPay === workerId ? (
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                          ) : (
-                                            `Pay $${summary.totalDue.toFixed(2)}`
-                                          )}
-                                        </Button>
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
+                              );
+                            })}
+                          </tbody>
+                        </table>
                       </CardContent>
                     </Card>
-                  </div>
+                  )}
 
-                  {/* Work Logs Table */}
+                  {/* COLLECT Section - Workers owe business (cash/check jobs) */}
+                  {collectItems.length > 0 && (
+                    <Card className="bg-zinc-800 border-zinc-700">
+                      <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="text-zinc-100 text-base flex items-center gap-2">
+                              <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                              Collect from Workers
+                            </CardTitle>
+                            <CardDescription className="text-zinc-400">
+                              Jobs paid by cash/check - workers collected payment and owe you
+                            </CardDescription>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-0">
+                        <table className="w-full">
+                          <thead className="bg-zinc-900/50">
+                            <tr>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Worker</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Job</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Date</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Collected</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Their Cut</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Owes You</th>
+                              <th className="text-left p-4 text-sm font-medium text-zinc-400">Status</th>
+                              <th className="text-right p-4 text-sm font-medium text-zinc-400">Action</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-700">
+                            {collectItems.map(log => {
+                              const collected = log.collectedAmount || 0;
+                              const theirCut = log.earnings || 0;
+                              const owesYou = log.businessOwedAmount || 0;
+
+                              return (
+                                <tr key={log.id} className="hover:bg-zinc-700/30">
+                                  <td className="p-4">
+                                    <button
+                                      onClick={() => log.userId && setProfileWorkerId(log.userId)}
+                                      className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                                    >
+                                      <Avatar className="h-8 w-8">
+                                        {log.user?.profilePhotoUrl && (
+                                          <AvatarImage src={log.user.profilePhotoUrl} alt={`${log.user.firstName} ${log.user.lastName}`} />
+                                        )}
+                                        <AvatarFallback style={{ backgroundColor: log.user?.color || '#10b981' }}>
+                                          {log.user?.firstName?.[0]}{log.user?.lastName?.[0]}
+                                        </AvatarFallback>
+                                      </Avatar>
+                                      <span className="text-sm text-zinc-200 hover:text-emerald-400 transition-colors">
+                                        {log.user?.firstName} {log.user?.lastName}
+                                      </span>
+                                    </button>
+                                  </td>
+                                  <td className="p-4 text-sm text-zinc-300">
+                                    {log.job?.serviceType || 'Unknown'}
+                                  </td>
+                                  <td className="p-4 text-sm text-zinc-400">
+                                    {format(new Date(log.clockIn), 'MMM d, h:mm a')}
+                                  </td>
+                                  <td className="p-4 text-sm text-zinc-300">
+                                    ${collected.toFixed(2)}
+                                  </td>
+                                  <td className="p-4 text-sm text-zinc-400">
+                                    ${theirCut.toFixed(2)}
+                                  </td>
+                                  <td className="p-4 text-sm font-medium text-emerald-400">
+                                    ${owesYou.toFixed(2)}
+                                  </td>
+                                  <td className="p-4">
+                                    <Badge className="bg-amber-600/20 text-amber-400 border-amber-600/30">
+                                      Pending ${owesYou.toFixed(2)}
+                                    </Badge>
+                                  </td>
+                                  <td className="p-4 text-right">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="border-emerald-600 text-emerald-400 hover:bg-emerald-600/20"
+                                      onClick={() => handleMarkCollected(log.id)}
+                                      disabled={processingPay === log.id}
+                                    >
+                                      {processingPay === log.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        'Mark Collected'
+                                      )}
+                                    </Button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Show "All caught up" message if no pending items */}
+                  {payOutItems.length === 0 && collectItems.length === 0 && workLogs.length > 0 && (
+                    <Card className="bg-zinc-800 border-zinc-700">
+                      <CardContent className="p-8 text-center">
+                        <div className="text-4xl mb-4">🎉</div>
+                        <h3 className="text-lg font-medium text-zinc-200 mb-2">All Caught Up!</h3>
+                        <p className="text-sm text-zinc-400">
+                          No pending payouts or collections for this period.
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* All Work Logs - Full history view */}
                   <Card className="bg-zinc-800 border-zinc-700">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-zinc-100 text-base">All Work Logs</CardTitle>
+                      <CardDescription className="text-zinc-400">
+                        Complete history for this period including paid items
+                      </CardDescription>
+                    </CardHeader>
                     <CardContent className="p-0">
                       <table className="w-full">
                         <thead className="bg-zinc-900/50">
@@ -2783,19 +3353,17 @@ export default function TeamManagementPage() {
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Job</th>
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Date</th>
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Hours</th>
-                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Base Pay</th>
-                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Tip</th>
-                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Total Due</th>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Amount</th>
+                            <th className="text-left p-4 text-sm font-medium text-zinc-400">Direction</th>
                             <th className="text-left p-4 text-sm font-medium text-zinc-400">Status</th>
                             <th className="text-right p-4 text-sm font-medium text-zinc-400">Action</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-700">
                           {workLogs.map(log => {
-                            const recordedTip = getRecordedTip(log);
-                            const tipEligible = getTipEligible(log);
                             const payoutAmount = getPayoutAmount(log);
-                            const basePay = Math.max(payoutAmount - tipEligible, 0);
+                            const isWorkerOwes = log.workerOwes;
+                            const owesAmount = isWorkerOwes ? (log.businessOwedAmount || 0) : payoutAmount;
 
                             return (
                               <tr key={log.id} className="hover:bg-zinc-700/30">
@@ -2804,87 +3372,85 @@ export default function TeamManagementPage() {
                                     type="checkbox"
                                     className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-emerald-500 focus:ring-emerald-500"
                                     checked={selectedWorkLogIds.includes(log.id)}
-                                  onChange={() => toggleSelectWorkLog(log.id)}
-                                  disabled={log.isPaid}
-                                />
-                              </td>
-                              <td className="p-4">
-                                <button
-                                  onClick={() => log.userId && setProfileWorkerId(log.userId)}
-                                  className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-                                >
-                                  <Avatar className="h-8 w-8">
-                                    <AvatarFallback style={{ backgroundColor: log.user?.color || '#10b981' }}>
-                                      {log.user?.firstName?.[0]}{log.user?.lastName?.[0]}
-                                    </AvatarFallback>
-                                  </Avatar>
-                                  <span className="text-sm text-zinc-200 hover:text-emerald-400 transition-colors">
-                                    {log.user?.firstName} {log.user?.lastName}
-                                  </span>
-                                </button>
-                              </td>
-                              <td className="p-4 text-sm text-zinc-300">
-                                {log.job?.serviceType || 'Unknown'}
-                              </td>
-                              <td className="p-4 text-sm text-zinc-400">
-                                {format(new Date(log.clockIn), 'MMM d, h:mm a')}
-                              </td>
-                              <td className="p-4 text-sm text-zinc-300">
-                                {log.hoursWorked?.toFixed(1) || '-'}h
-                              </td>
-                              <td className="p-4 text-sm text-zinc-300">
-                                ${basePay.toFixed(2)}
-                              </td>
-                              <td className="p-4 text-sm">
-                                {tipEligible > 0 ? (
-                                  <div className="text-emerald-400 font-medium">
-                                    +${tipEligible.toFixed(2)}
-                                    <div className="text-xs text-zinc-500">Card/Check/Invoice</div>
-                                  </div>
-                                ) : recordedTip > 0 ? (
-                                  <div className="text-amber-400 font-medium">
-                                    Cash ${recordedTip.toFixed(2)}
-                                    <div className="text-xs text-zinc-500">Worker already has it</div>
-                                  </div>
-                                ) : (
-                                  <span className="text-zinc-500">—</span>
-                                )}
-                              </td>
-                              <td className="p-4 text-sm font-medium text-emerald-400">
-                                ${payoutAmount.toFixed(2)}
-                                {tipEligible > 0 && (
-                                  <div className="text-xs text-zinc-500">Includes tip</div>
-                                )}
-                              </td>
-                              <td className="p-4">
-                                <Badge
-                                  className={
-                                    log.isPaid
-                                      ? 'bg-green-600/20 text-green-400 border-green-600/30'
-                                      : 'bg-amber-600/20 text-amber-400 border-amber-600/30'
-                                  }
-                                >
-                                  {log.isPaid ? 'Paid' : 'Unpaid'}
-                                </Badge>
-                              </td>
-                              <td className="p-4 text-right">
-                                {!log.isPaid && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-emerald-600 text-emerald-400 hover:bg-emerald-600/20"
-                                    onClick={() => handleMarkPaid(log.id)}
-                                    disabled={processingPay === log.id}
+                                    onChange={() => toggleSelectWorkLog(log.id)}
+                                    disabled={log.isPaid}
+                                  />
+                                </td>
+                                <td className="p-4">
+                                  <button
+                                    onClick={() => log.userId && setProfileWorkerId(log.userId)}
+                                    className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                                   >
-                                    {processingPay === log.id ? (
-                                      <Loader2 className="h-4 w-4 animate-spin" />
-                                    ) : (
-                                      'Mark Paid'
-                                    )}
-                                  </Button>
-                                )}
-                              </td>
-                            </tr>
+                                    <Avatar className="h-8 w-8">
+                                      {log.user?.profilePhotoUrl && (
+                                        <AvatarImage src={log.user.profilePhotoUrl} alt={`${log.user.firstName} ${log.user.lastName}`} />
+                                      )}
+                                      <AvatarFallback style={{ backgroundColor: log.user?.color || '#10b981' }}>
+                                        {log.user?.firstName?.[0]}{log.user?.lastName?.[0]}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <span className="text-sm text-zinc-200 hover:text-emerald-400 transition-colors">
+                                      {log.user?.firstName} {log.user?.lastName}
+                                    </span>
+                                  </button>
+                                </td>
+                                <td className="p-4 text-sm text-zinc-300">
+                                  {log.job?.serviceType || 'Unknown'}
+                                </td>
+                                <td className="p-4 text-sm text-zinc-400">
+                                  {format(new Date(log.clockIn), 'MMM d, h:mm a')}
+                                </td>
+                                <td className="p-4 text-sm text-zinc-300">
+                                  {log.hoursWorked?.toFixed(1) || '-'}h
+                                </td>
+                                <td className={cn(
+                                  "p-4 text-sm font-medium",
+                                  isWorkerOwes ? "text-emerald-400" : "text-red-400"
+                                )}>
+                                  ${owesAmount.toFixed(2)}
+                                </td>
+                                <td className="p-4">
+                                  <Badge className={cn(
+                                    isWorkerOwes
+                                      ? "bg-emerald-600/20 text-emerald-400 border-emerald-600/30"
+                                      : "bg-red-600/20 text-red-400 border-red-600/30"
+                                  )}>
+                                    {isWorkerOwes ? 'Collect' : 'Pay Out'}
+                                  </Badge>
+                                </td>
+                                <td className="p-4">
+                                  <Badge
+                                    className={
+                                      log.isPaid
+                                        ? 'bg-green-600/20 text-green-400 border-green-600/30'
+                                        : 'bg-amber-600/20 text-amber-400 border-amber-600/30'
+                                    }
+                                  >
+                                    {log.isPaid ? (isWorkerOwes ? 'Collected' : 'Paid') : (isWorkerOwes ? 'Pending' : 'Unpaid')}
+                                  </Badge>
+                                </td>
+                                <td className="p-4 text-right">
+                                  {!log.isPaid && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className={cn(
+                                        isWorkerOwes
+                                          ? "border-emerald-600 text-emerald-400 hover:bg-emerald-600/20"
+                                          : "border-red-600 text-red-400 hover:bg-red-600/20"
+                                      )}
+                                      onClick={() => isWorkerOwes ? handleMarkCollected(log.id) : handleMarkPaid(log.id)}
+                                      disabled={processingPay === log.id}
+                                    >
+                                      {processingPay === log.id ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                      ) : (
+                                        isWorkerOwes ? 'Collect' : 'Pay'
+                                      )}
+                                    </Button>
+                                  )}
+                                </td>
+                              </tr>
                             );
                           })}
                         </tbody>

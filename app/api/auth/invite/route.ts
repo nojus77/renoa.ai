@@ -100,6 +100,26 @@ export async function POST(request: NextRequest) {
     const tempPassword = generateTempPassword();
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
+    // Fetch provider's business hours to use as default working hours
+    const provider = await prisma.provider.findUnique({
+      where: { id: currentUser.providerId },
+      select: { workingHours: true },
+    });
+
+    // Default working hours if provider doesn't have any set
+    const defaultWorkingHours = {
+      monday: { enabled: true, start: '09:00', end: '17:00' },
+      tuesday: { enabled: true, start: '09:00', end: '17:00' },
+      wednesday: { enabled: true, start: '09:00', end: '17:00' },
+      thursday: { enabled: true, start: '09:00', end: '17:00' },
+      friday: { enabled: true, start: '09:00', end: '17:00' },
+      saturday: { enabled: false, start: '09:00', end: '17:00' },
+      sunday: { enabled: false, start: '09:00', end: '17:00' },
+    };
+
+    // Use provider's working hours if available, otherwise use defaults
+    const workingHours = provider?.workingHours || defaultWorkingHours;
+
     // Create the new user
     const newUser = await prisma.providerUser.create({
       data: {
@@ -111,6 +131,7 @@ export async function POST(request: NextRequest) {
         role,
         skills: [], // Keep empty for backward compatibility
         status: 'active',
+        workingHours: workingHours as any, // Inherit business hours as default
       },
     });
 
