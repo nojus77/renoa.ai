@@ -30,6 +30,8 @@ import {
   Wrench,
   Plus,
   Pencil,
+  Sun,
+  Moon,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -219,6 +221,9 @@ export default function WorkerProfile() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  // Theme state
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
   const fetchProfile = useCallback(async (uid: string) => {
     try {
       const res = await fetch(`/api/worker/profile?userId=${uid}`);
@@ -274,7 +279,31 @@ export default function WorkerProfile() {
         }
       })
       .catch((err) => console.error('Error fetching crew:', err));
+
+    // Load saved theme preference
+    const savedTheme = localStorage.getItem('workerTheme') as 'dark' | 'light' | null;
+    if (savedTheme) {
+      setTheme(savedTheme);
+      applyTheme(savedTheme);
+    }
   }, [router, fetchProfile]);
+
+  // Apply theme to document
+  const applyTheme = (newTheme: 'dark' | 'light') => {
+    if (newTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+  };
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(newTheme);
+    localStorage.setItem('workerTheme', newTheme);
+    applyTheme(newTheme);
+    toast.success(`${newTheme === 'light' ? 'Light' : 'Dark'} mode enabled`);
+  };
 
   // Track profile changes
   useEffect(() => {
@@ -842,6 +871,35 @@ export default function WorkerProfile() {
                     </div>
                     <ChevronRight className="w-5 h-5 text-zinc-600" />
                   </button>
+
+                  {/* Theme Toggle */}
+                  <div className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 bg-zinc-800 rounded-lg flex items-center justify-center">
+                        {theme === 'dark' ? (
+                          <Moon className="w-4 h-4 text-zinc-400" />
+                        ) : (
+                          <Sun className="w-4 h-4 text-yellow-400" />
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-white font-medium">Appearance</span>
+                        <p className="text-xs text-zinc-500">{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={toggleTheme}
+                      className={`relative w-12 h-7 rounded-full transition-colors ${
+                        theme === 'light' ? 'bg-[#C4F542]' : 'bg-zinc-700'
+                      }`}
+                    >
+                      <span
+                        className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
+                          theme === 'light' ? 'left-6' : 'left-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
 
                   <div className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">

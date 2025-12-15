@@ -243,7 +243,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       {process.env.NODE_ENV === 'development' && <ClickToComponent />}
       <div className="flex flex-col h-screen bg-background overflow-hidden">
         {/* Top Navigation Bar - Desktop */}
-        <div className="hidden lg:flex fixed top-0 left-0 right-0 h-[72px] bg-zinc-900 border-b border-zinc-800 z-50">
+        <div className="hidden lg:flex fixed top-0 left-0 right-0 h-[72px] bg-card dark:bg-zinc-900 border-b border-border dark:border-zinc-800 z-50 shadow-sm dark:shadow-none">
           <div className="flex items-center w-full px-8 max-w-[1920px] mx-auto">
             {/* Left: Logo + Business Name */}
             <div className="flex items-center gap-3 flex-shrink-0 min-w-[240px]">
@@ -251,15 +251,15 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                 <img
                   src={profilePhotoUrl}
                   alt="Logo"
-                  className="w-10 h-10 rounded-lg object-cover border border-zinc-700"
+                  className="w-10 h-10 rounded-lg object-cover border border-border dark:border-zinc-700"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-lg bg-emerald-600 flex items-center justify-center text-white font-bold text-sm">
+                <div className="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold text-sm">
                   {providerName?.charAt(0).toUpperCase() || 'R'}
                 </div>
               )}
               <div>
-                <h1 className="text-base font-bold text-zinc-100 whitespace-nowrap">
+                <h1 className="text-base font-bold text-foreground dark:text-zinc-100 whitespace-nowrap">
                   {providerName || 'Provider Portal'}
                 </h1>
               </div>
@@ -278,10 +278,10 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                     className={`
                       flex items-center gap-2 px-4 py-4 rounded-full transition-all font-medium whitespace-nowrap
                       ${active
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-primary text-primary-foreground'
                         : item.disabled
-                        ? 'text-zinc-500 cursor-not-allowed'
-                        : 'text-zinc-300 hover:bg-emerald-800/50 hover:text-white'
+                        ? 'text-muted-foreground cursor-not-allowed'
+                        : 'text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-emerald-800/50 hover:text-foreground dark:hover:text-white'
                       }
                     `}
                     style={{ fontSize: '14px' }}
@@ -302,7 +302,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
               <div className="relative">
                 <button
                   onClick={() => setNotificationsOpen(!notificationsOpen)}
-                  className="p-2.5 rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors relative"
+                  className="p-2.5 rounded-lg text-muted-foreground dark:text-zinc-400 hover:bg-accent dark:hover:bg-zinc-800 hover:text-foreground dark:hover:text-white transition-colors relative"
                   title="Notifications"
                 >
                   <Bell className="h-5 w-5" />
@@ -337,45 +337,45 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
               <div className="relative profile-dropdown">
                 <button
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-zinc-800 transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-accent dark:hover:bg-zinc-800 transition-colors"
                 >
                   {profilePhotoUrl ? (
                     <img
                       src={profilePhotoUrl}
                       alt="Profile"
-                      className="w-9 h-9 rounded-full object-cover border border-zinc-700"
+                      className="w-9 h-9 rounded-full object-cover border border-border dark:border-zinc-700"
                     />
                   ) : (
-                    <div className="w-9 h-9 rounded-full bg-zinc-700 flex items-center justify-center text-zinc-300 font-medium text-sm">
+                    <div className="w-9 h-9 rounded-full bg-muted dark:bg-zinc-700 flex items-center justify-center text-muted-foreground dark:text-zinc-300 font-medium text-sm">
                       {providerName?.charAt(0).toUpperCase() || 'P'}
                     </div>
                   )}
-                  <ChevronDown className={`h-4 w-4 text-zinc-400 transition-transform ${profileDropdownOpen ? 'rotate-180' : ''}`} />
+                  <ChevronDown className={`h-4 w-4 text-muted-foreground dark:text-zinc-400 transition-transform ${profileDropdownOpen ? 'rotate-180' : ''}`} />
                 </button>
 
                 {/* Dropdown Menu */}
                 {profileDropdownOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-72 bg-zinc-900 border border-zinc-800 rounded-lg shadow-xl overflow-hidden">
+                  <div className="absolute right-0 top-full mt-2 w-72 bg-card dark:bg-zinc-900 border border-border dark:border-zinc-800 rounded-lg shadow-xl overflow-hidden">
                     {/* User Info Header */}
-                    <div className="px-4 py-4 bg-gradient-to-br from-emerald-600/10 to-emerald-800/5 border-b border-zinc-800">
+                    <div className="px-4 py-4 bg-gradient-to-br from-primary/10 to-primary/5 border-b border-border dark:border-zinc-800">
                       <div className="flex items-center gap-3 mb-2">
                         {profilePhotoUrl ? (
                           <img
                             src={profilePhotoUrl}
                             alt="Profile"
-                            className="w-12 h-12 rounded-full object-cover border-2 border-emerald-500/30"
+                            className="w-12 h-12 rounded-full object-cover border-2 border-primary/30"
                           />
                         ) : (
-                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-400 flex items-center justify-center text-white text-lg font-bold">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-emerald-400 flex items-center justify-center text-white text-lg font-bold">
                             {(userName || providerName)?.charAt(0).toUpperCase() || 'U'}
                           </div>
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-zinc-100 truncate">
+                          <p className="text-sm font-semibold text-foreground dark:text-zinc-100 truncate">
                             {userName || providerName || 'User'}
                           </p>
                           {userEmail && (
-                            <p className="text-xs text-zinc-400 truncate flex items-center gap-1">
+                            <p className="text-xs text-muted-foreground dark:text-zinc-400 truncate flex items-center gap-1">
                               <Mail className="h-3 w-3" />
                               {userEmail}
                             </p>
@@ -383,7 +383,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-primary/20 text-primary border border-primary/30">
                           {userRole === 'owner' ? 'Owner' : userRole === 'office' ? 'Office' : 'Field'}
                         </span>
                       </div>
@@ -393,7 +393,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                     <div className="py-2">
                       <Link
                         href="/provider/dashboard"
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-zinc-800 hover:text-foreground dark:hover:text-white transition-colors"
                         onClick={() => setProfileDropdownOpen(false)}
                       >
                         <Target className="h-4 w-4" />
@@ -402,7 +402,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
 
                       <Link
                         href="/provider/profile"
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-zinc-800 hover:text-foreground dark:hover:text-white transition-colors"
                         onClick={() => setProfileDropdownOpen(false)}
                       >
                         <User className="h-4 w-4" />
@@ -412,7 +412,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                       {userRole === 'owner' && (
                         <Link
                           href="/provider/billing"
-                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                          className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-zinc-800 hover:text-foreground dark:hover:text-white transition-colors"
                           onClick={() => setProfileDropdownOpen(false)}
                         >
                           <CreditCard className="h-4 w-4" />
@@ -424,7 +424,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                         href="https://docs.renoa.com"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-zinc-800 hover:text-foreground dark:hover:text-white transition-colors"
                       >
                         <HelpCircle className="h-4 w-4" />
                         <span>Help Center</span>
@@ -432,13 +432,13 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                     </div>
 
                     {/* Divider */}
-                    <div className="border-t border-zinc-800 my-1"></div>
+                    <div className="border-t border-border dark:border-zinc-800 my-1"></div>
 
                     {/* Settings & Theme */}
                     <div className="py-2">
                       <Link
                         href="/provider/settings"
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-zinc-800 hover:text-foreground dark:hover:text-white transition-colors"
                         onClick={() => setProfileDropdownOpen(false)}
                       >
                         <Settings className="h-4 w-4" />
@@ -450,13 +450,13 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                     </div>
 
                     {/* Logout */}
-                    <div className="border-t border-zinc-800 pt-2">
+                    <div className="border-t border-border dark:border-zinc-800 pt-2">
                       <button
                         onClick={() => {
                           setProfileDropdownOpen(false);
                           handleLogout();
                         }}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-400 hover:bg-zinc-800 hover:text-red-300 transition-colors w-full text-left"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-500 dark:text-red-400 hover:bg-accent dark:hover:bg-zinc-800 hover:text-red-600 dark:hover:text-red-300 transition-colors w-full text-left"
                       >
                         <LogOut className="h-4 w-4" />
                         <span>Logout</span>
@@ -470,18 +470,18 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
         </div>
 
         {/* Mobile Header */}
-        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-zinc-900 border-b border-zinc-800 z-40 flex items-center justify-between px-4">
+        <div className="lg:hidden fixed top-0 left-0 right-0 h-16 bg-card dark:bg-zinc-900 border-b border-border dark:border-zinc-800 z-40 flex items-center justify-between px-4 shadow-sm dark:shadow-none">
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+            className="p-2 text-muted-foreground dark:text-zinc-400 hover:text-foreground dark:hover:text-white hover:bg-accent dark:hover:bg-zinc-800 rounded-lg transition-colors"
           >
             <Menu className="h-6 w-6" />
           </button>
 
           <div className="text-center">
-            <h1 className="text-lg font-bold text-zinc-100">Provider Portal</h1>
+            <h1 className="text-lg font-bold text-foreground dark:text-zinc-100">Provider Portal</h1>
             {providerName && (
-              <p className="text-xs text-zinc-500">{providerName}</p>
+              <p className="text-xs text-muted-foreground dark:text-zinc-500">{providerName}</p>
             )}
           </div>
 
@@ -498,31 +498,31 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
 
         {/* Mobile Menu Sidebar */}
         {mobileMenuOpen && (
-          <div className="lg:hidden fixed left-0 top-0 bottom-0 w-72 bg-zinc-900 border-r border-zinc-800 z-[60] shadow-2xl animate-in slide-in-from-left duration-300">
+          <div className="lg:hidden fixed left-0 top-0 bottom-0 w-72 bg-card dark:bg-zinc-900 border-r border-border dark:border-zinc-800 z-[60] shadow-2xl animate-in slide-in-from-left duration-300">
             {/* Mobile menu header */}
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+            <div className="p-4 border-b border-border dark:border-zinc-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
                 {profilePhotoUrl ? (
                   <img
                     src={profilePhotoUrl}
                     alt="Profile"
-                    className="w-10 h-10 rounded-full object-cover border-2 border-emerald-600"
+                    className="w-10 h-10 rounded-full object-cover border-2 border-primary"
                   />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center text-white font-bold">
+                  <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-primary-foreground font-bold">
                     {providerName?.charAt(0).toUpperCase() || 'P'}
                   </div>
                 )}
                 <div>
-                  <h2 className="text-base font-bold text-zinc-100">Menu</h2>
+                  <h2 className="text-base font-bold text-foreground dark:text-zinc-100">Menu</h2>
                   {providerName && (
-                    <p className="text-xs text-zinc-500">{providerName}</p>
+                    <p className="text-xs text-muted-foreground dark:text-zinc-500">{providerName}</p>
                   )}
                 </div>
               </div>
               <button
                 onClick={() => setMobileMenuOpen(false)}
-                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg"
+                className="p-2 text-muted-foreground dark:text-zinc-400 hover:text-foreground dark:hover:text-white hover:bg-accent dark:hover:bg-zinc-800 rounded-lg"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -541,10 +541,10 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                     className={`
                       flex items-center gap-3 px-4 py-3 rounded-lg transition-all min-h-[44px]
                       ${active
-                        ? 'bg-emerald-600 text-white'
+                        ? 'bg-primary text-primary-foreground'
                         : item.disabled
-                        ? 'text-zinc-500 cursor-not-allowed'
-                        : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'
+                        ? 'text-muted-foreground cursor-not-allowed'
+                        : 'text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-zinc-800 hover:text-foreground dark:hover:text-white'
                       }
                     `}
                     onClick={(e) => {
@@ -560,10 +560,10 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
             </nav>
 
             {/* Mobile menu logout */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-zinc-800 bg-zinc-900">
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-border dark:border-zinc-800 bg-card dark:bg-zinc-900">
               <Button
                 variant="outline"
-                className="w-full min-h-[44px] bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+                className="w-full min-h-[44px] bg-muted dark:bg-zinc-800 border-border dark:border-zinc-700 text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-zinc-700 hover:text-foreground dark:hover:text-white"
                 onClick={handleLogout}
               >
                 <LogOut className="h-4 w-4 mr-2" />
@@ -579,7 +579,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
         </div>
 
         {/* Bottom Navigation - Mobile only */}
-        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-zinc-900 border-t border-zinc-800 z-40">
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 h-16 bg-card dark:bg-zinc-900 border-t border-border dark:border-zinc-800 z-40 shadow-[0_-1px_3px_0_rgb(0_0_0/0.1)] dark:shadow-none">
           <div className="flex items-center justify-around h-full px-2">
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
@@ -592,10 +592,10 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                   className={`
                     flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px] min-h-[44px]
                     ${active
-                      ? 'text-emerald-400'
+                      ? 'text-primary'
                       : item.disabled
-                      ? 'text-zinc-600 cursor-not-allowed'
-                      : 'text-zinc-400 active:bg-zinc-800'
+                      ? 'text-muted-foreground/50 cursor-not-allowed'
+                      : 'text-muted-foreground dark:text-zinc-400 active:bg-accent dark:active:bg-zinc-800'
                     }
                   `}
                   onClick={(e) => {
@@ -611,7 +611,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
             {/* More button for additional menu items */}
             <button
               onClick={() => setMobileMenuOpen(true)}
-              className="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px] min-h-[44px] text-zinc-400 active:bg-zinc-800"
+              className="flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px] min-h-[44px] text-muted-foreground dark:text-zinc-400 active:bg-accent dark:active:bg-zinc-800"
             >
               <MoreHorizontal className="h-5 w-5" />
               <span className="text-[10px] font-medium">More</span>

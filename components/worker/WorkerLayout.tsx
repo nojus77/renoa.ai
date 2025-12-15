@@ -2,7 +2,8 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Calendar, DollarSign, User } from 'lucide-react';
+import { Home, Calendar, DollarSign, User, MessageSquare, MapPin } from 'lucide-react';
+import { useEffect } from 'react';
 
 // Renoa Design System Colors
 const LIME_GREEN = '#C4F542';
@@ -13,13 +14,24 @@ interface WorkerLayoutProps {
 
 const navItems = [
   { href: '/worker/dashboard', icon: Home, label: 'Home' },
-  { href: '/worker/earnings', icon: DollarSign, label: 'Earnings' },
   { href: '/worker/schedule', icon: Calendar, label: 'Schedule' },
+  { href: '/worker/map', icon: MapPin, label: 'Map' },
+  { href: '/worker/earnings', icon: DollarSign, label: 'Earnings' },
   { href: '/worker/profile', icon: User, label: 'Profile' },
 ];
 
 export default function WorkerLayout({ children }: WorkerLayoutProps) {
   const pathname = usePathname();
+
+  // Apply saved theme on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('workerTheme') as 'dark' | 'light' | null;
+    if (savedTheme === 'light') {
+      document.documentElement.classList.remove('dark');
+    } else {
+      document.documentElement.classList.add('dark');
+    }
+  }, []);
 
   return (
     <div className="min-h-screen bg-black text-white pb-20">

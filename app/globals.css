@@ -3,64 +3,75 @@
 @tailwind utilities;
 
 @layer base {
+  /* LIGHT MODE - Soft, airy, premium */
   :root {
-    /* Light theme - MODERN 2026 DESIGN - Pure white like Linear/Stripe */
-    --background: 0 0% 100%;           /* Pure white #ffffff */
-    --foreground: 222 47% 11%;         /* Near-black #111827 */
+    --background: 210 40% 98%;        /* Soft bluish white #f8fafc */
+    --foreground: 222 47% 11%;        /* Deep slate #0f172a */
 
-    --card: 0 0% 100%;                 /* White cards */
-    --card-foreground: 222 47% 11%;    /* Near-black */
+    --card: 0 0% 100%;                /* Pure white */
+    --card-foreground: 222 47% 11%;
 
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
 
-    --primary: 100 65% 16%;            /* #2d5016 forest green */
-    --primary-foreground: 0 0% 100%;   /* White text on primary */
+    --primary: 160 84% 39%;           /* Emerald #10b981 */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 13% 97%;          /* Subtle gray #f9fafb */
+    --secondary: 210 40% 96%;         /* Very light blue-gray */
     --secondary-foreground: 222 47% 11%;
 
-    --muted: 220 13% 97%;              /* Gray-50 #f9fafb */
-    --muted-foreground: 215 14% 42%;   /* Gray-500 #6b7280 */
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;  /* Slate-500 for muted text */
 
-    --accent: 138 76% 97%;             /* Light green #f0fdf4 */
-    --accent-foreground: 100 65% 16%;  /* Forest green */
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 91%;             /* Clean gray #e5e7eb */
-    --input: 220 13% 91%;              /* Gray-200 */
-    --ring: 100 65% 16%;               /* Forest green focus ring */
+    --border: 214 32% 91%;            /* Soft visible border */
+    --input: 214 32% 91%;
+    --ring: 160 84% 39%;              /* Emerald focus ring */
 
-    --radius: 0.5rem;
-    --chart-1: 100 65% 16%;            /* Forest green */
-    --chart-2: 217 91% 60%;            /* Blue */
-    --chart-3: 142 76% 45%;            /* Emerald */
-    --chart-4: 43 96% 56%;             /* Yellow */
-    --chart-5: 340 75% 55%;            /* Rose */
+    --radius: 0.75rem;
+
+    --chart-1: 160 84% 39%;
+    --chart-2: 217 91% 60%;
+    --chart-3: 142 76% 45%;
+    --chart-4: 43 96% 56%;
+    --chart-5: 340 75% 55%;
   }
 
+  /* DARK MODE - Keep exactly as-is */
   .dark {
-    --background: 0 0% 3.9%;
+    --background: 0 0% 4%;            /* #0a0a0a */
     --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
+
+    --card: 0 0% 7%;                  /* #121212 */
     --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
+
+    --popover: 0 0% 7%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
+
+    --primary: 160 84% 39%;           /* Emerald */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 15%;
     --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
+
+    --muted: 0 0% 15%;
+    --muted-foreground: 0 0% 64%;
+
+    --accent: 0 0% 15%;
     --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+
+    --destructive: 0 62% 50%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+
+    --border: 0 0% 18%;
+    --input: 0 0% 18%;
+    --ring: 160 84% 39%;
+
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
@@ -78,308 +89,19 @@
   }
 }
 
-/* ========================================
-   LIGHT THEME - MODERN & CLEAN
-   ======================================== */
+/* ===========================================
+   LIGHT MODE CARD SHADOWS
+   =========================================== */
 
-.light {
-  color-scheme: light;
-
-  /* CSS Variables for light theme - MODERN 2026 DESIGN */
-  --background: 116 23% 85%;         /* Light sage green #c8d5b9 */
-  --foreground: 222 47% 11%;         /* Near-black #111827 */
-
-  --card: 0 0% 100%;                 /* White */
-  --card-foreground: 222 47% 11%;    /* Near-black */
-
-  --primary: 100 65% 16%;            /* #2d5016 forest green */
-  --primary-foreground: 0 0% 100%;
-
-  --secondary: 116 23% 85%;          /* Light sage green #c8d5b9 */
-  --secondary-foreground: 222 47% 11%;
-
-  --muted: 116 23% 85%;              /* Light sage green #c8d5b9 */
-  --muted-foreground: 215 14% 42%;   /* Gray-500 #6b7280 */
-
-  --accent: 138 76% 97%;             /* Light green #f0fdf4 */
-  --accent-foreground: 100 65% 16%;
-
-  --border: 220 13% 91%;             /* Clean gray #e5e7eb */
-  --input: 220 13% 91%;              /* Gray-200 */
-  --ring: 100 65% 16%;
+/* Light mode card shadows - only apply when NOT in dark mode */
+:root .card-elevated,
+:root [data-elevated="true"] {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
 }
 
-/* ============================================
-   MODERN 2026 LIGHT THEME - Like Linear/Stripe
-   ============================================ */
-
-/* Base styles - Light sage green background */
-.light body {
-  background-color: #c8d5b9;  /* Light sage green */
-  color: #111827;  /* Near-black */
-}
-
-.light .bg-background {
-  background-color: #c8d5b9 !important;  /* Light sage green */
-}
-
-/* Main content area - Light sage green */
-.light main,
-.light .main-content,
-.light [class*="min-h-screen"] {
-  background-color: #c8d5b9 !important;  /* Light sage green */
-}
-
-/* Override gray backgrounds with light sage green */
-.light .bg-gray-50,
-.light .bg-slate-50 {
-  background-color: #c8d5b9 !important;  /* Light sage green */
-}
-
-.light .bg-gray-100,
-.light .bg-gray-200,
-.light .bg-slate-100,
-.light .bg-slate-200 {
-  background-color: #c8d5b9 !important;  /* Light sage green */
-}
-
-/* Page wrapper - Light sage green */
-.light div.min-h-screen.bg-zinc-950,
-.light div.min-h-screen.bg-background {
-  background-color: #c8d5b9 !important;
-}
-
-/* Cards with modern shadows - white on white with clean borders */
-.light .bg-card,
-.light .bg-white {
-  background-color: white !important;
-  border: 1px solid #e5e7eb !important;  /* Clean gray border */
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
-}
-
-/* Zinc backgrounds that are CARDS should be white */
-.light .bg-zinc-900\/50:not(.min-h-screen),
-.light .bg-zinc-800\/50,
-.light .bg-zinc-800\/30 {
-  background-color: white !important;
-  border: 1px solid #e5e7eb !important;  /* Clean gray border */
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06) !important;
-}
-
-.light .bg-zinc-800 {
-  background-color: #c8d5b9 !important;  /* Light sage green */
-  border: 1px solid #e5e7eb !important;
-}
-
-/* High contrast text - Modern & readable */
-.light .text-foreground,
-.light .text-zinc-100,
-.light .text-white {
-  color: #111827 !important;  /* Near-black */
-}
-
-.light .text-muted-foreground,
-.light .text-zinc-400,
-.light .text-zinc-500 {
-  color: #6b7280 !important;  /* Gray-500 */
-}
-
-.light .text-zinc-600 {
-  color: #4b5563 !important;  /* Gray-600 */
-}
-
-/* Headings - Bold and clear */
-.light h1,
-.light h2,
-.light h3 {
-  color: #111827 !important;  /* Near-black */
-  font-weight: 600;
-}
-
-/* Clean borders - Subtle gray */
-.light .border,
-.light .border-border,
-.light .border-zinc-800,
-.light .border-zinc-700 {
-  border-color: #e5e7eb !important;  /* Gray-200 */
-}
-
-/* Brand primary buttons - forest green */
-.light .bg-primary,
-.light .bg-emerald-600,
-.light .bg-emerald-500 {
-  background-color: #2d5016 !important;
-  color: white !important;
-  border: none !important;
-}
-
-.light .bg-primary:hover,
-.light .bg-emerald-600:hover,
-.light .bg-emerald-500:hover {
-  background-color: #1f3810 !important;
-}
-
-.light .text-emerald-400,
-.light .text-emerald-500,
-.light .text-emerald-600 {
-  color: #2d5016 !important;
-}
-
-/* Secondary colors */
-.light .bg-secondary {
-  background-color: #c8d5b9 !important;  /* Light sage green */
-  color: #111827 !important;  /* Near-black */
-  border: 1px solid #e5e7eb !important;  /* Gray-200 */
-}
-
-.light .bg-secondary:hover {
-  background-color: #b8c9a4 !important;  /* Slightly darker light sage */
-}
-
-/* Accent hover states - light green */
-.light .hover\:bg-accent:hover,
-.light .bg-accent {
-  background-color: #f0fdf4 !important;
-  color: #166534 !important;
-}
-
-/* Icon colors */
-.light .text-blue-400 {
-  color: #3b82f6 !important;
-}
-
-.light .text-yellow-400 {
-  color: #f59e0b !important;
-}
-
-.light .text-green-400 {
-  color: #10b981 !important;
-}
-
-.light .text-red-400 {
-  color: #ef4444 !important;
-}
-
-.light .text-purple-400 {
-  color: #a855f7 !important;
-}
-
-/* Status badges */
-.light [class*="bg-green"] {
-  background-color: #dcfce7 !important;
-  color: #166534 !important;
-}
-
-.light [class*="bg-yellow"] {
-  background-color: #fef3c7 !important;
-  color: #92400e !important;
-}
-
-.light [class*="bg-red"] {
-  background-color: #fee2e2 !important;
-  color: #991b1b !important;
-}
-
-.light [class*="bg-blue"] {
-  background-color: #dbeafe !important;
-  color: #1e40af !important;
-}
-
-/* Form inputs */
-.light input,
-.light textarea,
-.light select {
-  background-color: white !important;
-  border: 1px solid #e5e7eb !important;
-  color: #111827 !important;
-}
-
-.light input:focus,
-.light textarea:focus,
-.light select:focus {
-  border-color: #2d5016 !important;
-  outline: none !important;
-  box-shadow: 0 0 0 3px rgba(45, 80, 22, 0.1) !important;
-}
-
-.light input::placeholder,
-.light textarea::placeholder {
-  color: #9ca3af !important;
-}
-
-/* Hover effects */
-.light .hover\:bg-zinc-800:hover {
-  background-color: #c8d5b9 !important;  /* Light sage green */
-}
-
-.light [class*="hover:bg-emerald"]:hover {
-  background-color: #1f3810 !important;
-}
-
-/* Card hover effects */
-.light .card:hover,
-.light .hover-lift:hover {
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06) !important;
-  transform: translateY(-1px);
-  transition: all 0.2s ease;
-}
-
-/* Table rows */
-.light tr:hover {
-  background-color: #c8d5b9 !important;  /* Light sage green */
-}
-
-/* Dropdown menus */
-.light [role="menu"],
-.light [role="listbox"],
-.light .dropdown-content {
-  background-color: white !important;
-  border: 1px solid #e5e7eb !important;  /* Gray-200 */
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
-}
-
-/* Charts */
-.light .recharts-text {
-  fill: #6b7280 !important;  /* Gray-500 */
-}
-
-.light .recharts-cartesian-grid line {
-  stroke: #e5e7eb !important;  /* Gray-200 */
-}
-
-/* Sidebar */
-.light aside,
-.light nav {
-  background-color: white !important;
-  border-right: 1px solid #e5e7eb !important;  /* Gray-200 */
-}
-
-/* Header bars */
-.light header {
-  background-color: white !important;
-  border-bottom: 1px solid #e5e7eb !important;
-}
-
-/* Active navigation */
-.light [aria-current="page"],
-.light .nav-active {
-  background-color: #f0fdf4 !important;
-  color: #2d5016 !important;
-  font-weight: 500 !important;
-}
-
-/* Scrollbars in light mode */
-.light ::-webkit-scrollbar-track {
-  background: #c8d5b9;  /* Light sage green */
-}
-
-.light ::-webkit-scrollbar-thumb {
-  background: #a3be8c;  /* Medium sage */
-  border-radius: 4px;
-}
-
-.light ::-webkit-scrollbar-thumb:hover {
-  background: #8faa73;  /* Darker sage */
+.dark .card-elevated,
+.dark [data-elevated="true"] {
+  box-shadow: none;
 }
 
 /* ===========================================
@@ -394,28 +116,6 @@
 /* Ensure SelectContent itself has high z-index */
 [role="listbox"] {
   z-index: 9999 !important;
-  background-color: #18181b !important; /* zinc-900 */
-  border: 1px solid #27272a !important; /* zinc-800 */
-  color: #fafafa !important; /* zinc-100 */
-}
-
-/* Make sure individual items are visible */
-[role="option"] {
-  color: #fafafa !important; /* zinc-100 */
-  cursor: pointer !important;
-}
-
-/* Hover state for dropdown items */
-[role="option"]:hover,
-[role="option"][data-highlighted] {
-  background-color: #27272a !important; /* zinc-800 */
-  color: #fafafa !important; /* zinc-100 */
-}
-
-/* Selected state */
-[role="option"][data-state="checked"] {
-  background-color: #10b981 !important; /* emerald-500 */
-  color: white !important;
 }
 
 /* Fix for Dialog/Sheet dropdowns specifically */
@@ -471,4 +171,290 @@ input[type="range"].slider:disabled::-webkit-slider-thumb {
 
 input[type="range"].slider:disabled::-moz-range-thumb {
   cursor: not-allowed;
+}
+
+/* ========================================
+   NUCLEAR LIGHT MODE OVERRIDES
+   Forces theme colors over hardcoded dark classes
+   ======================================== */
+
+/* Only apply these overrides in light mode (when .dark is NOT present) */
+html:not(.dark) {
+  /* ===== BACKGROUND OVERRIDES ===== */
+
+  /* Override all dark backgrounds to use theme */
+  .bg-black,
+  .bg-\[\#0a0a0a\],
+  .bg-\[\#0f0f0f\],
+  .bg-\[\#111\],
+  .bg-\[\#121212\],
+  .bg-\[\#171717\],
+  .bg-\[\#1a1a1a\],
+  .bg-\[\#1e1e1e\],
+  .bg-zinc-950,
+  .bg-zinc-900,
+  .bg-neutral-950,
+  .bg-neutral-900,
+  .bg-slate-950,
+  .bg-slate-900,
+  .bg-gray-950,
+  .bg-gray-900 {
+    background-color: hsl(var(--background)) !important;
+  }
+
+  /* Secondary/card backgrounds */
+  .bg-zinc-800,
+  .bg-zinc-800\/50,
+  .bg-zinc-800\/80,
+  .bg-neutral-800,
+  .bg-slate-800,
+  .bg-gray-800,
+  .bg-\[\#262626\],
+  .bg-\[\#1f1f1f\],
+  .bg-\[\#1F1F1F\],
+  .bg-\[\#252525\] {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  /* Muted/hover backgrounds */
+  .bg-zinc-700,
+  .bg-zinc-700\/50,
+  .bg-neutral-700,
+  .bg-slate-700,
+  .bg-gray-700,
+  .bg-gray-600,
+  .bg-gray-500 {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  /* Fix that ugly dark header */
+  .bg-\[\#1e3a5f\],
+  .bg-\[\#1a365d\],
+  .bg-\[\#0f2744\],
+  .bg-blue-900,
+  .bg-blue-950 {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  /* ===== BORDER OVERRIDES ===== */
+
+  .border-zinc-800,
+  .border-zinc-700,
+  .border-zinc-600,
+  .border-neutral-800,
+  .border-neutral-700,
+  .border-slate-800,
+  .border-slate-700,
+  .border-gray-800,
+  .border-gray-700,
+  .border-\[\#2e2e2e\],
+  .border-\[\#2A2A2A\],
+  .border-\[\#333\],
+  .border-\[\#3f3f3f\] {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* ===== TEXT OVERRIDES ===== */
+
+  /* White text -> dark text */
+  .text-white {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Light gray text -> foreground */
+  .text-zinc-100,
+  .text-zinc-200,
+  .text-zinc-300,
+  .text-neutral-100,
+  .text-neutral-200,
+  .text-neutral-300,
+  .text-slate-100,
+  .text-slate-200,
+  .text-slate-300,
+  .text-gray-100,
+  .text-gray-200,
+  .text-gray-300 {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* Medium gray text -> muted-foreground */
+  .text-zinc-400,
+  .text-zinc-500,
+  .text-zinc-600,
+  .text-neutral-400,
+  .text-neutral-500,
+  .text-slate-400,
+  .text-slate-500,
+  .text-gray-400,
+  .text-gray-500 {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  /* ===== DIVIDE/SEPARATOR OVERRIDES ===== */
+
+  .divide-zinc-800 > :not([hidden]) ~ :not([hidden]),
+  .divide-zinc-700 > :not([hidden]) ~ :not([hidden]),
+  .divide-neutral-800 > :not([hidden]) ~ :not([hidden]),
+  .divide-slate-800 > :not([hidden]) ~ :not([hidden]),
+  .divide-gray-800 > :not([hidden]) ~ :not([hidden]) {
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* ===== HOVER STATE OVERRIDES ===== */
+
+  .hover\:bg-zinc-800:hover,
+  .hover\:bg-zinc-700:hover,
+  .hover\:bg-neutral-800:hover,
+  .hover\:bg-slate-800:hover,
+  .hover\:bg-gray-800:hover {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  .hover\:text-white:hover {
+    color: hsl(var(--foreground)) !important;
+  }
+
+  /* ===== RING/FOCUS OVERRIDES ===== */
+
+  .ring-zinc-800,
+  .ring-zinc-700,
+  .focus\:ring-zinc-800:focus,
+  .focus\:ring-zinc-700:focus {
+    --tw-ring-color: hsl(var(--ring)) !important;
+  }
+
+  /* ===== SPECIAL COMPONENT FIXES ===== */
+
+  /* Calendar grid cells */
+  [class*="calendar"] .bg-zinc-900,
+  [class*="calendar"] .bg-zinc-800,
+  [class*="Calendar"] .bg-zinc-900,
+  [class*="Calendar"] .bg-zinc-800 {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  /* Table headers */
+  thead.bg-zinc-800,
+  thead.bg-zinc-900,
+  thead .bg-zinc-800,
+  thead .bg-zinc-900,
+  th.bg-zinc-800,
+  th.bg-zinc-900 {
+    background-color: hsl(var(--muted)) !important;
+  }
+
+  /* Cards should have shadows in light mode */
+  .rounded-xl.border,
+  .rounded-lg.border,
+  [class*="card"],
+  [class*="Card"] {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+
+  /* Fix inputs */
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    background-color: hsl(var(--background)) !important;
+    border-color: hsl(var(--border)) !important;
+    color: hsl(var(--foreground)) !important;
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: hsl(var(--muted-foreground)) !important;
+  }
+
+  /* Fix dropdowns/popovers */
+  [data-radix-popper-content-wrapper] > div,
+  [role="menu"],
+  [role="listbox"],
+  .dropdown-content,
+  .popover-content {
+    background-color: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* Fix modals/dialogs */
+  [role="dialog"],
+  .dialog-content,
+  .modal-content {
+    background-color: hsl(var(--card)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+
+  /* Fix shadcn dialog specifically */
+  [data-state="open"][role="dialog"],
+  [data-radix-dialog-content] {
+    background-color: hsl(var(--card)) !important;
+  }
+
+  /* Fix shadcn sheet */
+  [data-radix-sheet-content] {
+    background-color: hsl(var(--card)) !important;
+  }
+}
+
+/* ===== PRESERVE INTENTIONAL DARK ELEMENTS ===== */
+/* These should stay dark even in light mode */
+
+html:not(.dark) {
+  /* Keep primary button colors */
+  .bg-primary,
+  .bg-emerald-500,
+  .bg-emerald-600 {
+    background-color: hsl(var(--primary)) !important;
+    color: hsl(var(--primary-foreground)) !important;
+  }
+
+  .text-primary-foreground {
+    color: hsl(var(--primary-foreground)) !important;
+  }
+
+  /* Keep status badge colors */
+  .bg-emerald-500\/20,
+  .bg-emerald-100 {
+    background-color: rgb(16 185 129 / 0.1) !important;
+  }
+
+  .bg-red-500\/20,
+  .bg-red-100 {
+    background-color: rgb(239 68 68 / 0.1) !important;
+  }
+
+  .bg-amber-500\/20,
+  .bg-amber-100,
+  .bg-yellow-500\/20,
+  .bg-yellow-100 {
+    background-color: rgb(245 158 11 / 0.1) !important;
+  }
+
+  .bg-blue-500\/20,
+  .bg-blue-100 {
+    background-color: rgb(59 130 246 / 0.1) !important;
+  }
+
+  /* Keep colored text for badges */
+  .text-emerald-400,
+  .text-emerald-500,
+  .text-emerald-600 {
+    color: rgb(16 185 129) !important;
+  }
+
+  .text-red-400,
+  .text-red-500 {
+    color: rgb(239 68 68) !important;
+  }
+
+  .text-amber-400,
+  .text-amber-500,
+  .text-yellow-400,
+  .text-yellow-500 {
+    color: rgb(245 158 11) !important;
+  }
+
+  .text-blue-400,
+  .text-blue-500 {
+    color: rgb(59 130 246) !important;
+  }
 }
