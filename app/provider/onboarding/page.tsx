@@ -23,11 +23,11 @@ export default function OnboardingPage() {
   }, [router]);
 
   const handleComplete = () => {
-    router.push('/provider/dashboard');
+    router.push('/provider/home');
   };
 
   const handleClose = () => {
-    router.push('/provider/dashboard');
+    router.push('/provider/home');
   };
 
   return (

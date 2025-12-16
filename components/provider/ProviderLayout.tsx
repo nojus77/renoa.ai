@@ -393,12 +393,12 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                     {/* Menu Items */}
                     <div className="py-2">
                       <Link
-                        href="/provider/dashboard"
+                        href="/provider/home"
                         className="flex items-center gap-3 px-4 py-2.5 text-sm text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-zinc-800 hover:text-foreground dark:hover:text-white transition-colors"
                         onClick={() => setProfileDropdownOpen(false)}
                       >
                         <Target className="h-4 w-4" />
-                        <span>Dashboard (Leads)</span>
+                        <span>Home</span>
                       </Link>
 
                       <Link

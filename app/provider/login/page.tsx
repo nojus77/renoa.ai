@@ -70,8 +70,11 @@ export default function ProviderLoginPage() {
       // Route based on user role
       if (data.user && data.user.role === 'field') {
         router.push('/worker/dashboard');
+      } else if (data.user && data.user.role === 'office') {
+        router.push('/provider/calendar');
       } else {
-        router.push('/provider/dashboard');
+        // Owner and other roles go to home
+        router.push('/provider/home');
       }
     } catch (error) {
       toast.error('Login failed');

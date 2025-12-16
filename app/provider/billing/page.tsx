@@ -50,7 +50,7 @@ export default function BillingPage() {
 
     if (role !== 'owner') {
       toast.error('Only owners can access billing');
-      router.push('/provider/dashboard');
+      router.push('/provider/home');
       return;
     }
 

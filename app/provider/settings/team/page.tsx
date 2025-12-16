@@ -49,7 +49,7 @@ export default function TeamSettingsPage() {
 
     if (role !== 'owner') {
       toast.error('Only owners can manage team members');
-      router.push('/provider/dashboard');
+      router.push('/provider/home');
       return;
     }
 
