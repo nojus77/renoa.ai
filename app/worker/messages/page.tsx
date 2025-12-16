@@ -20,6 +20,8 @@ import {
   Info,
   X,
   Crown,
+  Paperclip,
+  Camera,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -43,6 +45,9 @@ interface Message {
   createdAt?: string;
   read: boolean;
   crewId?: string | null;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 interface Conversation {
@@ -148,8 +153,13 @@ export default function WorkerMessages() {
   const [searchQuery, setSearchQuery] = useState('');
   const [messageText, setMessageText] = useState('');
   const [sending, setSending] = useState(false);
+  const [teamAttachment, setTeamAttachment] = useState<File | null>(null);
+  const [teamAttachmentPreview, setTeamAttachmentPreview] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const id = localStorage.getItem('workerUserId');
@@ -197,6 +207,20 @@ export default function WorkerMessages() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [customerMessages, teamMessages]);
+
+  useEffect(() => {
+    if (!teamAttachment) {
+      setTeamAttachmentPreview(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(teamAttachment);
+    setTeamAttachmentPreview(previewUrl);
+
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [teamAttachment]);
 
   // Apply search filter
   useEffect(() => {
@@ -322,13 +346,29 @@ export default function WorkerMessages() {
   };
 
   const handleSendMessage = async () => {
-    if (!messageText.trim() || sending) return;
+    const trimmedMessage = messageText.trim();
+    if (activeTab === 'team') {
+      if (!trimmedMessage && !teamAttachment) return;
+    } else if (!trimmedMessage) {
+      return;
+    }
+    if (sending) return;
 
     setSending(true);
     const tempId = `temp-${Date.now()}`;
 
     try {
       if (activeTab === 'team') {
+        if (!selectedTeamChat) {
+          toast.error('Select a team chat first');
+          setSending(false);
+          return;
+        }
+        if (!userId) {
+          toast.error('Not authenticated');
+          setSending(false);
+          return;
+        }
         // Determine message type
         let recipientId: string | null = null;
         let crewId: string | null = null;
@@ -345,14 +385,34 @@ export default function WorkerMessages() {
         }
 
         // Optimistically add message
+        const mediaPayload: { mediaUrl?: string; thumbnailUrl?: string; mediaType?: string } = {};
+        if (teamAttachment) {
+          const formData = new FormData();
+          formData.append('userId', userId);
+          formData.append('file', teamAttachment);
+
+          const uploadRes = await fetch('/api/worker/messages/team/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          const uploadData = await uploadRes.json();
+
+          if (!uploadRes.ok) throw new Error(uploadData.error || 'Failed to upload image');
+
+          mediaPayload.mediaUrl = uploadData.url;
+          mediaPayload.thumbnailUrl = uploadData.thumbnailUrl;
+          mediaPayload.mediaType = 'image';
+        }
+
         const tempMessage: Message = {
           id: tempId,
           senderUserId: userId,
           senderName: 'You',
-          content: messageText,
+          content: trimmedMessage,
           createdAt: new Date().toISOString(),
           read: false,
           crewId,
+          ...mediaPayload,
         };
         setTeamMessages(prev => [...prev, tempMessage]);
         setMessageText('');
@@ -364,12 +424,14 @@ export default function WorkerMessages() {
             userId,
             recipientUserId: recipientId,
             crewId,
-            content: messageText,
+            content: trimmedMessage,
+            ...mediaPayload,
           }),
         });
 
         if (!res.ok) throw new Error('Failed to send message');
 
+        setTeamAttachment(null);
         // Refresh messages
         fetchTeamMessages(selectedTeamChat!);
         fetchTeamConversations(userId);
@@ -384,7 +446,7 @@ export default function WorkerMessages() {
           customerName: selectedConversation.customerName,
           senderId: userId,
           senderType: 'worker',
-          content: messageText,
+          content: trimmedMessage,
           timestamp: new Date().toISOString(),
           read: false,
         };
@@ -397,7 +459,7 @@ export default function WorkerMessages() {
           body: JSON.stringify({
             userId,
             customerId: selectedConversation.customerId,
-            content: messageText,
+            content: trimmedMessage,
           }),
         });
 
@@ -428,6 +490,13 @@ export default function WorkerMessages() {
 
   const handleQuickReply = (template: string) => {
     setMessageText(template);
+  };
+
+  const handleTeamAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setTeamAttachment(e.target.files[0]);
+    }
+    e.target.value = '';
   };
 
   const getTimeAgo = (timestamp: string) => {
@@ -594,8 +663,24 @@ export default function WorkerMessages() {
                   className="w-full pl-10 pr-4 py-2.5 bg-[#1F1F1F] border border-[#2A2A2A] rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none transition-colors"
                   style={{ borderColor: searchQuery ? LIME_GREEN : '#2A2A2A' }}
                 />
-              </div>
-            </div>
+      </div>
+    </div>
+
+      {previewImage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4">
+          <button
+            onClick={() => setPreviewImage(null)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+          <img
+            src={previewImage}
+            alt="Full size"
+            className="max-h-full max-w-full rounded-2xl border border-[#2A2A2A] object-contain"
+          />
+        </div>
+      )}
           </div>
         )}
 
@@ -919,16 +1004,32 @@ export default function WorkerMessages() {
                           <span className="text-xs text-zinc-500 px-1">{message.senderName}</span>
                         )}
 
-                        <div
-                          className={`px-4 py-2.5 rounded-2xl ${
-                            isOwn
-                              ? 'rounded-br-sm text-black'
-                              : 'bg-[#2A2A2A] text-white rounded-bl-sm'
-                          }`}
-                          style={isOwn ? { backgroundColor: LIME_GREEN } : undefined}
-                        >
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
-                        </div>
+                        {(() => {
+                          if (!message.mediaUrl) return null;
+                          return (
+                            <img
+                              src={message.mediaUrl}
+                              alt="Attachment"
+                              className="rounded-2xl border border-[#2A2A2A] max-w-[280px] w-full object-cover cursor-pointer hover:opacity-90 transition mb-2"
+                              onClick={() => setPreviewImage(message.mediaUrl || null)}
+                            />
+                          );
+                        })()}
+
+                        {message.content && (
+                          <div
+                            className={`px-4 py-2.5 rounded-2xl ${
+                              isOwn
+                                ? 'rounded-br-sm text-black'
+                                : 'bg-[#2A2A2A] text-white rounded-bl-sm'
+                            }`}
+                            style={isOwn ? { backgroundColor: LIME_GREEN } : undefined}
+                          >
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">
+                              {message.content}
+                            </p>
+                          </div>
+                        )}
                         <div className="flex items-center gap-1 px-1">
                           <span className="text-xs text-zinc-600">
                             {formatMessageTime(message.timestamp || message.createdAt || '')}
@@ -965,25 +1066,103 @@ export default function WorkerMessages() {
               )}
 
               {/* Message Input */}
-              <div className="p-4 pt-2">
+              <div className="p-4 pt-2 space-y-3">
+                {activeTab === 'team' && teamAttachmentPreview && (
+                  <div className="border border-[#2A2A2A] rounded-2xl bg-[#0A0A0A] p-3">
+                    <div className="flex items-start gap-3">
+                      <img
+                        src={teamAttachmentPreview}
+                        alt="Preview"
+                        className="max-h-48 rounded-xl border border-[#2A2A2A] object-cover"
+                      />
+                      <button
+                        onClick={() => setTeamAttachment(null)}
+                        className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {teamAttachment?.name && (
+                      <p className="text-xs text-zinc-500 mt-2 truncate">{teamAttachment.name}</p>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-end gap-2">
+                  {activeTab === 'team' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => attachmentInputRef.current?.click()}
+                        className="p-2 rounded-xl bg-[#1F1F1F] border border-[#2A2A2A] text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
+                      >
+                        <Paperclip className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => cameraInputRef.current?.click()}
+                        className="p-2 rounded-xl bg-[#1F1F1F] border border-[#2A2A2A] text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
+                      >
+                        <Camera className="h-5 w-5" />
+                      </button>
+                      <input
+                        ref={attachmentInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={handleTeamAttachmentChange}
+                      />
+                      <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleTeamAttachmentChange}
+                      />
+                    </div>
+                  )}
+
                   <input
                     type="text"
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                    placeholder="Type a message..."
+                    placeholder={
+                      activeTab === 'team' && teamAttachment ? 'Add a caption...' : 'Type a message...'
+                    }
                     className="flex-1 px-4 py-2.5 bg-[#1F1F1F] border border-[#2A2A2A] rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none transition-colors"
-                    style={{ borderColor: messageText ? LIME_GREEN : '#2A2A2A' }}
+                    style={{
+                      borderColor:
+                        (activeTab === 'team' && (teamAttachment || messageText)) ||
+                        (activeTab === 'customers' && messageText)
+                          ? LIME_GREEN
+                          : '#2A2A2A',
+                    }}
                   />
 
                   <button
                     onClick={handleSendMessage}
-                    disabled={!messageText.trim() || sending}
+                    disabled={
+                      sending ||
+                      (activeTab === 'team'
+                        ? !messageText.trim() && !teamAttachment
+                        : !messageText.trim())
+                    }
                     className="p-2.5 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     style={{
-                      backgroundColor: messageText.trim() && !sending ? LIME_GREEN : '#2A2A2A',
-                      color: messageText.trim() && !sending ? 'black' : '#6B7280',
+                      backgroundColor:
+                        !sending &&
+                        (activeTab === 'team'
+                          ? messageText.trim() || teamAttachment
+                          : messageText.trim())
+                          ? LIME_GREEN
+                          : '#2A2A2A',
+                      color:
+                        !sending &&
+                        (activeTab === 'team'
+                          ? messageText.trim() || teamAttachment
+                          : messageText.trim())
+                          ? 'black'
+                          : '#6B7280',
                     }}
                   >
                     {sending ? (

@@ -120,6 +120,9 @@ export async function GET(request: NextRequest) {
     const formattedMessages = messages.map((msg) => ({
       id: msg.id,
       content: msg.content,
+      mediaUrl: msg.mediaUrl,
+      mediaType: msg.mediaType,
+      thumbnailUrl: msg.thumbnailUrl,
       senderUserId: msg.sender_user_id,
       senderName: `${msg.sender.firstName} ${msg.sender.lastName}`,
       senderRole: msg.sender.role,
@@ -149,11 +152,20 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, recipientUserId, crewId, content } = body;
+    const {
+      userId,
+      recipientUserId,
+      crewId,
+      content,
+      mediaUrl,
+      mediaType,
+      thumbnailUrl,
+    } = body;
 
-    if (!userId || !content?.trim()) {
+    const hasContent = typeof content === 'string' && content.trim().length > 0;
+    if (!userId || (!hasContent && !mediaUrl)) {
       return NextResponse.json(
-        { error: 'User ID and content are required' },
+        { error: 'User ID and message content or media are required' },
         { status: 400 }
       );
     }
@@ -200,6 +212,20 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    if (mediaUrl && mediaType && !['image', 'video'].includes(mediaType)) {
+      return NextResponse.json(
+        { error: 'Invalid media type. Use "image" or "video".' },
+        { status: 400 }
+      );
+    }
+
+    if (!mediaUrl && (mediaType || thumbnailUrl)) {
+      return NextResponse.json(
+        { error: 'Media type and thumbnail require a media URL.' },
+        { status: 400 }
+      );
+    }
+
     // Create the message
     const message = await prisma.team_messages.create({
       data: {
@@ -207,7 +233,10 @@ export async function POST(request: NextRequest) {
         sender_user_id: userId,
         recipient_user_id: crewId ? null : (recipientUserId || null),
         crew_id: crewId || null,
-        content: content.trim(),
+        content: hasContent ? content.trim() : '',
+        mediaUrl: mediaUrl || null,
+        mediaType: mediaUrl ? (mediaType || 'image') : null,
+        thumbnailUrl: mediaUrl ? (thumbnailUrl || mediaUrl) : null,
         read_by: [userId], // Sender has read their own message
       },
       include: {
@@ -227,6 +256,9 @@ export async function POST(request: NextRequest) {
       message: {
         id: message.id,
         content: message.content,
+        mediaUrl: message.mediaUrl,
+        mediaType: message.mediaType,
+        thumbnailUrl: message.thumbnailUrl,
         senderUserId: message.sender_user_id,
         senderName: `${message.sender.firstName} ${message.sender.lastName}`,
         senderRole: message.sender.role,

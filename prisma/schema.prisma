@@ -1003,6 +1003,9 @@ model team_messages {
   recipient_user_id String?  // null = team-wide (broadcast to all), or specific user for DM
   crew_id           String?  // For crew group chats
   content           String
+  mediaUrl          String?
+  mediaType         String?
+  thumbnailUrl      String?
   read              Boolean  @default(false)
   read_by           String[] @default([]) // User IDs who have read (for group chats)
   created_at        DateTime @default(now())

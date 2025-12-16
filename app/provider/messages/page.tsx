@@ -11,6 +11,8 @@ import {
   User,
   Briefcase,
   Send,
+  Paperclip,
+  Camera,
   Image as ImageIcon,
   ChevronDown,
   CheckCheck,
@@ -45,6 +47,9 @@ interface Message {
   readBy?: string[];
   crewId?: string | null;
   photoUrl?: string;
+  mediaUrl?: string | null;
+  mediaType?: string | null;
+  thumbnailUrl?: string | null;
 }
 
 interface Conversation {
@@ -161,10 +166,15 @@ export default function ProviderMessages() {
   const [messageText, setMessageText] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [teamAttachment, setTeamAttachment] = useState<File | null>(null);
+  const [teamAttachmentPreview, setTeamAttachmentPreview] = useState<string | null>(null);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const teamAttachmentInputRef = useRef<HTMLInputElement>(null);
+  const teamCameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const id = localStorage.getItem('providerId');
@@ -210,6 +220,20 @@ export default function ProviderMessages() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [customerMessages, teamMessages]);
+
+  useEffect(() => {
+    if (!teamAttachment) {
+      setTeamAttachmentPreview(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(teamAttachment);
+    setTeamAttachmentPreview(previewUrl);
+
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [teamAttachment]);
 
   const fetchConversations = async (id: string) => {
     try {
@@ -318,18 +342,28 @@ export default function ProviderMessages() {
   };
 
   const handleSendMessage = async () => {
-    if (!messageText.trim() && !photoFile) return;
+    const trimmedMessage = messageText.trim();
+    if (activeTab === 'team') {
+      if (!trimmedMessage && !teamAttachment) return;
+    } else if (activeTab === 'customers') {
+      if (!trimmedMessage && !photoFile) return;
+    }
     if (sending) return;
 
     setSending(true);
 
     try {
       if (activeTab === 'team' && selectedTeamChat) {
+        if (!providerId || !userId) {
+          toast.error('Missing provider info');
+          setSending(false);
+          return;
+        }
         // Send team message
         const body: any = {
           providerId,
           userId,
-          content: messageText,
+          content: trimmedMessage,
         };
 
         if (selectedTeamChat.type === 'crew' && selectedTeamChat.crewId) {
@@ -338,6 +372,27 @@ export default function ProviderMessages() {
           body.recipientUserId = selectedTeamChat.id;
         }
         // team type sends with no recipientUserId, no crewId
+
+        if (teamAttachment) {
+          const formData = new FormData();
+          formData.append('providerId', providerId);
+          formData.append('userId', userId);
+          formData.append('file', teamAttachment);
+
+          const uploadRes = await fetch('/api/provider/messages/team/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          const uploadData = await uploadRes.json();
+
+          if (!uploadRes.ok) {
+            throw new Error(uploadData.error || 'Failed to upload image');
+          }
+
+          body.mediaUrl = uploadData.url;
+          body.thumbnailUrl = uploadData.thumbnailUrl;
+          body.mediaType = 'image';
+        }
 
         const res = await fetch('/api/provider/messages/team', {
           method: 'POST',
@@ -355,6 +410,7 @@ export default function ProviderMessages() {
         }
 
         setMessageText('');
+        setTeamAttachment(null);
         fetchTeamConversations(providerId, userId);
       } else {
         // Send customer message
@@ -366,7 +422,7 @@ export default function ProviderMessages() {
           conversationId: selectedConversation.id,
           senderId: providerId,
           senderType: 'provider',
-          content: messageText,
+          content: trimmedMessage,
           timestamp: new Date().toISOString(),
           read: false,
         };
@@ -385,7 +441,7 @@ export default function ProviderMessages() {
           body: JSON.stringify({
             providerId,
             customerId: selectedConversation.customerId,
-            content: messageText,
+            content: trimmedMessage,
             type: 'sms',
           }),
         });
@@ -420,6 +476,13 @@ export default function ProviderMessages() {
     if (e.target.files && e.target.files[0]) {
       setPhotoFile(e.target.files[0]);
     }
+  };
+
+  const handleTeamAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setTeamAttachment(e.target.files[0]);
+    }
+    e.target.value = '';
   };
 
   const getTimeAgo = (timestamp: string) => {
@@ -576,6 +639,23 @@ export default function ProviderMessages() {
         <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
         </div>
+
+        {previewImage && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+            <button
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-4 right-4 p-2 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+              aria-label="Close preview"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            <img
+              src={previewImage}
+              alt="Full size preview"
+              className="max-h-full max-w-full rounded-2xl border border-zinc-800 object-contain"
+            />
+          </div>
+        )}
       </ProviderLayout>
     );
   }
@@ -1063,14 +1143,18 @@ export default function ProviderMessages() {
                                   <span className="text-xs text-zinc-500 px-1 mb-1">{message.senderName}</span>
                                 )}
 
-                                {message.photoUrl && (
-                                  <img
-                                    src={message.photoUrl}
-                                    alt="Attachment"
-                                    className="rounded-lg border border-zinc-700 max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
-                                    onClick={() => window.open(message.photoUrl, '_blank')}
-                                  />
-                                )}
+                                {(() => {
+                                  const mediaUrl = message.mediaUrl || message.photoUrl;
+                                  if (!mediaUrl) return null;
+                                  return (
+                                    <img
+                                      src={mediaUrl}
+                                      alt="Attachment"
+                                      className="rounded-xl border border-zinc-700 max-w-[300px] w-full object-cover cursor-pointer hover:opacity-90 transition-opacity mb-2"
+                                      onClick={() => setPreviewImage(mediaUrl)}
+                                    />
+                                  );
+                                })()}
                                 {message.content && (
                                   <div
                                     className={`px-3 py-2 rounded-2xl ${
@@ -1105,8 +1189,29 @@ export default function ProviderMessages() {
 
                 {/* Message Input */}
                 <div className="sticky bottom-0 z-10 border-t border-zinc-800 bg-zinc-950/95 backdrop-blur-sm shadow-lg p-3 md:p-4">
-                  {/* Photo Preview */}
-                  {photoFile && (
+                  {activeTab === 'team' && teamAttachmentPreview && (
+                    <div className="mb-3 border border-emerald-600/50 bg-zinc-900/70 rounded-xl p-3">
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={teamAttachmentPreview}
+                          alt="Preview"
+                          className="max-h-48 rounded-lg border border-zinc-800 object-cover"
+                        />
+                        <button
+                          onClick={() => setTeamAttachment(null)}
+                          className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                          aria-label="Remove attachment"
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                      {teamAttachment?.name && (
+                        <p className="text-xs text-zinc-500 mt-2 truncate">{teamAttachment.name}</p>
+                      )}
+                    </div>
+                  )}
+
+                  {activeTab === 'customers' && photoFile && (
                     <div className="mb-3 relative inline-block">
                       <div className="relative w-24 h-24 rounded-lg border-2 border-emerald-500 overflow-hidden">
                         <img
@@ -1126,8 +1231,39 @@ export default function ProviderMessages() {
                   )}
 
                   <div className="flex items-end gap-2 md:gap-3">
-                    {/* Left Actions - only for customer messages */}
-                    {activeTab === 'customers' && (
+                    {activeTab === 'team' ? (
+                      <div className="flex gap-1 md:gap-2">
+                        <button
+                          onClick={() => teamAttachmentInputRef.current?.click()}
+                          className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0"
+                          title="Attach image"
+                        >
+                          <Paperclip className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => teamCameraInputRef.current?.click()}
+                          className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0"
+                          title="Open camera"
+                        >
+                          <Camera className="h-5 w-5" />
+                        </button>
+                        <input
+                          ref={teamAttachmentInputRef}
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          className="hidden"
+                          onChange={handleTeamAttachmentChange}
+                        />
+                        <input
+                          ref={teamCameraInputRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={handleTeamAttachmentChange}
+                        />
+                      </div>
+                    ) : activeTab === 'customers' ? (
                       <div className="flex gap-1 md:gap-2">
                         <button
                           onClick={() => fileInputRef.current?.click()}
@@ -1174,7 +1310,7 @@ export default function ProviderMessages() {
                           )}
                         </div>
                       </div>
-                    )}
+                    ) : null}
 
                     {/* Message Input */}
                     <input
@@ -1182,14 +1318,23 @@ export default function ProviderMessages() {
                       value={messageText}
                       onChange={(e) => setMessageText(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                      placeholder="Type a message..."
+                      placeholder={
+                        activeTab === 'team' && teamAttachment
+                          ? 'Add a caption...'
+                          : 'Type a message...'
+                      }
                       className="flex-1 px-4 py-3 bg-zinc-900 border border-zinc-800 rounded-full text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
                     />
 
                     {/* Send Button */}
                     <Button
                       onClick={handleSendMessage}
-                      disabled={!messageText.trim() || sending}
+                      disabled={
+                        sending ||
+                        (activeTab === 'team'
+                          ? !messageText.trim() && !teamAttachment
+                          : !messageText.trim() && !photoFile)
+                      }
                       className="w-12 h-12 rounded-full bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
                     >
                       <Send className="h-5 w-5" />

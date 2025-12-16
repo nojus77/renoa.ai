@@ -133,6 +133,12 @@ export async function GET(request: NextRequest) {
         // Count members (unique userIds + leaderId)
         const memberIds = new Set([...crew.userIds, ...(crew.leaderId ? [crew.leaderId] : [])]);
 
+        const summaryText = lastMessage?.content?.trim()
+          ? lastMessage.content.trim()
+          : lastMessage?.mediaUrl
+            ? 'Photo'
+            : '';
+
         return {
           id: `crew-${crew.id}`,
           crewId: crew.id,
@@ -141,8 +147,8 @@ export async function GET(request: NextRequest) {
           color: crew.color,
           memberCount: memberIds.size,
           leaderId: crew.leaderId,
-          lastMessage: lastMessage
-            ? `${lastMessage.sender.firstName}: ${lastMessage.content}`
+          lastMessage: summaryText
+            ? `${lastMessage!.sender.firstName}: ${summaryText}`
             : null,
           lastMessageAt: lastMessage?.created_at?.toISOString() || null,
           unreadCount,
@@ -175,6 +181,12 @@ export async function GET(request: NextRequest) {
           orderBy: { created_at: 'desc' },
         });
 
+        const summaryText = lastMessage?.content?.trim()
+          ? lastMessage.content.trim()
+          : lastMessage?.mediaUrl
+            ? 'Photo'
+            : '';
+
         return {
           id: member.id,
           type: 'member' as const,
@@ -182,7 +194,7 @@ export async function GET(request: NextRequest) {
           email: member.email,
           role: member.role,
           avatar: member.profilePhotoUrl,
-          lastMessage: lastMessage?.content || null,
+          lastMessage: summaryText || null,
           lastMessageAt: lastMessage?.created_at?.toISOString() || null,
           unreadCount,
         };
@@ -225,9 +237,15 @@ export async function GET(request: NextRequest) {
         type: 'team',
         name: 'Team Chat',
         unreadCount: teamUnread,
-        lastMessage: lastTeamMessage
-          ? `${lastTeamMessage.sender.firstName}: ${lastTeamMessage.content}`
-          : null,
+        lastMessage: (() => {
+          if (!lastTeamMessage) return null;
+          const summaryText = lastTeamMessage.content?.trim()
+            ? lastTeamMessage.content.trim()
+            : lastTeamMessage.mediaUrl
+              ? 'Photo'
+              : '';
+          return summaryText ? `${lastTeamMessage.sender.firstName}: ${summaryText}` : null;
+        })(),
         lastMessageAt: lastTeamMessage?.created_at?.toISOString() || null,
       },
       crews: crewConversations,
