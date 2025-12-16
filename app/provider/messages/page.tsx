@@ -20,7 +20,9 @@ import {
   MessageSquare,
   Building2,
   Wrench,
-  ChevronLeft
+  ChevronLeft,
+  Info,
+  Crown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
@@ -35,11 +37,13 @@ interface Message {
   senderUserId?: string;
   senderName?: string;
   senderRole?: string;
-  senderAvatar?: string;
+  senderAvatar?: string | null;
   content: string;
   timestamp?: string;
   createdAt?: string;
   read: boolean;
+  readBy?: string[];
+  crewId?: string | null;
   photoUrl?: string;
 }
 
@@ -58,6 +62,7 @@ interface Conversation {
 
 interface TeamMember {
   id: string;
+  type: 'member';
   name: string;
   email: string;
   role: string;
@@ -67,13 +72,53 @@ interface TeamMember {
   unreadCount: number;
 }
 
+interface CrewChat {
+  id: string;
+  crewId: string;
+  type: 'crew';
+  name: string;
+  color: string;
+  memberCount: number;
+  leaderId?: string | null;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
+  unreadCount: number;
+  createdAt: string;
+}
+
 interface TeamChat {
   id: string;
+  type: 'team';
   name: string;
   unreadCount: number;
   lastMessage?: string | null;
   lastMessageAt?: string | null;
 }
+
+interface GroupInfo {
+  type: 'team' | 'crew';
+  name: string;
+  color?: string;
+  memberCount: number;
+  createdAt?: string;
+  members: GroupMember[];
+}
+
+interface GroupMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string | null;
+  isLead?: boolean;
+  isCurrentUser?: boolean;
+}
+
+type SelectedChat = {
+  type: 'team' | 'crew' | 'member';
+  id: string;
+  crewId?: string;
+};
 
 const QUICK_REPLY_TEMPLATES = [
   "On my way!",
@@ -100,9 +145,15 @@ export default function ProviderMessages() {
 
   // Team state
   const [teamChat, setTeamChat] = useState<TeamChat | null>(null);
+  const [crewChats, setCrewChats] = useState<CrewChat[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [selectedTeamMember, setSelectedTeamMember] = useState<string | null>(null);
+  const [selectedTeamChat, setSelectedTeamChat] = useState<SelectedChat | null>(null);
   const [teamMessages, setTeamMessages] = useState<Message[]>([]);
+
+  // Group info modal
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
+  const [loadingGroupInfo, setLoadingGroupInfo] = useState(false);
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
@@ -127,7 +178,7 @@ export default function ProviderMessages() {
 
     setProviderId(id);
     setProviderName(name);
-    setUserId(uid || id); // Fall back to providerId if userId not set
+    setUserId(uid || id);
 
     fetchConversations(id);
     if (uid || id) {
@@ -147,13 +198,13 @@ export default function ProviderMessages() {
       if (selectedConversation) {
         fetchCustomerMessages(selectedConversation.customerId);
       }
-      if (selectedTeamMember !== null) {
-        fetchTeamMessages(selectedTeamMember);
+      if (selectedTeamChat) {
+        fetchTeamMessages(selectedTeamChat);
       }
-    }, 10000); // Poll every 10 seconds
+    }, 10000);
 
     return () => clearInterval(interval);
-  }, [providerId, userId, selectedConversation, selectedTeamMember]);
+  }, [providerId, userId, selectedConversation, selectedTeamChat]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -184,6 +235,9 @@ export default function ProviderMessages() {
       if (data.teamChat) {
         setTeamChat(data.teamChat);
       }
+      if (data.crews) {
+        setCrewChats(data.crews);
+      }
       if (data.conversations) {
         setTeamMembers(data.conversations);
       }
@@ -205,11 +259,16 @@ export default function ProviderMessages() {
     }
   };
 
-  const fetchTeamMessages = async (recipientId: string | null) => {
+  const fetchTeamMessages = async (chat: SelectedChat) => {
     try {
-      const url = recipientId && recipientId !== 'team'
-        ? `/api/provider/messages/team?providerId=${providerId}&userId=${userId}&recipientId=${recipientId}`
-        : `/api/provider/messages/team?providerId=${providerId}&userId=${userId}`;
+      let url = `/api/provider/messages/team?providerId=${providerId}&userId=${userId}`;
+
+      if (chat.type === 'crew' && chat.crewId) {
+        url += `&crewId=${chat.crewId}`;
+      } else if (chat.type === 'member') {
+        url += `&recipientId=${chat.id}`;
+      }
+      // team type uses default (no recipientId, no crewId)
 
       const res = await fetch(url);
       const data = await res.json();
@@ -222,14 +281,40 @@ export default function ProviderMessages() {
     }
   };
 
+  const fetchGroupInfo = async (chat: SelectedChat) => {
+    setLoadingGroupInfo(true);
+    try {
+      let url = `/api/provider/messages/team/members?providerId=${providerId}&userId=${userId}`;
+
+      if (chat.type === 'crew' && chat.crewId) {
+        url += `&type=crew&crewId=${chat.crewId}`;
+      } else {
+        url += `&type=team`;
+      }
+
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.members) {
+        setGroupInfo(data);
+        setShowGroupInfo(true);
+      }
+    } catch (error) {
+      console.error('Failed to load group info:', error);
+      toast.error('Failed to load group info');
+    } finally {
+      setLoadingGroupInfo(false);
+    }
+  };
+
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation);
     fetchCustomerMessages(conversation.customerId);
   };
 
-  const handleSelectTeamMember = (memberId: string | null) => {
-    setSelectedTeamMember(memberId);
-    fetchTeamMessages(memberId);
+  const handleSelectTeamChat = (chat: SelectedChat) => {
+    setSelectedTeamChat(chat);
+    fetchTeamMessages(chat);
   };
 
   const handleSendMessage = async () => {
@@ -239,25 +324,37 @@ export default function ProviderMessages() {
     setSending(true);
 
     try {
-      if (activeTab === 'team') {
+      if (activeTab === 'team' && selectedTeamChat) {
         // Send team message
-        const recipientId = selectedTeamMember === 'team' ? null : selectedTeamMember;
+        const body: any = {
+          providerId,
+          userId,
+          content: messageText,
+        };
+
+        if (selectedTeamChat.type === 'crew' && selectedTeamChat.crewId) {
+          body.crewId = selectedTeamChat.crewId;
+        } else if (selectedTeamChat.type === 'member') {
+          body.recipientUserId = selectedTeamChat.id;
+        }
+        // team type sends with no recipientUserId, no crewId
 
         const res = await fetch('/api/provider/messages/team', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            providerId,
-            userId,
-            recipientUserId: recipientId,
-            content: messageText,
-          }),
+          body: JSON.stringify(body),
         });
 
         if (!res.ok) throw new Error('Failed to send message');
 
+        const data = await res.json();
+
+        // Optimistically add message to UI
+        if (data.message) {
+          setTeamMessages(prev => [...prev, data.message]);
+        }
+
         setMessageText('');
-        fetchTeamMessages(selectedTeamMember);
         fetchTeamConversations(providerId, userId);
       } else {
         // Send customer message
@@ -367,6 +464,19 @@ export default function ProviderMessages() {
     }
   };
 
+  const getRoleLabel = (role: string) => {
+    switch (role) {
+      case 'owner':
+        return 'Owner';
+      case 'office':
+        return 'Office';
+      case 'field':
+        return 'Field';
+      default:
+        return role;
+    }
+  };
+
   // Apply filters for customer conversations
   useEffect(() => {
     let filtered = conversations;
@@ -391,14 +501,36 @@ export default function ProviderMessages() {
     setFilteredConversations(filtered);
   }, [searchQuery, filter, conversations]);
 
-  const totalTeamUnread = (teamChat?.unreadCount || 0) + teamMembers.reduce((sum, m) => sum + m.unreadCount, 0);
+  const totalCrewUnread = crewChats.reduce((sum, c) => sum + c.unreadCount, 0);
+  const totalTeamUnread = (teamChat?.unreadCount || 0) + totalCrewUnread + teamMembers.reduce((sum, m) => sum + m.unreadCount, 0);
   const totalCustomerUnread = conversations.filter(c => c.unread).length;
 
   const hasSelection = activeTab === 'team'
-    ? selectedTeamMember !== null
+    ? selectedTeamChat !== null
     : selectedConversation !== null;
 
   const currentMessages = activeTab === 'team' ? teamMessages : customerMessages;
+
+  // Helper to check if current chat is a group (team or crew)
+  const isGroupChat = selectedTeamChat?.type === 'team' || selectedTeamChat?.type === 'crew';
+
+  // Get current chat name and info for header
+  const getCurrentChatInfo = () => {
+    if (!selectedTeamChat) return null;
+
+    if (selectedTeamChat.type === 'team') {
+      return { name: 'Team Chat', memberCount: teamMembers.length + 1 };
+    }
+    if (selectedTeamChat.type === 'crew') {
+      const crew = crewChats.find(c => c.crewId === selectedTeamChat.crewId);
+      return crew ? { name: crew.name, color: crew.color, memberCount: crew.memberCount } : null;
+    }
+    if (selectedTeamChat.type === 'member') {
+      const member = teamMembers.find(m => m.id === selectedTeamChat.id);
+      return member ? { name: member.name, role: member.role, avatar: member.avatar } : null;
+    }
+    return null;
+  };
 
   if (loading) {
     return (
@@ -449,7 +581,7 @@ export default function ProviderMessages() {
               <button
                 onClick={() => {
                   setActiveTab('customers');
-                  setSelectedTeamMember(null);
+                  setSelectedTeamChat(null);
                 }}
                 className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
                   activeTab === 'customers'
@@ -507,9 +639,9 @@ export default function ProviderMessages() {
                   {/* Team Chat (broadcast) */}
                   {teamChat && (
                     <button
-                      onClick={() => handleSelectTeamMember('team')}
+                      onClick={() => handleSelectTeamChat({ type: 'team', id: 'team' })}
                       className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
-                        selectedTeamMember === 'team' ? 'bg-zinc-800' : ''
+                        selectedTeamChat?.type === 'team' ? 'bg-zinc-800' : ''
                       }`}
                     >
                       <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
@@ -527,18 +659,56 @@ export default function ProviderMessages() {
                     </button>
                   )}
 
+                  {/* Crew Chats */}
+                  {crewChats.map(crew => (
+                    <button
+                      key={crew.id}
+                      onClick={() => handleSelectTeamChat({ type: 'crew', id: crew.id, crewId: crew.crewId })}
+                      className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
+                        selectedTeamChat?.crewId === crew.crewId ? 'bg-zinc-800' : ''
+                      }`}
+                    >
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                        style={{ backgroundColor: crew.color || '#6b7280' }}
+                      >
+                        <Users className="w-5 h-5 text-white" />
+                      </div>
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-white truncate">{crew.name}</p>
+                          <span className="text-xs text-zinc-500">{crew.memberCount}</span>
+                        </div>
+                        <p className="text-xs text-zinc-400 truncate">
+                          {crew.lastMessage || 'Crew chat'}
+                        </p>
+                      </div>
+                      {crew.unreadCount > 0 && (
+                        <Badge className="bg-emerald-500 text-white">{crew.unreadCount}</Badge>
+                      )}
+                    </button>
+                  ))}
+
                   {/* Individual team members */}
                   {teamMembers.map(member => (
                     <button
                       key={member.id}
-                      onClick={() => handleSelectTeamMember(member.id)}
+                      onClick={() => handleSelectTeamChat({ type: 'member', id: member.id })}
                       className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
-                        selectedTeamMember === member.id ? 'bg-zinc-800' : ''
+                        selectedTeamChat?.type === 'member' && selectedTeamChat?.id === member.id ? 'bg-zinc-800' : ''
                       }`}
                     >
-                      <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium flex-shrink-0">
-                        {getInitials(member.name)}
-                      </div>
+                      {member.avatar ? (
+                        <img
+                          src={member.avatar}
+                          alt={member.name}
+                          className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium flex-shrink-0">
+                          {getInitials(member.name)}
+                        </div>
+                      )}
                       <div className="flex-1 text-left min-w-0">
                         <div className="flex items-center gap-2">
                           <p className="font-medium text-white truncate">{member.name}</p>
@@ -554,7 +724,7 @@ export default function ProviderMessages() {
                     </button>
                   ))}
 
-                  {teamMembers.length === 0 && !teamChat && (
+                  {teamMembers.length === 0 && crewChats.length === 0 && !teamChat && (
                     <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
                       <Users className="w-12 h-12 text-zinc-600 mb-3" />
                       <p className="text-zinc-400 font-medium">No team members</p>
@@ -638,7 +808,7 @@ export default function ProviderMessages() {
                       {/* Back button for mobile */}
                       <button
                         onClick={() => {
-                          if (activeTab === 'team') setSelectedTeamMember(null);
+                          if (activeTab === 'team') setSelectedTeamChat(null);
                           else setSelectedConversation(null);
                         }}
                         className="md:hidden p-2 -ml-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors"
@@ -646,7 +816,7 @@ export default function ProviderMessages() {
                         <ChevronLeft className="h-5 w-5" />
                       </button>
 
-                      {activeTab === 'team' && selectedTeamMember === 'team' && (
+                      {activeTab === 'team' && selectedTeamChat?.type === 'team' && (
                         <>
                           <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
                             <Users className="w-5 h-5 text-white" />
@@ -658,24 +828,46 @@ export default function ProviderMessages() {
                         </>
                       )}
 
-                      {activeTab === 'team' && selectedTeamMember && selectedTeamMember !== 'team' && (
-                        <>
-                          {(() => {
-                            const member = teamMembers.find(m => m.id === selectedTeamMember);
-                            return member ? (
-                              <>
-                                <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium flex-shrink-0">
-                                  {getInitials(member.name)}
-                                </div>
-                                <div>
-                                  <p className="font-semibold text-white">{member.name}</p>
-                                  <p className="text-xs text-zinc-400 capitalize">{member.role}</p>
-                                </div>
-                              </>
-                            ) : null;
-                          })()}
-                        </>
-                      )}
+                      {activeTab === 'team' && selectedTeamChat?.type === 'crew' && (() => {
+                        const crew = crewChats.find(c => c.crewId === selectedTeamChat.crewId);
+                        return crew ? (
+                          <>
+                            <div
+                              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: crew.color || '#6b7280' }}
+                            >
+                              <Users className="w-5 h-5 text-white" />
+                            </div>
+                            <div>
+                              <p className="font-semibold text-white">{crew.name}</p>
+                              <p className="text-xs text-zinc-400">{crew.memberCount} members</p>
+                            </div>
+                          </>
+                        ) : null;
+                      })()}
+
+                      {activeTab === 'team' && selectedTeamChat?.type === 'member' && (() => {
+                        const member = teamMembers.find(m => m.id === selectedTeamChat.id);
+                        return member ? (
+                          <>
+                            {member.avatar ? (
+                              <img
+                                src={member.avatar}
+                                alt={member.name}
+                                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium flex-shrink-0">
+                                {getInitials(member.name)}
+                              </div>
+                            )}
+                            <div>
+                              <p className="font-semibold text-white">{member.name}</p>
+                              <p className="text-xs text-zinc-400 capitalize">{member.role}</p>
+                            </div>
+                          </>
+                        ) : null;
+                      })()}
 
                       {activeTab === 'customers' && selectedConversation && (
                         <>
@@ -692,29 +884,45 @@ export default function ProviderMessages() {
                       )}
                     </div>
 
-                    {/* Quick Actions for customer messages */}
-                    {activeTab === 'customers' && selectedConversation && (
-                      <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+                    {/* Quick Actions */}
+                    <div className="flex items-center gap-1 md:gap-2 flex-shrink-0">
+                      {/* Group info button for team/crew chats */}
+                      {activeTab === 'team' && isGroupChat && selectedTeamChat && (
                         <Button
                           size="sm"
                           variant="outline"
                           className="border-zinc-700 hover:bg-zinc-800 px-2 md:px-3"
-                          onClick={() => window.location.href = `tel:${selectedConversation.customerId}`}
+                          onClick={() => fetchGroupInfo(selectedTeamChat)}
+                          disabled={loadingGroupInfo}
                         >
-                          <Phone className="h-4 w-4 md:mr-2" />
-                          <span className="hidden md:inline">Call</span>
+                          <Info className="h-4 w-4 md:mr-2" />
+                          <span className="hidden md:inline">Info</span>
                         </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-zinc-700 hover:bg-zinc-800 px-2 md:px-3"
-                          onClick={() => router.push(`/provider/customers/${selectedConversation.customerId}`)}
-                        >
-                          <User className="h-4 w-4 md:mr-2" />
-                          <span className="hidden md:inline">Profile</span>
-                        </Button>
-                      </div>
-                    )}
+                      )}
+
+                      {activeTab === 'customers' && selectedConversation && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-zinc-700 hover:bg-zinc-800 px-2 md:px-3"
+                            onClick={() => window.location.href = `tel:${selectedConversation.customerId}`}
+                          >
+                            <Phone className="h-4 w-4 md:mr-2" />
+                            <span className="hidden md:inline">Call</span>
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="border-zinc-700 hover:bg-zinc-800 px-2 md:px-3"
+                            onClick={() => router.push(`/provider/customers/${selectedConversation.customerId}`)}
+                          >
+                            <User className="h-4 w-4 md:mr-2" />
+                            <span className="hidden md:inline">Profile</span>
+                          </Button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
 
@@ -743,38 +951,57 @@ export default function ProviderMessages() {
                           key={message.id}
                           className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                         >
-                          <div className={`max-w-[85%] sm:max-w-[75%] md:max-w-[70%] ${isOwn ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
-                            {/* Sender name for team messages */}
-                            {activeTab === 'team' && !isOwn && message.senderName && (
-                              <span className="text-xs text-zinc-500 px-2">{message.senderName}</span>
-                            )}
-
-                            {message.photoUrl && (
-                              <img
-                                src={message.photoUrl}
-                                alt="Attachment"
-                                className="rounded-lg border border-zinc-700 max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => window.open(message.photoUrl, '_blank')}
-                              />
-                            )}
-                            {message.content && (
-                              <div
-                                className={`px-3 md:px-4 py-2 md:py-2.5 rounded-2xl shadow-md ${
-                                  isOwn
-                                    ? 'bg-emerald-600 text-white rounded-br-sm'
-                                    : 'bg-zinc-800 text-zinc-100 rounded-bl-sm'
-                                }`}
-                              >
-                                <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
+                          <div className={`flex gap-2 max-w-[85%] sm:max-w-[75%] md:max-w-[70%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+                            {/* Avatar for team messages */}
+                            {activeTab === 'team' && !isOwn && (
+                              <div className="flex-shrink-0">
+                                {message.senderAvatar ? (
+                                  <img
+                                    src={message.senderAvatar}
+                                    alt={message.senderName || ''}
+                                    className="w-8 h-8 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-white text-xs font-medium">
+                                    {message.senderName ? getInitials(message.senderName) : '?'}
+                                  </div>
+                                )}
                               </div>
                             )}
-                            <div className="flex items-center gap-1 px-2">
-                              <span className="text-xs text-zinc-500">
-                                {formatMessageTime(message.timestamp || message.createdAt || '')}
-                              </span>
-                              {isOwn && message.read && (
-                                <CheckCheck className="h-3 w-3 text-blue-400" />
+
+                            <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                              {/* Sender name for team messages */}
+                              {activeTab === 'team' && !isOwn && message.senderName && (
+                                <span className="text-xs text-zinc-500 px-2 mb-1">{message.senderName}</span>
                               )}
+
+                              {message.photoUrl && (
+                                <img
+                                  src={message.photoUrl}
+                                  alt="Attachment"
+                                  className="rounded-lg border border-zinc-700 max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                  onClick={() => window.open(message.photoUrl, '_blank')}
+                                />
+                              )}
+                              {message.content && (
+                                <div
+                                  className={`px-3 md:px-4 py-2 md:py-2.5 rounded-2xl shadow-md ${
+                                    isOwn
+                                      ? 'bg-emerald-600 text-white rounded-br-sm'
+                                      : 'bg-zinc-800 text-zinc-100 rounded-bl-sm'
+                                  }`}
+                                >
+                                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-1 px-2 mt-1">
+                                <span className="text-xs text-zinc-500">
+                                  {formatMessageTime(message.timestamp || message.createdAt || '')}
+                                </span>
+                                {isOwn && message.read && (
+                                  <CheckCheck className="h-3 w-3 text-blue-400" />
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -894,6 +1121,76 @@ export default function ProviderMessages() {
             )}
           </div>
         </div>
+
+        {/* Group Info Modal */}
+        {showGroupInfo && groupInfo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-md max-h-[80vh] overflow-hidden">
+              {/* Modal Header */}
+              <div className="p-4 border-b border-zinc-700 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: groupInfo.color || '#10b981' }}
+                  >
+                    <Users className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-white">{groupInfo.name}</h3>
+                    <p className="text-xs text-zinc-400">{groupInfo.memberCount} members</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowGroupInfo(false)}
+                  className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+
+              {/* Members List */}
+              <div className="overflow-y-auto max-h-[60vh]">
+                <div className="p-2">
+                  <p className="text-xs font-medium text-zinc-500 px-3 py-2">Members</p>
+                  {groupInfo.members.map((member) => (
+                    <div
+                      key={member.id}
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50"
+                    >
+                      {member.avatar ? (
+                        <img
+                          src={member.avatar}
+                          alt={member.name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium">
+                          {getInitials(member.name)}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium text-white truncate">{member.name}</p>
+                          {member.isLead && (
+                            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">
+                              <Crown className="w-3 h-3" />
+                              Lead
+                            </span>
+                          )}
+                          {member.isCurrentUser && (
+                            <span className="text-xs text-zinc-500">(You)</span>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-400">{getRoleLabel(member.role)}</p>
+                      </div>
+                      <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ProviderLayout>
   );

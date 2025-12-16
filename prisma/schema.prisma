@@ -537,16 +537,17 @@ model UserStatusLog {
 }
 
 model Crew {
-  id         String   @id @default(cuid())
-  providerId String   @map("provider_id")
-  name       String
-  userIds    String[] @default([]) @map("user_ids")
-  leaderId   String?  @map("leader_id")
-  color      String   @default("#10b981")
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  provider   Provider @relation("ProviderCrews", fields: [providerId], references: [id], onDelete: Cascade)
-  jobs       Job[]    @relation("AssignedCrewJobs")
+  id           String          @id @default(cuid())
+  providerId   String          @map("provider_id")
+  name         String
+  userIds      String[]        @default([]) @map("user_ids")
+  leaderId     String?         @map("leader_id")
+  color        String          @default("#10b981")
+  createdAt    DateTime        @default(now()) @map("created_at")
+  updatedAt    DateTime        @updatedAt @map("updated_at")
+  provider     Provider        @relation("ProviderCrews", fields: [providerId], references: [id], onDelete: Cascade)
+  jobs         Job[]           @relation("AssignedCrewJobs")
+  teamMessages team_messages[] @relation("CrewMessages")
 
   @@index([providerId])
   @@map("crews")
@@ -996,22 +997,27 @@ model provider_customer_messages {
 
 // Team messages - internal communication between team members
 model team_messages {
-  id               String   @id @default(cuid())
-  provider_id      String
-  sender_user_id   String   // ProviderUser who sent it
-  recipient_user_id String?  // null = team-wide (broadcast to all)
-  content          String
-  read             Boolean  @default(false)
-  created_at       DateTime @default(now())
-  updated_at       DateTime @updatedAt
+  id                String   @id @default(cuid())
+  provider_id       String
+  sender_user_id    String   // ProviderUser who sent it
+  recipient_user_id String?  // null = team-wide (broadcast to all), or specific user for DM
+  crew_id           String?  // For crew group chats
+  content           String
+  read              Boolean  @default(false)
+  read_by           String[] @default([]) // User IDs who have read (for group chats)
+  created_at        DateTime @default(now())
+  updated_at        DateTime @updatedAt
 
   provider Provider     @relation(fields: [provider_id], references: [id], onDelete: Cascade)
   sender   ProviderUser @relation("SentTeamMessages", fields: [sender_user_id], references: [id], onDelete: Cascade)
+  crew     Crew?        @relation("CrewMessages", fields: [crew_id], references: [id], onDelete: Cascade)
 
   @@index([provider_id])
   @@index([sender_user_id])
   @@index([recipient_user_id])
+  @@index([crew_id])
   @@index([provider_id, recipient_user_id])
+  @@index([provider_id, crew_id])
   @@index([created_at])
 }
 

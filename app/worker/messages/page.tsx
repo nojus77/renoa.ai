@@ -17,6 +17,9 @@ import {
   User,
   Building2,
   Wrench,
+  Info,
+  X,
+  Crown,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -34,10 +37,12 @@ interface Message {
   senderUserId?: string;
   senderName?: string;
   senderRole?: string;
+  senderAvatar?: string | null;
   content: string;
   timestamp?: string;
   createdAt?: string;
   read: boolean;
+  crewId?: string | null;
 }
 
 interface Conversation {
@@ -54,6 +59,7 @@ interface Conversation {
 
 interface TeamMember {
   id: string;
+  type: 'member';
   name: string;
   email: string;
   role: string;
@@ -63,12 +69,46 @@ interface TeamMember {
   unreadCount: number;
 }
 
+interface CrewChat {
+  id: string;
+  crewId: string;
+  type: 'crew';
+  name: string;
+  color: string;
+  memberCount: number;
+  leaderId?: string | null;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
+  unreadCount: number;
+  createdAt: string;
+}
+
 interface TeamChat {
   id: string;
+  type: 'team';
   name: string;
   unreadCount: number;
   lastMessage?: string | null;
   lastMessageAt?: string | null;
+}
+
+interface GroupMember {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  avatar?: string | null;
+  isLead?: boolean;
+  isCurrentUser?: boolean;
+}
+
+interface GroupInfo {
+  type: 'team' | 'crew';
+  name: string;
+  color?: string;
+  memberCount: number;
+  createdAt?: string;
+  members: GroupMember[];
 }
 
 const QUICK_REPLY_TEMPLATES = [
@@ -84,7 +124,7 @@ export default function WorkerMessages() {
   const searchParams = useSearchParams();
   const [userId, setUserId] = useState('');
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<MessageTab>('customers');
+  const [activeTab, setActiveTab] = useState<MessageTab>('team');
 
   // Customer conversation state
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -94,9 +134,15 @@ export default function WorkerMessages() {
 
   // Team state
   const [teamChat, setTeamChat] = useState<TeamChat | null>(null);
+  const [crews, setCrews] = useState<CrewChat[]>([]);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
-  const [selectedTeamMember, setSelectedTeamMember] = useState<string | null>(null);
+  const [selectedTeamChat, setSelectedTeamChat] = useState<string | null>(null); // 'team', 'crew-{id}', or member id
   const [teamMessages, setTeamMessages] = useState<Message[]>([]);
+
+  // Group info modal state
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
+  const [loadingGroupInfo, setLoadingGroupInfo] = useState(false);
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
@@ -116,12 +162,6 @@ export default function WorkerMessages() {
     setUserId(id);
     fetchConversations(id);
     fetchTeamConversations(id);
-
-    // Check if we should open a specific conversation
-    const openCustomerId = searchParams.get('customerId');
-    if (openCustomerId) {
-      // Will be handled after conversations load
-    }
   }, [router, searchParams]);
 
   // Handle opening a specific conversation from URL params
@@ -145,13 +185,13 @@ export default function WorkerMessages() {
       if (selectedConversation) {
         fetchCustomerMessages(selectedConversation.customerId);
       }
-      if (selectedTeamMember !== null) {
-        fetchTeamMessages(selectedTeamMember);
+      if (selectedTeamChat !== null) {
+        fetchTeamMessages(selectedTeamChat);
       }
     }, 10000); // Poll every 10 seconds
 
     return () => clearInterval(interval);
-  }, [userId, selectedConversation, selectedTeamMember]);
+  }, [userId, selectedConversation, selectedTeamChat]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -196,6 +236,9 @@ export default function WorkerMessages() {
       if (data.teamChat) {
         setTeamChat(data.teamChat);
       }
+      if (data.crews) {
+        setCrews(data.crews);
+      }
       if (data.conversations) {
         setTeamMembers(data.conversations);
       }
@@ -217,11 +260,21 @@ export default function WorkerMessages() {
     }
   };
 
-  const fetchTeamMessages = async (recipientId: string | null) => {
+  const fetchTeamMessages = async (chatId: string) => {
     try {
-      const url = recipientId && recipientId !== 'team'
-        ? `/api/worker/messages/team?userId=${userId}&recipientId=${recipientId}`
-        : `/api/worker/messages/team?userId=${userId}`;
+      let url = `/api/worker/messages/team?userId=${userId}`;
+
+      if (chatId === 'team') {
+        // Team-wide chat
+        url += '&recipientId=team';
+      } else if (chatId.startsWith('crew-')) {
+        // Crew chat
+        const crewId = chatId.replace('crew-', '');
+        url += `&crewId=${crewId}`;
+      } else {
+        // Direct message
+        url += `&recipientId=${chatId}`;
+      }
 
       const res = await fetch(url);
       const data = await res.json();
@@ -234,14 +287,38 @@ export default function WorkerMessages() {
     }
   };
 
+  const fetchGroupInfo = async (chatId: string) => {
+    setLoadingGroupInfo(true);
+    try {
+      let url = `/api/worker/messages/team/members?userId=${userId}`;
+
+      if (chatId === 'team') {
+        url += '&type=team';
+      } else if (chatId.startsWith('crew-')) {
+        const crewId = chatId.replace('crew-', '');
+        url += `&type=crew&crewId=${crewId}`;
+      }
+
+      const res = await fetch(url);
+      const data = await res.json();
+      setGroupInfo(data);
+      setShowGroupInfo(true);
+    } catch (error) {
+      console.error('Failed to load group info:', error);
+      toast.error('Failed to load member info');
+    } finally {
+      setLoadingGroupInfo(false);
+    }
+  };
+
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation);
     fetchCustomerMessages(conversation.customerId);
   };
 
-  const handleSelectTeamMember = (memberId: string | null) => {
-    setSelectedTeamMember(memberId);
-    fetchTeamMessages(memberId);
+  const handleSelectTeamChat = (chatId: string) => {
+    setSelectedTeamChat(chatId);
+    fetchTeamMessages(chatId);
   };
 
   const handleSendMessage = async () => {
@@ -252,8 +329,20 @@ export default function WorkerMessages() {
 
     try {
       if (activeTab === 'team') {
-        // Send team message
-        const recipientId = selectedTeamMember === 'team' ? null : selectedTeamMember;
+        // Determine message type
+        let recipientId: string | null = null;
+        let crewId: string | null = null;
+
+        if (selectedTeamChat === 'team') {
+          // Team-wide message
+          recipientId = null;
+        } else if (selectedTeamChat?.startsWith('crew-')) {
+          // Crew message
+          crewId = selectedTeamChat.replace('crew-', '');
+        } else {
+          // Direct message
+          recipientId = selectedTeamChat;
+        }
 
         // Optimistically add message
         const tempMessage: Message = {
@@ -263,6 +352,7 @@ export default function WorkerMessages() {
           content: messageText,
           createdAt: new Date().toISOString(),
           read: false,
+          crewId,
         };
         setTeamMessages(prev => [...prev, tempMessage]);
         setMessageText('');
@@ -273,6 +363,7 @@ export default function WorkerMessages() {
           body: JSON.stringify({
             userId,
             recipientUserId: recipientId,
+            crewId,
             content: messageText,
           }),
         });
@@ -280,7 +371,7 @@ export default function WorkerMessages() {
         if (!res.ok) throw new Error('Failed to send message');
 
         // Refresh messages
-        fetchTeamMessages(selectedTeamMember);
+        fetchTeamMessages(selectedTeamChat!);
         fetchTeamConversations(userId);
       } else {
         // Send customer message
@@ -381,14 +472,45 @@ export default function WorkerMessages() {
     }
   };
 
-  const totalTeamUnread = (teamChat?.unreadCount || 0) + teamMembers.reduce((sum, m) => sum + m.unreadCount, 0);
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'owner':
+        return 'bg-amber-500/20 text-amber-400';
+      case 'office':
+        return 'bg-blue-500/20 text-blue-400';
+      case 'field':
+        return 'bg-emerald-500/20 text-emerald-400';
+      default:
+        return 'bg-zinc-500/20 text-zinc-400';
+    }
+  };
+
+  const totalTeamUnread = (teamChat?.unreadCount || 0) +
+    crews.reduce((sum, c) => sum + c.unreadCount, 0) +
+    teamMembers.reduce((sum, m) => sum + m.unreadCount, 0);
   const totalCustomerUnread = conversations.filter(c => c.unread).length;
 
   const hasSelection = activeTab === 'team'
-    ? selectedTeamMember !== null
+    ? selectedTeamChat !== null
     : selectedConversation !== null;
 
   const currentMessages = activeTab === 'team' ? teamMessages : customerMessages;
+
+  // Check if current chat is a group chat (team or crew)
+  const isGroupChat = selectedTeamChat === 'team' || selectedTeamChat?.startsWith('crew-');
+
+  // Get current chat info for header
+  const getCurrentChatInfo = () => {
+    if (selectedTeamChat === 'team') {
+      return { name: 'Team Chat', subtitle: `${teamMembers.length + 1} members`, isGroup: true };
+    }
+    if (selectedTeamChat?.startsWith('crew-')) {
+      const crew = crews.find(c => c.id === selectedTeamChat);
+      return { name: crew?.name || 'Crew Chat', subtitle: `${crew?.memberCount || 0} members`, isGroup: true, color: crew?.color };
+    }
+    const member = teamMembers.find(m => m.id === selectedTeamChat);
+    return { name: member?.name || '', subtitle: member?.role || '', isGroup: false, avatar: member?.avatar };
+  };
 
   if (loading) {
     return (
@@ -438,7 +560,7 @@ export default function WorkerMessages() {
               <button
                 onClick={() => {
                   setActiveTab('customers');
-                  setSelectedTeamMember(null);
+                  setSelectedTeamChat(null);
                 }}
                 className={`flex-1 px-4 py-3 text-sm font-medium flex items-center justify-center gap-2 transition-colors ${
                   activeTab === 'customers'
@@ -486,7 +608,7 @@ export default function WorkerMessages() {
                 {/* Team Chat (broadcast) */}
                 {teamChat && (
                   <button
-                    onClick={() => handleSelectTeamMember('team')}
+                    onClick={() => handleSelectTeamChat('team')}
                     className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
                   >
                     <div
@@ -512,16 +634,57 @@ export default function WorkerMessages() {
                   </button>
                 )}
 
+                {/* Crew Chats */}
+                {crews.map(crew => (
+                  <button
+                    key={crew.id}
+                    onClick={() => handleSelectTeamChat(crew.id)}
+                    className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
+                  >
+                    <div
+                      className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ backgroundColor: crew.color }}
+                    >
+                      <Users className="w-6 h-6 text-white" />
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-white truncate">{crew.name}</p>
+                        <span className="text-xs text-zinc-500">{crew.memberCount} members</span>
+                      </div>
+                      <p className="text-xs text-zinc-500 truncate">
+                        {crew.lastMessage || 'Crew chat'}
+                      </p>
+                    </div>
+                    {crew.unreadCount > 0 && (
+                      <span
+                        className="px-2 py-1 text-xs rounded-full text-black font-medium"
+                        style={{ backgroundColor: LIME_GREEN }}
+                      >
+                        {crew.unreadCount}
+                      </span>
+                    )}
+                  </button>
+                ))}
+
                 {/* Individual team members */}
                 {teamMembers.map(member => (
                   <button
                     key={member.id}
-                    onClick={() => handleSelectTeamMember(member.id)}
+                    onClick={() => handleSelectTeamChat(member.id)}
                     className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
                   >
-                    <div className="w-12 h-12 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white font-semibold flex-shrink-0">
-                      {getInitials(member.name)}
-                    </div>
+                    {member.avatar ? (
+                      <img
+                        src={member.avatar}
+                        alt={member.name}
+                        className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white font-semibold flex-shrink-0">
+                        {getInitials(member.name)}
+                      </div>
+                    )}
                     <div className="flex-1 text-left min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="font-semibold text-white truncate">{member.name}</p>
@@ -542,7 +705,7 @@ export default function WorkerMessages() {
                   </button>
                 ))}
 
-                {teamMembers.length === 0 && !teamChat && (
+                {teamMembers.length === 0 && crews.length === 0 && !teamChat && (
                   <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
                     <Users className="w-12 h-12 text-zinc-600 mb-3" />
                     <p className="text-zinc-400 font-medium">No team members</p>
@@ -622,7 +785,7 @@ export default function WorkerMessages() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
-                    if (activeTab === 'team') setSelectedTeamMember(null);
+                    if (activeTab === 'team') setSelectedTeamChat(null);
                     else setSelectedConversation(null);
                   }}
                   className="p-2 -ml-2 text-zinc-400 hover:text-white transition-colors"
@@ -630,39 +793,48 @@ export default function WorkerMessages() {
                   <ChevronLeft className="h-5 w-5" />
                 </button>
 
-                {activeTab === 'team' && selectedTeamMember === 'team' && (
-                  <>
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: LIME_GREEN }}
-                    >
-                      <Users className="w-5 h-5 text-black" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h2 className="font-semibold text-white">Team Chat</h2>
-                      <p className="text-xs text-zinc-500">{teamMembers.length + 1} members</p>
-                    </div>
-                  </>
-                )}
-
-                {activeTab === 'team' && selectedTeamMember && selectedTeamMember !== 'team' && (
-                  <>
-                    {(() => {
-                      const member = teamMembers.find(m => m.id === selectedTeamMember);
-                      return member ? (
-                        <>
-                          <div className="w-10 h-10 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white font-semibold flex-shrink-0">
-                            {getInitials(member.name)}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h2 className="font-semibold text-white truncate">{member.name}</h2>
-                            <p className="text-xs text-zinc-500 capitalize">{member.role}</p>
-                          </div>
-                        </>
-                      ) : null;
-                    })()}
-                  </>
-                )}
+                {activeTab === 'team' && selectedTeamChat && (() => {
+                  const chatInfo = getCurrentChatInfo();
+                  return (
+                    <>
+                      {chatInfo.isGroup ? (
+                        <div
+                          className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: chatInfo.color || LIME_GREEN }}
+                        >
+                          <Users className="w-5 h-5" style={{ color: chatInfo.color ? 'white' : 'black' }} />
+                        </div>
+                      ) : chatInfo.avatar ? (
+                        <img
+                          src={chatInfo.avatar}
+                          alt={chatInfo.name}
+                          className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white font-semibold flex-shrink-0">
+                          {getInitials(chatInfo.name)}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <h2 className="font-semibold text-white truncate">{chatInfo.name}</h2>
+                        <p className="text-xs text-zinc-500 capitalize">{chatInfo.subtitle}</p>
+                      </div>
+                      {chatInfo.isGroup && (
+                        <button
+                          onClick={() => fetchGroupInfo(selectedTeamChat!)}
+                          className="p-2 text-zinc-400 hover:text-white transition-colors"
+                          disabled={loadingGroupInfo}
+                        >
+                          {loadingGroupInfo ? (
+                            <Loader2 className="h-5 w-5 animate-spin" />
+                          ) : (
+                            <Info className="h-5 w-5" />
+                          )}
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
 
                 {activeTab === 'customers' && selectedConversation && (
                   <>
@@ -724,7 +896,24 @@ export default function WorkerMessages() {
                       key={message.id}
                       className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className={`max-w-[80%] flex flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}>
+                      {/* Avatar for non-own messages in team chat */}
+                      {activeTab === 'team' && !isOwn && (
+                        <div className="flex-shrink-0 mr-2">
+                          {message.senderAvatar ? (
+                            <img
+                              src={message.senderAvatar}
+                              alt={message.senderName || ''}
+                              className="w-8 h-8 rounded-full object-cover"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white text-xs font-semibold">
+                              {getInitials(message.senderName || '')}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className={`max-w-[75%] flex flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}>
                         {/* Sender name for team messages */}
                         {activeTab === 'team' && !isOwn && message.senderName && (
                           <span className="text-xs text-zinc-500 px-1">{message.senderName}</span>
@@ -805,6 +994,95 @@ export default function WorkerMessages() {
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Group Info Modal */}
+        {showGroupInfo && groupInfo && (
+          <div
+            className="fixed inset-0 bg-black/80 z-[60] flex items-center justify-center p-4"
+            onClick={() => setShowGroupInfo(false)}
+          >
+            <div
+              className="bg-[#1F1F1F] w-full max-w-sm rounded-2xl border border-[#2A2A2A] shadow-2xl max-h-[80vh] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-4 border-b border-[#2A2A2A]">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="w-10 h-10 rounded-full flex items-center justify-center"
+                    style={{ backgroundColor: groupInfo.color || LIME_GREEN }}
+                  >
+                    <Users className="w-5 h-5" style={{ color: groupInfo.color ? 'white' : 'black' }} />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-semibold text-white">{groupInfo.name}</h2>
+                    <p className="text-xs text-zinc-500">{groupInfo.memberCount} members</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowGroupInfo(false)}
+                  className="p-2 hover:bg-[#2A2A2A] rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-zinc-400" />
+                </button>
+              </div>
+
+              {/* Member List */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                {groupInfo.members.map((member) => (
+                  <div
+                    key={member.id}
+                    className="flex items-center gap-3 p-3 bg-[#2A2A2A] rounded-xl"
+                  >
+                    {member.avatar ? (
+                      <img
+                        src={member.avatar}
+                        alt={member.name}
+                        className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-[#3A3A3A] flex items-center justify-center text-white font-semibold flex-shrink-0">
+                        {getInitials(member.name)}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-white truncate">{member.name}</p>
+                        {member.isLead && (
+                          <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">
+                            <Crown className="w-3 h-3" />
+                            Lead
+                          </span>
+                        )}
+                        {member.isCurrentUser && (
+                          <span className="px-1.5 py-0.5 bg-zinc-500/20 text-zinc-400 rounded text-xs">
+                            You
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-xs capitalize ${getRoleBadgeColor(member.role).replace('bg-', 'text-').replace('/20', '')}`}>
+                        {member.role}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Modal Footer */}
+              {groupInfo.createdAt && (
+                <div className="p-4 border-t border-[#2A2A2A]">
+                  <p className="text-xs text-zinc-500 text-center">
+                    Created {new Date(groupInfo.createdAt).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         )}
