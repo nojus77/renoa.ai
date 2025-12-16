@@ -15,6 +15,7 @@ interface WorkerLayoutProps {
 const navItems = [
   { href: '/worker/dashboard', icon: Home, label: 'Home' },
   { href: '/worker/schedule', icon: Calendar, label: 'Schedule' },
+  { href: '/worker/map', icon: MapPin, label: 'Map' },
   { href: '/worker/messages', icon: MessageSquare, label: 'Messages' },
   { href: '/worker/earnings', icon: DollarSign, label: 'Earnings' },
   { href: '/worker/profile', icon: User, label: 'Profile' },
