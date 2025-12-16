@@ -455,6 +455,7 @@ model Provider {
   notifications              Notification[]               @relation("ProviderNotifications")
   workLogs                   WorkLog[]                    @relation("ProviderWorkLogs")
   statusLogs                 UserStatusLog[]              @relation("ProviderStatusLogs")
+  teamMessages               team_messages[]
 }
 
 model Notification {
@@ -509,6 +510,7 @@ model ProviderUser {
   workerSkills      ProviderUserSkill[] @relation("UserSkills")
   workLogs          WorkLog[]           @relation("UserWorkLogs")
   statusLogs        UserStatusLog[]     @relation("UserStatusLogs")
+  sentTeamMessages  team_messages[]     @relation("SentTeamMessages")
 
   @@index([providerId])
   @@index([email])
@@ -990,6 +992,27 @@ model provider_customer_messages {
   @@index([created_at])
   @@index([customer_id])
   @@index([provider_id, customer_id])
+}
+
+// Team messages - internal communication between team members
+model team_messages {
+  id               String   @id @default(cuid())
+  provider_id      String
+  sender_user_id   String   // ProviderUser who sent it
+  recipient_user_id String?  // null = team-wide (broadcast to all)
+  content          String
+  read             Boolean  @default(false)
+  created_at       DateTime @default(now())
+  updated_at       DateTime @updatedAt
+
+  provider Provider     @relation(fields: [provider_id], references: [id], onDelete: Cascade)
+  sender   ProviderUser @relation("SentTeamMessages", fields: [sender_user_id], references: [id], onDelete: Cascade)
+
+  @@index([provider_id])
+  @@index([sender_user_id])
+  @@index([recipient_user_id])
+  @@index([provider_id, recipient_user_id])
+  @@index([created_at])
 }
 
 model referrals {
