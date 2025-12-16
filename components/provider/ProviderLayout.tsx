@@ -162,14 +162,6 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       showInTopNav: true,
     },
     {
-      name: 'Dashboard',
-      href: '/provider/dashboard',
-      icon: Target,
-      disabled: false,
-      showInBottomNav: false,
-      showInTopNav: true,
-    },
-    {
       name: 'Calendar',
       href: '/provider/calendar',
       icon: Calendar,

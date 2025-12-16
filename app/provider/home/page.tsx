@@ -1,31 +1,17 @@
 "use client"
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
-import { format, formatDistanceToNow } from 'date-fns';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { format } from 'date-fns';
 import ProviderLayout from '@/components/provider/ProviderLayout';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import {
   Calendar,
-  Clock,
   DollarSign,
   TrendingUp,
   MapPin,
-  Phone,
-  Navigation,
-  Users,
-  FileText,
-  Target,
-  CheckCircle2,
-  PlayCircle,
-  Plus,
   ChevronRight,
-  Activity,
-  AlertCircle,
+  Briefcase,
 } from 'lucide-react';
-import { toast } from 'sonner';
 
 interface Worker {
   id: string;
@@ -50,6 +36,8 @@ interface UpcomingJob {
   id: string;
   startTime: string;
   serviceType: string;
+  customerName?: string;
+  address?: string;
 }
 
 interface Stats {
@@ -63,21 +51,111 @@ interface Stats {
   completedThisMonth: number;
 }
 
-interface RecentActivity {
-  id: string;
-  type: 'job' | 'invoice';
-  status: string;
-  customerName: string;
-  serviceType?: string;
-  timestamp: string;
-  amount?: number;
+interface RevenueDataPoint {
+  date: string;
+  amount: number;
+  label: string;
 }
 
 interface HomeData {
   todaysJobs: TodayJob[];
   upcomingJobs: UpcomingJob[];
   stats: Stats;
-  recentActivity: RecentActivity[];
+  revenueHistory?: RevenueDataPoint[];
+}
+
+// Simple line chart component
+function RevenueChart({ data, height = 200 }: { data: RevenueDataPoint[]; height?: number }) {
+  const maxValue = Math.max(...data.map(d => d.amount), 1);
+  const minValue = Math.min(...data.map(d => d.amount));
+  const range = maxValue - minValue || 1;
+
+  // Create SVG path for smooth curve
+  const points = data.map((d, i) => ({
+    x: (i / (data.length - 1)) * 100,
+    y: 100 - ((d.amount - minValue) / range) * 80 - 10,
+  }));
+
+  // Create smooth curve path
+  const pathData = points.reduce((acc, point, i) => {
+    if (i === 0) return `M ${point.x} ${point.y}`;
+
+    const prev = points[i - 1];
+    const cpx1 = prev.x + (point.x - prev.x) / 3;
+    const cpx2 = prev.x + (point.x - prev.x) * 2 / 3;
+
+    return `${acc} C ${cpx1} ${prev.y}, ${cpx2} ${point.y}, ${point.x} ${point.y}`;
+  }, '');
+
+  // Create gradient fill path
+  const fillPath = `${pathData} L 100 100 L 0 100 Z`;
+
+  return (
+    <div className="relative w-full" style={{ height }}>
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        className="w-full h-full"
+      >
+        <defs>
+          <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+            <stop offset="0%" stopColor="rgb(16, 185, 129)" stopOpacity="0.3" />
+            <stop offset="100%" stopColor="rgb(16, 185, 129)" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+
+        {/* Grid lines */}
+        {[0, 25, 50, 75, 100].map((y) => (
+          <line
+            key={y}
+            x1="0"
+            y1={y}
+            x2="100"
+            y2={y}
+            stroke="currentColor"
+            strokeOpacity="0.1"
+            strokeWidth="0.5"
+          />
+        ))}
+
+        {/* Gradient fill */}
+        <path
+          d={fillPath}
+          fill="url(#chartGradient)"
+        />
+
+        {/* Line */}
+        <path
+          d={pathData}
+          fill="none"
+          stroke="rgb(16, 185, 129)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          vectorEffect="non-scaling-stroke"
+        />
+
+        {/* Data points */}
+        {points.map((point, i) => (
+          <circle
+            key={i}
+            cx={point.x}
+            cy={point.y}
+            r="1.5"
+            fill="rgb(16, 185, 129)"
+            className="transition-all hover:r-3"
+          />
+        ))}
+      </svg>
+
+      {/* X-axis labels */}
+      <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[10px] text-muted-foreground px-1 -mb-5">
+        {data.filter((_, i) => i % Math.ceil(data.length / 7) === 0 || i === data.length - 1).map((d, i) => (
+          <span key={i}>{d.label}</span>
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function ProviderHome() {
@@ -86,6 +164,7 @@ export default function ProviderHome() {
   const [providerId, setProviderId] = useState('');
   const [loading, setLoading] = useState(true);
   const [homeData, setHomeData] = useState<HomeData | null>(null);
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('month');
 
   useEffect(() => {
     const id = localStorage.getItem('providerId');
@@ -98,22 +177,28 @@ export default function ProviderHome() {
 
     setProviderId(id);
     setProviderName(name);
-
-    // Use mock data for offline preview
-    const useMockData = true; // Set to false when you have good WiFi
-
-    if (useMockData) {
-      loadMockData();
-    } else {
-      fetchHomeData(id);
-    }
+    loadMockData();
   }, [router]);
 
   const loadMockData = () => {
     setLoading(true);
-    // Simulate API delay
     setTimeout(() => {
       const today = new Date();
+
+      // Generate revenue history for the past 30 days
+      const revenueHistory: RevenueDataPoint[] = [];
+      for (let i = 29; i >= 0; i--) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        const baseAmount = 400 + Math.random() * 300;
+        const weekendMultiplier = date.getDay() === 0 || date.getDay() === 6 ? 0.6 : 1;
+        revenueHistory.push({
+          date: date.toISOString(),
+          amount: Math.round(baseAmount * weekendMultiplier),
+          label: format(date, 'MMM d'),
+        });
+      }
+
       const mockData: HomeData = {
         todaysJobs: [
           {
@@ -121,21 +206,19 @@ export default function ProviderHome() {
             customerName: 'John Smith',
             customerPhone: '(555) 123-4567',
             serviceType: 'Lawn Mowing',
-            address: '123 Oak Street, Springfield, IL',
+            address: '123 Oak Street, Springfield',
             startTime: new Date(today.setHours(9, 0, 0, 0)).toISOString(),
             endTime: new Date(today.setHours(10, 30, 0, 0)).toISOString(),
             status: 'scheduled',
             totalAmount: 85,
-            workers: [
-              { id: 'w1', firstName: 'Mike', lastName: 'Johnson' },
-            ],
+            workers: [{ id: 'w1', firstName: 'Mike', lastName: 'Johnson' }],
           },
           {
             id: '2',
             customerName: 'Sarah Williams',
             customerPhone: '(555) 234-5678',
             serviceType: 'Hedge Trimming',
-            address: '456 Maple Ave, Springfield, IL',
+            address: '456 Maple Ave, Springfield',
             startTime: new Date(today.setHours(11, 0, 0, 0)).toISOString(),
             endTime: new Date(today.setHours(12, 30, 0, 0)).toISOString(),
             status: 'in_progress',
@@ -145,36 +228,35 @@ export default function ProviderHome() {
               { id: 'w2', firstName: 'Carlos', lastName: 'Rodriguez' },
             ],
           },
-          {
-            id: '3',
-            customerName: 'Robert Davis',
-            customerPhone: '(555) 345-6789',
-            serviceType: 'Mulching',
-            address: '789 Pine Road, Springfield, IL',
-            startTime: new Date(today.setHours(14, 0, 0, 0)).toISOString(),
-            endTime: new Date(today.setHours(16, 0, 0, 0)).toISOString(),
-            status: 'scheduled',
-            totalAmount: 200,
-            workers: [
-              { id: 'w2', firstName: 'Carlos', lastName: 'Rodriguez' },
-            ],
-          },
         ],
         upcomingJobs: [
           {
             id: '4',
             serviceType: 'Spring Cleanup',
-            startTime: new Date(today.getTime() + 86400000).toISOString(), // Tomorrow
+            customerName: 'Emily Davis',
+            address: '789 Pine Road',
+            startTime: new Date(today.getTime() + 86400000).toISOString(),
           },
           {
             id: '5',
             serviceType: 'Lawn Mowing',
-            startTime: new Date(today.getTime() + 172800000).toISOString(), // 2 days
+            customerName: 'Robert Chen',
+            address: '321 Elm Street',
+            startTime: new Date(today.getTime() + 172800000).toISOString(),
           },
           {
             id: '6',
             serviceType: 'Fertilization',
-            startTime: new Date(today.getTime() + 259200000).toISOString(), // 3 days
+            customerName: 'Amanda Foster',
+            address: '654 Cedar Lane',
+            startTime: new Date(today.getTime() + 259200000).toISOString(),
+          },
+          {
+            id: '7',
+            serviceType: 'Tree Trimming',
+            customerName: 'David Park',
+            address: '987 Birch Ave',
+            startTime: new Date(today.getTime() + 345600000).toISOString(),
           },
         ],
         stats: {
@@ -187,84 +269,11 @@ export default function ProviderHome() {
           completedThisWeek: 12,
           completedThisMonth: 48,
         },
-        recentActivity: [
-          {
-            id: 'a1',
-            type: 'job',
-            status: 'completed',
-            customerName: 'Jennifer Martinez',
-            serviceType: 'Lawn Mowing',
-            timestamp: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-            amount: 85,
-          },
-          {
-            id: 'a2',
-            type: 'invoice',
-            status: 'paid',
-            customerName: 'Michael Brown',
-            timestamp: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
-            amount: 250,
-          },
-          {
-            id: 'a3',
-            type: 'job',
-            status: 'completed',
-            customerName: 'Lisa Anderson',
-            serviceType: 'Hedge Trimming',
-            timestamp: new Date(Date.now() - 86400000).toISOString(), // Yesterday
-            amount: 120,
-          },
-          {
-            id: 'a4',
-            type: 'invoice',
-            status: 'sent',
-            customerName: 'David Wilson',
-            timestamp: new Date(Date.now() - 172800000).toISOString(), // 2 days ago
-            amount: 300,
-          },
-        ],
+        revenueHistory,
       };
       setHomeData(mockData);
       setLoading(false);
-    }, 500);
-  };
-
-  const fetchHomeData = async (id: string) => {
-    setLoading(true);
-    try {
-      const res = await fetch(`/api/provider/home?providerId=${id}`);
-      const data = await res.json();
-
-      if (data.success) {
-        setHomeData(data.data);
-      } else {
-        toast.error('Failed to load home data');
-      }
-    } catch (error) {
-      console.error('Error fetching home data:', error);
-      toast.error('Failed to load home data');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleJobAction = async (jobId: string, newStatus: string) => {
-    try {
-      const res = await fetch(`/api/provider/jobs/${jobId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      });
-
-      if (res.ok) {
-        toast.success(`Job ${newStatus === 'in_progress' ? 'started' : 'completed'}!`);
-        fetchHomeData(providerId);
-      } else {
-        toast.error('Failed to update job');
-      }
-    } catch (error) {
-      toast.error('Failed to update job status');
-    }
+    }, 300);
   };
 
   const formatTime = (date: string) => {
@@ -279,43 +288,19 @@ export default function ProviderHome() {
     }).format(amount);
   };
 
-  const getStatusColor = (status: string) => {
-    const colors: Record<string, string> = {
-      scheduled: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      in_progress: 'bg-orange-500/20 text-orange-400 border-orange-500/30',
-      completed: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-      pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
-      sent: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
-      paid: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
-    };
-    return colors[status] || 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30';
-  };
-
-  const getActivityIcon = (activity: RecentActivity) => {
-    if (activity.type === 'job') {
-      if (activity.status === 'completed') return <CheckCircle2 className="h-4 w-4 text-emerald-400" />;
-      if (activity.status === 'in_progress') return <PlayCircle className="h-4 w-4 text-orange-400" />;
-      return <Calendar className="h-4 w-4 text-blue-400" />;
+  const chartData = useMemo(() => {
+    if (!homeData?.revenueHistory) return [];
+    if (viewMode === 'week') {
+      return homeData.revenueHistory.slice(-7);
     }
-    if (activity.status === 'paid') return <DollarSign className="h-4 w-4 text-emerald-400" />;
-    return <FileText className="h-4 w-4 text-yellow-400" />;
-  };
-
-  const getActivityMessage = (activity: RecentActivity) => {
-    if (activity.type === 'job') {
-      const statusText = activity.status === 'completed' ? 'Completed' :
-                        activity.status === 'in_progress' ? 'Started' : 'Scheduled';
-      return `${statusText} ${activity.serviceType} for ${activity.customerName}`;
-    }
-    const statusText = activity.status === 'paid' ? 'Payment received' : 'Invoice sent';
-    return `${statusText} - ${activity.customerName} ${activity.amount ? formatCurrency(activity.amount) : ''}`;
-  };
+    return homeData.revenueHistory;
+  }, [homeData?.revenueHistory, viewMode]);
 
   if (loading) {
     return (
       <ProviderLayout providerName={providerName}>
         <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-muted-foreground">Loading...</div>
+          <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
       </ProviderLayout>
     );
@@ -331,479 +316,244 @@ export default function ProviderHome() {
     );
   }
 
-  const { todaysJobs, upcomingJobs, stats, recentActivity } = homeData;
+  const { todaysJobs, upcomingJobs, stats } = homeData;
 
   return (
     <ProviderLayout providerName={providerName}>
       <div className="min-h-screen bg-background">
-        {/* Header */}
-        <div className="border-b border-border bg-card/30">
-          <div className="max-w-[1400px] mx-auto px-4 md:px-6 py-6 md:py-8">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-foreground">
-                  Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}
-                </h1>
-                <p className="text-muted-foreground mt-1">
-                  {format(new Date(), 'EEEE, MMMM d, yyyy')}
-                </p>
-              </div>
-              <Button
-                onClick={() => router.push('/provider/calendar')}
-                className="bg-blue-600 hover:bg-blue-500"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                New Job
-              </Button>
-            </div>
-          </div>
-        </div>
+        <div className="max-w-6xl mx-auto px-4 md:px-6 py-8 md:py-12">
 
-        <div className="max-w-[1800px] mx-auto px-4 md:px-8 py-6 md:py-10">
-          {/* Action Required Banner */}
-          {(stats.pendingInvoicesCount > 0 || stats.newLeadsCount > 0) && (
-            <div className="bg-gradient-to-r from-red-500/10 via-orange-500/10 to-yellow-500/10 border-2 border-orange-500/30 rounded-2xl p-6 mb-10">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="p-4 bg-orange-500/20 rounded-xl">
-                  <AlertCircle className="h-8 w-8 text-orange-400" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-foreground">Action Required</h2>
-                  <p className="text-muted-foreground">Items that need immediate attention</p>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {stats.pendingInvoicesCount > 0 && (
-                  <button
-                    onClick={() => router.push('/provider/invoices')}
-                    className="p-6 border-2 border-yellow-500/40 rounded-xl hover:border-yellow-500/70 hover:bg-yellow-500/5 transition-all text-left group bg-card"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="p-3 bg-yellow-500/20 rounded-xl">
-                        <FileText className="h-7 w-7 text-yellow-400" />
-                      </div>
-                      <ChevronRight className="h-6 w-6 text-muted-foreground group-hover:text-yellow-400 transition-colors" />
-                    </div>
-                    <div className="text-3xl font-bold text-foreground mb-2">
-                      {formatCurrency(stats.pendingInvoicesAmount)}
-                    </div>
-                    <p className="text-base text-muted-foreground font-medium">
-                      {stats.pendingInvoicesCount} Unpaid Invoice{stats.pendingInvoicesCount !== 1 ? 's' : ''}
-                    </p>
-                    <p className="text-sm text-muted-foreground/70 mt-2">
-                      Outstanding receivables requiring follow-up
-                    </p>
-                  </button>
-                )}
-                {stats.newLeadsCount > 0 && (
-                  <button
-                    onClick={() => router.push('/provider/dashboard')}
-                    className="p-6 border-2 border-purple-500/40 rounded-xl hover:border-purple-500/70 hover:bg-purple-500/5 transition-all text-left group bg-card"
-                  >
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="p-3 bg-purple-500/20 rounded-xl">
-                        <Target className="h-7 w-7 text-purple-400" />
-                      </div>
-                      <ChevronRight className="h-6 w-6 text-muted-foreground group-hover:text-purple-400 transition-colors" />
-                    </div>
-                    <div className="text-3xl font-bold text-foreground mb-2">
-                      {stats.newLeadsCount}
-                    </div>
-                    <p className="text-base text-muted-foreground font-medium">
-                      New Lead{stats.newLeadsCount !== 1 ? 's' : ''} Awaiting Response
-                    </p>
-                    <p className="text-sm text-muted-foreground/70 mt-2">
-                      Potential customers need quotes or scheduling
-                    </p>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Business Performance Dashboard */}
+          {/* Header */}
           <div className="mb-10">
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-foreground mb-2">Business Performance</h2>
-              <p className="text-muted-foreground">Key metrics and revenue tracking</p>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              {/* Revenue This Month - Largest */}
-              <Card className="lg:row-span-2 bg-gradient-to-br from-blue-500/5 to-emerald-500/5 border-2 border-border hover:border-blue-500/30 transition-all">
-                <CardHeader className="pb-6">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="p-4 bg-emerald-500/20 rounded-2xl">
-                      <DollarSign className="h-10 w-10 text-emerald-400" />
-                    </div>
-                    <Badge variant="outline" className="text-base px-4 py-2 bg-background">
-                      MTD
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-lg text-muted-foreground font-normal">Monthly Revenue</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-6xl font-bold text-foreground mb-6">
-                    {formatCurrency(stats.monthlyRevenue)}
-                  </div>
-                  <div className="space-y-4 pt-6 border-t border-border">
-                    <div className="flex items-center justify-between">
-                      <span className="text-base text-muted-foreground">Jobs Completed</span>
-                      <span className="text-2xl font-bold text-foreground">{stats.completedThisMonth}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-base text-muted-foreground">Avg per Job</span>
-                      <span className="text-2xl font-bold text-foreground">
-                        {formatCurrency(stats.completedThisMonth > 0 ? stats.monthlyRevenue / stats.completedThisMonth : 0)}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Weekly Revenue */}
-              <Card className="bg-card border-2 border-border hover:border-emerald-500/30 transition-all">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-3 bg-emerald-500/15 rounded-xl">
-                      <TrendingUp className="h-8 w-8 text-emerald-400" />
-                    </div>
-                    <Badge variant="outline" className="text-sm px-3 py-1.5">
-                      This Week
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-base text-muted-foreground font-normal">Weekly Revenue</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-foreground mb-4">
-                    {formatCurrency(stats.weeklyRevenue)}
-                  </div>
-                  <div className="pt-4 border-t border-border">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Jobs Completed</span>
-                      <span className="text-xl font-semibold text-foreground">{stats.completedThisWeek}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Today's Operations */}
-              <Card className="bg-card border-2 border-border hover:border-blue-500/30 transition-all">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="p-3 bg-blue-500/15 rounded-xl">
-                      <Calendar className="h-8 w-8 text-blue-400" />
-                    </div>
-                    <Badge variant="outline" className="text-sm px-3 py-1.5">
-                      Today
-                    </Badge>
-                  </div>
-                  <CardTitle className="text-base text-muted-foreground font-normal">Jobs Scheduled</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-4xl font-bold text-foreground mb-4">
-                    {stats.todaysJobsCount}
-                  </div>
-                  <div className="pt-4 border-t border-border">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Revenue Target</span>
-                      <span className="text-xl font-semibold text-foreground">
-                        {formatCurrency(todaysJobs.reduce((sum, job) => sum + (job.totalAmount || 0), 0))}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Week Progress Indicator */}
-              <Card className="bg-card border-2 border-border">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-base text-muted-foreground font-normal">Week Progress</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-4xl font-bold text-foreground">
-                        {Math.round((stats.weeklyRevenue / (stats.monthlyRevenue || 1)) * 100)}%
-                      </span>
-                      <span className="text-sm text-muted-foreground">of monthly</span>
-                    </div>
-                    <div className="pt-4 border-t border-border">
-                      <p className="text-sm text-muted-foreground">
-                        On track for {formatCurrency(stats.weeklyRevenue * 4.33)} this month
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+            <h1 className="text-3xl md:text-4xl font-light text-foreground mb-1">
+              Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}
+            </h1>
+            <p className="text-muted-foreground">
+              {format(new Date(), 'EEEE, MMMM d')}
+            </p>
           </div>
 
-          {/* Operations Overview */}
-          <div>
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-foreground mb-2">Today&apos;s Operations</h2>
-              <p className="text-muted-foreground">Real-time field activity and scheduling</p>
-            </div>
+          {/* Main Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
 
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-              {/* Today's Schedule - Summary View */}
-              <div className="xl:col-span-2">
-                <Card className="bg-card border-2 border-border">
-                  <CardHeader className="border-b border-border pb-5">
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="flex items-center gap-3 text-xl">
-                        <div className="p-2 bg-blue-500/10 rounded-lg">
-                          <Clock className="h-6 w-6 text-blue-500" />
-                        </div>
-                        Field Schedule
-                      </CardTitle>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => router.push('/provider/calendar')}
-                        className="text-blue-500 hover:text-blue-400 border-blue-500/30"
-                      >
-                        Full Calendar
-                        <ChevronRight className="h-4 w-4 ml-1" />
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    {todaysJobs.length === 0 ? (
-                      <div className="text-center py-12">
-                        <div className="p-4 bg-muted/50 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                          <Calendar className="h-8 w-8 text-muted-foreground" />
-                        </div>
-                        <h3 className="text-lg font-semibold text-foreground mb-2">
-                          No jobs scheduled today
-                        </h3>
-                        <p className="text-sm text-muted-foreground mb-6">
-                          Take a break or add a new job to your schedule
-                        </p>
-                        <Button
-                          onClick={() => router.push('/provider/calendar')}
-                          variant="outline"
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Schedule Job
-                        </Button>
-                      </div>
-                    ) : (
-                      <div className="space-y-4">
-                        {todaysJobs.map((job) => (
-                          <div
-                            key={job.id}
-                            className="p-4 border border-border rounded-lg hover:border-blue-500/50 transition-all cursor-pointer bg-card/50"
-                            onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                          >
-                            <div className="flex items-start justify-between mb-3">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <h4 className="font-semibold text-foreground truncate">
-                                    {job.customerName}
-                                  </h4>
-                                  <Badge className={`${getStatusColor(job.status)} border flex-shrink-0`}>
-                                    {job.status === 'in_progress' ? 'In Progress' : 'Scheduled'}
-                                  </Badge>
-                                </div>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  {job.serviceType}
-                                </p>
-                                {job.workers.length > 0 && (
-                                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                    <Users className="h-3 w-3" />
-                                    {job.workers.map(w => `${w.firstName} ${w.lastName}`).join(', ')}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-right flex-shrink-0 ml-4">
-                                <div className="text-lg font-semibold text-blue-500 mb-1">
-                                  {formatTime(job.startTime)}
-                                </div>
-                                {job.totalAmount && (
-                                  <div className="text-sm text-muted-foreground">
-                                    {formatCurrency(job.totalAmount)}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
+            {/* Left Column - Revenue & Stats */}
+            <div className="lg:col-span-2 space-y-6">
 
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
-                              <MapPin className="h-4 w-4 flex-shrink-0" />
-                              <span className="truncate">{job.address}</span>
-                            </div>
-
-                            <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                              <Button
-                                size="sm"
-                                className="flex-1 bg-emerald-600 hover:bg-emerald-500"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleJobAction(
-                                    job.id,
-                                    job.status === 'in_progress' ? 'completed' : 'in_progress'
-                                  );
-                                }}
-                              >
-                                {job.status === 'in_progress' ? (
-                                  <>
-                                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                                    Complete
-                                  </>
-                                ) : (
-                                  <>
-                                    <PlayCircle className="h-4 w-4 mr-2" />
-                                    Start
-                                  </>
-                                )}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.location.href = `tel:${job.customerPhone}`;
-                                }}
-                              >
-                                <Phone className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  window.open(`https://maps.google.com/?q=${encodeURIComponent(job.address)}`);
-                                }}
-                              >
-                                <Navigation className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                </CardContent>
-              </Card>
-
-              {/* Upcoming Jobs */}
-              {upcomingJobs.length > 0 && (
-                <Card className="bg-card border-border">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-lg">
-                      <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                      Coming Up
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {upcomingJobs.map((job) => (
-                        <div
-                          key={job.id}
-                          className="flex items-center justify-between p-3 border border-border rounded-lg hover:border-blue-500/50 transition-colors cursor-pointer"
-                          onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-muted rounded-lg">
-                              <Calendar className="h-4 w-4 text-muted-foreground" />
-                            </div>
-                            <div>
-                              <p className="font-medium text-foreground text-sm">
-                                {job.serviceType}
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                {format(new Date(job.startTime), 'EEE, MMM d · h:mm a')}
-                              </p>
-                            </div>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-
-            {/* Right Sidebar - Business Insights */}
-            <div className="space-y-6">
-              {/* Week At a Glance */}
-              <Card className="bg-card border-2 border-border">
-                <CardHeader className="pb-5 border-b border-border">
-                  <CardTitle className="text-lg flex items-center gap-3">
-                    <div className="p-2 bg-purple-500/10 rounded-lg">
-                      <TrendingUp className="h-5 w-5 text-purple-500" />
-                    </div>
-                    Week at a Glance
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6">
-                  <div className="space-y-5">
-                    <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Total Revenue</p>
-                        <p className="text-2xl font-bold text-foreground">{formatCurrency(stats.weeklyRevenue)}</p>
-                      </div>
-                      <div className="p-3 bg-emerald-500/20 rounded-lg">
-                        <DollarSign className="h-6 w-6 text-emerald-400" />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
-                      <div>
-                        <p className="text-sm text-muted-foreground mb-1">Jobs Completed</p>
-                        <p className="text-2xl font-bold text-foreground">{stats.completedThisWeek}</p>
-                      </div>
-                      <div className="p-3 bg-blue-500/20 rounded-lg">
-                        <CheckCircle2 className="h-6 w-6 text-blue-400" />
-                      </div>
-                    </div>
-                    {upcomingJobs.length > 0 && (
-                      <div className="flex items-center justify-between p-4 bg-muted/30 rounded-xl">
-                        <div>
-                          <p className="text-sm text-muted-foreground mb-1">Jobs Ahead</p>
-                          <p className="text-2xl font-bold text-foreground">{upcomingJobs.length}</p>
-                        </div>
-                        <div className="p-3 bg-orange-500/20 rounded-lg">
-                          <Calendar className="h-6 w-6 text-orange-400" />
-                        </div>
-                      </div>
-                    )}
+              {/* Revenue Card */}
+              <div className="bg-card rounded-2xl border border-border p-6 md:p-8">
+                <div className="flex items-start justify-between mb-6">
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">Revenue</p>
+                    <p className="text-4xl md:text-5xl font-light text-foreground">
+                      {formatCurrency(viewMode === 'week' ? stats.weeklyRevenue : stats.monthlyRevenue)}
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {viewMode === 'week' ? 'This week' : 'This month'}
+                    </p>
                   </div>
-                </CardContent>
-              </Card>
 
-              {/* Recent Business Activity */}
-              <Card className="bg-card border-2 border-border">
-                <CardHeader className="pb-5 border-b border-border">
-                  <CardTitle className="text-lg flex items-center gap-3">
-                    <div className="p-2 bg-blue-500/10 rounded-lg">
-                      <Activity className="h-5 w-5 text-blue-500" />
-                    </div>
-                    Recent Activity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-5">
+                  {/* View Toggle */}
+                  <div className="flex bg-muted rounded-lg p-1">
+                    <button
+                      onClick={() => setViewMode('week')}
+                      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                        viewMode === 'week'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Week
+                    </button>
+                    <button
+                      onClick={() => setViewMode('month')}
+                      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                        viewMode === 'month'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Month
+                    </button>
+                  </div>
+                </div>
+
+                {/* Chart */}
+                <div className="mt-4 pb-6">
+                  <RevenueChart data={chartData} height={180} />
+                </div>
+
+                {/* Stats Row */}
+                <div className="grid grid-cols-3 gap-4 pt-6 border-t border-border">
+                  <div>
+                    <p className="text-2xl font-semibold text-foreground">
+                      {viewMode === 'week' ? stats.completedThisWeek : stats.completedThisMonth}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Jobs completed</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-semibold text-foreground">
+                      {formatCurrency((viewMode === 'week' ? stats.weeklyRevenue : stats.monthlyRevenue) /
+                        (viewMode === 'week' ? stats.completedThisWeek : stats.completedThisMonth) || 0)}
+                    </p>
+                    <p className="text-sm text-muted-foreground">Avg per job</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-semibold text-emerald-500">
+                      +{Math.round(((stats.weeklyRevenue / (stats.monthlyRevenue / 4)) - 1) * 100)}%
+                    </p>
+                    <p className="text-sm text-muted-foreground">vs last week</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Week at a Glance - Compact */}
+              <div className="bg-card rounded-2xl border border-border p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium text-foreground">Week at a Glance</h3>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="text-center p-4 bg-muted/30 rounded-xl">
+                    <p className="text-3xl font-semibold text-foreground">{stats.todaysJobsCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Today</p>
+                  </div>
+                  <div className="text-center p-4 bg-muted/30 rounded-xl">
+                    <p className="text-3xl font-semibold text-foreground">{stats.completedThisWeek}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Completed</p>
+                  </div>
+                  <div className="text-center p-4 bg-emerald-500/10 rounded-xl">
+                    <p className="text-3xl font-semibold text-emerald-500">{formatCurrency(stats.weeklyRevenue)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Revenue</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Jobs */}
+            <div className="space-y-6">
+
+              {/* Today's Jobs */}
+              {todaysJobs.length > 0 && (
+                <div className="bg-card rounded-2xl border border-border p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="font-medium text-foreground">Today</h3>
+                    <span className="text-sm text-muted-foreground">{todaysJobs.length} jobs</span>
+                  </div>
                   <div className="space-y-3">
-                    {recentActivity.slice(0, 5).map((activity) => (
-                      <div key={`${activity.type}-${activity.id}`} className="flex items-start gap-3 p-3 rounded-lg hover:bg-muted/50 transition-colors border border-transparent hover:border-border">
-                        <div className="p-2 bg-muted/50 rounded-lg mt-0.5">
-                          {getActivityIcon(activity)}
+                    {todaysJobs.map((job) => (
+                      <button
+                        key={job.id}
+                        onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                        className="w-full p-4 bg-muted/30 hover:bg-muted/50 rounded-xl text-left transition-colors group"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-foreground truncate">{job.serviceType}</p>
+                            <p className="text-sm text-muted-foreground truncate">{job.customerName}</p>
+                          </div>
+                          <div className="text-right ml-3">
+                            <p className="text-sm font-medium text-emerald-500">{formatTime(job.startTime)}</p>
+                            {job.status === 'in_progress' && (
+                              <span className="inline-flex items-center text-[10px] text-orange-500 font-medium">
+                                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1 animate-pulse" />
+                                In progress
+                              </span>
+                            )}
+                          </div>
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-foreground font-medium mb-1 leading-snug">
-                            {getActivityMessage(activity)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
-                          </p>
+                        <div className="flex items-center text-xs text-muted-foreground">
+                          <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                          <span className="truncate">{job.address}</span>
                         </div>
-                      </div>
+                      </button>
                     ))}
                   </div>
-                </CardContent>
-              </Card>
+                </div>
+              )}
+
+              {/* Coming Up */}
+              <div className="bg-card rounded-2xl border border-border p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-medium text-foreground">Coming Up</h3>
+                  <button
+                    onClick={() => router.push('/provider/calendar')}
+                    className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
+                  >
+                    View all
+                    <ChevronRight className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {upcomingJobs.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">No upcoming jobs</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {upcomingJobs.map((job) => (
+                      <button
+                        key={job.id}
+                        onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                        className="w-full flex items-center justify-between p-3 hover:bg-muted/30 rounded-lg transition-colors group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
+                            <Briefcase className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-medium text-foreground text-sm truncate">{job.serviceType}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(job.startTime), 'EEE, MMM d')} · {formatTime(job.startTime)}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Quick Actions - Minimal */}
+              {(stats.pendingInvoicesCount > 0 || stats.newLeadsCount > 0) && (
+                <div className="bg-card rounded-2xl border border-border p-6">
+                  <h3 className="font-medium text-foreground mb-4">Needs Attention</h3>
+                  <div className="space-y-2">
+                    {stats.pendingInvoicesCount > 0 && (
+                      <button
+                        onClick={() => router.push('/provider/invoices')}
+                        className="w-full flex items-center justify-between p-3 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <DollarSign className="h-4 w-4 text-amber-500" />
+                          <span className="text-sm text-foreground">
+                            {stats.pendingInvoicesCount} unpaid invoices
+                          </span>
+                        </div>
+                        <span className="text-sm font-medium text-amber-500">
+                          {formatCurrency(stats.pendingInvoicesAmount)}
+                        </span>
+                      </button>
+                    )}
+                    {stats.newLeadsCount > 0 && (
+                      <button
+                        onClick={() => router.push('/provider/dashboard')}
+                        className="w-full flex items-center justify-between p-3 bg-purple-500/10 hover:bg-purple-500/20 rounded-lg transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <TrendingUp className="h-4 w-4 text-purple-500" />
+                          <span className="text-sm text-foreground">
+                            {stats.newLeadsCount} new leads
+                          </span>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-purple-500" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
           </div>
         </div>
       </div>
