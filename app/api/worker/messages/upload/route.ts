@@ -19,19 +19,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID and Customer ID are required' }, { status: 400 });
     }
 
-    // Get the user and their provider
-    const user = await prisma.user.findUnique({
+    // Get the worker and their provider
+    const worker = await prisma.providerUser.findUnique({
       where: { id: userId },
       select: { providerId: true },
     });
 
-    if (!user || !user.providerId) {
-      return NextResponse.json({ error: 'User not found or not associated with a provider' }, { status: 404 });
+    if (!worker || !worker.providerId) {
+      return NextResponse.json({ error: 'Worker not found or not associated with a provider' }, { status: 404 });
     }
 
     // Verify the customer belongs to this provider
     const customer = await prisma.customer.findFirst({
-      where: { id: customerId, providerId: user.providerId },
+      where: { id: customerId, providerId: worker.providerId },
       select: { id: true },
     });
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     validateCustomerMessageFile(file);
-    const upload = await uploadCustomerMessageMedia({ file, providerId: user.providerId, customerId });
+    const upload = await uploadCustomerMessageMedia({ file, providerId: worker.providerId, customerId });
 
     return NextResponse.json({
       url: upload.url,
