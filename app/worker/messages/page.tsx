@@ -568,6 +568,23 @@ export default function WorkerMessages() {
   // Check if current chat is a group chat (team or crew)
   const isGroupChat = selectedTeamChat === 'team' || selectedTeamChat?.startsWith('crew-');
 
+  // Check if message should show avatar/name (first in group or different sender or >5 min gap)
+  const shouldShowSenderInfo = (messages: Message[], index: number) => {
+    if (index === 0) return true;
+    const current = messages[index];
+    const prev = messages[index - 1];
+
+    // Different sender
+    if (current.senderUserId !== prev.senderUserId) return true;
+
+    // More than 5 minutes gap
+    const currentTime = new Date(current.timestamp || current.createdAt || '').getTime();
+    const prevTime = new Date(prev.timestamp || prev.createdAt || '').getTime();
+    if (currentTime - prevTime > 5 * 60 * 1000) return true;
+
+    return false;
+  };
+
   // Get current chat info for header
   const getCurrentChatInfo = () => {
     if (selectedTeamChat === 'team') {
@@ -951,7 +968,7 @@ export default function WorkerMessages() {
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            <div className="flex-1 overflow-y-auto p-4 space-y-0.5">
               {currentMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-48 text-center">
                   <MessageSquare className="h-12 w-12 text-zinc-600 mb-3" />
@@ -959,15 +976,16 @@ export default function WorkerMessages() {
                   <p className="text-xs text-zinc-600 mt-1">Send a message to start the conversation</p>
                 </div>
               ) : (
-                currentMessages.map((message) => {
+                currentMessages.map((message, index) => {
                   const isOwn = activeTab === 'team'
                     ? message.senderUserId === userId
                     : message.senderType === 'worker';
                   const isSystem = message.senderType === 'system';
+                  const showSenderInfo = activeTab === 'team' ? shouldShowSenderInfo(currentMessages, index) : true;
 
                   if (isSystem) {
                     return (
-                      <div key={message.id} className="flex justify-center">
+                      <div key={message.id} className="flex justify-center py-2">
                         <div className="flex items-center gap-2 px-3 py-1.5 bg-[#1F1F1F] rounded-full text-xs text-zinc-500">
                           <Clock className="h-3 w-3" />
                           <span>{message.content}</span>
@@ -979,28 +997,30 @@ export default function WorkerMessages() {
                   return (
                     <div
                       key={message.id}
-                      className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
+                      className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${showSenderInfo ? 'mt-3' : 'mt-0.5'}`}
                     >
-                      {/* Avatar for non-own messages in team chat */}
+                      {/* Avatar for non-own messages in team chat - only show on first of group */}
                       {activeTab === 'team' && !isOwn && (
-                        <div className="flex-shrink-0 mr-2">
-                          {message.senderAvatar ? (
-                            <img
-                              src={message.senderAvatar}
-                              alt={message.senderName || ''}
-                              className="w-8 h-8 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white text-xs font-semibold">
-                              {getInitials(message.senderName || '')}
-                            </div>
-                          )}
+                        <div className="flex-shrink-0 mr-2 w-8">
+                          {showSenderInfo ? (
+                            message.senderAvatar ? (
+                              <img
+                                src={message.senderAvatar}
+                                alt={message.senderName || ''}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white text-xs font-semibold">
+                                {getInitials(message.senderName || '')}
+                              </div>
+                            )
+                          ) : null}
                         </div>
                       )}
 
                       <div className={`max-w-[75%] flex flex-col gap-1 ${isOwn ? 'items-end' : 'items-start'}`}>
-                        {/* Sender name for team messages */}
-                        {activeTab === 'team' && !isOwn && message.senderName && (
+                        {/* Sender name for team messages - only on first of group */}
+                        {activeTab === 'team' && !isOwn && message.senderName && showSenderInfo && (
                           <span className="text-xs text-zinc-500 px-1">{message.senderName}</span>
                         )}
 
