@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { Home, Calendar, DollarSign, User, Bell, MapPin } from 'lucide-react';
+import { Home, Calendar, DollarSign, User, Bell, MapPin, MessageSquare } from 'lucide-react';
 import { useEffect, useState, useCallback } from 'react';
 
 // Renoa Design System Colors
@@ -15,7 +15,7 @@ interface WorkerLayoutProps {
 const navItems = [
   { href: '/worker/dashboard', icon: Home, label: 'Home' },
   { href: '/worker/schedule', icon: Calendar, label: 'Schedule' },
-  { href: '/worker/map', icon: MapPin, label: 'Map' },
+  { href: '/worker/messages', icon: MessageSquare, label: 'Messages' },
   { href: '/worker/earnings', icon: DollarSign, label: 'Earnings' },
   { href: '/worker/profile', icon: User, label: 'Profile' },
 ];
@@ -23,6 +23,7 @@ const navItems = [
 export default function WorkerLayout({ children }: WorkerLayoutProps) {
   const pathname = usePathname();
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
   const [providerId, setProviderId] = useState<string | null>(null);
 
@@ -41,6 +42,23 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
     }
   }, [providerId, userId]);
 
+  // Fetch unread messages count
+  const fetchUnreadMessagesCount = useCallback(async () => {
+    if (!userId) return;
+
+    try {
+      const res = await fetch(`/api/worker/messages/team/conversations?userId=${userId}`);
+      const data = await res.json();
+      if (data.teamChat && data.conversations) {
+        const teamUnread = data.teamChat.unreadCount || 0;
+        const directUnread = data.conversations.reduce((sum: number, c: { unreadCount: number }) => sum + (c.unreadCount || 0), 0);
+        setUnreadMessagesCount(teamUnread + directUnread);
+      }
+    } catch (error) {
+      console.error('Error fetching message count:', error);
+    }
+  }, [userId]);
+
   // Get user IDs from localStorage
   useEffect(() => {
     const uid = localStorage.getItem('workerUserId');
@@ -57,6 +75,15 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
       return () => clearInterval(interval);
     }
   }, [userId, providerId, fetchNotificationCount]);
+
+  // Fetch unread messages on mount and poll every 30 seconds
+  useEffect(() => {
+    if (userId) {
+      fetchUnreadMessagesCount();
+      const interval = setInterval(fetchUnreadMessagesCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [userId, fetchUnreadMessagesCount]);
 
   // Apply saved theme on mount
   useEffect(() => {
@@ -99,6 +126,8 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
           {navItems.map((item) => {
             const isActive = pathname === item.href;
             const Icon = item.icon;
+            const isMessages = item.href === '/worker/messages';
+            const showBadge = isMessages && unreadMessagesCount > 0;
 
             return (
               <Link
@@ -111,7 +140,17 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
                 }`}
                 style={isActive ? { color: LIME_GREEN } : undefined}
               >
-                <Icon className="w-5 h-5" />
+                <div className="relative">
+                  <Icon className="w-5 h-5" />
+                  {showBadge && (
+                    <span
+                      className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] flex items-center justify-center text-[9px] font-bold text-black rounded-full px-1"
+                      style={{ backgroundColor: LIME_GREEN }}
+                    >
+                      {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[10px] font-medium">{item.label}</span>
               </Link>
             );
