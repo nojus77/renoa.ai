@@ -90,18 +90,22 @@ interface HomeData {
 }
 
 // Generate test data for a specific date range
+// Uses seeded random based on date for consistent values
 function generateTestDataForRange(startDate: Date, endDate: Date): RevenueDataPoint[] {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return days.map(date => {
+    const dateStr = format(date, 'yyyy-MM-dd');
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
     const baseAmount = isWeekend ? 320 : 180;
-    const variation = Math.floor(Math.random() * 180) - 60;
+    // Use date string hash for consistent "random" variation
+    const hash = dateStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const variation = ((hash % 180) - 60);
     const amount = Math.max(50, baseAmount + variation);
 
     return {
-      date: date.toISOString().split('T')[0],
+      date: dateStr,
       amount,
       label: format(date, 'MMM d'),
       day: dayNames[date.getDay()],
@@ -158,10 +162,13 @@ export default function ProviderHome() {
 
   // Navigation handlers
   const canGoNext = useMemo(() => {
-    const nextDate = viewMode === 'week'
-      ? addWeeks(currentDate, 1)
-      : addMonths(currentDate, 1);
-    return !isFuture(startOfWeek(nextDate, { weekStartsOn: 1 }));
+    if (viewMode === 'week') {
+      const nextWeekStart = startOfWeek(addWeeks(currentDate, 1), { weekStartsOn: 1 });
+      return !isFuture(nextWeekStart);
+    } else {
+      const nextMonthStart = startOfMonth(addMonths(currentDate, 1));
+      return !isFuture(nextMonthStart);
+    }
   }, [viewMode, currentDate]);
 
   const handlePrev = () => {
@@ -295,33 +302,34 @@ export default function ProviderHome() {
 
   // Filter chart data based on selected date range
   const chartData = useMemo(() => {
-    if (!homeData?.revenueHistory) return [];
+    // Always generate the full date range for the selected period
+    const fullRangeData = generateTestDataForRange(dateRange.start, dateRange.end);
 
-    const startStr = dateRange.start.toISOString().split('T')[0];
-    const endStr = dateRange.end.toISOString().split('T')[0];
+    // If we have real revenue history, merge it in
+    if (homeData?.revenueHistory && homeData.revenueHistory.length > 0) {
+      const revenueMap = new Map(homeData.revenueHistory.map(d => [d.date, d.amount]));
 
-    // Filter data within range
-    let filtered = homeData.revenueHistory.filter(d => {
-      return d.date >= startStr && d.date <= endStr;
-    });
-
-    // If no data in range, generate test data
-    if (filtered.length === 0) {
-      filtered = generateTestDataForRange(dateRange.start, dateRange.end);
+      // Update generated data with real values where available
+      fullRangeData.forEach(d => {
+        const realAmount = revenueMap.get(d.date);
+        if (realAmount !== undefined) {
+          d.amount = realAmount;
+        }
+      });
     }
 
     // Add display labels
     if (viewMode === 'week') {
       // Week: Show all 7 days with day abbreviation
-      return filtered.map(d => ({
+      return fullRangeData.map(d => ({
         ...d,
-        displayLabel: format(new Date(d.date), 'EEE'),
+        displayLabel: format(new Date(d.date + 'T12:00:00'), 'EEE'), // Add time to avoid timezone issues
       }));
     } else {
       // Month: Show every 5th day as number
-      return filtered.map((d, i) => {
-        const dayNum = new Date(d.date).getDate();
-        const showLabel = dayNum === 1 || dayNum % 5 === 0 || i === filtered.length - 1;
+      return fullRangeData.map((d, i) => {
+        const dayNum = new Date(d.date + 'T12:00:00').getDate();
+        const showLabel = dayNum === 1 || dayNum % 5 === 0 || i === fullRangeData.length - 1;
         return {
           ...d,
           displayLabel: showLabel ? String(dayNum) : '',
@@ -585,7 +593,7 @@ export default function ProviderHome() {
                     <p className="text-sm">No jobs scheduled today</p>
                   </div>
                 ) : (
-                  <div className="space-y-2 overflow-y-auto flex-1 pr-1">
+                  <div className={`space-y-2 flex-1 ${todaysJobs.length > 3 ? 'overflow-y-auto pr-1' : ''}`}>
                     {todaysJobs.slice(0, 3).map((job) => (
                       <button
                         key={job.id}

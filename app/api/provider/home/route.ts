@@ -60,10 +60,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Get upcoming jobs (future jobs excluding today)
-    // Extended to 30 days and includes pending status
-    const next30Days = new Date(todayEnd);
-    next30Days.setDate(next30Days.getDate() + 30);
-
+    // Include all non-completed/cancelled statuses
     const upcomingJobs = await prisma.job.findMany({
       where: {
         providerId,
@@ -71,7 +68,7 @@ export async function GET(request: NextRequest) {
           gt: todayEnd, // Jobs starting after today
         },
         status: {
-          in: ['scheduled', 'pending'],
+          notIn: ['completed', 'cancelled', 'no_show'],
         },
       },
       select: {
@@ -79,6 +76,7 @@ export async function GET(request: NextRequest) {
         startTime: true,
         serviceType: true,
         address: true,
+        status: true,
         customer: {
           select: {
             name: true,
@@ -91,14 +89,16 @@ export async function GET(request: NextRequest) {
       take: 5,
     });
 
-    console.log('📅 Upcoming jobs query result:', {
+    console.log('📅 Upcoming jobs query:', {
+      providerId,
+      todayEnd: todayEnd.toISOString(),
       count: upcomingJobs.length,
       jobs: upcomingJobs.map(j => ({
         id: j.id,
         serviceType: j.serviceType,
-        startTime: j.startTime,
+        startTime: j.startTime.toISOString(),
+        status: j.status,
       })),
-      todayEnd: todayEnd.toISOString(),
     });
 
     // Get weekly stats
