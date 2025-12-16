@@ -59,27 +59,46 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get upcoming jobs (next 7 days excluding today)
+    // Get upcoming jobs (future jobs excluding today)
+    // Extended to 30 days and includes pending status
+    const next30Days = new Date(todayEnd);
+    next30Days.setDate(next30Days.getDate() + 30);
+
     const upcomingJobs = await prisma.job.findMany({
       where: {
         providerId,
         startTime: {
-          gt: todayEnd,
-          lte: next7Days,
+          gt: todayEnd, // Jobs starting after today
         },
         status: {
-          in: ['scheduled'],
+          in: ['scheduled', 'pending'],
         },
       },
       select: {
         id: true,
         startTime: true,
         serviceType: true,
+        address: true,
+        customer: {
+          select: {
+            name: true,
+          },
+        },
       },
       orderBy: {
         startTime: 'asc',
       },
       take: 5,
+    });
+
+    console.log('📅 Upcoming jobs query result:', {
+      count: upcomingJobs.length,
+      jobs: upcomingJobs.map(j => ({
+        id: j.id,
+        serviceType: j.serviceType,
+        startTime: j.startTime,
+      })),
+      todayEnd: todayEnd.toISOString(),
     });
 
     // Get weekly stats
@@ -301,6 +320,8 @@ export async function GET(request: NextRequest) {
           id: job.id,
           startTime: job.startTime.toISOString(),
           serviceType: job.serviceType,
+          customerName: job.customer?.name || 'Unknown Customer',
+          address: job.address || '',
         })),
         stats: {
           todaysJobsCount: todaysJobs.length,

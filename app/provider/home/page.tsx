@@ -645,7 +645,8 @@ export default function ProviderHome() {
                           </div>
                           <div className="min-w-0">
                             <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground truncate">
+                              {job.customerName && <span>{job.customerName} · </span>}
                               {format(new Date(job.startTime), 'EEE, MMM d')} · {formatTime(job.startTime)}
                             </p>
                           </div>
@@ -667,7 +668,7 @@ export default function ProviderHome() {
                   </div>
                   <div className="p-3 bg-emerald-500/10 rounded-xl">
                     <p className="text-xl font-bold text-emerald-600">{formatCurrency(stats.monthlyRevenue)}</p>
-                    <p className="text-xs text-muted-foreground">Monthly rev</p>
+                    <p className="text-xs text-muted-foreground">Monthly revenue</p>
                   </div>
                 </div>
               </div>
