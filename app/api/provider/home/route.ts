@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     console.log('🔍 DEBUG - All jobs for provider:', {
       providerId,
       totalJobs: allProviderJobs.length,
-      allStatuses: [...new Set(allProviderJobs.map(j => j.status))],
+      allStatuses: Array.from(new Set(allProviderJobs.map(j => j.status))),
       futureJobs: allProviderJobs.filter(j => j.startTime > todayEnd).length,
       jobs: allProviderJobs.map(j => ({
         id: j.id.slice(-6),
