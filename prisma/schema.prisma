@@ -978,17 +978,19 @@ model promotions {
 }
 
 model provider_customer_messages {
-  id          String   @id
-  provider_id String
-  customer_id String
-  content     String
-  direction   String
-  type        String   @default("sms")
-  status      String   @default("sent")
-  created_at  DateTime @default(now())
-  updated_at  DateTime
-  customers   Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
-  Provider    Provider @relation(fields: [provider_id], references: [id], onDelete: Cascade)
+  id           String   @id
+  provider_id  String
+  customer_id  String
+  content      String
+  direction    String
+  type         String   @default("sms")
+  status       String   @default("sent")
+  media_url    String?
+  media_type   String?
+  created_at   DateTime @default(now())
+  updated_at   DateTime
+  customers    Customer @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  Provider     Provider @relation(fields: [provider_id], references: [id], onDelete: Cascade)
 
   @@index([created_at])
   @@index([customer_id])

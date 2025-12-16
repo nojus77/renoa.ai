@@ -635,8 +635,8 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
           />
         )}
 
-        {/* Support Chat */}
-        <SupportChat />
+        {/* Support Chat - hide on messages page to avoid overlap with send button */}
+        {pathname !== '/provider/messages' && <SupportChat />}
       </div>
     </ThemeProvider>
   );

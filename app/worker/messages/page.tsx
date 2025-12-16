@@ -203,10 +203,14 @@ export default function WorkerMessages() {
     return () => clearInterval(interval);
   }, [userId, selectedConversation, selectedTeamChat]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive or conversation changes
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [customerMessages, teamMessages]);
+    // Use setTimeout to ensure DOM has updated before scrolling
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [customerMessages, teamMessages, selectedConversation, selectedTeamChat]);
 
   useEffect(() => {
     if (!teamAttachment) {

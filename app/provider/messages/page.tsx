@@ -166,6 +166,7 @@ export default function ProviderMessages() {
   const [messageText, setMessageText] = useState('');
   const [showTemplates, setShowTemplates] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [teamAttachment, setTeamAttachment] = useState<File | null>(null);
   const [teamAttachmentPreview, setTeamAttachmentPreview] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
@@ -173,6 +174,7 @@ export default function ProviderMessages() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const customerCameraInputRef = useRef<HTMLInputElement>(null);
   const teamAttachmentInputRef = useRef<HTMLInputElement>(null);
   const teamCameraInputRef = useRef<HTMLInputElement>(null);
 
@@ -216,10 +218,14 @@ export default function ProviderMessages() {
     return () => clearInterval(interval);
   }, [providerId, userId, selectedConversation, selectedTeamChat]);
 
-  // Auto-scroll to bottom when new messages arrive
+  // Auto-scroll to bottom when new messages arrive or conversation changes
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [customerMessages, teamMessages]);
+    // Use setTimeout to ensure DOM has updated before scrolling
+    const timer = setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [customerMessages, teamMessages, selectedConversation, selectedTeamChat]);
 
   useEffect(() => {
     if (!teamAttachment) {
@@ -234,6 +240,20 @@ export default function ProviderMessages() {
       URL.revokeObjectURL(previewUrl);
     };
   }, [teamAttachment]);
+
+  useEffect(() => {
+    if (!photoFile) {
+      setPhotoPreview(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(photoFile);
+    setPhotoPreview(previewUrl);
+
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [photoFile]);
 
   const fetchConversations = async (id: string) => {
     try {
@@ -416,6 +436,30 @@ export default function ProviderMessages() {
         // Send customer message
         if (!selectedConversation) return;
 
+        // Handle photo upload if present
+        let mediaUrl: string | undefined;
+        let mediaType: string | undefined;
+
+        if (photoFile) {
+          const formData = new FormData();
+          formData.append('providerId', providerId);
+          formData.append('customerId', selectedConversation.customerId);
+          formData.append('file', photoFile);
+
+          const uploadRes = await fetch('/api/provider/messages/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          const uploadData = await uploadRes.json();
+
+          if (!uploadRes.ok) {
+            throw new Error(uploadData.error || 'Failed to upload image');
+          }
+
+          mediaUrl = uploadData.url;
+          mediaType = 'image';
+        }
+
         // Optimistically add message to UI
         const tempMessage: Message = {
           id: `temp-${Date.now()}`,
@@ -423,17 +467,12 @@ export default function ProviderMessages() {
           senderId: providerId,
           senderType: 'provider',
           content: trimmedMessage,
+          mediaUrl,
+          mediaType,
           timestamp: new Date().toISOString(),
           read: false,
         };
         setCustomerMessages(prev => [...prev, tempMessage]);
-
-        if (photoFile) {
-          toast.error('Photo upload coming soon!');
-          setPhotoFile(null);
-          setSending(false);
-          return;
-        }
 
         const res = await fetch('/api/provider/messages', {
           method: 'POST',
@@ -443,6 +482,8 @@ export default function ProviderMessages() {
             customerId: selectedConversation.customerId,
             content: trimmedMessage,
             type: 'sms',
+            mediaUrl,
+            mediaType,
           }),
         });
 
@@ -455,7 +496,6 @@ export default function ProviderMessages() {
           msg.id === tempMessage.id ? data.message : msg
         ));
 
-        toast.success('Message sent!');
         setMessageText('');
         setPhotoFile(null);
         fetchConversations(providerId);
@@ -476,6 +516,7 @@ export default function ProviderMessages() {
     if (e.target.files && e.target.files[0]) {
       setPhotoFile(e.target.files[0]);
     }
+    e.target.value = '';
   };
 
   const handleTeamAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1211,22 +1252,25 @@ export default function ProviderMessages() {
                     </div>
                   )}
 
-                  {activeTab === 'customers' && photoFile && (
-                    <div className="mb-3 relative inline-block">
-                      <div className="relative w-24 h-24 rounded-lg border-2 border-emerald-500 overflow-hidden">
+                  {activeTab === 'customers' && photoPreview && (
+                    <div className="mb-3 border border-emerald-600/50 bg-zinc-900/70 rounded-xl p-3">
+                      <div className="flex items-start gap-3">
                         <img
-                          src={URL.createObjectURL(photoFile)}
+                          src={photoPreview}
                           alt="Preview"
-                          className="w-full h-full object-cover"
+                          className="max-h-48 rounded-lg border border-zinc-800 object-cover"
                         />
                         <button
                           onClick={() => setPhotoFile(null)}
-                          className="absolute top-1 right-1 p-1 bg-black/60 rounded-full hover:bg-black/80 transition-colors"
+                          className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                          aria-label="Remove photo"
                         >
-                          <X className="h-3 w-3 text-white" />
+                          <X className="h-4 w-4" />
                         </button>
                       </div>
-                      <p className="text-xs text-zinc-500 mt-1">{photoFile.name}</p>
+                      {photoFile?.name && (
+                        <p className="text-xs text-zinc-500 mt-2 truncate">{photoFile.name}</p>
+                      )}
                     </div>
                   )}
 
@@ -1270,12 +1314,27 @@ export default function ProviderMessages() {
                           className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0"
                           title="Attach photo"
                         >
-                          <ImageIcon className="h-5 w-5" />
+                          <Paperclip className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => customerCameraInputRef.current?.click()}
+                          className="p-2 text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 rounded-lg transition-colors flex-shrink-0"
+                          title="Open camera"
+                        >
+                          <Camera className="h-5 w-5" />
                         </button>
                         <input
                           ref={fileInputRef}
                           type="file"
+                          accept="image/jpeg,image/png,image/webp,image/gif"
+                          onChange={handlePhotoSelect}
+                          className="hidden"
+                        />
+                        <input
+                          ref={customerCameraInputRef}
+                          type="file"
                           accept="image/*"
+                          capture="environment"
                           onChange={handlePhotoSelect}
                           className="hidden"
                         />
@@ -1319,7 +1378,7 @@ export default function ProviderMessages() {
                       onChange={(e) => setMessageText(e.target.value)}
                       onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                       placeholder={
-                        activeTab === 'team' && teamAttachment
+                        (activeTab === 'team' && teamAttachment) || (activeTab === 'customers' && photoFile)
                           ? 'Add a caption...'
                           : 'Type a message...'
                       }
