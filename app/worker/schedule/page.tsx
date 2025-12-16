@@ -110,30 +110,30 @@ export default function WorkerSchedule() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-purple-500/10 border-l-purple-500';
+        return 'bg-emerald-500/10 border-l-emerald-500';
       case 'in_progress':
-        return 'bg-amber-500/10 border-l-amber-500';
+        return 'bg-purple-500/10 border-l-purple-500';
       case 'on_the_way':
         return 'bg-blue-500/10 border-l-blue-500';
       case 'scheduled':
-        return 'bg-emerald-500/10 border-l-emerald-500';
+        return 'bg-amber-500/10 border-l-amber-500';
       default:
-        return 'bg-[#2D2D2D] border-l-[#C4F542]';
+        return 'bg-amber-500/10 border-l-amber-500';
     }
   };
 
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-purple-500/20 text-purple-400';
+        return 'bg-emerald-500/20 text-emerald-400';
       case 'in_progress':
-        return 'bg-amber-500/15 text-amber-500';
+        return 'bg-purple-500/20 text-purple-400';
       case 'on_the_way':
         return 'bg-blue-500/15 text-blue-500';
       case 'scheduled':
-        return 'bg-emerald-500/15 text-emerald-500';
+        return 'bg-amber-500/20 text-amber-400';
       default:
-        return 'bg-[#C4F542]/15 text-[#C4F542]';
+        return 'bg-amber-500/20 text-amber-400';
     }
   };
 

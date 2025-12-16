@@ -482,14 +482,14 @@ export default function WorkerDashboard() {
     const status = getJobStatus(job);
     switch (status) {
       case 'completed':
-        return 'border-l-purple-500';
+        return 'border-l-emerald-500';
       case 'working':
-        return 'border-l-[#C4F542]';
+        return 'border-l-purple-500';
       case 'on_the_way':
       case 'arrived':
         return 'border-l-blue-500';
       default:
-        return 'border-l-[#C4F542]';
+        return 'border-l-amber-500';
     }
   };
 
@@ -498,14 +498,14 @@ export default function WorkerDashboard() {
     const status = getJobStatus(job);
     if (status === 'completed') {
       return (
-        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-500/20 text-emerald-400">
           completed
         </span>
       );
     }
     if (status === 'working') {
       return (
-        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-[#C4F542]/20 text-[#C4F542]">
+        <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
           in progress
         </span>
       );
