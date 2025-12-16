@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import ProviderLayout from '@/components/provider/ProviderLayout';
@@ -54,44 +54,44 @@ interface Stats {
 interface RevenueDataPoint {
   date: string;
   amount: number;
-  label: string;
 }
 
 interface HomeData {
   todaysJobs: TodayJob[];
   upcomingJobs: UpcomingJob[];
   stats: Stats;
-  revenueHistory?: RevenueDataPoint[];
+  revenueHistory: RevenueDataPoint[];
 }
 
-// Simple line chart component
-function RevenueChart({ data, height = 200 }: { data: RevenueDataPoint[]; height?: number }) {
+// Clean line chart - no dots, straight lines
+function RevenueChart({ data }: { data: RevenueDataPoint[] }) {
+  if (data.length === 0) return null;
+
   const maxValue = Math.max(...data.map(d => d.amount), 1);
   const minValue = Math.min(...data.map(d => d.amount));
   const range = maxValue - minValue || 1;
 
-  // Create SVG path for smooth curve
+  // Create points with straight lines (no bezier curves)
   const points = data.map((d, i) => ({
-    x: (i / (data.length - 1)) * 100,
-    y: 100 - ((d.amount - minValue) / range) * 80 - 10,
+    x: (i / Math.max(data.length - 1, 1)) * 100,
+    y: 100 - ((d.amount - minValue) / range) * 85 - 7.5,
   }));
 
-  // Create smooth curve path
+  // Create straight line path (L = line to, not bezier curves)
   const pathData = points.reduce((acc, point, i) => {
     if (i === 0) return `M ${point.x} ${point.y}`;
-
-    const prev = points[i - 1];
-    const cpx1 = prev.x + (point.x - prev.x) / 3;
-    const cpx2 = prev.x + (point.x - prev.x) * 2 / 3;
-
-    return `${acc} C ${cpx1} ${prev.y}, ${cpx2} ${point.y}, ${point.x} ${point.y}`;
+    return `${acc} L ${point.x} ${point.y}`;
   }, '');
 
   // Create gradient fill path
   const fillPath = `${pathData} L 100 100 L 0 100 Z`;
 
+  // Show fewer labels based on data length
+  const labelInterval = data.length <= 7 ? 1 : Math.ceil(data.length / 6);
+  const labelsToShow = data.filter((_, i) => i % labelInterval === 0 || i === data.length - 1);
+
   return (
-    <div className="relative w-full" style={{ height }}>
+    <div className="relative w-full h-full">
       <svg
         viewBox="0 0 100 100"
         preserveAspectRatio="none"
@@ -99,13 +99,13 @@ function RevenueChart({ data, height = 200 }: { data: RevenueDataPoint[]; height
       >
         <defs>
           <linearGradient id="chartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="rgb(16, 185, 129)" stopOpacity="0.3" />
+            <stop offset="0%" stopColor="rgb(16, 185, 129)" stopOpacity="0.2" />
             <stop offset="100%" stopColor="rgb(16, 185, 129)" stopOpacity="0" />
           </linearGradient>
         </defs>
 
-        {/* Grid lines */}
-        {[0, 25, 50, 75, 100].map((y) => (
+        {/* Subtle grid lines */}
+        {[25, 50, 75].map((y) => (
           <line
             key={y}
             x1="0"
@@ -113,8 +113,8 @@ function RevenueChart({ data, height = 200 }: { data: RevenueDataPoint[]; height
             x2="100"
             y2={y}
             stroke="currentColor"
-            strokeOpacity="0.1"
-            strokeWidth="0.5"
+            strokeOpacity="0.05"
+            strokeWidth="0.3"
           />
         ))}
 
@@ -124,34 +124,22 @@ function RevenueChart({ data, height = 200 }: { data: RevenueDataPoint[]; height
           fill="url(#chartGradient)"
         />
 
-        {/* Line */}
+        {/* Line - no dots */}
         <path
           d={pathData}
           fill="none"
           stroke="rgb(16, 185, 129)"
-          strokeWidth="2"
+          strokeWidth="1.5"
           strokeLinecap="round"
           strokeLinejoin="round"
           vectorEffect="non-scaling-stroke"
         />
-
-        {/* Data points */}
-        {points.map((point, i) => (
-          <circle
-            key={i}
-            cx={point.x}
-            cy={point.y}
-            r="1.5"
-            fill="rgb(16, 185, 129)"
-            className="transition-all hover:r-3"
-          />
-        ))}
       </svg>
 
       {/* X-axis labels */}
-      <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[10px] text-muted-foreground px-1 -mb-5">
-        {data.filter((_, i) => i % Math.ceil(data.length / 7) === 0 || i === data.length - 1).map((d, i) => (
-          <span key={i}>{d.label}</span>
+      <div className="absolute bottom-0 left-0 right-0 flex justify-between text-[9px] text-muted-foreground px-0.5 translate-y-4">
+        {labelsToShow.map((d, i) => (
+          <span key={i}>{format(new Date(d.date), 'M/d')}</span>
         ))}
       </div>
     </div>
@@ -164,7 +152,35 @@ export default function ProviderHome() {
   const [providerId, setProviderId] = useState('');
   const [loading, setLoading] = useState(true);
   const [homeData, setHomeData] = useState<HomeData | null>(null);
-  const [viewMode, setViewMode] = useState<'week' | 'month'>('month');
+  const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
+
+  const loadData = useCallback(async (id: string) => {
+    try {
+      const res = await fetch(`/api/provider/home?providerId=${id}`);
+      const result = await res.json();
+      if (result.success && result.data) {
+        setHomeData({
+          todaysJobs: result.data.todaysJobs || [],
+          upcomingJobs: result.data.upcomingJobs || [],
+          stats: result.data.stats || {
+            todaysJobsCount: 0,
+            weeklyRevenue: 0,
+            monthlyRevenue: 0,
+            pendingInvoicesCount: 0,
+            pendingInvoicesAmount: 0,
+            newLeadsCount: 0,
+            completedThisWeek: 0,
+            completedThisMonth: 0,
+          },
+          revenueHistory: result.data.revenueHistory || [],
+        });
+      }
+    } catch (error) {
+      console.error('Error loading home data:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
     const id = localStorage.getItem('providerId');
@@ -177,104 +193,8 @@ export default function ProviderHome() {
 
     setProviderId(id);
     setProviderName(name);
-    loadMockData();
-  }, [router]);
-
-  const loadMockData = () => {
-    setLoading(true);
-    setTimeout(() => {
-      const today = new Date();
-
-      // Generate revenue history for the past 30 days
-      const revenueHistory: RevenueDataPoint[] = [];
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
-        const baseAmount = 400 + Math.random() * 300;
-        const weekendMultiplier = date.getDay() === 0 || date.getDay() === 6 ? 0.6 : 1;
-        revenueHistory.push({
-          date: date.toISOString(),
-          amount: Math.round(baseAmount * weekendMultiplier),
-          label: format(date, 'MMM d'),
-        });
-      }
-
-      const mockData: HomeData = {
-        todaysJobs: [
-          {
-            id: '1',
-            customerName: 'John Smith',
-            customerPhone: '(555) 123-4567',
-            serviceType: 'Lawn Mowing',
-            address: '123 Oak Street, Springfield',
-            startTime: new Date(today.setHours(9, 0, 0, 0)).toISOString(),
-            endTime: new Date(today.setHours(10, 30, 0, 0)).toISOString(),
-            status: 'scheduled',
-            totalAmount: 85,
-            workers: [{ id: 'w1', firstName: 'Mike', lastName: 'Johnson' }],
-          },
-          {
-            id: '2',
-            customerName: 'Sarah Williams',
-            customerPhone: '(555) 234-5678',
-            serviceType: 'Hedge Trimming',
-            address: '456 Maple Ave, Springfield',
-            startTime: new Date(today.setHours(11, 0, 0, 0)).toISOString(),
-            endTime: new Date(today.setHours(12, 30, 0, 0)).toISOString(),
-            status: 'in_progress',
-            totalAmount: 120,
-            workers: [
-              { id: 'w1', firstName: 'Mike', lastName: 'Johnson' },
-              { id: 'w2', firstName: 'Carlos', lastName: 'Rodriguez' },
-            ],
-          },
-        ],
-        upcomingJobs: [
-          {
-            id: '4',
-            serviceType: 'Spring Cleanup',
-            customerName: 'Emily Davis',
-            address: '789 Pine Road',
-            startTime: new Date(today.getTime() + 86400000).toISOString(),
-          },
-          {
-            id: '5',
-            serviceType: 'Lawn Mowing',
-            customerName: 'Robert Chen',
-            address: '321 Elm Street',
-            startTime: new Date(today.getTime() + 172800000).toISOString(),
-          },
-          {
-            id: '6',
-            serviceType: 'Fertilization',
-            customerName: 'Amanda Foster',
-            address: '654 Cedar Lane',
-            startTime: new Date(today.getTime() + 259200000).toISOString(),
-          },
-          {
-            id: '7',
-            serviceType: 'Tree Trimming',
-            customerName: 'David Park',
-            address: '987 Birch Ave',
-            startTime: new Date(today.getTime() + 345600000).toISOString(),
-          },
-        ],
-        stats: {
-          todaysJobsCount: 3,
-          weeklyRevenue: 3250,
-          monthlyRevenue: 12480,
-          pendingInvoicesCount: 5,
-          pendingInvoicesAmount: 1850,
-          newLeadsCount: 4,
-          completedThisWeek: 12,
-          completedThisMonth: 48,
-        },
-        revenueHistory,
-      };
-      setHomeData(mockData);
-      setLoading(false);
-    }, 300);
-  };
+    loadData(id);
+  }, [router, loadData]);
 
   const formatTime = (date: string) => {
     return format(new Date(date), 'h:mm a');
@@ -299,7 +219,7 @@ export default function ProviderHome() {
   if (loading) {
     return (
       <ProviderLayout providerName={providerName}>
-        <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-[calc(100vh-120px)] flex items-center justify-center">
           <div className="animate-pulse text-muted-foreground">Loading...</div>
         </div>
       </ProviderLayout>
@@ -309,7 +229,7 @@ export default function ProviderHome() {
   if (!homeData) {
     return (
       <ProviderLayout providerName={providerName}>
-        <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="h-[calc(100vh-120px)] flex items-center justify-center">
           <div className="text-muted-foreground">Failed to load data</div>
         </div>
       </ProviderLayout>
@@ -320,43 +240,42 @@ export default function ProviderHome() {
 
   return (
     <ProviderLayout providerName={providerName}>
-      <div className="min-h-screen bg-background">
-        <div className="max-w-6xl mx-auto px-4 md:px-6 py-8 md:py-12">
-
-          {/* Header */}
-          <div className="mb-10">
-            <h1 className="text-3xl md:text-4xl font-light text-foreground mb-1">
+      <div className="h-[calc(100vh-120px)] overflow-hidden">
+        <div className="h-full max-w-7xl mx-auto px-4 py-4">
+          {/* Header - Compact */}
+          <div className="mb-4">
+            <h1 className="text-2xl font-light text-foreground">
               Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {format(new Date(), 'EEEE, MMMM d')}
             </p>
           </div>
 
-          {/* Main Grid */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+          {/* Main Grid - 60/40 split */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 h-[calc(100%-80px)]">
 
-            {/* Left Column - Revenue & Stats */}
-            <div className="lg:col-span-2 space-y-6">
+            {/* Left Column - Revenue (60%) */}
+            <div className="lg:col-span-3 flex flex-col gap-4">
 
               {/* Revenue Card */}
-              <div className="bg-card rounded-2xl border border-border p-6 md:p-8">
-                <div className="flex items-start justify-between mb-6">
+              <div className="bg-card rounded-xl border border-border p-5 flex-1 flex flex-col min-h-0">
+                <div className="flex items-start justify-between mb-3">
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Revenue</p>
-                    <p className="text-4xl md:text-5xl font-light text-foreground">
+                    <p className="text-xs text-muted-foreground mb-0.5">Revenue</p>
+                    <p className="text-3xl font-light text-foreground">
                       {formatCurrency(viewMode === 'week' ? stats.weeklyRevenue : stats.monthlyRevenue)}
                     </p>
-                    <p className="text-sm text-muted-foreground mt-1">
+                    <p className="text-xs text-muted-foreground">
                       {viewMode === 'week' ? 'This week' : 'This month'}
                     </p>
                   </div>
 
                   {/* View Toggle */}
-                  <div className="flex bg-muted rounded-lg p-1">
+                  <div className="flex bg-muted rounded-md p-0.5">
                     <button
                       onClick={() => setViewMode('week')}
-                      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                      className={`px-2.5 py-1 text-xs rounded transition-colors ${
                         viewMode === 'week'
                           ? 'bg-background text-foreground shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
@@ -366,7 +285,7 @@ export default function ProviderHome() {
                     </button>
                     <button
                       onClick={() => setViewMode('month')}
-                      className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+                      className={`px-2.5 py-1 text-xs rounded transition-colors ${
                         viewMode === 'month'
                           ? 'bg-background text-foreground shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
@@ -377,177 +296,181 @@ export default function ProviderHome() {
                   </div>
                 </div>
 
-                {/* Chart */}
-                <div className="mt-4 pb-6">
-                  <RevenueChart data={chartData} height={180} />
+                {/* Chart - fills remaining space */}
+                <div className="flex-1 min-h-0 pb-5">
+                  <RevenueChart data={chartData} />
                 </div>
 
                 {/* Stats Row */}
-                <div className="grid grid-cols-3 gap-4 pt-6 border-t border-border">
+                <div className="grid grid-cols-3 gap-3 pt-3 border-t border-border">
                   <div>
-                    <p className="text-2xl font-semibold text-foreground">
+                    <p className="text-xl font-semibold text-foreground">
                       {viewMode === 'week' ? stats.completedThisWeek : stats.completedThisMonth}
                     </p>
-                    <p className="text-sm text-muted-foreground">Jobs completed</p>
+                    <p className="text-xs text-muted-foreground">Jobs done</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-semibold text-foreground">
-                      {formatCurrency((viewMode === 'week' ? stats.weeklyRevenue : stats.monthlyRevenue) /
-                        (viewMode === 'week' ? stats.completedThisWeek : stats.completedThisMonth) || 0)}
+                    <p className="text-xl font-semibold text-foreground">
+                      {formatCurrency(
+                        (viewMode === 'week' ? stats.weeklyRevenue : stats.monthlyRevenue) /
+                        Math.max(viewMode === 'week' ? stats.completedThisWeek : stats.completedThisMonth, 1)
+                      )}
                     </p>
-                    <p className="text-sm text-muted-foreground">Avg per job</p>
+                    <p className="text-xs text-muted-foreground">Avg/job</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-semibold text-emerald-500">
-                      +{Math.round(((stats.weeklyRevenue / (stats.monthlyRevenue / 4)) - 1) * 100)}%
+                    <p className="text-xl font-semibold text-emerald-500">
+                      {stats.todaysJobsCount}
                     </p>
-                    <p className="text-sm text-muted-foreground">vs last week</p>
+                    <p className="text-xs text-muted-foreground">Today</p>
                   </div>
                 </div>
               </div>
 
               {/* Week at a Glance - Compact */}
-              <div className="bg-card rounded-2xl border border-border p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium text-foreground">Week at a Glance</h3>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              <div className="bg-card rounded-xl border border-border p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-foreground">Week at a Glance</h3>
+                  <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
                 </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="text-center p-4 bg-muted/30 rounded-xl">
-                    <p className="text-3xl font-semibold text-foreground">{stats.todaysJobsCount}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Today</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <p className="text-2xl font-semibold text-foreground">{stats.todaysJobsCount}</p>
+                    <p className="text-[10px] text-muted-foreground">Today</p>
                   </div>
-                  <div className="text-center p-4 bg-muted/30 rounded-xl">
-                    <p className="text-3xl font-semibold text-foreground">{stats.completedThisWeek}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Completed</p>
+                  <div className="text-center p-3 bg-muted/30 rounded-lg">
+                    <p className="text-2xl font-semibold text-foreground">{stats.completedThisWeek}</p>
+                    <p className="text-[10px] text-muted-foreground">Completed</p>
                   </div>
-                  <div className="text-center p-4 bg-emerald-500/10 rounded-xl">
-                    <p className="text-3xl font-semibold text-emerald-500">{formatCurrency(stats.weeklyRevenue)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Revenue</p>
+                  <div className="text-center p-3 bg-emerald-500/10 rounded-lg">
+                    <p className="text-2xl font-semibold text-emerald-500">{formatCurrency(stats.weeklyRevenue)}</p>
+                    <p className="text-[10px] text-muted-foreground">Revenue</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Right Column - Jobs */}
-            <div className="space-y-6">
+            {/* Right Column - Jobs (40%) */}
+            <div className="lg:col-span-2 flex flex-col gap-4 min-h-0">
 
               {/* Today's Jobs */}
-              {todaysJobs.length > 0 && (
-                <div className="bg-card rounded-2xl border border-border p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-medium text-foreground">Today</h3>
-                    <span className="text-sm text-muted-foreground">{todaysJobs.length} jobs</span>
-                  </div>
-                  <div className="space-y-3">
-                    {todaysJobs.map((job) => (
+              <div className="bg-card rounded-xl border border-border p-4 flex-shrink-0 max-h-[40%] overflow-auto">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-foreground">Today</h3>
+                  <span className="text-xs text-muted-foreground">{todaysJobs.length} jobs</span>
+                </div>
+                {todaysJobs.length === 0 ? (
+                  <p className="text-xs text-muted-foreground text-center py-4">No jobs today</p>
+                ) : (
+                  <div className="space-y-2">
+                    {todaysJobs.slice(0, 3).map((job) => (
                       <button
                         key={job.id}
                         onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                        className="w-full p-4 bg-muted/30 hover:bg-muted/50 rounded-xl text-left transition-colors group"
+                        className="w-full p-3 bg-muted/30 hover:bg-muted/50 rounded-lg text-left transition-colors"
                       >
-                        <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-start justify-between mb-1">
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-foreground truncate">{job.serviceType}</p>
-                            <p className="text-sm text-muted-foreground truncate">{job.customerName}</p>
+                            <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
+                            <p className="text-xs text-muted-foreground truncate">{job.customerName}</p>
                           </div>
-                          <div className="text-right ml-3">
-                            <p className="text-sm font-medium text-emerald-500">{formatTime(job.startTime)}</p>
+                          <div className="text-right ml-2">
+                            <p className="text-xs font-medium text-emerald-500">{formatTime(job.startTime)}</p>
                             {job.status === 'in_progress' && (
-                              <span className="inline-flex items-center text-[10px] text-orange-500 font-medium">
-                                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1 animate-pulse" />
-                                In progress
+                              <span className="inline-flex items-center text-[9px] text-orange-500 font-medium">
+                                <span className="w-1 h-1 bg-orange-500 rounded-full mr-1 animate-pulse" />
+                                Active
                               </span>
                             )}
                           </div>
                         </div>
-                        <div className="flex items-center text-xs text-muted-foreground">
-                          <MapPin className="h-3 w-3 mr-1 flex-shrink-0" />
+                        <div className="flex items-center text-[10px] text-muted-foreground">
+                          <MapPin className="h-2.5 w-2.5 mr-1 flex-shrink-0" />
                           <span className="truncate">{job.address}</span>
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Coming Up */}
-              <div className="bg-card rounded-2xl border border-border p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium text-foreground">Coming Up</h3>
-                  <button
-                    onClick={() => router.push('/provider/calendar')}
-                    className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1"
-                  >
-                    View all
-                    <ChevronRight className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {upcomingJobs.length === 0 ? (
-                  <div className="text-center py-8">
-                    <Calendar className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
-                    <p className="text-sm text-muted-foreground">No upcoming jobs</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {upcomingJobs.map((job) => (
-                      <button
-                        key={job.id}
-                        onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                        className="w-full flex items-center justify-between p-3 hover:bg-muted/30 rounded-lg transition-colors group"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-10 h-10 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0">
-                            <Briefcase className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="font-medium text-foreground text-sm truncate">{job.serviceType}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(new Date(job.startTime), 'EEE, MMM d')} · {formatTime(job.startTime)}
-                            </p>
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              {/* Quick Actions - Minimal */}
+              {/* Coming Up */}
+              <div className="bg-card rounded-xl border border-border p-4 flex-1 min-h-0 overflow-auto">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-sm font-medium text-foreground">Coming Up</h3>
+                  <button
+                    onClick={() => router.push('/provider/calendar')}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
+                  >
+                    View all
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+
+                {upcomingJobs.length === 0 ? (
+                  <div className="text-center py-6">
+                    <Calendar className="h-6 w-6 text-muted-foreground mx-auto mb-1" />
+                    <p className="text-xs text-muted-foreground">No upcoming jobs</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    {upcomingJobs.slice(0, 4).map((job) => (
+                      <button
+                        key={job.id}
+                        onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                        className="w-full flex items-center justify-between p-2 hover:bg-muted/30 rounded-lg transition-colors"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-8 h-8 rounded-md bg-muted/50 flex items-center justify-center flex-shrink-0">
+                            <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-foreground truncate">{job.serviceType}</p>
+                            <p className="text-[10px] text-muted-foreground">
+                              {format(new Date(job.startTime), 'EEE, MMM d')} · {formatTime(job.startTime)}
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Needs Attention - Compact */}
               {(stats.pendingInvoicesCount > 0 || stats.newLeadsCount > 0) && (
-                <div className="bg-card rounded-2xl border border-border p-6">
-                  <h3 className="font-medium text-foreground mb-4">Needs Attention</h3>
-                  <div className="space-y-2">
+                <div className="bg-card rounded-xl border border-border p-4 flex-shrink-0">
+                  <h3 className="text-sm font-medium text-foreground mb-2">Attention</h3>
+                  <div className="space-y-1.5">
                     {stats.pendingInvoicesCount > 0 && (
                       <button
                         onClick={() => router.push('/provider/invoices')}
-                        className="w-full flex items-center justify-between p-3 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors"
+                        className="w-full flex items-center justify-between p-2 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors"
                       >
-                        <div className="flex items-center gap-3">
-                          <DollarSign className="h-4 w-4 text-amber-500" />
-                          <span className="text-sm text-foreground">
-                            {stats.pendingInvoicesCount} unpaid invoices
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="h-3.5 w-3.5 text-amber-500" />
+                          <span className="text-xs text-foreground">
+                            {stats.pendingInvoicesCount} unpaid
                           </span>
                         </div>
-                        <span className="text-sm font-medium text-amber-500">
+                        <span className="text-xs font-medium text-amber-500">
                           {formatCurrency(stats.pendingInvoicesAmount)}
                         </span>
                       </button>
                     )}
                     {stats.newLeadsCount > 0 && (
                       <button
-                        onClick={() => router.push('/provider/dashboard')}
-                        className="w-full flex items-center justify-between p-3 bg-purple-500/10 hover:bg-purple-500/20 rounded-lg transition-colors"
+                        onClick={() => router.push('/provider/leads')}
+                        className="w-full flex items-center justify-between p-2 bg-purple-500/10 hover:bg-purple-500/20 rounded-lg transition-colors"
                       >
-                        <div className="flex items-center gap-3">
-                          <TrendingUp className="h-4 w-4 text-purple-500" />
-                          <span className="text-sm text-foreground">
+                        <div className="flex items-center gap-2">
+                          <TrendingUp className="h-3.5 w-3.5 text-purple-500" />
+                          <span className="text-xs text-foreground">
                             {stats.newLeadsCount} new leads
                           </span>
                         </div>
-                        <ChevronRight className="h-4 w-4 text-purple-500" />
+                        <ChevronRight className="h-3.5 w-3.5 text-purple-500" />
                       </button>
                     )}
                   </div>

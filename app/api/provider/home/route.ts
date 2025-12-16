@@ -228,6 +228,53 @@ export async function GET(request: NextRequest) {
 
     const userMap = new Map(users.map(u => [u.id, u]));
 
+    // Get revenue history for the past 30 days (grouped by day)
+    const thirtyDaysAgo = new Date(now);
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 29);
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const completedJobsLast30Days = await prisma.job.findMany({
+      where: {
+        providerId,
+        status: 'completed',
+        endTime: {
+          gte: thirtyDaysAgo,
+          lte: now,
+        },
+      },
+      select: {
+        endTime: true,
+        actualValue: true,
+        estimatedValue: true,
+      },
+    });
+
+    // Group revenue by date
+    const revenueByDate = new Map<string, number>();
+
+    // Initialize all 30 days with 0
+    for (let i = 29; i >= 0; i--) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - i);
+      const dateKey = date.toISOString().split('T')[0];
+      revenueByDate.set(dateKey, 0);
+    }
+
+    // Sum up completed job revenues by date
+    completedJobsLast30Days.forEach(job => {
+      const dateKey = job.endTime.toISOString().split('T')[0];
+      const amount = job.actualValue || job.estimatedValue || 0;
+      revenueByDate.set(dateKey, (revenueByDate.get(dateKey) || 0) + amount);
+    });
+
+    // Convert to array sorted by date
+    const revenueHistory = Array.from(revenueByDate.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, amount]) => ({
+        date,
+        amount,
+      }));
+
     return NextResponse.json({
       success: true,
       data: {
@@ -268,6 +315,7 @@ export async function GET(request: NextRequest) {
           completedThisMonth: monthlyJobs.length,
         },
         recentActivity: activity,
+        revenueHistory,
       },
     });
   } catch (error) {
