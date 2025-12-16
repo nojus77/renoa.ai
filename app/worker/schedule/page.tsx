@@ -110,7 +110,7 @@ export default function WorkerSchedule() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-zinc-800/50 border-l-[#6B7280]';
+        return 'bg-purple-500/10 border-l-purple-500';
       case 'in_progress':
         return 'bg-amber-500/10 border-l-amber-500';
       case 'on_the_way':
@@ -125,7 +125,7 @@ export default function WorkerSchedule() {
   const getStatusBadgeClass = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-[#6B7280]/15 text-[#6B7280]';
+        return 'bg-purple-500/20 text-purple-400';
       case 'in_progress':
         return 'bg-amber-500/15 text-amber-500';
       case 'on_the_way':
@@ -147,8 +147,6 @@ export default function WorkerSchedule() {
         return status.charAt(0).toUpperCase() + status.slice(1);
     }
   };
-
-  const isCompleted = (status: string) => status === 'completed';
 
   return (
     <WorkerLayout>
@@ -249,7 +247,6 @@ export default function WorkerSchedule() {
             </div>
           ) : (
             selectedJobs.map((job) => {
-              const completed = isCompleted(job.status);
               return (
                 <button
                   key={job.id}
@@ -260,10 +257,10 @@ export default function WorkerSchedule() {
                 >
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className={`font-semibold ${completed ? 'text-[#6B7280]' : 'text-white'}`}>
+                      <p className="font-semibold text-white">
                         {job.serviceType}
                       </p>
-                      <p className={`text-sm ${completed ? 'text-[#4B5563]' : 'text-[#9CA3AF]'}`}>
+                      <p className="text-sm text-[#9CA3AF]">
                         {job.customer.name}
                       </p>
                     </div>
@@ -271,18 +268,18 @@ export default function WorkerSchedule() {
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(job.status)}`}>
                         {formatStatusLabel(job.status)}
                       </span>
-                      <ChevronRight className={`w-5 h-5 ${completed ? 'text-[#4B5563]' : 'text-[#6B7280]'}`} />
+                      <ChevronRight className="w-5 h-5 text-[#6B7280]" />
                     </div>
                   </div>
 
                   <div className="mt-3 flex items-center gap-4 text-sm">
-                    <div className={`flex items-center gap-1.5 ${completed ? 'text-[#4B5563]' : 'text-[#9CA3AF]'}`}>
+                    <div className="flex items-center gap-1.5 text-[#9CA3AF]">
                       <Clock className="w-4 h-4" />
                       {formatTime(job.startTime)} - {formatTime(job.endTime)}
                     </div>
                   </div>
 
-                  <div className={`mt-2 flex items-start gap-1.5 text-sm ${completed ? 'text-[#4B5563]' : 'text-[#6B7280]'}`}>
+                  <div className="mt-2 flex items-start gap-1.5 text-sm text-[#6B7280]">
                     <MapPin className="w-4 h-4 mt-0.5 flex-shrink-0" />
                     <span>{job.address}</span>
                   </div>
