@@ -25,7 +25,7 @@ import {
   Crown
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 
 type MessageTab = 'team' | 'customers';
 
@@ -446,6 +446,13 @@ export default function ProviderMessages() {
     });
   };
 
+  const formatDateDivider = (timestamp: string) => {
+    const date = new Date(timestamp);
+    if (isToday(date)) return 'Today';
+    if (isYesterday(date)) return 'Yesterday';
+    return format(date, 'MMM d, yyyy');
+  };
+
   const getInitials = (name: string) => {
     const parts = name.split(' ');
     return parts.map(p => p[0]).join('').toUpperCase().slice(0, 2);
@@ -501,6 +508,10 @@ export default function ProviderMessages() {
     setFilteredConversations(filtered);
   }, [searchQuery, filter, conversations]);
 
+  // Split team members into active (has messages) and pinned (no messages)
+  const activeTeamMembers = teamMembers.filter(m => m.lastMessageAt);
+  const pinnedTeamMembers = teamMembers.filter(m => !m.lastMessageAt);
+
   const totalCrewUnread = crewChats.reduce((sum, c) => sum + c.unreadCount, 0);
   const totalTeamUnread = (teamChat?.unreadCount || 0) + totalCrewUnread + teamMembers.reduce((sum, m) => sum + m.unreadCount, 0);
   const totalCustomerUnread = conversations.filter(c => c.unread).length;
@@ -513,6 +524,33 @@ export default function ProviderMessages() {
 
   // Helper to check if current chat is a group (team or crew)
   const isGroupChat = selectedTeamChat?.type === 'team' || selectedTeamChat?.type === 'crew';
+
+  // Check if message should show avatar/name (first in group or different sender or >5 min gap)
+  const shouldShowSenderInfo = (messages: Message[], index: number, isTeamTab: boolean) => {
+    if (index === 0) return true;
+    const current = messages[index];
+    const prev = messages[index - 1];
+
+    // Different sender
+    const currentSenderId = isTeamTab ? current.senderUserId : current.senderType;
+    const prevSenderId = isTeamTab ? prev.senderUserId : prev.senderType;
+    if (currentSenderId !== prevSenderId) return true;
+
+    // More than 5 minutes gap
+    const currentTime = new Date(current.timestamp || current.createdAt || '').getTime();
+    const prevTime = new Date(prev.timestamp || prev.createdAt || '').getTime();
+    if (currentTime - prevTime > 5 * 60 * 1000) return true;
+
+    return false;
+  };
+
+  // Check if we need a date divider before this message
+  const shouldShowDateDivider = (messages: Message[], index: number) => {
+    if (index === 0) return true;
+    const current = new Date(messages[index].timestamp || messages[index].createdAt || '');
+    const prev = new Date(messages[index - 1].timestamp || messages[index - 1].createdAt || '');
+    return !isSameDay(current, prev);
+  };
 
   // Get current chat name and info for header
   const getCurrentChatInfo = () => {
@@ -689,8 +727,8 @@ export default function ProviderMessages() {
                     </button>
                   ))}
 
-                  {/* Individual team members */}
-                  {teamMembers.map(member => (
+                  {/* Active team members (has messages) */}
+                  {activeTeamMembers.map(member => (
                     <button
                       key={member.id}
                       onClick={() => handleSelectTeamChat({ type: 'member', id: member.id })}
@@ -723,6 +761,43 @@ export default function ProviderMessages() {
                       )}
                     </button>
                   ))}
+
+                  {/* Pinned team members (no messages yet) */}
+                  {pinnedTeamMembers.length > 0 && (
+                    <>
+                      <div className="px-3 py-2 bg-zinc-900/50 border-b border-zinc-800">
+                        <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Start a conversation</p>
+                      </div>
+                      {pinnedTeamMembers.map(member => (
+                        <button
+                          key={member.id}
+                          onClick={() => handleSelectTeamChat({ type: 'member', id: member.id })}
+                          className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
+                            selectedTeamChat?.type === 'member' && selectedTeamChat?.id === member.id ? 'bg-zinc-800' : ''
+                          }`}
+                        >
+                          {member.avatar ? (
+                            <img
+                              src={member.avatar}
+                              alt={member.name}
+                              className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium flex-shrink-0">
+                              {getInitials(member.name)}
+                            </div>
+                          )}
+                          <div className="flex-1 text-left min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-white truncate">{member.name}</p>
+                              <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
+                            </div>
+                            <p className="text-xs text-zinc-500">{getRoleLabel(member.role)}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </>
+                  )}
 
                   {teamMembers.length === 0 && crewChats.length === 0 && !teamChat && (
                     <div className="flex flex-col items-center justify-center h-full text-center px-6 py-12">
@@ -927,17 +1002,19 @@ export default function ProviderMessages() {
                 </div>
 
                 {/* Message Thread */}
-                <div className="flex-1 overflow-y-auto p-3 md:p-6">
-                  <div className="max-w-4xl mx-auto space-y-3 md:space-y-4">
-                    {currentMessages.map((message) => {
+                <div className="flex-1 overflow-y-auto px-4 py-3">
+                  <div className="space-y-0.5">
+                    {currentMessages.map((message, index) => {
                       const isOwn = activeTab === 'team'
                         ? message.senderUserId === userId
                         : message.senderType === 'provider';
                       const isSystem = message.senderType === 'system';
+                      const showSenderInfo = shouldShowSenderInfo(currentMessages, index, activeTab === 'team');
+                      const showDateDivider = shouldShowDateDivider(currentMessages, index);
 
                       if (isSystem) {
                         return (
-                          <div key={message.id} className="flex justify-center">
+                          <div key={message.id} className="flex justify-center py-2">
                             <div className="flex items-center gap-2 px-4 py-2 bg-zinc-800/50 border border-zinc-700 rounded-full text-xs text-zinc-400">
                               <Clock className="h-3 w-3" />
                               <span>{message.content}</span>
@@ -947,59 +1024,74 @@ export default function ProviderMessages() {
                       }
 
                       return (
-                        <div
-                          key={message.id}
-                          className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div className={`flex gap-2 max-w-[85%] sm:max-w-[75%] md:max-w-[70%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
-                            {/* Avatar for team messages */}
-                            {activeTab === 'team' && !isOwn && (
-                              <div className="flex-shrink-0">
-                                {message.senderAvatar ? (
-                                  <img
-                                    src={message.senderAvatar}
-                                    alt={message.senderName || ''}
-                                    className="w-8 h-8 rounded-full object-cover"
-                                  />
-                                ) : (
-                                  <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-white text-xs font-medium">
-                                    {message.senderName ? getInitials(message.senderName) : '?'}
-                                  </div>
-                                )}
-                              </div>
-                            )}
+                        <div key={message.id}>
+                          {/* Date Divider */}
+                          {showDateDivider && (
+                            <div className="flex items-center gap-3 py-4">
+                              <div className="flex-1 h-px bg-zinc-800"></div>
+                              <span className="text-xs text-zinc-500 font-medium">
+                                {formatDateDivider(message.timestamp || message.createdAt || '')}
+                              </span>
+                              <div className="flex-1 h-px bg-zinc-800"></div>
+                            </div>
+                          )}
 
-                            <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
-                              {/* Sender name for team messages */}
-                              {activeTab === 'team' && !isOwn && message.senderName && (
-                                <span className="text-xs text-zinc-500 px-2 mb-1">{message.senderName}</span>
-                              )}
-
-                              {message.photoUrl && (
-                                <img
-                                  src={message.photoUrl}
-                                  alt="Attachment"
-                                  className="rounded-lg border border-zinc-700 max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
-                                  onClick={() => window.open(message.photoUrl, '_blank')}
-                                />
-                              )}
-                              {message.content && (
-                                <div
-                                  className={`px-3 md:px-4 py-2 md:py-2.5 rounded-2xl shadow-md ${
-                                    isOwn
-                                      ? 'bg-emerald-600 text-white rounded-br-sm'
-                                      : 'bg-zinc-800 text-zinc-100 rounded-bl-sm'
-                                  }`}
-                                >
-                                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
+                          <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} ${showSenderInfo ? 'mt-3' : 'mt-0.5'}`}>
+                            <div className={`flex gap-2 max-w-[75%] ${isOwn ? 'flex-row-reverse' : 'flex-row'}`}>
+                              {/* Avatar for team messages - only show on first message of group */}
+                              {activeTab === 'team' && !isOwn && (
+                                <div className="flex-shrink-0 w-8">
+                                  {showSenderInfo ? (
+                                    message.senderAvatar ? (
+                                      <img
+                                        src={message.senderAvatar}
+                                        alt={message.senderName || ''}
+                                        className="w-8 h-8 rounded-full object-cover"
+                                      />
+                                    ) : (
+                                      <div className="w-8 h-8 rounded-full bg-zinc-700 flex items-center justify-center text-white text-xs font-medium">
+                                        {message.senderName ? getInitials(message.senderName) : '?'}
+                                      </div>
+                                    )
+                                  ) : null}
                                 </div>
                               )}
-                              <div className="flex items-center gap-1 px-2 mt-1">
-                                <span className="text-xs text-zinc-500">
-                                  {formatMessageTime(message.timestamp || message.createdAt || '')}
-                                </span>
-                                {isOwn && message.read && (
-                                  <CheckCheck className="h-3 w-3 text-blue-400" />
+
+                              <div className={`flex flex-col ${isOwn ? 'items-end' : 'items-start'}`}>
+                                {/* Sender name for team messages - only on first of group */}
+                                {activeTab === 'team' && !isOwn && message.senderName && showSenderInfo && (
+                                  <span className="text-xs text-zinc-500 px-1 mb-1">{message.senderName}</span>
+                                )}
+
+                                {message.photoUrl && (
+                                  <img
+                                    src={message.photoUrl}
+                                    alt="Attachment"
+                                    className="rounded-lg border border-zinc-700 max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() => window.open(message.photoUrl, '_blank')}
+                                  />
+                                )}
+                                {message.content && (
+                                  <div
+                                    className={`px-3 py-2 rounded-2xl ${
+                                      isOwn
+                                        ? 'bg-emerald-600 text-white rounded-br-md'
+                                        : 'bg-zinc-800 text-zinc-100 rounded-bl-md'
+                                    }`}
+                                  >
+                                    <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
+                                  </div>
+                                )}
+                                {/* Only show timestamp on last message of group or if it's the only message */}
+                                {(index === currentMessages.length - 1 || shouldShowSenderInfo(currentMessages, index + 1, activeTab === 'team')) && (
+                                  <div className="flex items-center gap-1 px-1 mt-1">
+                                    <span className="text-xs text-zinc-500">
+                                      {formatMessageTime(message.timestamp || message.createdAt || '')}
+                                    </span>
+                                    {isOwn && message.read && (
+                                      <CheckCheck className="h-3 w-3 text-blue-400" />
+                                    )}
+                                  </div>
                                 )}
                               </div>
                             </div>
