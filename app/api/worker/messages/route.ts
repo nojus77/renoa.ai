@@ -116,11 +116,12 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, customerId, content } = body;
+    const { userId, customerId, content, mediaUrl, mediaType } = body;
 
-    if (!userId || !customerId || !content) {
+    const hasContent = typeof content === 'string' && content.trim().length > 0;
+    if (!userId || !customerId || (!hasContent && !mediaUrl)) {
       return NextResponse.json(
-        { error: 'User ID, Customer ID, and message content are required' },
+        { error: 'User ID, Customer ID, and message content or media are required' },
         { status: 400 }
       );
     }
@@ -161,10 +162,12 @@ export async function POST(request: NextRequest) {
         id: crypto.randomUUID(),
         provider_id: worker.providerId,
         customer_id: customerId,
-        content,
+        content: hasContent ? content.trim() : '',
         direction: 'sent',
         type: 'sms',
         status: 'sent',
+        media_url: mediaUrl || null,
+        media_type: mediaUrl ? (mediaType || 'image') : null,
         updated_at: new Date(),
       },
     });
@@ -188,6 +191,8 @@ export async function POST(request: NextRequest) {
         direction: message.direction,
         type: message.type,
         status: message.status,
+        mediaUrl: message.media_url,
+        mediaType: message.media_type,
         timestamp: message.created_at.toISOString(),
         read: false,
       },

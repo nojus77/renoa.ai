@@ -95,6 +95,8 @@ export async function GET(
       direction: msg.direction,
       type: msg.type,
       status: msg.status,
+      mediaUrl: msg.media_url,
+      mediaType: msg.media_type,
       timestamp: msg.created_at.toISOString(),
       read: msg.status === 'read',
     }));

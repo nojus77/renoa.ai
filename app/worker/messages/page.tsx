@@ -155,11 +155,15 @@ export default function WorkerMessages() {
   const [sending, setSending] = useState(false);
   const [teamAttachment, setTeamAttachment] = useState<File | null>(null);
   const [teamAttachmentPreview, setTeamAttachmentPreview] = useState<string | null>(null);
+  const [customerAttachment, setCustomerAttachment] = useState<File | null>(null);
+  const [customerAttachmentPreview, setCustomerAttachmentPreview] = useState<string | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const attachmentInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const customerAttachmentInputRef = useRef<HTMLInputElement>(null);
+  const customerCameraInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const id = localStorage.getItem('workerUserId');
@@ -225,6 +229,20 @@ export default function WorkerMessages() {
       URL.revokeObjectURL(previewUrl);
     };
   }, [teamAttachment]);
+
+  useEffect(() => {
+    if (!customerAttachment) {
+      setCustomerAttachmentPreview(null);
+      return;
+    }
+
+    const previewUrl = URL.createObjectURL(customerAttachment);
+    setCustomerAttachmentPreview(previewUrl);
+
+    return () => {
+      URL.revokeObjectURL(previewUrl);
+    };
+  }, [customerAttachment]);
 
   // Apply search filter
   useEffect(() => {
@@ -353,8 +371,8 @@ export default function WorkerMessages() {
     const trimmedMessage = messageText.trim();
     if (activeTab === 'team') {
       if (!trimmedMessage && !teamAttachment) return;
-    } else if (!trimmedMessage) {
-      return;
+    } else if (activeTab === 'customers') {
+      if (!trimmedMessage && !customerAttachment) return;
     }
     if (sending) return;
 
@@ -443,6 +461,30 @@ export default function WorkerMessages() {
         // Send customer message
         if (!selectedConversation) return;
 
+        // Handle photo upload if present
+        let mediaUrl: string | undefined;
+        let mediaType: string | undefined;
+
+        if (customerAttachment) {
+          const formData = new FormData();
+          formData.append('userId', userId);
+          formData.append('customerId', selectedConversation.customerId);
+          formData.append('file', customerAttachment);
+
+          const uploadRes = await fetch('/api/worker/messages/upload', {
+            method: 'POST',
+            body: formData,
+          });
+          const uploadData = await uploadRes.json();
+
+          if (!uploadRes.ok) {
+            throw new Error(uploadData.error || 'Failed to upload image');
+          }
+
+          mediaUrl = uploadData.url;
+          mediaType = 'image';
+        }
+
         // Optimistically add message to UI
         const tempMessage: Message = {
           id: tempId,
@@ -451,11 +493,14 @@ export default function WorkerMessages() {
           senderId: userId,
           senderType: 'worker',
           content: trimmedMessage,
+          mediaUrl,
+          mediaType,
           timestamp: new Date().toISOString(),
           read: false,
         };
         setCustomerMessages(prev => [...prev, tempMessage]);
         setMessageText('');
+        setCustomerAttachment(null);
 
         const res = await fetch('/api/worker/messages', {
           method: 'POST',
@@ -464,6 +509,8 @@ export default function WorkerMessages() {
             userId,
             customerId: selectedConversation.customerId,
             content: trimmedMessage,
+            mediaUrl,
+            mediaType,
           }),
         });
 
@@ -499,6 +546,13 @@ export default function WorkerMessages() {
   const handleTeamAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setTeamAttachment(e.target.files[0]);
+    }
+    e.target.value = '';
+  };
+
+  const handleCustomerAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files[0]) {
+      setCustomerAttachment(e.target.files[0]);
     }
     e.target.value = '';
   };
@@ -1112,6 +1166,27 @@ export default function WorkerMessages() {
                   </div>
                 )}
 
+                {activeTab === 'customers' && customerAttachmentPreview && (
+                  <div className="border border-[#2A2A2A] rounded-2xl bg-[#0A0A0A] p-3">
+                    <div className="flex items-start gap-3">
+                      <img
+                        src={customerAttachmentPreview}
+                        alt="Preview"
+                        className="max-h-48 rounded-xl border border-[#2A2A2A] object-cover"
+                      />
+                      <button
+                        onClick={() => setCustomerAttachment(null)}
+                        className="p-2 rounded-full bg-black/60 hover:bg-black/80 text-white transition-colors"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    {customerAttachment?.name && (
+                      <p className="text-xs text-zinc-500 mt-2 truncate">{customerAttachment.name}</p>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex items-end gap-2">
                   {activeTab === 'team' && (
                     <div className="flex gap-2">
@@ -1145,19 +1220,53 @@ export default function WorkerMessages() {
                     </div>
                   )}
 
+                  {activeTab === 'customers' && (
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => customerAttachmentInputRef.current?.click()}
+                        className="p-2 rounded-xl bg-[#1F1F1F] border border-[#2A2A2A] text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
+                      >
+                        <Paperclip className="h-5 w-5" />
+                      </button>
+                      <button
+                        onClick={() => customerCameraInputRef.current?.click()}
+                        className="p-2 rounded-xl bg-[#1F1F1F] border border-[#2A2A2A] text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
+                      >
+                        <Camera className="h-5 w-5" />
+                      </button>
+                      <input
+                        ref={customerAttachmentInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        className="hidden"
+                        onChange={handleCustomerAttachmentChange}
+                      />
+                      <input
+                        ref={customerCameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={handleCustomerAttachmentChange}
+                      />
+                    </div>
+                  )}
+
                   <input
                     type="text"
                     value={messageText}
                     onChange={(e) => setMessageText(e.target.value)}
                     onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
                     placeholder={
-                      activeTab === 'team' && teamAttachment ? 'Add a caption...' : 'Type a message...'
+                      (activeTab === 'team' && teamAttachment) || (activeTab === 'customers' && customerAttachment)
+                        ? 'Add a caption...'
+                        : 'Type a message...'
                     }
                     className="flex-1 px-4 py-2.5 bg-[#1F1F1F] border border-[#2A2A2A] rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none transition-colors"
                     style={{
                       borderColor:
                         (activeTab === 'team' && (teamAttachment || messageText)) ||
-                        (activeTab === 'customers' && messageText)
+                        (activeTab === 'customers' && (customerAttachment || messageText))
                           ? LIME_GREEN
                           : '#2A2A2A',
                     }}
@@ -1169,7 +1278,7 @@ export default function WorkerMessages() {
                       sending ||
                       (activeTab === 'team'
                         ? !messageText.trim() && !teamAttachment
-                        : !messageText.trim())
+                        : !messageText.trim() && !customerAttachment)
                     }
                     className="p-2.5 rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                     style={{
@@ -1177,14 +1286,14 @@ export default function WorkerMessages() {
                         !sending &&
                         (activeTab === 'team'
                           ? messageText.trim() || teamAttachment
-                          : messageText.trim())
+                          : messageText.trim() || customerAttachment)
                           ? LIME_GREEN
                           : '#2A2A2A',
                       color:
                         !sending &&
                         (activeTab === 'team'
                           ? messageText.trim() || teamAttachment
-                          : messageText.trim())
+                          : messageText.trim() || customerAttachment)
                           ? 'black'
                           : '#6B7280',
                     }}
