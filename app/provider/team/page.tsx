@@ -206,6 +206,7 @@ export default function TeamManagementPage() {
 
   // Profile modal state
   const [profileWorkerId, setProfileWorkerId] = useState<string | null>(null);
+  const [profileInitialTab, setProfileInitialTab] = useState<'profile' | 'skills' | 'performance' | 'time'>('profile');
 
   // Available skills state
   const [availableSkills, setAvailableSkills] = useState<any[]>([]);
@@ -2667,7 +2668,14 @@ export default function TeamManagementPage() {
                         </thead>
                         <tbody className="divide-y divide-zinc-800">
                           {productivityData.map((worker, index) => (
-                            <tr key={worker.id} className="hover:bg-zinc-800/50">
+                            <tr
+                              key={worker.id}
+                              className="hover:bg-zinc-800/50 cursor-pointer"
+                              onClick={() => {
+                                setProfileInitialTab('performance');
+                                setProfileWorkerId(worker.id);
+                              }}
+                            >
                               {/* Rank */}
                               <td className="p-4">
                                 {index === 0 && <span className="text-2xl">🥇</span>}
@@ -3673,7 +3681,10 @@ export default function TeamManagementPage() {
       <WorkerProfileModal
         workerId={profileWorkerId}
         isOpen={!!profileWorkerId}
-        onClose={() => setProfileWorkerId(null)}
+        onClose={() => {
+          setProfileWorkerId(null);
+          setProfileInitialTab('profile');
+        }}
         onUpdate={() => {
           // Refresh team members after update
           fetchTeamMembers();
@@ -3682,6 +3693,7 @@ export default function TeamManagementPage() {
           // Remove deleted member from state
           setTeamMembers(prev => prev.filter(m => m.id !== workerId));
         }}
+        initialTab={profileInitialTab}
       />
 
     </ProviderLayout>

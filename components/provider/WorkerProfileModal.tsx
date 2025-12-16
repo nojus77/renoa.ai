@@ -34,26 +34,24 @@ import {
   Phone,
   Mail,
   Edit2,
-  Star,
   Clock,
-  Briefcase,
   DollarSign,
-  Calendar,
   Award,
-  CheckCircle,
-  XCircle,
-  Clock as ClockIcon,
-  ChevronRight,
-  User,
-  Wrench,
   Check,
   Plus,
   Trash2,
   Search,
+  User,
+  Wrench,
+  TrendingUp,
+  BarChart3,
+  Car,
+  Coffee,
+  Briefcase,
+  ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
-import WorkerWeekCalendar from './WorkerWeekCalendar';
 
 interface WorkerProfileModalProps {
   workerId: string | null;
@@ -61,6 +59,7 @@ interface WorkerProfileModalProps {
   onClose: () => void;
   onUpdate?: () => void;
   onDelete?: (workerId: string) => void;
+  initialTab?: 'profile' | 'skills' | 'performance' | 'time';
 }
 
 interface ProfileData {
@@ -98,23 +97,21 @@ interface ProfileData {
     avgRating: number | null;
     totalReviews: number;
   };
-  schedule: {
-    weekStart: string;
-    weekEnd: string;
-    days: Array<{
-      date: string;
-      dayName: string;
-      dayNum: number;
-      isOff: boolean;
-      workingHours: { start: string; end: string } | null;
-      jobs: Array<{
-        id: string;
-        time: string;
-        service: string;
-        customer: string;
-        status: string;
-      }>;
-    }>;
+}
+
+interface PerformanceData {
+  stats: {
+    jobsCompleted: number;
+    totalRevenue: number;
+    hoursWorked: number;
+    avgJobDuration: number;
+    revenuePerHour: number;
+  };
+  utilization: number;
+  timeBreakdown: {
+    jobTime: number;
+    driveTime: number;
+    idleTime: number;
   };
   recentJobs: Array<{
     id: string;
@@ -122,32 +119,18 @@ interface ProfileData {
     customer: string;
     service: string;
     status: string;
-    address: string;
-    duration: number | null;
-    earnings: number | null;
+    duration: number;
+    revenue: number;
   }>;
-  earnings: {
-    history: Array<{
-      period: string;
-      startDate: string;
-      endDate: string;
-      hours: number;
-      jobs: number;
-      amount: number;
-      isPaid: boolean;
-      paidAt: string | null;
-    }>;
-    pending: number;
-  };
-  timeOff: Array<{
-    id: string;
-    startDate: string;
-    endDate: string;
-    reason: string | null;
-    notes: string | null;
-    status: string;
-    createdAt: string;
-  }>;
+}
+
+interface TimeLog {
+  id: string;
+  date: string;
+  clockIn: string;
+  clockOut: string | null;
+  hoursWorked: number;
+  status: 'active' | 'completed';
 }
 
 interface AvailableSkill {
@@ -156,7 +139,7 @@ interface AvailableSkill {
   category: string | null;
 }
 
-type TabType = 'overview' | 'schedule' | 'jobs' | 'earnings' | 'timeoff';
+type TabType = 'profile' | 'skills' | 'performance' | 'time';
 
 export default function WorkerProfileModal({
   workerId,
@@ -164,15 +147,21 @@ export default function WorkerProfileModal({
   onClose,
   onUpdate,
   onDelete,
+  initialTab = 'profile',
 }: WorkerProfileModalProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
-  const [weekOffset, setWeekOffset] = useState(0);
-  const [loadingSchedule, setLoadingSchedule] = useState(false);
-  const [jobFilter, setJobFilter] = useState<'all' | 'completed' | 'upcoming'>('all');
-  const [earningsFilter, setEarningsFilter] = useState<'all' | 'paid' | 'unpaid'>('all');
+  const [activeTab, setActiveTab] = useState<TabType>(initialTab);
+
+  // Performance state
+  const [performanceData, setPerformanceData] = useState<PerformanceData | null>(null);
+  const [performancePeriod, setPerformancePeriod] = useState<'week' | 'month' | 'quarter'>('week');
+  const [loadingPerformance, setLoadingPerformance] = useState(false);
+
+  // Time logs state
+  const [timeLogs, setTimeLogs] = useState<TimeLog[]>([]);
+  const [loadingTimeLogs, setLoadingTimeLogs] = useState(false);
 
   // Edit states
   const [editingContact, setEditingContact] = useState(false);
@@ -203,17 +192,12 @@ export default function WorkerProfileModal({
   const [savingRole, setSavingRole] = useState(false);
   const [savingSkill, setSavingSkill] = useState(false);
 
-  const fetchProfile = useCallback(async (offset = 0) => {
+  const fetchProfile = useCallback(async () => {
     if (!workerId) return;
 
     try {
-      if (offset !== 0) {
-        setLoadingSchedule(true);
-      } else {
-        setLoading(true);
-      }
-
-      const res = await fetch(`/api/provider/team/${workerId}/profile?weekOffset=${offset}`);
+      setLoading(true);
+      const res = await fetch(`/api/provider/team/${workerId}/profile`);
       const data = await res.json();
 
       if (data.error) {
@@ -224,28 +208,67 @@ export default function WorkerProfileModal({
       setProfile(data);
 
       // Initialize form values
-      if (offset === 0) {
-        setContactForm({ phone: data.user.phone || '' });
-        setPayForm({
-          payType: data.user.payType || 'hourly',
-          hourlyRate: data.user.hourlyRate?.toString() || '',
-          commissionRate: data.user.commissionRate?.toString() || '',
-        });
-        setPermissionsForm({
-          canCreateJobs: data.user.canCreateJobs || false,
-          jobsNeedApproval: data.user.jobsNeedApproval || false,
-        });
-        setRoleForm({
-          role: data.user.role || 'field',
-          status: data.user.status || 'active',
-        });
-      }
+      setContactForm({ phone: data.user.phone || '' });
+      setPayForm({
+        payType: data.user.payType || 'hourly',
+        hourlyRate: data.user.hourlyRate?.toString() || '',
+        commissionRate: data.user.commissionRate?.toString() || '',
+      });
+      setPermissionsForm({
+        canCreateJobs: data.user.canCreateJobs || false,
+        jobsNeedApproval: data.user.jobsNeedApproval || false,
+      });
+      setRoleForm({
+        role: data.user.role || 'field',
+        status: data.user.status || 'active',
+      });
     } catch (error) {
       console.error('Error fetching profile:', error);
       toast.error('Failed to load profile');
     } finally {
       setLoading(false);
-      setLoadingSchedule(false);
+    }
+  }, [workerId]);
+
+  const fetchPerformance = useCallback(async () => {
+    if (!workerId) return;
+
+    try {
+      setLoadingPerformance(true);
+      const res = await fetch(`/api/provider/team/${workerId}/performance?period=${performancePeriod}`);
+      const data = await res.json();
+
+      if (data.error) {
+        console.error('Performance error:', data.error);
+        return;
+      }
+
+      setPerformanceData(data);
+    } catch (error) {
+      console.error('Error fetching performance:', error);
+    } finally {
+      setLoadingPerformance(false);
+    }
+  }, [workerId, performancePeriod]);
+
+  const fetchTimeLogs = useCallback(async () => {
+    if (!workerId) return;
+
+    try {
+      setLoadingTimeLogs(true);
+      const res = await fetch(`/api/provider/team/${workerId}/time-logs`);
+      const data = await res.json();
+
+      if (data.error) {
+        console.error('Time logs error:', data.error);
+        return;
+      }
+
+      setTimeLogs(data.logs || []);
+    } catch (error) {
+      console.error('Error fetching time logs:', error);
+    } finally {
+      setLoadingTimeLogs(false);
     }
   }, [workerId]);
 
@@ -253,7 +276,8 @@ export default function WorkerProfileModal({
     if (!profile) return;
     setLoadingSkills(true);
     try {
-      const res = await fetch(`/api/provider/skills?providerId=${profile.user.id.split('_')[0]}`);
+      const providerId = localStorage.getItem('providerId');
+      const res = await fetch(`/api/provider/skills?providerId=${providerId}`);
       const data = await res.json();
       if (data.skills) {
         setAvailableSkills(data.skills);
@@ -267,22 +291,29 @@ export default function WorkerProfileModal({
 
   useEffect(() => {
     if (isOpen && workerId) {
-      setActiveTab('overview');
-      setWeekOffset(0);
+      setActiveTab(initialTab);
       setEditingContact(false);
       setEditingPay(false);
       setEditingSkills(false);
       setEditingPermissions(false);
       setEditingRole(false);
-      fetchProfile(0);
+      fetchProfile();
     }
-  }, [isOpen, workerId, fetchProfile]);
+  }, [isOpen, workerId, initialTab, fetchProfile]);
 
+  // Fetch performance data when tab changes to performance
   useEffect(() => {
-    if (isOpen && workerId && weekOffset !== 0) {
-      fetchProfile(weekOffset);
+    if (isOpen && workerId && activeTab === 'performance') {
+      fetchPerformance();
     }
-  }, [weekOffset, isOpen, workerId, fetchProfile]);
+  }, [isOpen, workerId, activeTab, performancePeriod, fetchPerformance]);
+
+  // Fetch time logs when tab changes to time
+  useEffect(() => {
+    if (isOpen && workerId && activeTab === 'time') {
+      fetchTimeLogs();
+    }
+  }, [isOpen, workerId, activeTab, fetchTimeLogs]);
 
   useEffect(() => {
     if (editingSkills && profile) {
@@ -324,7 +355,7 @@ export default function WorkerProfileModal({
       }
       toast.success('Contact info updated');
       setEditingContact(false);
-      fetchProfile(weekOffset);
+      fetchProfile();
       onUpdate?.();
     } catch (error) {
       console.error('Error saving contact:', error);
@@ -364,7 +395,7 @@ export default function WorkerProfileModal({
       }
       toast.success('Pay rate updated');
       setEditingPay(false);
-      fetchProfile(weekOffset);
+      fetchProfile();
       onUpdate?.();
     } catch (error) {
       console.error('Error saving pay:', error);
@@ -393,7 +424,7 @@ export default function WorkerProfileModal({
       }
       toast.success('Permissions updated');
       setEditingPermissions(false);
-      fetchProfile(weekOffset);
+      fetchProfile();
       onUpdate?.();
     } catch (error) {
       console.error('Error saving permissions:', error);
@@ -422,7 +453,7 @@ export default function WorkerProfileModal({
       }
       toast.success('Role & status updated');
       setEditingRole(false);
-      fetchProfile(weekOffset);
+      fetchProfile();
       onUpdate?.();
     } catch (error) {
       console.error('Error saving role:', error);
@@ -447,7 +478,7 @@ export default function WorkerProfileModal({
         return;
       }
       toast.success('Skill added');
-      fetchProfile(weekOffset);
+      fetchProfile();
       onUpdate?.();
     } catch (error) {
       console.error('Error adding skill:', error);
@@ -470,7 +501,7 @@ export default function WorkerProfileModal({
         return;
       }
       toast.success('Skill removed');
-      fetchProfile(weekOffset);
+      fetchProfile();
       onUpdate?.();
     } catch (error) {
       console.error('Error removing skill:', error);
@@ -545,18 +576,6 @@ export default function WorkerProfileModal({
     }
   };
 
-  const filteredJobs = profile?.recentJobs.filter(job => {
-    if (jobFilter === 'completed') return job.status === 'completed';
-    if (jobFilter === 'upcoming') return job.status === 'scheduled';
-    return true;
-  }) || [];
-
-  const filteredEarnings = profile?.earnings.history.filter(entry => {
-    if (earningsFilter === 'paid') return entry.isPaid;
-    if (earningsFilter === 'unpaid') return !entry.isPaid;
-    return true;
-  }) || [];
-
   // Filter available skills (exclude already assigned)
   const assignedSkillIds = new Set(profile?.skills.map(s => s.id) || []);
   const filteredAvailableSkills = availableSkills.filter(
@@ -564,11 +583,10 @@ export default function WorkerProfileModal({
   );
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
-    { id: 'overview', label: 'Overview', icon: <User className="w-4 h-4" /> },
-    { id: 'schedule', label: 'Schedule', icon: <Calendar className="w-4 h-4" /> },
-    { id: 'jobs', label: 'Jobs', icon: <Briefcase className="w-4 h-4" /> },
-    { id: 'earnings', label: 'Earnings', icon: <DollarSign className="w-4 h-4" /> },
-    { id: 'timeoff', label: 'Time Off', icon: <ClockIcon className="w-4 h-4" /> },
+    { id: 'profile', label: 'Profile', icon: <User className="w-4 h-4" /> },
+    { id: 'skills', label: 'Skills & Pay', icon: <Wrench className="w-4 h-4" /> },
+    { id: 'performance', label: 'Performance', icon: <TrendingUp className="w-4 h-4" /> },
+    { id: 'time', label: 'Time Logs', icon: <Clock className="w-4 h-4" /> },
   ];
 
   const SectionHeader = ({
@@ -664,39 +682,6 @@ export default function WorkerProfileModal({
                     </Button>
                   </div>
                 </div>
-
-                {/* Stats Row */}
-                <div className="grid grid-cols-4 gap-3 mt-4">
-                  <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-semibold text-white">{profile.stats.weekHours}h</div>
-                    <div className="text-xs text-zinc-500">{profile.stats.weekJobs} jobs this week</div>
-                  </div>
-                  <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-semibold text-white">{profile.stats.monthHours}h</div>
-                    <div className="text-xs text-zinc-500">{profile.stats.monthJobs} jobs this month</div>
-                  </div>
-                  <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-semibold text-emerald-400">
-                      ${profile.stats.totalUnpaidEarnings.toFixed(0)}
-                    </div>
-                    <div className="text-xs text-zinc-500">Unpaid earnings</div>
-                  </div>
-                  <div className="bg-zinc-800/50 rounded-lg p-3 text-center">
-                    <div className="text-lg font-semibold text-yellow-400 flex items-center justify-center gap-1">
-                      {profile.stats.avgRating ? (
-                        <>
-                          <Star className="w-4 h-4 fill-current" />
-                          {profile.stats.avgRating}
-                        </>
-                      ) : (
-                        <span className="text-zinc-500 text-sm">No reviews</span>
-                      )}
-                    </div>
-                    <div className="text-xs text-zinc-500">
-                      {profile.stats.totalReviews} review{profile.stats.totalReviews !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-                </div>
               </div>
 
               {/* Tabs */}
@@ -719,8 +704,8 @@ export default function WorkerProfileModal({
 
               {/* Tab Content */}
               <div className="flex-1 overflow-y-auto p-6">
-                {/* Overview Tab */}
-                {activeTab === 'overview' && (
+                {/* Profile Tab */}
+                {activeTab === 'profile' && (
                   <div className="space-y-6">
                     {/* Contact Info */}
                     <div className="bg-zinc-800/30 rounded-lg p-4">
@@ -821,75 +806,73 @@ export default function WorkerProfileModal({
                       )}
                     </div>
 
-                    {/* Pay Rate */}
-                    <div className="bg-zinc-800/30 rounded-lg p-4">
-                      <SectionHeader
-                        title="Pay Rate"
-                        isEditing={editingPay}
-                        onEdit={() => {
-                          setPayForm({
-                            payType: profile.user.payType || 'hourly',
-                            hourlyRate: profile.user.hourlyRate?.toString() || '',
-                            commissionRate: profile.user.commissionRate?.toString() || '',
-                          });
-                          setEditingPay(true);
-                        }}
-                        onSave={savePay}
-                        onCancel={() => setEditingPay(false)}
-                        saving={savingPay}
-                      />
-                      {editingPay ? (
-                        <div className="space-y-3">
-                          <div>
-                            <label className="text-xs text-zinc-500 mb-1 block">Pay Type</label>
-                            <Select value={payForm.payType} onValueChange={(v) => setPayForm({ ...payForm, payType: v })}>
-                              <SelectTrigger className="bg-zinc-800 border-zinc-700 h-9 w-48">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="hourly">Hourly</SelectItem>
-                                <SelectItem value="commission">Commission</SelectItem>
-                              </SelectContent>
-                            </Select>
+                    {/* Permissions */}
+                    {profile.user.role === 'field' && (
+                      <div className="bg-zinc-800/30 rounded-lg p-4">
+                        <SectionHeader
+                          title="Permissions"
+                          isEditing={editingPermissions}
+                          onEdit={() => {
+                            setPermissionsForm({
+                              canCreateJobs: profile.user.canCreateJobs || false,
+                              jobsNeedApproval: profile.user.jobsNeedApproval || false,
+                            });
+                            setEditingPermissions(true);
+                          }}
+                          onSave={savePermissions}
+                          onCancel={() => setEditingPermissions(false)}
+                          saving={savingPermissions}
+                        />
+                        {editingPermissions ? (
+                          <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-zinc-300">Can create jobs</span>
+                              <Switch
+                                checked={permissionsForm.canCreateJobs}
+                                onCheckedChange={(checked) => setPermissionsForm({ ...permissionsForm, canCreateJobs: checked })}
+                              />
+                            </div>
+                            {permissionsForm.canCreateJobs && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-zinc-300">Jobs need approval</span>
+                                <Switch
+                                  checked={permissionsForm.jobsNeedApproval}
+                                  onCheckedChange={(checked) => setPermissionsForm({ ...permissionsForm, jobsNeedApproval: checked })}
+                                />
+                              </div>
+                            )}
                           </div>
-                          {payForm.payType === 'hourly' ? (
-                            <div>
-                              <label className="text-xs text-zinc-500 mb-1 block">Hourly Rate ($)</label>
-                              <Input
-                                type="number"
-                                value={payForm.hourlyRate}
-                                onChange={(e) => setPayForm({ ...payForm, hourlyRate: e.target.value })}
-                                placeholder="0.00"
-                                className="bg-zinc-800 border-zinc-700 h-9 w-32"
-                              />
+                        ) : (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm text-zinc-300">Can create jobs</span>
+                              <Badge variant={profile.user.canCreateJobs ? 'default' : 'outline'} className={profile.user.canCreateJobs ? 'bg-emerald-500/20 text-emerald-400' : ''}>
+                                {profile.user.canCreateJobs ? 'Yes' : 'No'}
+                              </Badge>
                             </div>
-                          ) : (
-                            <div>
-                              <label className="text-xs text-zinc-500 mb-1 block">Commission Rate (%)</label>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={payForm.commissionRate}
-                                onChange={(e) => setPayForm({ ...payForm, commissionRate: e.target.value })}
-                                placeholder="0"
-                                className="bg-zinc-800 border-zinc-700 h-9 w-32"
-                              />
-                            </div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="w-4 h-4 text-emerald-500" />
-                          <span className="text-lg font-semibold text-white">
-                            {profile.user.payType === 'commission'
-                              ? `${profile.user.commissionRate || 0}% commission`
-                              : `$${profile.user.hourlyRate || 0}/hr`}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                            {profile.user.canCreateJobs && (
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm text-zinc-300">Jobs need approval</span>
+                                <Badge variant={profile.user.jobsNeedApproval ? 'default' : 'outline'} className={profile.user.jobsNeedApproval ? 'bg-yellow-500/20 text-yellow-400' : 'bg-emerald-500/20 text-emerald-400'}>
+                                  {profile.user.jobsNeedApproval ? 'Yes' : 'No'}
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
 
+                    {/* Member Since */}
+                    <div className="text-sm text-zinc-500">
+                      Member since {format(parseISO(profile.user.createdAt), 'MMMM d, yyyy')}
+                    </div>
+                  </div>
+                )}
+
+                {/* Skills & Pay Tab */}
+                {activeTab === 'skills' && (
+                  <div className="space-y-6">
                     {/* Skills */}
                     <div className="bg-zinc-800/30 rounded-lg p-4">
                       <SectionHeader
@@ -987,264 +970,283 @@ export default function WorkerProfileModal({
                       )}
                     </div>
 
-                    {/* Permissions */}
-                    {profile.user.role === 'field' && (
-                      <div className="bg-zinc-800/30 rounded-lg p-4">
-                        <SectionHeader
-                          title="Permissions"
-                          isEditing={editingPermissions}
-                          onEdit={() => {
-                            setPermissionsForm({
-                              canCreateJobs: profile.user.canCreateJobs || false,
-                              jobsNeedApproval: profile.user.jobsNeedApproval || false,
-                            });
-                            setEditingPermissions(true);
-                          }}
-                          onSave={savePermissions}
-                          onCancel={() => setEditingPermissions(false)}
-                          saving={savingPermissions}
-                        />
-                        {editingPermissions ? (
-                          <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-zinc-300">Can create jobs</span>
-                              <Switch
-                                checked={permissionsForm.canCreateJobs}
-                                onCheckedChange={(checked) => setPermissionsForm({ ...permissionsForm, canCreateJobs: checked })}
+                    {/* Pay Rate */}
+                    <div className="bg-zinc-800/30 rounded-lg p-4">
+                      <SectionHeader
+                        title="Pay Rate"
+                        isEditing={editingPay}
+                        onEdit={() => {
+                          setPayForm({
+                            payType: profile.user.payType || 'hourly',
+                            hourlyRate: profile.user.hourlyRate?.toString() || '',
+                            commissionRate: profile.user.commissionRate?.toString() || '',
+                          });
+                          setEditingPay(true);
+                        }}
+                        onSave={savePay}
+                        onCancel={() => setEditingPay(false)}
+                        saving={savingPay}
+                      />
+                      {editingPay ? (
+                        <div className="space-y-3">
+                          <div>
+                            <label className="text-xs text-zinc-500 mb-1 block">Pay Type</label>
+                            <Select value={payForm.payType} onValueChange={(v) => setPayForm({ ...payForm, payType: v })}>
+                              <SelectTrigger className="bg-zinc-800 border-zinc-700 h-9 w-48">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="hourly">Hourly</SelectItem>
+                                <SelectItem value="commission">Commission</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {payForm.payType === 'hourly' ? (
+                            <div>
+                              <label className="text-xs text-zinc-500 mb-1 block">Hourly Rate ($)</label>
+                              <Input
+                                type="number"
+                                value={payForm.hourlyRate}
+                                onChange={(e) => setPayForm({ ...payForm, hourlyRate: e.target.value })}
+                                placeholder="0.00"
+                                className="bg-zinc-800 border-zinc-700 h-9 w-32"
                               />
                             </div>
-                            {permissionsForm.canCreateJobs && (
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-zinc-300">Jobs need approval</span>
-                                <Switch
-                                  checked={permissionsForm.jobsNeedApproval}
-                                  onCheckedChange={(checked) => setPermissionsForm({ ...permissionsForm, jobsNeedApproval: checked })}
-                                />
-                              </div>
-                            )}
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm text-zinc-300">Can create jobs</span>
-                              <Badge variant={profile.user.canCreateJobs ? 'default' : 'outline'} className={profile.user.canCreateJobs ? 'bg-emerald-500/20 text-emerald-400' : ''}>
-                                {profile.user.canCreateJobs ? 'Yes' : 'No'}
-                              </Badge>
+                          ) : (
+                            <div>
+                              <label className="text-xs text-zinc-500 mb-1 block">Commission Rate (%)</label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                value={payForm.commissionRate}
+                                onChange={(e) => setPayForm({ ...payForm, commissionRate: e.target.value })}
+                                placeholder="0"
+                                className="bg-zinc-800 border-zinc-700 h-9 w-32"
+                              />
                             </div>
-                            {profile.user.canCreateJobs && (
-                              <div className="flex items-center justify-between">
-                                <span className="text-sm text-zinc-300">Jobs need approval</span>
-                                <Badge variant={profile.user.jobsNeedApproval ? 'default' : 'outline'} className={profile.user.jobsNeedApproval ? 'bg-yellow-500/20 text-yellow-400' : 'bg-emerald-500/20 text-emerald-400'}>
-                                  {profile.user.jobsNeedApproval ? 'Yes' : 'No'}
-                                </Badge>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Member Since */}
-                    <div className="text-sm text-zinc-500">
-                      Member since {format(parseISO(profile.user.createdAt), 'MMMM d, yyyy')}
-                    </div>
-                  </div>
-                )}
-
-                {/* Schedule Tab */}
-                {activeTab === 'schedule' && (
-                  <WorkerWeekCalendar
-                    days={profile.schedule.days}
-                    weekStart={profile.schedule.weekStart}
-                    weekEnd={profile.schedule.weekEnd}
-                    onPrevWeek={() => setWeekOffset(prev => prev - 1)}
-                    onNextWeek={() => setWeekOffset(prev => prev + 1)}
-                    onJobClick={handleJobClick}
-                    loading={loadingSchedule}
-                  />
-                )}
-
-                {/* Jobs Tab */}
-                {activeTab === 'jobs' && (
-                  <div className="space-y-4">
-                    {/* Filter */}
-                    <div className="flex gap-2">
-                      {(['all', 'completed', 'upcoming'] as const).map((filter) => (
-                        <button
-                          key={filter}
-                          onClick={() => setJobFilter(filter)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            jobFilter === filter
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                          }`}
-                        >
-                          {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Jobs List */}
-                    <div className="space-y-2">
-                      {filteredJobs.length === 0 ? (
-                        <div className="text-center py-8 text-zinc-500">
-                          No jobs found
+                          )}
                         </div>
                       ) : (
-                        filteredJobs.map((job) => (
-                          <button
-                            key={job.id}
-                            onClick={() => handleJobClick(job.id)}
-                            className="w-full flex items-center justify-between p-3 bg-zinc-800/30 hover:bg-zinc-800/50 rounded-lg transition-colors text-left"
-                          >
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-medium text-white truncate">{job.service}</span>
-                                {getJobStatusBadge(job.status)}
-                              </div>
-                              <div className="text-sm text-zinc-400 truncate">{job.customer}</div>
-                              <div className="text-xs text-zinc-500">
-                                {format(parseISO(job.date), 'MMM d, yyyy h:mm a')}
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {job.earnings && (
-                                <span className="text-emerald-400 font-medium">
-                                  ${job.earnings.toFixed(0)}
-                                </span>
-                              )}
-                              <ChevronRight className="w-4 h-4 text-zinc-500" />
-                            </div>
-                          </button>
-                        ))
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-emerald-500" />
+                          <span className="text-lg font-semibold text-white">
+                            {profile.user.payType === 'commission'
+                              ? `${profile.user.commissionRate || 0}% commission`
+                              : `$${profile.user.hourlyRate || 0}/hr`}
+                          </span>
+                        </div>
                       )}
                     </div>
-                  </div>
-                )}
 
-                {/* Earnings Tab */}
-                {activeTab === 'earnings' && (
-                  <div className="space-y-4">
-                    {/* Summary */}
+                    {/* Quick Stats */}
                     <div className="grid grid-cols-3 gap-3">
                       <div className="bg-zinc-800/30 rounded-lg p-3 text-center">
-                        <div className="text-lg font-semibold text-white">
-                          ${profile.stats.weekEarnings.toFixed(0)}
-                        </div>
+                        <div className="text-lg font-semibold text-white">{profile.stats.weekHours}h</div>
                         <div className="text-xs text-zinc-500">This week</div>
                       </div>
                       <div className="bg-zinc-800/30 rounded-lg p-3 text-center">
-                        <div className="text-lg font-semibold text-white">
-                          ${profile.stats.monthEarnings.toFixed(0)}
-                        </div>
-                        <div className="text-xs text-zinc-500">This month</div>
+                        <div className="text-lg font-semibold text-white">{profile.stats.weekJobs}</div>
+                        <div className="text-xs text-zinc-500">Jobs this week</div>
                       </div>
                       <div className="bg-emerald-500/10 rounded-lg p-3 text-center border border-emerald-500/20">
                         <div className="text-lg font-semibold text-emerald-400">
-                          ${profile.earnings.pending.toFixed(0)}
+                          ${profile.stats.totalUnpaidEarnings.toFixed(0)}
                         </div>
-                        <div className="text-xs text-zinc-500">Pending</div>
+                        <div className="text-xs text-zinc-500">Unpaid</div>
                       </div>
-                    </div>
-
-                    {/* Filter */}
-                    <div className="flex gap-2">
-                      {(['all', 'paid', 'unpaid'] as const).map((filter) => (
-                        <button
-                          key={filter}
-                          onClick={() => setEarningsFilter(filter)}
-                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                            earningsFilter === filter
-                              ? 'bg-emerald-500/20 text-emerald-400'
-                              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
-                          }`}
-                        >
-                          {filter.charAt(0).toUpperCase() + filter.slice(1)}
-                        </button>
-                      ))}
-                    </div>
-
-                    {/* Earnings History */}
-                    <div className="space-y-2">
-                      {filteredEarnings.length === 0 ? (
-                        <div className="text-center py-8 text-zinc-500">
-                          No earnings found
-                        </div>
-                      ) : (
-                        filteredEarnings.map((entry, idx) => (
-                          <div
-                            key={idx}
-                            className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-lg"
-                          >
-                            <div>
-                              <div className="font-medium text-white">{entry.period}</div>
-                              <div className="text-sm text-zinc-400">
-                                {entry.hours}h • {entry.jobs} jobs
-                              </div>
-                            </div>
-                            <div className="text-right">
-                              <div className="font-semibold text-white">${entry.amount.toFixed(2)}</div>
-                              <Badge
-                                variant="outline"
-                                className={entry.isPaid
-                                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                                  : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                                }
-                              >
-                                {entry.isPaid ? 'Paid' : 'Pending'}
-                              </Badge>
-                            </div>
-                          </div>
-                        ))
-                      )}
                     </div>
                   </div>
                 )}
 
-                {/* Time Off Tab */}
-                {activeTab === 'timeoff' && (
-                  <div className="space-y-4">
-                    {profile.timeOff.length === 0 ? (
-                      <div className="text-center py-8 text-zinc-500">
-                        No time off requests
-                      </div>
-                    ) : (
-                      profile.timeOff.map((request) => (
-                        <div
-                          key={request.id}
-                          className="flex items-start justify-between p-4 bg-zinc-800/30 rounded-lg"
+                {/* Performance Tab */}
+                {activeTab === 'performance' && (
+                  <div className="space-y-6">
+                    {/* Period Selector */}
+                    <div className="flex gap-2">
+                      {(['week', 'month', 'quarter'] as const).map((period) => (
+                        <button
+                          key={period}
+                          onClick={() => setPerformancePeriod(period)}
+                          className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                            performancePeriod === period
+                              ? 'bg-emerald-500/20 text-emerald-400'
+                              : 'bg-zinc-800 text-zinc-400 hover:bg-zinc-700'
+                          }`}
                         >
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="font-medium text-white capitalize">
-                                {request.reason || 'Time Off'}
-                              </span>
-                              <Badge
-                                variant="outline"
-                                className={
-                                  request.status === 'approved'
-                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
-                                    : request.status === 'denied'
-                                    ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                                    : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                                }
-                              >
-                                {request.status === 'approved' && <CheckCircle className="w-3 h-3 mr-1" />}
-                                {request.status === 'denied' && <XCircle className="w-3 h-3 mr-1" />}
-                                {request.status === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                                {request.status}
-                              </Badge>
+                          {period.charAt(0).toUpperCase() + period.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+
+                    {loadingPerformance ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                      </div>
+                    ) : performanceData ? (
+                      <>
+                        {/* Stats Grid */}
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                          <div className="bg-zinc-800/30 rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-zinc-400 text-sm mb-1">
+                              <Briefcase className="w-4 h-4" />
+                              Jobs
                             </div>
-                            <div className="text-sm text-zinc-400 mt-1">
-                              {format(parseISO(request.startDate), 'MMM d, yyyy')} -{' '}
-                              {format(parseISO(request.endDate), 'MMM d, yyyy')}
+                            <div className="text-2xl font-bold text-white">{performanceData.stats.jobsCompleted}</div>
+                          </div>
+                          <div className="bg-zinc-800/30 rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-zinc-400 text-sm mb-1">
+                              <DollarSign className="w-4 h-4" />
+                              Revenue
                             </div>
-                            {request.notes && (
-                              <div className="text-sm text-zinc-500 mt-2">{request.notes}</div>
-                            )}
+                            <div className="text-2xl font-bold text-emerald-400">${performanceData.stats.totalRevenue.toFixed(0)}</div>
+                          </div>
+                          <div className="bg-zinc-800/30 rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-zinc-400 text-sm mb-1">
+                              <Clock className="w-4 h-4" />
+                              Hours
+                            </div>
+                            <div className="text-2xl font-bold text-white">{performanceData.stats.hoursWorked.toFixed(1)}h</div>
+                          </div>
+                          <div className="bg-zinc-800/30 rounded-lg p-4">
+                            <div className="flex items-center gap-2 text-zinc-400 text-sm mb-1">
+                              <TrendingUp className="w-4 h-4" />
+                              $/Hour
+                            </div>
+                            <div className="text-2xl font-bold text-white">${performanceData.stats.revenuePerHour.toFixed(0)}</div>
                           </div>
                         </div>
-                      ))
+
+                        {/* Utilization Bar */}
+                        <div className="bg-zinc-800/30 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-sm font-medium text-zinc-300">Utilization Rate</span>
+                            <span className="text-sm font-bold text-emerald-400">{performanceData.utilization}%</span>
+                          </div>
+                          <div className="h-3 bg-zinc-700 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                              style={{ width: `${performanceData.utilization}%` }}
+                            />
+                          </div>
+                          <div className="text-xs text-zinc-500 mt-1">
+                            Time spent on billable work vs. available hours
+                          </div>
+                        </div>
+
+                        {/* Time Breakdown */}
+                        <div className="bg-zinc-800/30 rounded-lg p-4">
+                          <h3 className="text-sm font-medium text-zinc-400 mb-3">Time Breakdown</h3>
+                          <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 bg-emerald-500 rounded" />
+                                <Briefcase className="w-4 h-4 text-zinc-400" />
+                                <span className="text-sm text-zinc-300">Job Time</span>
+                              </div>
+                              <span className="text-sm font-medium text-white">{performanceData.timeBreakdown.jobTime.toFixed(1)}h</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 bg-blue-500 rounded" />
+                                <Car className="w-4 h-4 text-zinc-400" />
+                                <span className="text-sm text-zinc-300">Drive Time</span>
+                              </div>
+                              <span className="text-sm font-medium text-white">{performanceData.timeBreakdown.driveTime.toFixed(1)}h</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <div className="w-3 h-3 bg-zinc-500 rounded" />
+                                <Coffee className="w-4 h-4 text-zinc-400" />
+                                <span className="text-sm text-zinc-300">Idle Time</span>
+                              </div>
+                              <span className="text-sm font-medium text-white">{performanceData.timeBreakdown.idleTime.toFixed(1)}h</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Recent Jobs */}
+                        {performanceData.recentJobs.length > 0 && (
+                          <div className="bg-zinc-800/30 rounded-lg p-4">
+                            <h3 className="text-sm font-medium text-zinc-400 mb-3">Recent Jobs</h3>
+                            <div className="space-y-2">
+                              {performanceData.recentJobs.slice(0, 5).map((job) => (
+                                <button
+                                  key={job.id}
+                                  onClick={() => handleJobClick(job.id)}
+                                  className="w-full flex items-center justify-between p-2 bg-zinc-800/50 hover:bg-zinc-800 rounded-lg transition-colors text-left"
+                                >
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-medium text-white text-sm truncate">{job.service}</span>
+                                      {getJobStatusBadge(job.status)}
+                                    </div>
+                                    <div className="text-xs text-zinc-500">{job.customer}</div>
+                                  </div>
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-emerald-400 text-sm font-medium">${job.revenue.toFixed(0)}</span>
+                                    <ChevronRight className="w-4 h-4 text-zinc-500" />
+                                  </div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-12 text-zinc-500">
+                        No performance data available
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Time Logs Tab */}
+                {activeTab === 'time' && (
+                  <div className="space-y-4">
+                    {loadingTimeLogs ? (
+                      <div className="flex items-center justify-center py-12">
+                        <Loader2 className="w-6 h-6 animate-spin text-emerald-500" />
+                      </div>
+                    ) : timeLogs.length > 0 ? (
+                      <div className="space-y-2">
+                        {timeLogs.map((log) => (
+                          <div
+                            key={log.id}
+                            className="flex items-center justify-between p-3 bg-zinc-800/30 rounded-lg"
+                          >
+                            <div>
+                              <div className="font-medium text-white">
+                                {format(parseISO(log.date), 'EEEE, MMM d, yyyy')}
+                              </div>
+                              <div className="text-sm text-zinc-400">
+                                {format(parseISO(log.clockIn), 'h:mm a')}
+                                {log.clockOut ? ` - ${format(parseISO(log.clockOut), 'h:mm a')}` : ' - Active'}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="font-semibold text-white">
+                                {log.hoursWorked.toFixed(1)}h
+                              </div>
+                              <Badge
+                                variant="outline"
+                                className={log.status === 'active'
+                                  ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                  : 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'
+                                }
+                              >
+                                {log.status === 'active' ? 'Active' : 'Completed'}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12 text-zinc-500">
+                        <Clock className="w-12 h-12 mx-auto mb-3 text-zinc-600" />
+                        <p>No time logs found</p>
+                        <p className="text-sm mt-1">Time logs will appear when the worker clocks in</p>
+                      </div>
                     )}
                   </div>
                 )}
