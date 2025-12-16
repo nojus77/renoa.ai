@@ -225,11 +225,16 @@ export default function WorkerSchedule() {
         {/* Selected Day Jobs */}
         <div className="space-y-3">
           <h2 className="text-lg font-semibold text-white">
-            {new Date(selectedDay + 'T12:00:00').toLocaleDateString('en-US', {
-              weekday: 'long',
-              month: 'long',
-              day: 'numeric',
-            })}
+            {(() => {
+              // Parse date correctly to avoid timezone issues
+              const [year, month, day] = selectedDay.split('-').map(Number);
+              const date = new Date(year, month - 1, day);
+              return date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+              });
+            })()}
           </h2>
 
           {loading ? (

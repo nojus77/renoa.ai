@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { startOfDay, endOfDay, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
+import { getDateRange } from '@/lib/date-utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -21,14 +22,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Parse date or use today
+    // Parse date or use today - use shared date utility for consistency
     const targetDate = dateStr ? parseISO(dateStr) : new Date();
-    const dayStart = startOfDay(targetDate);
-    const dayEnd = endOfDay(targetDate);
+    const { start: dayStart, end: dayEnd } = getDateRange(targetDate);
 
     console.log('[Dispatch API] Fetching jobs for:', {
       providerId,
       date: dateStr,
+      targetDate: targetDate.toISOString(),
       dayStart: dayStart.toISOString(),
       dayEnd: dayEnd.toISOString(),
     });
@@ -86,12 +87,19 @@ export async function GET(request: NextRequest) {
       orderBy: { firstName: 'asc' },
     });
 
+    console.log('[Dispatch API] Total workers found:', workers.length);
+    console.log('[Dispatch API] Workers:', workers.map(w => ({
+      id: w.id,
+      name: `${w.firstName} ${w.lastName}`,
+    })));
+
     console.log('[Dispatch API] Total jobs found:', jobs.length);
     console.log('[Dispatch API] Jobs:', jobs.map(j => ({
       id: j.id,
       service: j.serviceType,
       assignedUserIds: j.assignedUserIds,
-      startTime: j.startTime,
+      startTime: j.startTime.toISOString(),
+      customer: j.customer?.name,
     })));
 
     // Process jobs - separate assigned from unassigned

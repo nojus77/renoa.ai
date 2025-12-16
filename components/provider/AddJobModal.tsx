@@ -97,15 +97,17 @@ export default function AddJobModal({
   const [jobDetails, setJobDetails] = useState({
     serviceType: '',
     customServiceType: '',
+    appointmentType: 'anytime' as 'fixed' | 'anytime' | 'window', // Scheduling flexibility - determines date/time UI
     date: selectedDate ? selectedDate.toISOString().split('T')[0] : '', // NO DEFAULT
     startTime: selectedHour ? `${selectedHour.toString().padStart(2, '0')}:00` : '', // NO DEFAULT
-    duration: '', // NO DEFAULT
+    duration: '', // NO DEFAULT - in minutes for consistency
     endTime: '',
+    windowStart: '08:00', // For window appointments
+    windowEnd: '12:00', // For window appointments
     estimatedValue: '',
     internalNotes: '',
     customerNotes: '',
     status: 'scheduled' as 'scheduled' | 'in_progress' | 'completed',
-    appointmentType: 'anytime' as 'fixed' | 'anytime' | 'window', // Scheduling flexibility
     isRecurring: false,
     recurringFrequency: '',
     recurringEndDate: '',
@@ -478,8 +480,28 @@ export default function AddJobModal({
       }
 
       // Now create the job with the customerId
-      const startDateTime = new Date(`${jobDetails.date}T${jobDetails.startTime}`);
-      const durationHours = parseFloat(jobDetails.duration);
+      // Calculate start/end times based on appointment type
+      let startDateTime: Date;
+      let endDateTime: Date;
+      const durationHours = jobDetails.duration ? parseFloat(jobDetails.duration) : 2; // Default 2 hours
+
+      if (jobDetails.appointmentType === 'fixed') {
+        // Fixed: use exact start time
+        startDateTime = new Date(`${jobDetails.date}T${jobDetails.startTime || '09:00'}`);
+        endDateTime = new Date(startDateTime.getTime() + durationHours * 60 * 60 * 1000);
+      } else if (jobDetails.appointmentType === 'anytime') {
+        // Anytime: set to business hours (8am-5pm) but mark as flexible
+        startDateTime = new Date(`${jobDetails.date}T08:00`);
+        endDateTime = new Date(`${jobDetails.date}T17:00`);
+      } else if (jobDetails.appointmentType === 'window') {
+        // Window: use the window start time
+        startDateTime = new Date(`${jobDetails.date}T${jobDetails.windowStart || '08:00'}`);
+        endDateTime = new Date(`${jobDetails.date}T${jobDetails.windowEnd || '12:00'}`);
+      } else {
+        // Fallback
+        startDateTime = new Date(`${jobDetails.date}T${jobDetails.startTime || '09:00'}`);
+        endDateTime = new Date(startDateTime.getTime() + durationHours * 60 * 60 * 1000);
+      }
 
       const payload = {
         providerId,
@@ -493,6 +515,9 @@ export default function AddJobModal({
         customerNotes: jobDetails.customerNotes || null,
         status: jobDetails.status,
         appointmentType: jobDetails.appointmentType,
+        arrivalWindowStart: jobDetails.appointmentType === 'window' ? startDateTime.toISOString() : null,
+        arrivalWindowEnd: jobDetails.appointmentType === 'window' ? endDateTime.toISOString() : null,
+        estimatedDuration: durationHours * 60, // Send in minutes
         isRecurring: jobDetails.isRecurring,
         recurringFrequency: jobDetails.isRecurring ? jobDetails.recurringFrequency : null,
         recurringEndDate: jobDetails.isRecurring && jobDetails.recurringEndDate ? jobDetails.recurringEndDate : null,
@@ -553,15 +578,17 @@ export default function AddJobModal({
     setJobDetails({
       serviceType: '',
       customServiceType: '',
+      appointmentType: 'anytime',
       date: new Date().toISOString().split('T')[0],
       startTime: '09:00',
       duration: '2',
       endTime: '',
+      windowStart: '08:00',
+      windowEnd: '12:00',
       estimatedValue: '',
       internalNotes: '',
       customerNotes: '',
       status: 'scheduled',
-      appointmentType: 'anytime',
       isRecurring: false,
       recurringFrequency: '',
       recurringEndDate: '',
@@ -916,61 +943,214 @@ export default function AddJobModal({
                   </div>
                 )}
 
-                {/* Date and Time */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2">
-                      Date <span className="text-red-400">*</span>
-                      {selectedDate && (
-                        <span className="ml-2 text-xs text-emerald-400 font-normal">
-                          📅 {new Date(jobDetails.date).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-                        </span>
-                      )}
-                    </label>
-                    <input
-                      type="date"
-                      value={jobDetails.date}
-                      onChange={(e) => setJobDetails(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm md:text-base"
-                      required
-                    />
-                    {selectedDate && (
-                      <p className="mt-1 text-xs text-zinc-500">
-                        You can change this date if needed
-                      </p>
-                    )}
+                {/* Appointment Type - FIRST, determines date/time UI */}
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-3">
+                    Appointment Type <span className="text-red-400">*</span>
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { value: 'fixed', label: 'Fixed Time', icon: '📌', desc: 'Exact time required' },
+                      { value: 'anytime', label: 'Anytime', icon: '🔄', desc: 'Flexible within day' },
+                      { value: 'window', label: 'Time Window', icon: '⏰', desc: 'Arrival range' },
+                    ].map((type) => (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => setJobDetails(prev => ({ ...prev, appointmentType: type.value as 'fixed' | 'anytime' | 'window' }))}
+                        className={`
+                          p-3 rounded-lg border-2 transition-all text-left active:scale-95
+                          ${jobDetails.appointmentType === type.value
+                            ? 'border-emerald-500 bg-emerald-500/10'
+                            : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600 hover:bg-zinc-800/50'
+                          }
+                        `}
+                      >
+                        <div className="text-xl mb-1">{type.icon}</div>
+                        <div className="text-xs font-medium text-zinc-200">{type.label}</div>
+                        <div className="text-[10px] text-zinc-500 mt-0.5">{type.desc}</div>
+                      </button>
+                    ))}
                   </div>
+                </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-zinc-300 mb-2">
-                      Start Time <span className="text-red-400">*</span>
-                    </label>
-                    <Listbox
-                      value={jobDetails.startTime}
-                      onChange={(value) => setJobDetails(prev => ({ ...prev, startTime: value }))}
-                    >
-                      <div className="relative">
-                        <Listbox.Button className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm md:text-base text-left">
-                          {jobDetails.startTime ? timeOptions.find(t => t.value === jobDetails.startTime)?.label || jobDetails.startTime : 'Select time'}
-                        </Listbox.Button>
-                        <Listbox.Options className="absolute z-10 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                          {timeOptions.map((time) => (
-                            <Listbox.Option
-                              key={time.value}
-                              value={time.value}
-                              className={({ active }) =>
-                                `cursor-pointer px-4 py-2 text-sm ${
-                                  active ? 'bg-emerald-500/10 text-emerald-400' : 'text-zinc-300'
-                                }`
-                              }
-                            >
-                              {time.label}
-                            </Listbox.Option>
-                          ))}
-                        </Listbox.Options>
+                {/* Dynamic Date & Time - Based on Appointment Type */}
+                <div className="space-y-4 p-4 bg-zinc-800/30 border border-zinc-700 rounded-lg">
+                  {/* FIXED TIME appointments */}
+                  {jobDetails.appointmentType === 'fixed' && (
+                    <>
+                      <p className="text-sm text-zinc-400">Customer expects you at the exact scheduled time</p>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Date <span className="text-red-400">*</span>
+                          </label>
+                          <input
+                            type="date"
+                            value={jobDetails.date}
+                            onChange={(e) => setJobDetails(prev => ({ ...prev, date: e.target.value }))}
+                            className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm md:text-base"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-zinc-300 mb-2">
+                            Exact Time <span className="text-red-400">*</span>
+                          </label>
+                          <Listbox
+                            value={jobDetails.startTime}
+                            onChange={(value) => setJobDetails(prev => ({ ...prev, startTime: value }))}
+                          >
+                            <div className="relative">
+                              <Listbox.Button className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm md:text-base text-left">
+                                {jobDetails.startTime ? timeOptions.find(t => t.value === jobDetails.startTime)?.label || jobDetails.startTime : 'Select time'}
+                              </Listbox.Button>
+                              <Listbox.Options className="absolute z-10 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                {timeOptions.map((time) => (
+                                  <Listbox.Option
+                                    key={time.value}
+                                    value={time.value}
+                                    className={({ active }) =>
+                                      `cursor-pointer px-4 py-2 text-sm ${
+                                        active ? 'bg-emerald-500/10 text-emerald-400' : 'text-zinc-300'
+                                      }`
+                                    }
+                                  >
+                                    {time.label}
+                                  </Listbox.Option>
+                                ))}
+                              </Listbox.Options>
+                            </div>
+                          </Listbox>
+                        </div>
                       </div>
-                    </Listbox>
-                  </div>
+                    </>
+                  )}
+
+                  {/* ANYTIME appointments */}
+                  {jobDetails.appointmentType === 'anytime' && (
+                    <>
+                      <p className="text-sm text-zinc-400">Flexible - just needs to be done this day. Route optimization will find the best order.</p>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Date <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={jobDetails.date}
+                          onChange={(e) => setJobDetails(prev => ({ ...prev, date: e.target.value }))}
+                          className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm md:text-base"
+                          required
+                        />
+                      </div>
+                    </>
+                  )}
+
+                  {/* WINDOW appointments */}
+                  {jobDetails.appointmentType === 'window' && (
+                    <>
+                      <p className="text-sm text-zinc-400">Customer expects arrival within a time range</p>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Date <span className="text-red-400">*</span>
+                        </label>
+                        <input
+                          type="date"
+                          value={jobDetails.date}
+                          onChange={(e) => setJobDetails(prev => ({ ...prev, date: e.target.value }))}
+                          className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm md:text-base"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Arrival Window <span className="text-red-400">*</span>
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs text-zinc-500 mb-1 block">From</label>
+                            <Listbox
+                              value={jobDetails.windowStart}
+                              onChange={(value) => setJobDetails(prev => ({ ...prev, windowStart: value, startTime: value }))}
+                            >
+                              <div className="relative">
+                                <Listbox.Button className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm text-left">
+                                  {timeOptions.find(t => t.value === jobDetails.windowStart)?.label || jobDetails.windowStart}
+                                </Listbox.Button>
+                                <Listbox.Options className="absolute z-10 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                  {timeOptions.map((time) => (
+                                    <Listbox.Option
+                                      key={time.value}
+                                      value={time.value}
+                                      className={({ active }) =>
+                                        `cursor-pointer px-4 py-2 text-sm ${
+                                          active ? 'bg-emerald-500/10 text-emerald-400' : 'text-zinc-300'
+                                        }`
+                                      }
+                                    >
+                                      {time.label}
+                                    </Listbox.Option>
+                                  ))}
+                                </Listbox.Options>
+                              </div>
+                            </Listbox>
+                          </div>
+                          <div>
+                            <label className="text-xs text-zinc-500 mb-1 block">To</label>
+                            <Listbox
+                              value={jobDetails.windowEnd}
+                              onChange={(value) => setJobDetails(prev => ({ ...prev, windowEnd: value }))}
+                            >
+                              <div className="relative">
+                                <Listbox.Button className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm text-left">
+                                  {timeOptions.find(t => t.value === jobDetails.windowEnd)?.label || jobDetails.windowEnd}
+                                </Listbox.Button>
+                                <Listbox.Options className="absolute z-10 w-full mt-1 bg-zinc-800 border border-zinc-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                                  {timeOptions.map((time) => (
+                                    <Listbox.Option
+                                      key={time.value}
+                                      value={time.value}
+                                      className={({ active }) =>
+                                        `cursor-pointer px-4 py-2 text-sm ${
+                                          active ? 'bg-emerald-500/10 text-emerald-400' : 'text-zinc-300'
+                                        }`
+                                      }
+                                    >
+                                      {time.label}
+                                    </Listbox.Option>
+                                  ))}
+                                </Listbox.Options>
+                              </div>
+                            </Listbox>
+                          </div>
+                        </div>
+                        {/* Quick window presets */}
+                        <div className="flex gap-2 flex-wrap mt-2">
+                          {[
+                            { label: 'Morning (8-12)', start: '08:00', end: '12:00' },
+                            { label: 'Afternoon (12-5)', start: '12:00', end: '17:00' },
+                            { label: 'All Day (8-5)', start: '08:00', end: '17:00' },
+                          ].map(preset => (
+                            <button
+                              key={preset.label}
+                              type="button"
+                              onClick={() => {
+                                setJobDetails(prev => ({
+                                  ...prev,
+                                  windowStart: preset.start,
+                                  windowEnd: preset.end,
+                                  startTime: preset.start,
+                                }));
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-zinc-700/50 text-zinc-400 hover:bg-zinc-600/50 text-xs"
+                            >
+                              {preset.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Conflict Warning */}
@@ -1034,42 +1214,6 @@ export default function AddJobModal({
                       End time: {jobDetails.endTime || 'Calculating...'}
                     </p>
                   )}
-                </div>
-
-                {/* Appointment Type - Scheduling Flexibility */}
-                <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-3">
-                    Appointment Type
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { value: 'fixed', label: 'Fixed Time', icon: '📌', desc: 'Must start at exact time' },
-                      { value: 'anytime', label: 'Anytime', icon: '🔄', desc: 'Flexible within the day' },
-                      { value: 'window', label: 'Time Window', icon: '⏰', desc: 'Arrival window range' },
-                    ].map((type) => (
-                      <button
-                        key={type.value}
-                        type="button"
-                        onClick={() => setJobDetails(prev => ({ ...prev, appointmentType: type.value as 'fixed' | 'anytime' | 'window' }))}
-                        className={`
-                          p-3 rounded-lg border-2 transition-all text-left active:scale-95
-                          ${jobDetails.appointmentType === type.value
-                            ? 'border-emerald-500 bg-emerald-500/10'
-                            : 'border-zinc-700 bg-zinc-800/30 hover:border-zinc-600 hover:bg-zinc-800/50'
-                          }
-                        `}
-                      >
-                        <div className="text-xl mb-1">{type.icon}</div>
-                        <div className="text-xs font-medium text-zinc-200">{type.label}</div>
-                        <div className="text-[10px] text-zinc-500 mt-0.5">{type.desc}</div>
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-zinc-500 mt-2">
-                    {jobDetails.appointmentType === 'fixed' && 'Fixed appointments must start at the scheduled time.'}
-                    {jobDetails.appointmentType === 'anytime' && 'Anytime jobs can be reordered for route optimization.'}
-                    {jobDetails.appointmentType === 'window' && 'Window appointments give customers an arrival range.'}
-                  </p>
                 </div>
 
                 {/* Recurring Job Options */}
