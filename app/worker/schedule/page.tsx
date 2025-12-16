@@ -33,9 +33,10 @@ export default function WorkerSchedule() {
     monday.setHours(0, 0, 0, 0);
     return monday;
   });
-  const [selectedDay, setSelectedDay] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [selectedDay, setSelectedDay] = useState<string>(() => {
+    const today = new Date();
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+  });
   const [showCalendar, setShowCalendar] = useState(false);
   const [calendarMonth, setCalendarMonth] = useState(new Date());
 
@@ -103,6 +104,14 @@ export default function WorkerSchedule() {
 
   const getJobCountForDay = (dateStr: string) => {
     return jobsByDay[dateStr]?.length || 0;
+  };
+
+  // Format date to YYYY-MM-DD in local timezone (avoids UTC conversion issues)
+  const formatDateStr = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
   };
 
   const selectedJobs = jobsByDay[selectedDay] || [];
@@ -186,7 +195,7 @@ export default function WorkerSchedule() {
         {/* Week Strip */}
         <div className="grid grid-cols-7 gap-1 bg-[#1F1F1F] rounded-xl p-2 border border-[#2A2A2A]">
           {getWeekDays().map((day) => {
-            const dateStr = day.toISOString().split('T')[0];
+            const dateStr = formatDateStr(day);
             const isSelected = selectedDay === dateStr;
             const jobCount = getJobCountForDay(dateStr);
 
@@ -345,7 +354,8 @@ export default function WorkerSchedule() {
                   const month = calendarMonth.getMonth();
                   const firstDay = new Date(year, month, 1).getDay();
                   const daysInMonth = new Date(year, month + 1, 0).getDate();
-                  const today = new Date().toISOString().split('T')[0];
+                  const todayDate = new Date();
+                  const today = `${todayDate.getFullYear()}-${String(todayDate.getMonth() + 1).padStart(2, '0')}-${String(todayDate.getDate()).padStart(2, '0')}`;
                   const days = [];
 
                   // Empty cells for days before month starts
@@ -401,7 +411,7 @@ export default function WorkerSchedule() {
               <button
                 onClick={() => {
                   const today = new Date();
-                  const todayStr = today.toISOString().split('T')[0];
+                  const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
                   setSelectedDay(todayStr);
                   setCalendarMonth(today);
                   const dayOfWeek = today.getDay();
