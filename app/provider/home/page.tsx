@@ -389,11 +389,11 @@ export default function ProviderHome() {
       <div className="w-full bg-background">
         <div className="max-w-[1400px] mx-auto px-8 py-6">
 
-          {/* Main Grid: 65% / 35% with 20px gap */}
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_380px] gap-5">
+          {/* Main Grid: 70% / 28% split using 12-col grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-            {/* LEFT COLUMN - Revenue */}
-            <div className="space-y-5">
+            {/* LEFT COLUMN - Revenue (8 cols = ~67%) */}
+            <div className="lg:col-span-8 space-y-5">
 
               {/* Revenue Card - Main Focus */}
               <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
@@ -500,7 +500,7 @@ export default function ProviderHome() {
                       <CartesianGrid
                         strokeDasharray="3 3"
                         stroke="currentColor"
-                        strokeOpacity={0.08}
+                        strokeOpacity={0.06}
                         vertical={false}
                       />
                       <XAxis
@@ -510,17 +510,17 @@ export default function ProviderHome() {
                         tick={{ fill: 'currentColor', opacity: 0.6, fontSize: 11 }}
                         tickLine={false}
                         axisLine={false}
-                        dy={8}
+                        tickMargin={8}
                       />
                       <YAxis
+                        domain={[0, 'auto']}
                         stroke="currentColor"
                         strokeOpacity={0.5}
                         tick={{ fill: 'currentColor', opacity: 0.6, fontSize: 11 }}
                         tickLine={false}
                         axisLine={false}
                         tickFormatter={(value) => `$${value}`}
-                        dx={-5}
-                        width={50}
+                        width={55}
                       />
                       <Tooltip content={<CustomTooltip />} />
                       <Area
@@ -529,7 +529,7 @@ export default function ProviderHome() {
                         stroke="#1A5F4F"
                         strokeWidth={2.5}
                         fill="url(#colorRevenue)"
-                        dot={{ r: 3, fill: '#1A5F4F', strokeWidth: 2, stroke: '#fff' }}
+                        dot={false}
                         activeDot={{ r: 5, fill: '#1A5F4F', strokeWidth: 2, stroke: '#fff' }}
                       />
                     </AreaChart>
@@ -553,31 +553,10 @@ export default function ProviderHome() {
                 </div>
               </div>
 
-              {/* Week at a Glance - Compact */}
-              <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-base font-semibold text-foreground">Week at a Glance</h3>
-                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div className="text-center p-4 bg-muted/40 rounded-xl">
-                    <p className="text-2xl font-bold text-foreground">{stats.todaysJobsCount}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Today</p>
-                  </div>
-                  <div className="text-center p-4 bg-muted/40 rounded-xl">
-                    <p className="text-2xl font-bold text-foreground">{stats.completedThisWeek}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Completed</p>
-                  </div>
-                  <div className="text-center p-4 bg-emerald-500/10 rounded-xl">
-                    <p className="text-2xl font-bold text-emerald-600">{formatCurrency(stats.weeklyRevenue)}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Revenue</p>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            {/* RIGHT COLUMN - Jobs & Actions */}
-            <div className="space-y-5">
+            {/* RIGHT COLUMN - Jobs & Actions (4 cols = ~33%) */}
+            <div className="lg:col-span-4 space-y-5">
 
               {/* Today's Jobs - Reduced height */}
               <div className="bg-card rounded-2xl border border-border shadow-sm p-5 max-h-[200px] flex flex-col">
@@ -666,60 +645,80 @@ export default function ProviderHome() {
                 )}
               </div>
 
-              {/* Week at Glance - Right side compact version */}
+            </div>
+
+            {/* FULL WIDTH ROW - Week at a Glance */}
+            <div className="lg:col-span-12">
               <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
-                <h3 className="text-base font-semibold text-foreground mb-3">Quick Stats</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="p-3 bg-muted/40 rounded-xl">
-                    <p className="text-xl font-bold text-foreground">{stats.completedThisMonth}</p>
-                    <p className="text-xs text-muted-foreground">This month</p>
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-base font-semibold text-foreground">Week at a Glance</h3>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="text-center p-4 bg-muted/40 rounded-xl">
+                    <p className="text-2xl font-bold text-foreground">{stats.todaysJobsCount}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Today</p>
                   </div>
-                  <div className="p-3 bg-emerald-500/10 rounded-xl">
-                    <p className="text-xl font-bold text-emerald-600">{formatCurrency(stats.monthlyRevenue)}</p>
-                    <p className="text-xs text-muted-foreground">Monthly revenue</p>
+                  <div className="text-center p-4 bg-muted/40 rounded-xl">
+                    <p className="text-2xl font-bold text-foreground">{stats.completedThisWeek}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Completed</p>
+                  </div>
+                  <div className="text-center p-4 bg-emerald-500/10 rounded-xl">
+                    <p className="text-2xl font-bold text-emerald-600">{formatCurrency(stats.weeklyRevenue)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Weekly Revenue</p>
+                  </div>
+                  <div className="text-center p-4 bg-emerald-500/10 rounded-xl">
+                    <p className="text-2xl font-bold text-emerald-600">{formatCurrency(stats.monthlyRevenue)}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">Monthly Revenue</p>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Needs Attention */}
-              {(stats.pendingInvoicesCount > 0 || stats.newLeadsCount > 0) && (
+            {/* FULL WIDTH ROW - Needs Attention */}
+            {(stats.pendingInvoicesCount > 0 || stats.newLeadsCount > 0) && (
+              <div className="lg:col-span-12">
                 <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
-                  <h3 className="text-base font-semibold text-foreground mb-3">Attention</h3>
-                  <div className="space-y-2">
+                  <h3 className="text-base font-semibold text-foreground mb-3">Needs Attention</h3>
+                  <div className="flex flex-wrap gap-3">
                     {stats.pendingInvoicesCount > 0 && (
                       <button
                         onClick={() => router.push('/provider/invoices')}
-                        className="w-full flex items-center justify-between p-3 bg-amber-500/10 hover:bg-amber-500/15 rounded-xl transition-colors"
+                        className="flex items-center gap-3 px-4 py-3 bg-amber-500/10 hover:bg-amber-500/15 rounded-xl transition-colors"
                       >
-                        <div className="flex items-center gap-2.5">
-                          <DollarSign className="h-4 w-4 text-amber-600" />
-                          <span className="text-sm font-medium text-foreground">
-                            {stats.pendingInvoicesCount} unpaid
-                          </span>
+                        <DollarSign className="h-5 w-5 text-amber-600" />
+                        <div className="text-left">
+                          <p className="text-sm font-medium text-foreground">
+                            {stats.pendingInvoicesCount} unpaid invoices
+                          </p>
+                          <p className="text-xs text-amber-600 font-semibold">
+                            {formatCurrency(stats.pendingInvoicesAmount)}
+                          </p>
                         </div>
-                        <span className="text-sm font-semibold text-amber-600">
-                          {formatCurrency(stats.pendingInvoicesAmount)}
-                        </span>
+                        <ChevronRight className="h-4 w-4 text-amber-600 ml-2" />
                       </button>
                     )}
                     {stats.newLeadsCount > 0 && (
                       <button
                         onClick={() => router.push('/provider/leads')}
-                        className="w-full flex items-center justify-between p-3 bg-purple-500/10 hover:bg-purple-500/15 rounded-xl transition-colors"
+                        className="flex items-center gap-3 px-4 py-3 bg-purple-500/10 hover:bg-purple-500/15 rounded-xl transition-colors"
                       >
-                        <div className="flex items-center gap-2.5">
-                          <TrendingUp className="h-4 w-4 text-purple-600" />
-                          <span className="text-sm font-medium text-foreground">
+                        <TrendingUp className="h-5 w-5 text-purple-600" />
+                        <div className="text-left">
+                          <p className="text-sm font-medium text-foreground">
                             {stats.newLeadsCount} new leads
-                          </span>
+                          </p>
+                          <p className="text-xs text-purple-600 font-semibold">
+                            Review matches
+                          </p>
                         </div>
-                        <ChevronRight className="h-4 w-4 text-purple-600" />
+                        <ChevronRight className="h-4 w-4 text-purple-600 ml-2" />
                       </button>
                     )}
                   </div>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

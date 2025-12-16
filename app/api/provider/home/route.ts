@@ -59,6 +59,31 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // DEBUG: Get ALL jobs for this provider to understand what exists
+    const allProviderJobs = await prisma.job.findMany({
+      where: { providerId },
+      select: {
+        id: true,
+        startTime: true,
+        status: true,
+        serviceType: true,
+      },
+      orderBy: { startTime: 'asc' },
+    });
+
+    console.log('🔍 DEBUG - All jobs for provider:', {
+      providerId,
+      totalJobs: allProviderJobs.length,
+      allStatuses: [...new Set(allProviderJobs.map(j => j.status))],
+      futureJobs: allProviderJobs.filter(j => j.startTime > todayEnd).length,
+      jobs: allProviderJobs.map(j => ({
+        id: j.id.slice(-6),
+        status: j.status,
+        startTime: j.startTime.toISOString(),
+        isFuture: j.startTime > todayEnd,
+      })),
+    });
+
     // Get upcoming jobs (future jobs excluding today)
     // Include all non-completed/cancelled statuses
     const upcomingJobs = await prisma.job.findMany({
@@ -89,15 +114,15 @@ export async function GET(request: NextRequest) {
       take: 5,
     });
 
-    console.log('📅 Upcoming jobs query:', {
-      providerId,
-      todayEnd: todayEnd.toISOString(),
+    console.log('📅 Upcoming jobs result:', {
       count: upcomingJobs.length,
+      todayEnd: todayEnd.toISOString(),
       jobs: upcomingJobs.map(j => ({
-        id: j.id,
+        id: j.id.slice(-6),
         serviceType: j.serviceType,
         startTime: j.startTime.toISOString(),
         status: j.status,
+        customerName: j.customer?.name,
       })),
     });
 
