@@ -4,6 +4,45 @@ import { createNotification } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Trigger route re-optimization for a worker after job completion
+ * This is called asynchronously to not block the clock-out response
+ */
+async function triggerReoptimize(
+  workerId: string,
+  providerId: string,
+  trigger: string
+): Promise<void> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const response = await fetch(`${baseUrl}/api/provider/dispatch/reoptimize`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workerId,
+        providerId,
+        trigger,
+        useTraffic: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.warn('[Reoptimize Trigger] Failed:', error);
+    } else {
+      const result = await response.json();
+      if (result.hasSignificantChanges) {
+        console.log('[Reoptimize Trigger] Significant ETA changes detected:', {
+          workerId,
+          changes: result.changes?.length || 0,
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[Reoptimize Trigger] Error:', error);
+  }
+}
+
 // POST clock out of a job - completes WorkLog, calculates earnings
 export async function POST(request: NextRequest) {
   try {
@@ -233,6 +272,12 @@ export async function POST(request: NextRequest) {
         title: 'Job Completed',
         message: `${user.firstName} ${user.lastName} completed ${job.serviceType || 'job'} for ${job.customer?.name || 'customer'}`,
         link: `/provider/jobs/${jobId}`,
+      });
+
+      // Trigger route re-optimization for remaining jobs (async, don't await)
+      // This updates ETAs for remaining jobs after this one is completed
+      triggerReoptimize(userId, job.providerId, 'job_completed').catch(err => {
+        console.error('[Clock-out] Reoptimize trigger failed:', err);
       });
     }
 

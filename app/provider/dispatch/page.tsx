@@ -147,6 +147,32 @@ export default function DispatchPage() {
   const [providerId, setProviderId] = useState<string>('');
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [providerName, setProviderName] = useState<string>('');
+  const [autoAssign, setAutoAssign] = useState(true);
+  const [optimizationResult, setOptimizationResult] = useState<{
+    workers: Array<{
+      id: string;
+      name: string;
+      color: string;
+      jobCount: number;
+      totalMiles: number;
+      totalMinutes: number;
+      savedMiles: number;
+    }>;
+    unassignableJobs: Array<{
+      id: string;
+      service: string;
+      customer: string | null;
+      reason: string;
+    }>;
+    totalSavedMiles: number;
+    totalSavedMinutes: number;
+    summary: {
+      totalWorkers: number;
+      totalJobs: number;
+      unassignedCount: number;
+      avgJobsPerWorker: number;
+    };
+  } | null>(null);
 
   // Check theme
   useEffect(() => {
@@ -299,7 +325,7 @@ export default function DispatchPage() {
     calculateWorkerRoutes();
   }, [isLoaded, jobs, workers]);
 
-  // Optimize routes for all workers
+  // Optimize routes for all workers (multi-worker optimization with auto-assign)
   const optimizeAllRoutes = async () => {
     if (!isLoaded || !providerId || workers.length === 0) return;
 
@@ -307,10 +333,17 @@ export default function DispatchPage() {
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const workerIds = workers.map(w => w.id);
-      const res = await fetch('/api/provider/dispatch/optimize', {
+
+      // Use the new optimize-all endpoint for multi-worker optimization
+      const res = await fetch('/api/provider/dispatch/optimize-all', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ providerId, date: dateStr, workerIds }),
+        body: JSON.stringify({
+          providerId,
+          date: dateStr,
+          workerIds,
+          autoAssign, // Pass the auto-assign setting
+        }),
       });
 
       const data = await res.json();
@@ -319,12 +352,21 @@ export default function DispatchPage() {
         throw new Error(data.error || 'Failed to optimize routes');
       }
 
+      // Store the optimization result for display
+      setOptimizationResult(data);
+
+      // Build success message
+      let message = `Routes optimized! Saved ${data.totalSavedMiles?.toFixed(1) || 0} miles`;
+      if (autoAssign && data.summary?.unassignedCount > 0) {
+        message += ` (${data.summary.unassignedCount} jobs need manual assignment)`;
+      }
+
       setNotification({
-        message: `Routes optimized! Saved ${data.totalSavedMiles?.toFixed(1) || 0} miles`,
-        type: 'success'
+        message,
+        type: data.unassignableJobs?.length > 0 ? 'error' : 'success'
       });
 
-      // Refresh data
+      // Refresh data to show updated assignments
       await fetchDispatchData();
     } catch (error) {
       console.error('Optimize error:', error);
@@ -437,10 +479,30 @@ export default function DispatchPage() {
                 Refresh
               </Button>
 
+              {/* Auto-assign toggle */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setAutoAssign(!autoAssign)}
+                  className={`relative w-10 h-5 rounded-full transition-colors ${
+                    autoAssign ? 'bg-primary' : 'bg-muted'
+                  }`}
+                  title={autoAssign ? 'Auto-assign enabled' : 'Auto-assign disabled'}
+                >
+                  <span
+                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
+                      autoAssign ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+                <span className="text-xs text-muted-foreground">
+                  Auto-assign
+                </span>
+              </div>
+
               {/* Optimize All */}
               <Button
                 onClick={optimizeAllRoutes}
-                disabled={optimizing || jobs.length < 2}
+                disabled={optimizing || (jobs.length < 2 && unassignedJobs.length === 0)}
                 className="bg-primary hover:bg-primary/90"
               >
                 {optimizing ? (

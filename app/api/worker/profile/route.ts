@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { geocodeAddress } from '@/lib/geocode';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,6 +31,8 @@ export async function GET(request: NextRequest) {
         commissionRate: true,
         workingHours: true,
         homeAddress: true,
+        homeLatitude: true,
+        homeLongitude: true,
         createdAt: true,
         canCreateJobs: true,
         jobsNeedApproval: true,
@@ -100,7 +103,7 @@ export async function GET(request: NextRequest) {
 export async function PUT(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, firstName, lastName, phone } = body;
+    const { userId, firstName, lastName, phone, homeAddress } = body;
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
@@ -119,26 +122,59 @@ export async function PUT(request: NextRequest) {
       }
     }
 
+    // Build update data
+    const updateData: Record<string, unknown> = {
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone || null,
+    };
+
+    // Handle home address with geocoding
+    if (homeAddress !== undefined) {
+      updateData.homeAddress = homeAddress || null;
+
+      if (homeAddress && homeAddress.trim()) {
+        try {
+          const coords = await geocodeAddress(homeAddress.trim());
+          if (coords) {
+            updateData.homeLatitude = coords.lat;
+            updateData.homeLongitude = coords.lng;
+            console.log(`📍 Geocoded worker home address: ${homeAddress} -> ${coords.lat}, ${coords.lng}`);
+          } else {
+            console.warn(`⚠️ Could not geocode home address: ${homeAddress}`);
+            updateData.homeLatitude = null;
+            updateData.homeLongitude = null;
+          }
+        } catch (geocodeError) {
+          console.error('Geocoding error:', geocodeError);
+          updateData.homeLatitude = null;
+          updateData.homeLongitude = null;
+        }
+      } else {
+        updateData.homeLatitude = null;
+        updateData.homeLongitude = null;
+      }
+    }
+
     const updated = await prisma.providerUser.update({
       where: { id: userId },
-      data: {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        phone: phone || null,
-      },
+      data: updateData,
       select: {
         id: true,
         firstName: true,
         lastName: true,
         phone: true,
+        homeAddress: true,
+        homeLatitude: true,
+        homeLongitude: true,
       },
     });
 
     return NextResponse.json({ success: true, user: updated });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating worker profile:', error);
 
-    if (error.code === 'P2025') {
+    if (error && typeof error === 'object' && 'code' in error && error.code === 'P2025') {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 

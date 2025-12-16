@@ -20,12 +20,23 @@ export interface DistanceResult {
 
 export interface DrivingDistanceResult extends DistanceResult {
   durationMinutes: number;
-  durationInTraffic?: number;
+  durationInTrafficMinutes?: number;
+}
+
+export interface TrafficAwareResult {
+  durationMinutes: number;
+  durationInTrafficMinutes: number;
+  trafficDelayMinutes: number;
+  miles: number;
 }
 
 // Simple in-memory cache for distance results
 const distanceCache = new Map<string, { result: DrivingDistanceResult; timestamp: number }>();
 const CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+
+// Traffic-aware cache (shorter TTL since traffic changes)
+const trafficCache = new Map<string, { result: TrafficAwareResult; timestamp: number }>();
+const TRAFFIC_CACHE_TTL = 15 * 60 * 1000; // 15 minutes
 
 function getCacheKey(point1: Coordinates, point2: Coordinates): string {
   return `${point1.latitude},${point1.longitude}->${point2.latitude},${point2.longitude}`;
@@ -363,4 +374,177 @@ export async function estimateTravelTime(
  */
 export function clearDistanceCache(): void {
   distanceCache.clear();
+  trafficCache.clear();
+}
+
+/**
+ * Get driving time with real-time or predicted traffic
+ *
+ * Uses Google Distance Matrix API with departure_time parameter:
+ * - For current time: uses live traffic data
+ * - For future times: uses "best_guess" traffic model based on historical data
+ *
+ * @param origin Starting point
+ * @param destination End point
+ * @param departureTime When the trip will start (default: now)
+ */
+export async function getDrivingTimeWithTraffic(
+  origin: Coordinates,
+  destination: Coordinates,
+  departureTime?: Date
+): Promise<TrafficAwareResult> {
+  const apiKey = process.env.GOOGLE_MAPS_API || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+  // Default to now if no departure time specified
+  const departure = departureTime || new Date();
+  const departureTimestamp = Math.floor(departure.getTime() / 1000);
+
+  // Check if departure is in the past (more than 1 min ago)
+  const now = Math.floor(Date.now() / 1000);
+  const isCurrentTime = departureTimestamp <= now + 60;
+
+  // Cache key includes departure time (rounded to 15 min intervals for efficiency)
+  const timeSlot = Math.floor(departureTimestamp / (15 * 60)) * (15 * 60);
+  const trafficCacheKey = `${getCacheKey(origin, destination)}@${timeSlot}`;
+
+  // Check traffic cache
+  const cached = trafficCache.get(trafficCacheKey);
+  if (cached && Date.now() - cached.timestamp < TRAFFIC_CACHE_TTL) {
+    return cached.result;
+  }
+
+  // Fall back to Haversine estimate if no API key
+  if (!apiKey) {
+    const haversine = calculateHaversineDistance(origin, destination);
+    const estimatedMinutes = Math.ceil(haversine.miles / 30 * 60);
+    return {
+      durationMinutes: estimatedMinutes,
+      durationInTrafficMinutes: estimatedMinutes,
+      trafficDelayMinutes: 0,
+      miles: haversine.miles,
+    };
+  }
+
+  try {
+    const originStr = `${origin.latitude},${origin.longitude}`;
+    const destStr = `${destination.latitude},${destination.longitude}`;
+
+    // Build URL with traffic parameters
+    let url = `https://maps.googleapis.com/maps/api/distancematrix/json?` +
+      `origins=${originStr}&destinations=${destStr}&units=imperial&key=${apiKey}`;
+
+    if (isCurrentTime) {
+      // Use "now" for live traffic
+      url += `&departure_time=now`;
+    } else {
+      // Use specific departure time for future traffic prediction
+      url += `&departure_time=${departureTimestamp}&traffic_model=best_guess`;
+    }
+
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.status === 'OK' && data.rows?.[0]?.elements?.[0]?.status === 'OK') {
+      const element = data.rows[0].elements[0];
+
+      // Distance in meters -> miles
+      const meters = element.distance.value;
+      const miles = meters / 1609.34;
+
+      // Duration without traffic (in seconds -> minutes)
+      const durationSeconds = element.duration.value;
+      const durationMinutes = Math.ceil(durationSeconds / 60);
+
+      // Duration in traffic (if available)
+      const durationInTrafficSeconds = element.duration_in_traffic?.value || durationSeconds;
+      const durationInTrafficMinutes = Math.ceil(durationInTrafficSeconds / 60);
+
+      const result: TrafficAwareResult = {
+        durationMinutes,
+        durationInTrafficMinutes,
+        trafficDelayMinutes: Math.max(0, durationInTrafficMinutes - durationMinutes),
+        miles: Math.round(miles * 10) / 10,
+      };
+
+      // Cache the result
+      trafficCache.set(trafficCacheKey, { result, timestamp: Date.now() });
+
+      return result;
+    }
+
+    console.warn(`Traffic API error: ${data.status}`, data.error_message);
+  } catch (error) {
+    console.error('Traffic API request failed:', error);
+  }
+
+  // Fallback to Haversine
+  const haversine = calculateHaversineDistance(origin, destination);
+  const estimatedMinutes = Math.ceil(haversine.miles / 30 * 60);
+  return {
+    durationMinutes: estimatedMinutes,
+    durationInTrafficMinutes: estimatedMinutes,
+    trafficDelayMinutes: 0,
+    miles: haversine.miles,
+  };
+}
+
+/**
+ * Get traffic-aware driving times for multiple segments in batch
+ * Useful for calculating a full route with traffic
+ */
+export async function getDrivingTimesWithTrafficBatch(
+  segments: Array<{ origin: Coordinates; destination: Coordinates; departureTime: Date }>,
+): Promise<TrafficAwareResult[]> {
+  // Process in parallel but with some rate limiting
+  const results: TrafficAwareResult[] = [];
+  const batchSize = 10;
+
+  for (let i = 0; i < segments.length; i += batchSize) {
+    const batch = segments.slice(i, i + batchSize);
+    const batchResults = await Promise.all(
+      batch.map(seg => getDrivingTimeWithTraffic(seg.origin, seg.destination, seg.departureTime))
+    );
+    results.push(...batchResults);
+
+    // Small delay between batches
+    if (i + batchSize < segments.length) {
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+  }
+
+  return results;
+}
+
+/**
+ * Calculate total route time with traffic for a sequence of stops
+ * Returns cumulative ETAs for each stop
+ */
+export async function calculateRouteWithTraffic(
+  stops: Coordinates[],
+  startTime: Date
+): Promise<Array<{ eta: Date; travelMinutes: number; trafficDelayMinutes: number }>> {
+  if (stops.length < 2) {
+    return [];
+  }
+
+  const results: Array<{ eta: Date; travelMinutes: number; trafficDelayMinutes: number }> = [];
+  let currentTime = new Date(startTime);
+
+  for (let i = 0; i < stops.length - 1; i++) {
+    const traffic = await getDrivingTimeWithTraffic(stops[i], stops[i + 1], currentTime);
+
+    // ETA is current time + travel time with traffic
+    const eta = new Date(currentTime.getTime() + traffic.durationInTrafficMinutes * 60 * 1000);
+
+    results.push({
+      eta,
+      travelMinutes: traffic.durationInTrafficMinutes,
+      trafficDelayMinutes: traffic.trafficDelayMinutes,
+    });
+
+    // Update current time for next segment (assuming arrival = next departure)
+    currentTime = eta;
+  }
+
+  return results;
 }

@@ -502,6 +502,13 @@ model ProviderUser {
   homeAddress       String?             @map("home_address") // For travel distance calculations
   homeLatitude      Float?              @map("home_latitude")
   homeLongitude     Float?              @map("home_longitude")
+  // Real-time location tracking (when clocked in)
+  currentLatitude         Float?        @map("current_latitude")
+  currentLongitude        Float?        @map("current_longitude")
+  currentLocationAccuracy Float?        @map("current_location_accuracy") // meters
+  currentLocationHeading  Float?        @map("current_location_heading") // degrees
+  currentLocationSpeed    Float?        @map("current_location_speed") // m/s
+  lastLocationUpdate      DateTime?     @map("last_location_update")
   // Worker permissions
   canCreateJobs     Boolean             @default(false) @map("can_create_jobs")
   jobsNeedApproval  Boolean             @default(true) @map("jobs_need_approval")

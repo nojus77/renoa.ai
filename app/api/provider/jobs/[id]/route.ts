@@ -4,6 +4,39 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 /**
+ * Trigger route re-optimization for affected workers after job assignment changes
+ */
+async function triggerReoptimize(
+  workerIds: string[],
+  providerId: string,
+  trigger: string
+): Promise<void> {
+  if (workerIds.length === 0) return;
+
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    // Trigger reoptimize for each affected worker
+    await Promise.all(
+      workerIds.map(workerId =>
+        fetch(`${baseUrl}/api/provider/dispatch/reoptimize`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            workerId,
+            providerId,
+            trigger,
+            useTraffic: false, // Use faster calculation for batch triggers
+          }),
+        }).catch(err => console.warn('[Reoptimize Trigger] Error for worker', workerId, err))
+      )
+    );
+  } catch (error) {
+    console.error('[Reoptimize Trigger] Error:', error);
+  }
+}
+
+/**
  * GET /api/provider/jobs/[id]
  * Fetch a single job with all details
  */
@@ -160,6 +193,22 @@ export async function PATCH(
         photos: true,
       },
     });
+
+    // Trigger re-optimization if assignment changed
+    if (assignedUserIds !== undefined) {
+      const oldWorkers = existingJob.assignedUserIds || [];
+      const newWorkers = assignedUserIds || [];
+
+      // Find all affected workers (old and new assignments)
+      const affectedWorkers = Array.from(new Set([...oldWorkers, ...newWorkers]));
+
+      if (affectedWorkers.length > 0) {
+        // Trigger async reoptimize - don't await to avoid blocking response
+        triggerReoptimize(affectedWorkers, providerId, 'job_reassigned').catch(err => {
+          console.error('[Job Update] Reoptimize trigger failed:', err);
+        });
+      }
+    }
 
     return NextResponse.json({
       success: true,

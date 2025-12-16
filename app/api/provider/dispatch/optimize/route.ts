@@ -1,10 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { startOfDay, endOfDay, parseISO, addMinutes } from 'date-fns';
+import { startOfDay, endOfDay, parseISO, addMinutes, format } from 'date-fns';
 import {
   calculateHaversineDistance,
-  calculateDrivingDistance,
-  calculateRouteDistance,
   type Coordinates,
 } from '@/lib/services/distance-service';
 
@@ -12,6 +10,10 @@ const WORKER_COLORS = [
   '#10b981', '#3b82f6', '#f59e0b', '#ef4444',
   '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16',
 ];
+
+// Default work day start time (8 AM)
+const DEFAULT_START_HOUR = 8;
+const AVG_SPEED_MPH = 30; // Average driving speed
 
 interface JobWithCoords {
   id: string;
@@ -23,6 +25,14 @@ interface JobWithCoords {
   lat: number;
   lng: number;
   customer: { name: string | null } | null;
+}
+
+interface ScheduledJob extends JobWithCoords {
+  eta: Date;
+  etaEnd: Date;
+  travelTimeMinutes: number;
+  isLate: boolean;
+  lateByMinutes: number;
 }
 
 /**
@@ -58,11 +68,86 @@ function calculateTotalRouteDistance(
 }
 
 /**
+ * Calculate travel time in minutes between two points
+ */
+function calculateTravelTime(from: Coordinates, to: Coordinates): number {
+  const dist = calculateHaversineDistance(from, to);
+  return Math.ceil(dist.miles / AVG_SPEED_MPH * 60);
+}
+
+/**
+ * Calculate ETAs for each job in order, updating times to be chronological
+ */
+function calculateETAs(
+  jobs: JobWithCoords[],
+  startPoint: Coordinates | null,
+  dayStart: Date
+): ScheduledJob[] {
+  const scheduled: ScheduledJob[] = [];
+
+  // Start time: 8 AM on the given day
+  let currentTime = new Date(dayStart);
+  currentTime.setHours(DEFAULT_START_HOUR, 0, 0, 0);
+
+  let currentLocation = startPoint;
+
+  for (let i = 0; i < jobs.length; i++) {
+    const job = jobs[i];
+    let travelTimeMinutes = 0;
+
+    // Calculate travel time from current location to this job
+    if (currentLocation) {
+      travelTimeMinutes = calculateTravelTime(currentLocation, {
+        latitude: job.lat,
+        longitude: job.lng,
+      });
+    }
+
+    // Calculate ETA
+    const eta = addMinutes(currentTime, travelTimeMinutes);
+
+    // Job duration in minutes (estimatedDuration is in hours)
+    const durationMinutes = (job.estimatedDuration || 1) * 60;
+    const etaEnd = addMinutes(eta, durationMinutes);
+
+    // Check if this job has a fixed/window time and we'd be late
+    const scheduledTime = new Date(job.startTime);
+    let isLate = false;
+    let lateByMinutes = 0;
+
+    if (job.appointmentType === 'fixed' || job.appointmentType === 'window') {
+      // For fixed/window appointments, check if ETA is after scheduled time
+      const diff = Math.round((eta.getTime() - scheduledTime.getTime()) / 60000);
+      if (diff > 15) { // Allow 15 min grace period
+        isLate = true;
+        lateByMinutes = diff;
+      }
+    }
+
+    scheduled.push({
+      ...job,
+      eta,
+      etaEnd,
+      travelTimeMinutes,
+      isLate,
+      lateByMinutes,
+    });
+
+    // Update current time and location for next iteration
+    currentTime = etaEnd;
+    currentLocation = { latitude: job.lat, longitude: job.lng };
+  }
+
+  return scheduled;
+}
+
+/**
  * Optimizes routes for workers using a hybrid approach:
  * - Respects fixed appointment times (appointmentType === 'fixed')
  * - Respects time windows (appointmentType === 'window')
  * - Uses nearest-neighbor for flexible jobs (appointmentType === 'anytime')
  * - Starts from worker's home or office location
+ * - Calculates and updates ETAs to ensure chronological order
  */
 export async function POST(req: Request) {
   try {
@@ -145,6 +230,7 @@ export async function POST(req: Request) {
           savedMiles: 0,
           savedMinutes: 0,
           reorderedJobs: [],
+          conflicts: [],
         });
         continue;
       }
@@ -174,6 +260,7 @@ export async function POST(req: Request) {
           savedMiles: 0,
           savedMinutes: 0,
           reorderedJobs: [],
+          conflicts: [],
         });
         continue;
       }
@@ -193,86 +280,31 @@ export async function POST(req: Request) {
       let optimizedJobs: JobWithCoords[] = [];
 
       if (fixedJobs.length > 0 || windowJobs.length > 0) {
-        // Mixed schedule: place fixed/window jobs at their times, optimize flexible jobs around them
+        // Mixed schedule: fixed/window jobs are anchor points, flexible jobs fill gaps
 
-        // Create time slots for the day
-        interface TimeSlot {
-          job: JobWithCoords;
-          type: 'fixed' | 'window' | 'flexible';
-        }
+        // Sort fixed/window jobs by their scheduled time
+        const anchorJobs = [...fixedJobs, ...windowJobs].sort(
+          (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+        );
 
-        const timeSlots: TimeSlot[] = [];
-
-        // Add fixed jobs to their exact slots
-        for (const job of fixedJobs) {
-          timeSlots.push({ job, type: 'fixed' });
-        }
-
-        // Add window jobs (they have some flexibility but should stay near their time)
-        for (const job of windowJobs) {
-          timeSlots.push({ job, type: 'window' });
-        }
-
-        // Sort by start time
-        timeSlots.sort((a, b) => new Date(a.job.startTime).getTime() - new Date(b.job.startTime).getTime());
-
-        // Now insert flexible jobs using nearest-neighbor relative to fixed/window anchors
+        // Use nearest-neighbor to insert flexible jobs optimally around anchor points
         const remainingFlexible = [...flexibleJobs];
+        let currentLocation = startPoint;
+        const finalSchedule: JobWithCoords[] = [];
 
-        // If there are fixed/window jobs, insert flexible jobs in gaps
-        if (timeSlots.length > 0) {
-          // Insert flexible jobs before the first fixed job
-          let currentLocation = startPoint;
-          const finalSchedule: JobWithCoords[] = [];
+        // Process each anchor job
+        for (let anchorIdx = 0; anchorIdx < anchorJobs.length; anchorIdx++) {
+          const anchorJob = anchorJobs[anchorIdx];
+          const anchorTime = new Date(anchorJob.startTime).getTime();
 
-          for (let slotIdx = 0; slotIdx < timeSlots.length; slotIdx++) {
-            const slot = timeSlots[slotIdx];
-            const slotTime = new Date(slot.job.startTime).getTime();
+          // Try to fit flexible jobs before this anchor
+          // Estimate current time based on where we are in the schedule
+          let currentTimeEstimate = finalSchedule.length > 0
+            ? new Date(finalSchedule[finalSchedule.length - 1].endTime).getTime()
+            : startOfDay(dateObj).getTime() + DEFAULT_START_HOUR * 60 * 60 * 1000;
 
-            // Insert as many flexible jobs as fit before this slot
-            while (remainingFlexible.length > 0 && currentLocation) {
-              // Find nearest flexible job
-              let nearestIdx = 0;
-              let nearestDist = Infinity;
-
-              for (let f = 0; f < remainingFlexible.length; f++) {
-                const dist = calculateHaversineDistance(currentLocation, {
-                  latitude: remainingFlexible[f].lat,
-                  longitude: remainingFlexible[f].lng,
-                });
-                if (dist.miles < nearestDist) {
-                  nearestDist = dist.miles;
-                  nearestIdx = f;
-                }
-              }
-
-              // Estimate if we have time to fit this job before the fixed appointment
-              const travelTimeEstimate = Math.ceil(nearestDist / 30 * 60); // 30 mph average
-              const jobDuration = (remainingFlexible[nearestIdx].estimatedDuration || 1) * 60; // hours to minutes
-              const currentTime = finalSchedule.length > 0
-                ? new Date(finalSchedule[finalSchedule.length - 1].endTime).getTime()
-                : startOfDay(dateObj).getTime() + 8 * 60 * 60 * 1000; // 8 AM default
-
-              const neededTime = currentTime + (travelTimeEstimate + jobDuration) * 60 * 1000;
-
-              if (neededTime <= slotTime) {
-                // We can fit this job
-                const flexJob = remainingFlexible.splice(nearestIdx, 1)[0];
-                finalSchedule.push(flexJob);
-                currentLocation = { latitude: flexJob.lat, longitude: flexJob.lng };
-              } else {
-                // No time before this fixed slot, break
-                break;
-              }
-            }
-
-            // Add the fixed/window job
-            finalSchedule.push(slot.job);
-            currentLocation = { latitude: slot.job.lat, longitude: slot.job.lng };
-          }
-
-          // Add remaining flexible jobs after the last fixed appointment
           while (remainingFlexible.length > 0 && currentLocation) {
+            // Find nearest flexible job to current location
             let nearestIdx = 0;
             let nearestDist = Infinity;
 
@@ -287,16 +319,49 @@ export async function POST(req: Request) {
               }
             }
 
-            const flexJob = remainingFlexible.splice(nearestIdx, 1)[0];
-            finalSchedule.push(flexJob);
-            currentLocation = { latitude: flexJob.lat, longitude: flexJob.lng };
+            // Estimate time needed for this flexible job
+            const travelTime = Math.ceil(nearestDist / AVG_SPEED_MPH * 60);
+            const jobDuration = (remainingFlexible[nearestIdx].estimatedDuration || 1) * 60;
+            const neededTime = currentTimeEstimate + (travelTime + jobDuration) * 60 * 1000;
+
+            // Check if we can fit this job before the anchor
+            if (neededTime <= anchorTime - 15 * 60 * 1000) { // 15 min buffer
+              const flexJob = remainingFlexible.splice(nearestIdx, 1)[0];
+              finalSchedule.push(flexJob);
+              currentLocation = { latitude: flexJob.lat, longitude: flexJob.lng };
+              currentTimeEstimate = neededTime;
+            } else {
+              break; // No more flexible jobs fit before this anchor
+            }
           }
 
-          optimizedJobs = finalSchedule;
-        } else {
-          // No fixed/window jobs, use pure nearest-neighbor
-          optimizedJobs = timeSlots.map(s => s.job);
+          // Add the anchor job
+          finalSchedule.push(anchorJob);
+          currentLocation = { latitude: anchorJob.lat, longitude: anchorJob.lng };
         }
+
+        // Add remaining flexible jobs after all anchors (in optimal order)
+        while (remainingFlexible.length > 0 && currentLocation) {
+          let nearestIdx = 0;
+          let nearestDist = Infinity;
+
+          for (let f = 0; f < remainingFlexible.length; f++) {
+            const dist = calculateHaversineDistance(currentLocation, {
+              latitude: remainingFlexible[f].lat,
+              longitude: remainingFlexible[f].lng,
+            });
+            if (dist.miles < nearestDist) {
+              nearestDist = dist.miles;
+              nearestIdx = f;
+            }
+          }
+
+          const flexJob = remainingFlexible.splice(nearestIdx, 1)[0];
+          finalSchedule.push(flexJob);
+          currentLocation = { latitude: flexJob.lat, longitude: flexJob.lng };
+        }
+
+        optimizedJobs = finalSchedule;
       } else {
         // All flexible - pure nearest-neighbor optimization from start location
         let currentLocation = startPoint || (jobsWithCoords.length > 0 ? {
@@ -330,36 +395,66 @@ export async function POST(req: Request) {
       // Calculate AFTER distance
       const afterMiles = calculateTotalRouteDistance(startPoint, optimizedJobs);
 
-      // Build reordered jobs list for UI
+      // Calculate ETAs for the optimized route
+      const scheduledJobs = calculateETAs(optimizedJobs, startPoint, dateObj);
+
+      // Build reordered jobs list for UI with new ETAs
       const optimizedOrder = optimizedJobs.map(j => j.id);
       const reorderedJobs = [];
+      const conflicts = [];
 
-      for (let o = 0; o < optimizedOrder.length; o++) {
-        const jobId = optimizedOrder[o];
-        const oldIdx = originalOrder.indexOf(jobId);
+      for (let o = 0; o < scheduledJobs.length; o++) {
+        const scheduledJob = scheduledJobs[o];
+        const oldIdx = originalOrder.indexOf(scheduledJob.id);
+
+        // Check for conflicts (late to fixed/window appointments)
+        if (scheduledJob.isLate) {
+          conflicts.push({
+            service: scheduledJob.serviceType,
+            customer: scheduledJob.customer?.name || 'Unknown',
+            scheduledTime: format(new Date(scheduledJob.startTime), 'h:mm a'),
+            eta: format(scheduledJob.eta, 'h:mm a'),
+            lateByMinutes: scheduledJob.lateByMinutes,
+          });
+        }
+
         if (oldIdx !== o) {
-          const job = optimizedJobs[o];
           reorderedJobs.push({
-            service: job.serviceType,
-            customer: job.customer?.name || 'Unknown',
+            service: scheduledJob.serviceType,
+            customer: scheduledJob.customer?.name || 'Unknown',
             oldOrder: oldIdx + 1,
             newOrder: o + 1,
+            oldTime: format(new Date(scheduledJob.startTime), 'h:mm a'),
+            newTime: format(scheduledJob.eta, 'h:mm a'),
           });
         }
       }
 
-      // Update database with new route order
-      for (let o = 0; o < optimizedOrder.length; o++) {
+      // Update database with new route order AND new start times
+      for (let o = 0; o < scheduledJobs.length; o++) {
+        const scheduledJob = scheduledJobs[o];
+
+        // Calculate new end time based on ETA and duration
+        const durationMinutes = (scheduledJob.estimatedDuration || 1) * 60;
+        const newEndTime = addMinutes(scheduledJob.eta, durationMinutes);
+
         await prisma.job.update({
-          where: { id: optimizedOrder[o] },
-          data: { routeOrder: o + 1 },
+          where: { id: scheduledJob.id },
+          data: {
+            routeOrder: o + 1,
+            // Only update times for flexible/anytime jobs
+            // Keep fixed/window appointment times intact
+            ...(scheduledJob.appointmentType !== 'fixed' && scheduledJob.appointmentType !== 'window' ? {
+              startTime: scheduledJob.eta,
+              endTime: newEndTime,
+            } : {}),
+          },
         });
       }
 
       // Calculate actual savings
       const savedMiles = Math.max(0, beforeMiles - afterMiles);
-      // Estimate time savings: assume 30 mph average + 2 min per stop saved
-      const savedMinutes = Math.round(savedMiles / 30 * 60 + reorderedJobs.length * 2);
+      const savedMinutes = Math.round(savedMiles / AVG_SPEED_MPH * 60 + reorderedJobs.length * 2);
 
       totalSavedMiles += savedMiles;
       totalSavedMinutes += savedMinutes;
@@ -373,6 +468,7 @@ export async function POST(req: Request) {
         savedMiles: Math.round(savedMiles * 10) / 10,
         savedMinutes,
         reorderedJobs,
+        conflicts,
       });
     }
 

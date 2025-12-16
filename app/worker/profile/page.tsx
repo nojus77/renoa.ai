@@ -32,6 +32,8 @@ import {
   Pencil,
   Sun,
   Moon,
+  MapPin,
+  Navigation,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import {
@@ -77,6 +79,8 @@ interface UserProfile {
   commissionRate: number | null;
   workingHours: Record<string, { start: string; end: string }> | null;
   homeAddress: string | null;
+  homeLatitude: number | null;
+  homeLongitude: number | null;
   workerSkills: Skill[];
   equipment?: string[];
   provider: {
@@ -224,6 +228,11 @@ export default function WorkerProfile() {
   // Theme state
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
+  // Home address state
+  const [homeAddress, setHomeAddress] = useState('');
+  const [homeAddressModalOpen, setHomeAddressModalOpen] = useState(false);
+  const [savingHomeAddress, setSavingHomeAddress] = useState(false);
+
   const fetchProfile = useCallback(async (uid: string) => {
     try {
       const res = await fetch(`/api/worker/profile?userId=${uid}`);
@@ -253,6 +262,11 @@ export default function WorkerProfile() {
         if (data.user.equipment) {
           setEquipment(data.user.equipment);
           setSelectedEquipment(data.user.equipment);
+        }
+
+        // Initialize home address
+        if (data.user.homeAddress) {
+          setHomeAddress(data.user.homeAddress);
         }
       }
     } catch (error) {
@@ -458,6 +472,43 @@ export default function WorkerProfile() {
     if (customEquipment.trim() && !selectedEquipment.includes(customEquipment.trim())) {
       setSelectedEquipment([...selectedEquipment, customEquipment.trim()]);
       setCustomEquipment('');
+    }
+  };
+
+  const handleSaveHomeAddress = async () => {
+    if (!profile) return;
+    setSavingHomeAddress(true);
+
+    try {
+      const res = await fetch('/api/worker/profile', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: profile.id,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          phone: profile.phone,
+          homeAddress: homeAddress.trim() || null,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        setProfile({
+          ...profile,
+          homeAddress: homeAddress.trim() || null,
+          homeLatitude: data.user?.homeLatitude || null,
+          homeLongitude: data.user?.homeLongitude || null,
+        });
+        toast.success('Home address updated!');
+        setHomeAddressModalOpen(false);
+      } else {
+        toast.error(data.error || 'Failed to update home address');
+      }
+    } catch {
+      toast.error('Connection error');
+    } finally {
+      setSavingHomeAddress(false);
     }
   };
 
@@ -831,6 +882,58 @@ export default function WorkerProfile() {
                   )}
                 </div>
               </div>
+
+              {/* Home Address Card */}
+              <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A]">
+                <div className="p-6 border-b border-[#2A2A2A] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Navigation className="w-5 h-5" style={{ color: LIME_GREEN }} />
+                    <h2 className="text-lg font-semibold text-white">Home Address</h2>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setHomeAddress(profile?.homeAddress || '');
+                      setHomeAddressModalOpen(true);
+                    }}
+                    className="flex items-center gap-1 text-sm font-medium px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ color: LIME_GREEN, backgroundColor: `${LIME_GREEN}15` }}
+                  >
+                    <Pencil className="w-3.5 h-3.5" />
+                    Edit
+                  </button>
+                </div>
+                <div className="p-6">
+                  {profile?.homeAddress ? (
+                    <div className="flex items-start gap-3">
+                      <MapPin className="w-5 h-5 text-zinc-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="text-white">{profile.homeAddress}</p>
+                        {profile.homeLatitude && profile.homeLongitude && (
+                          <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
+                            <Check className="w-3 h-3" />
+                            Location verified for route optimization
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6">
+                      <div className="w-12 h-12 bg-zinc-800 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <MapPin className="w-6 h-6 text-zinc-600" />
+                      </div>
+                      <p className="text-zinc-500 text-sm">No home address set</p>
+                      <p className="text-zinc-600 text-xs mt-1">Used to optimize your daily routes</p>
+                      <button
+                        onClick={() => setHomeAddressModalOpen(true)}
+                        className="mt-3 text-sm font-medium"
+                        style={{ color: LIME_GREEN }}
+                      >
+                        + Add your home address
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Right Column */}
@@ -1192,6 +1295,50 @@ export default function WorkerProfile() {
                   style={{ backgroundColor: LIME_GREEN }}
                 >
                   {savingEquipment ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Equipment'}
+                </button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Home Address Edit Modal */}
+        <Dialog open={homeAddressModalOpen} onOpenChange={setHomeAddressModalOpen}>
+          <DialogContent className="bg-zinc-900 border-zinc-800 max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-white">Edit Home Address</DialogTitle>
+              <DialogDescription className="text-zinc-400">
+                Your home address is used to optimize your daily routes, starting from your home.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-zinc-400 mb-2">Home Address</label>
+                <input
+                  type="text"
+                  value={homeAddress}
+                  onChange={(e) => setHomeAddress(e.target.value)}
+                  placeholder="123 Main St, City, State ZIP"
+                  className="w-full h-11 px-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-600 focus:border-[#C4F542] focus:outline-none"
+                />
+                <p className="text-xs text-zinc-500 mt-2">
+                  Enter your full address including city, state, and ZIP code for accurate routing.
+                </p>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setHomeAddressModalOpen(false)}
+                  className="flex-1 h-11 bg-zinc-800 hover:bg-zinc-700 text-white font-medium rounded-xl transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveHomeAddress}
+                  disabled={savingHomeAddress}
+                  className="flex-1 h-11 text-black font-medium rounded-xl transition-colors flex items-center justify-center"
+                  style={{ backgroundColor: LIME_GREEN }}
+                >
+                  {savingHomeAddress ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Save Address'}
                 </button>
               </div>
             </div>
