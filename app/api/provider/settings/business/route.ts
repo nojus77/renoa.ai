@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { geocodeAddress } from '@/lib/geocode';
 
 export async function POST(request: NextRequest) {
   try {
@@ -70,6 +71,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Geocode the business address for route optimization
+    const fullAddress = `${businessAddress.trim()}, ${city.trim()}, ${state.trim()} ${zipCode.trim()}`;
+    let officeLatitude: number | null = null;
+    let officeLongitude: number | null = null;
+
+    try {
+      const coords = await geocodeAddress(fullAddress);
+      if (coords) {
+        officeLatitude = coords.lat;
+        officeLongitude = coords.lng;
+        console.log(`[Business Settings] Geocoded office: ${fullAddress} -> ${officeLatitude}, ${officeLongitude}`);
+      } else {
+        console.warn(`[Business Settings] Could not geocode address: ${fullAddress}`);
+      }
+    } catch (geocodeError) {
+      console.error('[Business Settings] Geocoding error:', geocodeError);
+      // Continue without coordinates - don't fail the entire save
+    }
+
     // Update provider business settings
     const provider = await prisma.provider.update({
       where: { id: providerId },
@@ -85,6 +105,9 @@ export async function POST(request: NextRequest) {
         website: website || undefined,
         businessHours: businessHours || undefined,
         timeZone: timeZone || undefined,
+        // Save geocoded coordinates
+        officeLatitude,
+        officeLongitude,
         updatedAt: new Date(),
       },
       select: {
@@ -100,6 +123,8 @@ export async function POST(request: NextRequest) {
         website: true,
         businessHours: true,
         timeZone: true,
+        officeLatitude: true,
+        officeLongitude: true,
       },
     });
 
@@ -143,6 +168,8 @@ export async function GET(request: NextRequest) {
         website: true,
         businessHours: true,
         timeZone: true,
+        officeLatitude: true,
+        officeLongitude: true,
       },
     });
 

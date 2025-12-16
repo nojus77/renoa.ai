@@ -411,6 +411,9 @@ model Provider {
   city                       String?
   state                      String?
   zipCode                    String?                      @map("zip_code")
+  // Office location for route optimization
+  officeLatitude             Float?                       @map("office_latitude")
+  officeLongitude            Float?                       @map("office_longitude")
   taxId                      String?                      @map("tax_id")
   businessEntity             String?                      @map("business_entity")
   serviceRadius              Int                          @default(25)

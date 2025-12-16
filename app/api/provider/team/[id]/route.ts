@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { geocodeAddress } from '@/lib/geocode';
 
 const prisma = new PrismaClient();
 
@@ -55,9 +56,9 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status, role, hourlyRate, payType, commissionRate, firstName, lastName, phone, skills, color, changedBy, canCreateJobs, jobsNeedApproval } = body;
+    const { status, role, hourlyRate, payType, commissionRate, firstName, lastName, phone, skills, color, changedBy, canCreateJobs, jobsNeedApproval, homeAddress } = body;
 
-    console.log('📝 Team member update request:', { id, payType, hourlyRate, commissionRate });
+    console.log('📝 Team member update request:', { id, payType, hourlyRate, commissionRate, homeAddress });
 
     // Get current user data before update (for status change logging)
     const currentUser = await prisma.providerUser.findUnique({
@@ -94,6 +95,37 @@ export async function PATCH(
     if (color !== undefined) updateData.color = color;
     if (canCreateJobs !== undefined) updateData.canCreateJobs = canCreateJobs;
     if (jobsNeedApproval !== undefined) updateData.jobsNeedApproval = jobsNeedApproval;
+
+    // Handle home address update with geocoding
+    if (homeAddress !== undefined) {
+      updateData.homeAddress = homeAddress || null;
+
+      // Geocode the address if provided
+      if (homeAddress && homeAddress.trim()) {
+        try {
+          const coords = await geocodeAddress(homeAddress.trim());
+          if (coords) {
+            updateData.homeLatitude = coords.lat;
+            updateData.homeLongitude = coords.lng;
+            console.log(`📍 Geocoded home address: ${homeAddress} -> ${coords.lat}, ${coords.lng}`);
+          } else {
+            console.warn(`⚠️ Could not geocode home address: ${homeAddress}`);
+            // Clear coordinates if we can't geocode
+            updateData.homeLatitude = null;
+            updateData.homeLongitude = null;
+          }
+        } catch (geocodeError) {
+          console.error('Geocoding error:', geocodeError);
+          // Don't fail the update, just clear coordinates
+          updateData.homeLatitude = null;
+          updateData.homeLongitude = null;
+        }
+      } else {
+        // Clear coordinates if address is cleared
+        updateData.homeLatitude = null;
+        updateData.homeLongitude = null;
+      }
+    }
 
     console.log('📝 Updating with data:', updateData);
 

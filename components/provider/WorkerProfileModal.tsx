@@ -49,6 +49,7 @@ import {
   Coffee,
   Briefcase,
   ChevronRight,
+  MapPin,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { format, parseISO } from 'date-fns';
@@ -79,6 +80,9 @@ interface ProfileData {
     createdAt: string;
     canCreateJobs: boolean;
     jobsNeedApproval: boolean;
+    homeAddress: string | null;
+    homeLatitude: number | null;
+    homeLongitude: number | null;
   };
   skills: Array<{
     id: string;
@@ -169,12 +173,14 @@ export default function WorkerProfileModal({
   const [editingSkills, setEditingSkills] = useState(false);
   const [editingPermissions, setEditingPermissions] = useState(false);
   const [editingRole, setEditingRole] = useState(false);
+  const [editingHomeAddress, setEditingHomeAddress] = useState(false);
 
   // Form values
   const [contactForm, setContactForm] = useState({ phone: '' });
   const [payForm, setPayForm] = useState({ payType: 'hourly', hourlyRate: '', commissionRate: '' });
   const [permissionsForm, setPermissionsForm] = useState({ canCreateJobs: false, jobsNeedApproval: false });
   const [roleForm, setRoleForm] = useState({ role: 'field', status: 'active' });
+  const [homeAddressForm, setHomeAddressForm] = useState({ homeAddress: '' });
 
   // Skills management
   const [availableSkills, setAvailableSkills] = useState<AvailableSkill[]>([]);
@@ -191,6 +197,7 @@ export default function WorkerProfileModal({
   const [savingPermissions, setSavingPermissions] = useState(false);
   const [savingRole, setSavingRole] = useState(false);
   const [savingSkill, setSavingSkill] = useState(false);
+  const [savingHomeAddress, setSavingHomeAddress] = useState(false);
 
   const fetchProfile = useCallback(async () => {
     if (!workerId) return;
@@ -221,6 +228,9 @@ export default function WorkerProfileModal({
       setRoleForm({
         role: data.user.role || 'field',
         status: data.user.status || 'active',
+      });
+      setHomeAddressForm({
+        homeAddress: data.user.homeAddress || '',
       });
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -297,6 +307,7 @@ export default function WorkerProfileModal({
       setEditingSkills(false);
       setEditingPermissions(false);
       setEditingRole(false);
+      setEditingHomeAddress(false);
       fetchProfile();
     }
   }, [isOpen, workerId, initialTab, fetchProfile]);
@@ -460,6 +471,34 @@ export default function WorkerProfileModal({
       toast.error('Failed to save');
     } finally {
       setSavingRole(false);
+    }
+  };
+
+  const saveHomeAddress = async () => {
+    if (!workerId) return;
+    setSavingHomeAddress(true);
+    try {
+      const res = await fetch(`/api/provider/team/${workerId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          homeAddress: homeAddressForm.homeAddress || null,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        toast.error(data.error);
+        return;
+      }
+      toast.success('Home address updated');
+      setEditingHomeAddress(false);
+      fetchProfile();
+      onUpdate?.();
+    } catch (error) {
+      console.error('Error saving home address:', error);
+      toast.error('Failed to save');
+    } finally {
+      setSavingHomeAddress(false);
     }
   };
 
@@ -856,6 +895,60 @@ export default function WorkerProfileModal({
                                 <Badge variant={profile.user.jobsNeedApproval ? 'default' : 'outline'} className={profile.user.jobsNeedApproval ? 'bg-yellow-500/20 text-yellow-400' : 'bg-emerald-500/20 text-emerald-400'}>
                                   {profile.user.jobsNeedApproval ? 'Yes' : 'No'}
                                 </Badge>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Home Address - For Route Optimization */}
+                    {profile.user.role === 'field' && (
+                      <div className="bg-zinc-800/30 rounded-lg p-4">
+                        <SectionHeader
+                          title="Home Address (for route optimization)"
+                          isEditing={editingHomeAddress}
+                          onEdit={() => {
+                            setHomeAddressForm({
+                              homeAddress: profile.user.homeAddress || '',
+                            });
+                            setEditingHomeAddress(true);
+                          }}
+                          onSave={saveHomeAddress}
+                          onCancel={() => setEditingHomeAddress(false)}
+                          saving={savingHomeAddress}
+                        />
+                        {editingHomeAddress ? (
+                          <div className="space-y-3">
+                            <div className="flex items-start gap-3">
+                              <MapPin className="w-4 h-4 text-zinc-500 mt-2" />
+                              <Input
+                                value={homeAddressForm.homeAddress}
+                                onChange={(e) => setHomeAddressForm({ homeAddress: e.target.value })}
+                                placeholder="123 Main St, City, State ZIP"
+                                className="flex-1 bg-zinc-800 border-zinc-700 h-8"
+                              />
+                            </div>
+                            <p className="text-xs text-zinc-500">
+                              Used to calculate optimal routes starting from worker&apos;s home location.
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {profile.user.homeAddress ? (
+                              <div className="flex items-center gap-3">
+                                <MapPin className="w-4 h-4 text-zinc-500" />
+                                <span className="text-sm text-zinc-300">{profile.user.homeAddress}</span>
+                                {profile.user.homeLatitude && profile.user.homeLongitude && (
+                                  <Badge variant="outline" className="text-xs bg-emerald-500/10 text-emerald-400 border-emerald-500/30">
+                                    Geocoded
+                                  </Badge>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-3 text-zinc-500">
+                                <MapPin className="w-4 h-4" />
+                                <span className="text-sm italic">Not set - will use office location</span>
                               </div>
                             )}
                           </div>

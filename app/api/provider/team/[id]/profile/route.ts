@@ -309,6 +309,9 @@ export async function GET(
         createdAt: user.createdAt.toISOString(),
         canCreateJobs: user.canCreateJobs,
         jobsNeedApproval: user.jobsNeedApproval,
+        homeAddress: user.homeAddress,
+        homeLatitude: user.homeLatitude,
+        homeLongitude: user.homeLongitude,
       },
       skills,
       stats: {
