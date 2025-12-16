@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   format,
@@ -34,6 +34,9 @@ import {
   ChevronRight,
   ChevronLeft,
   Briefcase,
+  Clock,
+  User,
+  X,
 } from 'lucide-react';
 
 interface Worker {
@@ -89,6 +92,34 @@ interface HomeData {
   revenueHistory: RevenueDataPoint[];
 }
 
+interface DateBreakdownJob {
+  id: string;
+  serviceType: string;
+  address: string;
+  startTime: string;
+  endTime: string;
+  status: string;
+  amount: number | null;
+  customerName: string;
+  customerPhone: string;
+  assignedUsers: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    profilePhotoUrl: string | null;
+  }[];
+}
+
+interface DateBreakdown {
+  date: string;
+  jobs: DateBreakdownJob[];
+  summary: {
+    totalJobs: number;
+    completedJobs: number;
+    totalRevenue: number;
+  };
+}
+
 // Generate test data for a specific date range
 // Uses seeded random based on date for consistent values
 function generateTestDataForRange(startDate: Date, endDate: Date): RevenueDataPoint[] {
@@ -137,6 +168,12 @@ export default function ProviderHome() {
   const [homeData, setHomeData] = useState<HomeData | null>(null);
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
+
+  // Date breakdown state (for graph click interaction)
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dateBreakdown, setDateBreakdown] = useState<DateBreakdown | null>(null);
+  const [loadingBreakdown, setLoadingBreakdown] = useState(false);
+  const breakdownRef = useRef<HTMLDivElement>(null);
 
   // Get date range based on view mode
   const dateRange = useMemo(() => {
@@ -187,6 +224,61 @@ export default function ProviderHome() {
       setCurrentDate(addMonths(currentDate, 1));
     }
   };
+
+  // Handle graph click to show job breakdown
+  const handleGraphClick = useCallback(async (data: RevenueDataPoint) => {
+    if (!providerId || !data.date) return;
+
+    // Toggle off if clicking the same date
+    if (selectedDate === data.date) {
+      setSelectedDate(null);
+      setDateBreakdown(null);
+      return;
+    }
+
+    setSelectedDate(data.date);
+    setLoadingBreakdown(true);
+
+    try {
+      const res = await fetch(`/api/provider/jobs/by-date?providerId=${providerId}&date=${data.date}`);
+      const result = await res.json();
+
+      if (result.success && result.data) {
+        setDateBreakdown(result.data);
+      } else {
+        setDateBreakdown(null);
+      }
+    } catch (error) {
+      console.error('Error fetching date breakdown:', error);
+      setDateBreakdown(null);
+    } finally {
+      setLoadingBreakdown(false);
+    }
+  }, [providerId, selectedDate]);
+
+  // Close breakdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (breakdownRef.current && !breakdownRef.current.contains(event.target as Node)) {
+        setSelectedDate(null);
+        setDateBreakdown(null);
+      }
+    };
+
+    if (selectedDate) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [selectedDate]);
+
+  // Close breakdown when changing date range
+  useEffect(() => {
+    setSelectedDate(null);
+    setDateBreakdown(null);
+  }, [viewMode, currentDate]);
 
   const loadData = useCallback(async (id: string) => {
     try {
@@ -490,6 +582,13 @@ export default function ProviderHome() {
                     <AreaChart
                       data={chartData}
                       margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
+                      onClick={(data) => {
+                        const payload = (data as { activePayload?: Array<{ payload: RevenueDataPoint }> })?.activePayload?.[0]?.payload;
+                        if (payload) {
+                          handleGraphClick(payload);
+                        }
+                      }}
+                      style={{ cursor: 'pointer' }}
                     >
                       <defs>
                         <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
@@ -530,11 +629,133 @@ export default function ProviderHome() {
                         strokeWidth={2.5}
                         fill="url(#colorRevenue)"
                         dot={false}
-                        activeDot={{ r: 5, fill: '#1A5F4F', strokeWidth: 2, stroke: '#fff' }}
+                        activeDot={{
+                          r: 6,
+                          fill: '#1A5F4F',
+                          strokeWidth: 2,
+                          stroke: '#fff',
+                          cursor: 'pointer',
+                        }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
+
+                {/* Date Breakdown Dropdown */}
+                {selectedDate && (
+                  <div
+                    ref={breakdownRef}
+                    className="mt-4 bg-muted/30 rounded-xl border border-border overflow-hidden"
+                  >
+                    {/* Header */}
+                    <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                        <span className="font-medium text-foreground">
+                          {format(new Date(selectedDate + 'T12:00:00'), 'EEEE, MMMM d, yyyy')}
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedDate(null);
+                          setDateBreakdown(null);
+                        }}
+                        className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                      >
+                        <X className="h-4 w-4 text-muted-foreground" />
+                      </button>
+                    </div>
+
+                    {/* Content */}
+                    <div className="p-4">
+                      {loadingBreakdown ? (
+                        <div className="flex items-center justify-center py-8">
+                          <div className="animate-pulse text-muted-foreground">Loading jobs...</div>
+                        </div>
+                      ) : dateBreakdown?.jobs.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                          <Briefcase className="h-8 w-8 mb-2 opacity-50" />
+                          <p className="text-sm">No jobs scheduled for this day</p>
+                        </div>
+                      ) : (
+                        <>
+                          {/* Summary */}
+                          {dateBreakdown && (
+                            <div className="grid grid-cols-3 gap-4 mb-4">
+                              <div className="text-center p-3 bg-background rounded-lg">
+                                <p className="text-lg font-bold text-foreground">{dateBreakdown.summary.totalJobs}</p>
+                                <p className="text-xs text-muted-foreground">Total Jobs</p>
+                              </div>
+                              <div className="text-center p-3 bg-background rounded-lg">
+                                <p className="text-lg font-bold text-emerald-600">{dateBreakdown.summary.completedJobs}</p>
+                                <p className="text-xs text-muted-foreground">Completed</p>
+                              </div>
+                              <div className="text-center p-3 bg-background rounded-lg">
+                                <p className="text-lg font-bold text-foreground">{formatCurrency(dateBreakdown.summary.totalRevenue)}</p>
+                                <p className="text-xs text-muted-foreground">Revenue</p>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Job Cards */}
+                          <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                            {dateBreakdown?.jobs.map((job) => (
+                              <button
+                                key={job.id}
+                                onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                                className="w-full p-4 bg-background hover:bg-muted/40 rounded-xl text-left transition-colors border border-border/50"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <p className="font-medium text-foreground truncate">{job.serviceType}</p>
+                                      <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
+                                        job.status === 'completed'
+                                          ? 'bg-emerald-500/10 text-emerald-600'
+                                          : job.status === 'in_progress'
+                                          ? 'bg-orange-500/10 text-orange-600'
+                                          : job.status === 'cancelled'
+                                          ? 'bg-red-500/10 text-red-600'
+                                          : 'bg-blue-500/10 text-blue-600'
+                                      }`}>
+                                        {job.status.replace('_', ' ')}
+                                      </span>
+                                    </div>
+                                    <p className="text-sm text-muted-foreground truncate">{job.customerName}</p>
+                                    {job.address && (
+                                      <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
+                                        <MapPin className="h-3 w-3 flex-shrink-0" />
+                                        <span className="truncate">{job.address}</span>
+                                      </div>
+                                    )}
+                                    <div className="flex items-center gap-3 mt-2">
+                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <Clock className="h-3 w-3" />
+                                        <span>{format(new Date(job.startTime), 'h:mm a')} - {format(new Date(job.endTime), 'h:mm a')}</span>
+                                      </div>
+                                      {job.assignedUsers.length > 0 && (
+                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                          <User className="h-3 w-3" />
+                                          <span>{job.assignedUsers.map(u => `${u.firstName} ${u.lastName.charAt(0)}.`).join(', ')}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                    {job.amount !== null && (
+                                      <p className="text-sm font-semibold text-emerald-600">{formatCurrency(job.amount)}</p>
+                                    )}
+                                    <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 ml-auto" />
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Stats Row */}
                 <div className="grid grid-cols-3 gap-4 pt-4 mt-2 border-t border-border">
