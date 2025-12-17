@@ -363,11 +363,35 @@ export default function WorkerMessages() {
 
   const handleSelectConversation = (conversation: Conversation) => {
     setSelectedConversation(conversation);
+    // Immediately mark as read in local state and dispatch event
+    if (conversation.unread || conversation.unreadCount > 0) {
+      setConversations(prev => prev.map(c =>
+        c.id === conversation.id ? { ...c, unread: false, unreadCount: 0 } : c
+      ));
+      window.dispatchEvent(new CustomEvent('messagesRead'));
+    }
     fetchCustomerMessages(conversation.customerId);
   };
 
   const handleSelectTeamChat = (chatId: string) => {
     setSelectedTeamChat(chatId);
+    // Immediately mark as read in local state and dispatch event
+    if (chatId === 'team' && teamChat?.unreadCount) {
+      setTeamChat(prev => prev ? { ...prev, unreadCount: 0 } : null);
+      window.dispatchEvent(new CustomEvent('messagesRead'));
+    } else if (chatId.startsWith('crew-')) {
+      const crewId = chatId.replace('crew-', '');
+      setCrews(prev => prev.map(c =>
+        c.crewId === crewId ? { ...c, unreadCount: 0 } : c
+      ));
+      window.dispatchEvent(new CustomEvent('messagesRead'));
+    } else if (chatId !== 'team') {
+      // Direct message to team member
+      setTeamMembers(prev => prev.map(m =>
+        m.id === chatId ? { ...m, unreadCount: 0 } : m
+      ));
+      window.dispatchEvent(new CustomEvent('messagesRead'));
+    }
     fetchTeamMessages(chatId);
   };
 
