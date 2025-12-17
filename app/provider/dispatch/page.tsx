@@ -164,15 +164,26 @@ export default function DispatchPage() {
       customer: string | null;
       reason: string;
     }>;
+    skillMismatches: Array<{
+      jobId: string;
+      jobTitle: string;
+      serviceType: string;
+      assignedWorkerId: string;
+      assignedWorkerName: string;
+      workerSkills: string[];
+      requiredSkills: string[];
+    }>;
     totalSavedMiles: number;
     totalSavedMinutes: number;
     summary: {
       totalWorkers: number;
       totalJobs: number;
       unassignedCount: number;
+      skillMismatchCount: number;
       avgJobsPerWorker: number;
     };
   } | null>(null);
+  const [showSkillMismatchModal, setShowSkillMismatchModal] = useState(false);
 
   // Check theme
   useEffect(() => {
@@ -361,9 +372,15 @@ export default function DispatchPage() {
         message += ` (${data.summary.unassignedCount} jobs need manual assignment)`;
       }
 
+      // Check for skill mismatches
+      const hasIssues = (data.unassignableJobs?.length > 0) || (data.skillMismatches?.length > 0);
+      if (data.skillMismatches?.length > 0) {
+        setShowSkillMismatchModal(true);
+      }
+
       setNotification({
         message,
-        type: data.unassignableJobs?.length > 0 ? 'error' : 'success'
+        type: hasIssues ? 'error' : 'success'
       });
 
       // Refresh data to show updated assignments
@@ -924,6 +941,90 @@ export default function DispatchPage() {
             </div>
           </div>
         </div>
+
+        {/* Skill Mismatch Modal */}
+        {showSkillMismatchModal && optimizationResult?.skillMismatches && optimizationResult.skillMismatches.length > 0 && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-card border border-border rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  <h3 className="font-semibold text-foreground">
+                    Skill Mismatches Found
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowSkillMismatchModal(false)}
+                  className="p-1 hover:bg-accent rounded"
+                >
+                  <XCircle className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
+
+              <div className="p-4 overflow-y-auto flex-1">
+                <p className="text-sm text-muted-foreground mb-4">
+                  {optimizationResult.skillMismatches.length} job(s) are assigned to workers without the required skills:
+                </p>
+
+                <div className="space-y-3">
+                  {optimizationResult.skillMismatches.map((mismatch) => (
+                    <div
+                      key={mismatch.jobId}
+                      className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground text-sm truncate">
+                            {mismatch.jobTitle}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Assigned to: <span className="text-amber-600 font-medium">{mismatch.assignedWorkerName}</span>
+                          </p>
+                          <div className="mt-2 text-xs">
+                            <p className="text-muted-foreground">
+                              Worker skills: {mismatch.workerSkills.length > 0 ? mismatch.workerSkills.slice(0, 3).join(', ') : 'None'}
+                              {mismatch.workerSkills.length > 3 && ` +${mismatch.workerSkills.length - 3} more`}
+                            </p>
+                            <p className="text-amber-600 mt-0.5">
+                              Needs: {mismatch.requiredSkills.slice(0, 3).join(' or ')}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            router.push(`/provider/jobs/${mismatch.jobId}`);
+                            setShowSkillMismatchModal(false);
+                          }}
+                          className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
+                        >
+                          Reassign
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-border flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowSkillMismatchModal(false)}
+                >
+                  Ignore for Now
+                </Button>
+                <Button
+                  onClick={() => {
+                    // Open calendar to reassign
+                    router.push('/provider/calendar');
+                    setShowSkillMismatchModal(false);
+                  }}
+                >
+                  View Calendar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </ProviderLayout>
   );

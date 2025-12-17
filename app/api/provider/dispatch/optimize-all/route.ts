@@ -448,12 +448,39 @@ export async function POST(req: Request) {
     const assignedJobs: JobWithCoords[] = [];
     const unassignedJobs: JobWithCoords[] = [];
 
+    // Track skill mismatches in existing assignments
+    const skillMismatches: Array<{
+      jobId: string;
+      jobTitle: string;
+      serviceType: string;
+      assignedWorkerId: string;
+      assignedWorkerName: string;
+      workerSkills: string[];
+      requiredSkills: string[];
+    }> = [];
+
     for (const job of jobsWithCoords) {
       if (job.assignedUserIds.length > 0) {
         // Find which worker(s) this job is assigned to
         for (const workerId of job.assignedUserIds) {
           const worker = workerMap.get(workerId);
           if (worker) {
+            // Check if worker has skills for this job
+            const requiredSkills = getRequiredSkillsForJob(job.serviceType);
+            const hasSkills = workerCanDoJob(worker.skills, job.serviceType);
+
+            if (!hasSkills && requiredSkills.length > 0) {
+              skillMismatches.push({
+                jobId: job.id,
+                jobTitle: `${job.serviceType} - ${job.customer?.name || 'Unknown'}`,
+                serviceType: job.serviceType,
+                assignedWorkerId: workerId,
+                assignedWorkerName: `${worker.firstName} ${worker.lastName}`,
+                workerSkills: worker.skills,
+                requiredSkills,
+              });
+            }
+
             worker.assignedJobs.push(job);
           }
         }
@@ -629,12 +656,14 @@ export async function POST(req: Request) {
       success: true,
       workers: workerResults,
       unassignableJobs,
+      skillMismatches,
       totalSavedMiles: Math.round(totalSavedMiles * 10) / 10,
       totalSavedMinutes,
       summary: {
         totalWorkers: workerResults.length,
         totalJobs: workerResults.reduce((sum, w) => sum + w.jobCount, 0),
         unassignedCount: unassignableJobs.length,
+        skillMismatchCount: skillMismatches.length,
         avgJobsPerWorker: workerResults.length > 0
           ? Math.round(workerResults.reduce((sum, w) => sum + w.jobCount, 0) / workerResults.length * 10) / 10
           : 0,
