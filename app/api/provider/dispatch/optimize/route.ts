@@ -35,6 +35,63 @@ interface ScheduledJob extends JobWithCoords {
   lateByMinutes: number;
 }
 
+interface SkillMismatch {
+  jobId: string;
+  jobTitle: string;
+  serviceType: string;
+  assignedWorkerId: string;
+  assignedWorkerName: string;
+  workerSkills: string[];
+  requiredSkills: string[];
+}
+
+/**
+ * Skill mapping for job types - worker needs ANY of these skills
+ */
+function getRequiredSkillsForJob(serviceType: string): string[] {
+  const skillMap: Record<string, string[]> = {
+    'Lawn Mowing': ['Lawn Mowing', 'Lawn Care', 'Mowing', 'Lawn Edging', 'Lawn', 'Zero-Turn Mower', 'Walk-Behind Mower', 'Edging & Trimming'],
+    'Lawn Edging': ['Lawn Edging', 'Edging & Trimming', 'Lawn Mowing', 'Lawn Care', 'Lawn', 'Mowing', 'String Trimmer', 'Edger'],
+    'Tree Trimming': ['Tree Trimming', 'Pruning', 'Tree Work', 'Trimming & Pruning', 'Chainsaw Operation'],
+    'Tree Removal': ['Tree Removal', 'Tree Work', 'Tree Trimming', 'Chainsaw Operation', 'ISA Certified Arborist'],
+    'Trimming & Pruning': ['Trimming & Pruning', 'Pruning', 'Tree Trimming', 'Bush/Shrub Pruning', 'Hedge Trimming', 'Landscaping', 'Lawn Care'],
+    'Landscaping': ['Landscaping', 'Planting', 'Garden Bed Maintenance', 'Landscape Design', 'Mulching', 'Lawn Care'],
+    'Planting': ['Planting (Shrubs)', 'Planting (Flowers)', 'Planting (Trees)', 'Planting', 'Landscaping', 'Garden Bed Maintenance', 'Lawn Care', 'Mulching', 'Edging & Trimming'],
+    'Mulching': ['Mulching', 'Landscaping', 'Garden Bed Maintenance', 'Planting', 'Planting (Shrubs)', 'Planting (Flowers)', 'Lawn Care', 'Edging & Trimming'],
+    'Hardscaping': ['Hardscaping', 'Paver Installation', 'Retaining Wall', 'Concrete Work', 'Stone Work'],
+    'Irrigation': ['Irrigation', 'Sprinkler Repair', 'Sprinkler Installation', 'Irrigation Repair', 'Irrigation Installation'],
+    'Fertilization': ['Fertilization', 'Lawn Treatment', 'Pesticide Applicator License', 'Weed Control', 'Lawn Care'],
+    'Hedge Trimming': ['Hedge Trimming', 'Bush/Shrub Pruning', 'Pruning', 'Trimming & Pruning'],
+    'Spring Cleanup': ['Spring Cleanup', 'Fall Cleanup', 'Cleanup', 'Leaf Removal', 'Lawn Care', 'Debris Removal', 'Lawn Mowing', 'Leaf Blower'],
+    'Fall Cleanup': ['Fall Cleanup', 'Spring Cleanup', 'Cleanup', 'Leaf Removal', 'Lawn Care', 'Debris Removal', 'Leaf Blower'],
+    'Leaf Removal': ['Leaf Removal', 'Fall Cleanup', 'Spring Cleanup', 'Cleanup', 'Leaf Blower', 'Debris Removal', 'Lawn Care', 'Lawn Mowing'],
+    'Aeration': ['Aeration', 'Lawn Care', 'Lawn Mowing', 'Lawn Treatment'],
+    'Seeding': ['Seeding', 'Seeding & Overseeding', 'Lawn Care', 'Sod Installation', 'Aeration'],
+  };
+  return skillMap[serviceType] || [];
+}
+
+/**
+ * Check if worker has skills for a job (with fuzzy matching)
+ */
+function workerCanDoJob(workerSkills: string[], serviceType: string): boolean {
+  const requiredSkills = getRequiredSkillsForJob(serviceType);
+
+  // If no specific skills required, any worker can do it
+  if (requiredSkills.length === 0) return true;
+
+  // Check if worker has ANY of the required skills (fuzzy match)
+  return requiredSkills.some(required =>
+    workerSkills.some(workerSkill => {
+      const reqLower = required.toLowerCase();
+      const skillLower = workerSkill.toLowerCase();
+      return skillLower === reqLower ||
+        skillLower.includes(reqLower) ||
+        reqLower.includes(skillLower);
+    })
+  );
+}
+
 /**
  * Calculate total route distance for a list of jobs
  */
@@ -173,7 +230,7 @@ export async function POST(req: Request) {
     let totalSavedMiles = 0;
     let totalSavedMinutes = 0;
 
-    // Get workers with their home locations
+    // Get workers with their home locations and skills
     const workers = await prisma.providerUser.findMany({
       where: workerIds?.length > 0
         ? { id: { in: workerIds }, providerId }
@@ -184,8 +241,16 @@ export async function POST(req: Request) {
         lastName: true,
         homeLatitude: true,
         homeLongitude: true,
+        workerSkills: {
+          include: {
+            skill: true,
+          },
+        },
       },
     });
+
+    // Track skill mismatches across all workers
+    const skillMismatches: SkillMismatch[] = [];
 
     console.log('[Optimize API] Workers found:', workers.length, workers.map(w => w.firstName));
 
@@ -233,6 +298,27 @@ export async function POST(req: Request) {
           conflicts: [],
         });
         continue;
+      }
+
+      // Get worker skills
+      const workerSkills = worker.workerSkills?.map(ws => ws.skill.name) || [];
+
+      // Check for skill mismatches in this worker's jobs
+      for (const job of jobs) {
+        const requiredSkills = getRequiredSkillsForJob(job.serviceType);
+        const hasSkills = workerCanDoJob(workerSkills, job.serviceType);
+
+        if (!hasSkills && requiredSkills.length > 0) {
+          skillMismatches.push({
+            jobId: job.id,
+            jobTitle: `${job.serviceType} - ${job.customer?.name || 'Unknown'}`,
+            serviceType: job.serviceType,
+            assignedWorkerId: worker.id,
+            assignedWorkerName: workerName,
+            workerSkills,
+            requiredSkills,
+          });
+        }
       }
 
       // Get jobs with coordinates
@@ -475,8 +561,12 @@ export async function POST(req: Request) {
     return NextResponse.json({
       success: true,
       workerResults,
+      skillMismatches,
       totalSavedMiles: Math.round(totalSavedMiles * 10) / 10,
       totalSavedMinutes,
+      summary: {
+        skillMismatchCount: skillMismatches.length,
+      },
     });
   } catch (error) {
     console.error('[Optimize API] Error:', error);

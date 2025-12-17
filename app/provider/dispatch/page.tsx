@@ -566,6 +566,20 @@ export default function DispatchPage() {
               <p className="text-sm text-muted-foreground">No jobs assigned yet</p>
             )}
           </div>
+
+          {/* Skill Mismatch Warning Banner */}
+          {optimizationResult?.skillMismatches && optimizationResult.skillMismatches.length > 0 && (
+            <button
+              onClick={() => setShowSkillMismatchModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-lg hover:bg-amber-500/20 transition-colors"
+            >
+              <AlertTriangle className="w-4 h-4 text-amber-500" />
+              <span className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+                {optimizationResult.skillMismatches.length} job{optimizationResult.skillMismatches.length > 1 ? 's' : ''} assigned to workers without required skills
+              </span>
+              <ChevronRight className="w-4 h-4 text-amber-500" />
+            </button>
+          )}
         </div>
 
         {/* Main Content - Map and Panels */}
