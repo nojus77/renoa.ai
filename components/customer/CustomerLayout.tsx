@@ -128,7 +128,7 @@ export default function CustomerLayout({ children }: CustomerLayoutProps) {
                 </Link>
               )}
               <span className="text-sm text-zinc-600">
-                Hi, <span className="font-semibold text-zinc-900">{customer.name.split(' ')[0]}</span>
+                Hi, <span className="font-semibold text-zinc-900">{customer.name?.split(' ')[0] || 'there'}</span>
               </span>
               <Button
                 onClick={handleLogout}
