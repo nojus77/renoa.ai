@@ -37,6 +37,8 @@ import {
   Clock,
   User,
   X,
+  AlertTriangle,
+  Users,
 } from 'lucide-react';
 
 interface Worker {
@@ -75,6 +77,8 @@ interface Stats {
   newLeadsCount: number;
   completedThisWeek: number;
   completedThisMonth: number;
+  jobsNeedingAssignment: number;
+  overdueJobsCount: number;
 }
 
 interface RevenueDataPoint {
@@ -300,6 +304,8 @@ export default function ProviderHome() {
             newLeadsCount: 0,
             completedThisWeek: 0,
             completedThisMonth: 0,
+            jobsNeedingAssignment: 0,
+            overdueJobsCount: 0,
           },
           revenueHistory: hasRealData
             ? result.data.revenueHistory.map((d: RevenueDataPoint) => ({
@@ -332,6 +338,8 @@ export default function ProviderHome() {
             newLeadsCount: 5,
             completedThisWeek: 18,
             completedThisMonth: 67,
+            jobsNeedingAssignment: 0,
+            overdueJobsCount: 0,
           },
           revenueHistory: testData,
         });
@@ -358,6 +366,8 @@ export default function ProviderHome() {
           newLeadsCount: 5,
           completedThisWeek: 18,
           completedThisMonth: 67,
+          jobsNeedingAssignment: 0,
+          overdueJobsCount: 0,
         },
         revenueHistory: testData,
       });
@@ -897,11 +907,45 @@ export default function ProviderHome() {
             </div>
 
             {/* FULL WIDTH ROW - Needs Attention */}
-            {(stats.pendingInvoicesCount > 0 || stats.newLeadsCount > 0) && (
+            {(stats.pendingInvoicesCount > 0 || stats.newLeadsCount > 0 || stats.jobsNeedingAssignment > 0 || stats.overdueJobsCount > 0) && (
               <div className="lg:col-span-12">
                 <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
                   <h3 className="text-base font-semibold text-foreground mb-3">Needs Attention</h3>
                   <div className="flex flex-wrap gap-3">
+                    {stats.overdueJobsCount > 0 && (
+                      <button
+                        onClick={() => router.push('/provider/jobs')}
+                        className="flex items-center gap-3 px-4 py-3 bg-red-500/10 hover:bg-red-500/15 rounded-xl transition-colors"
+                      >
+                        <AlertTriangle className="h-5 w-5 text-red-600" />
+                        <div className="text-left">
+                          <p className="text-sm font-medium text-foreground">
+                            {stats.overdueJobsCount} overdue {stats.overdueJobsCount === 1 ? 'job' : 'jobs'}
+                          </p>
+                          <p className="text-xs text-red-600 font-semibold">
+                            Past scheduled time
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-red-600 ml-2" />
+                      </button>
+                    )}
+                    {stats.jobsNeedingAssignment > 0 && (
+                      <button
+                        onClick={() => router.push('/provider/calendar')}
+                        className="flex items-center gap-3 px-4 py-3 bg-orange-500/10 hover:bg-orange-500/15 rounded-xl transition-colors"
+                      >
+                        <Users className="h-5 w-5 text-orange-600" />
+                        <div className="text-left">
+                          <p className="text-sm font-medium text-foreground">
+                            {stats.jobsNeedingAssignment} {stats.jobsNeedingAssignment === 1 ? 'job needs' : 'jobs need'} crew
+                          </p>
+                          <p className="text-xs text-orange-600 font-semibold">
+                            No workers assigned
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-orange-600 ml-2" />
+                      </button>
+                    )}
                     {stats.pendingInvoicesCount > 0 && (
                       <button
                         onClick={() => router.push('/provider/invoices')}
@@ -910,7 +954,7 @@ export default function ProviderHome() {
                         <DollarSign className="h-5 w-5 text-amber-600" />
                         <div className="text-left">
                           <p className="text-sm font-medium text-foreground">
-                            {stats.pendingInvoicesCount} unpaid invoices
+                            {stats.pendingInvoicesCount} unpaid {stats.pendingInvoicesCount === 1 ? 'invoice' : 'invoices'}
                           </p>
                           <p className="text-xs text-amber-600 font-semibold">
                             {formatCurrency(stats.pendingInvoicesAmount)}
@@ -927,7 +971,7 @@ export default function ProviderHome() {
                         <TrendingUp className="h-5 w-5 text-purple-600" />
                         <div className="text-left">
                           <p className="text-sm font-medium text-foreground">
-                            {stats.newLeadsCount} new leads
+                            {stats.newLeadsCount} new {stats.newLeadsCount === 1 ? 'lead' : 'leads'}
                           </p>
                           <p className="text-xs text-purple-600 font-semibold">
                             Review matches

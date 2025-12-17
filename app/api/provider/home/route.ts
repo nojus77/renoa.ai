@@ -196,6 +196,61 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // DEBUG: Log leads info for this provider
+    const allProviderLeads = await prisma.lead.findMany({
+      where: { assignedProviderId: providerId },
+      select: { id: true, status: true, firstName: true, lastName: true },
+    });
+    console.log('🎯 DEBUG - Leads for provider:', {
+      providerId,
+      totalLeads: allProviderLeads.length,
+      newLeadsCount: newLeads,
+      leadStatuses: allProviderLeads.map(l => l.status),
+      leads: allProviderLeads.slice(0, 5).map(l => ({
+        id: l.id.slice(-6),
+        status: l.status,
+        name: `${l.firstName} ${l.lastName}`,
+      })),
+    });
+
+    // Get jobs needing crew assignment (scheduled but no workers assigned)
+    const jobsNeedingAssignment = await prisma.job.count({
+      where: {
+        providerId,
+        status: {
+          in: ['scheduled', 'pending'],
+        },
+        startTime: {
+          gte: todayStart,
+          lte: next7Days,
+        },
+        assignedUserIds: {
+          isEmpty: true,
+        },
+      },
+    });
+
+    // Get overdue jobs (past end time but not completed)
+    const overdueJobs = await prisma.job.count({
+      where: {
+        providerId,
+        status: {
+          in: ['scheduled', 'in_progress'],
+        },
+        endTime: {
+          lt: now,
+        },
+      },
+    });
+
+    console.log('🔔 DEBUG - Alerts for provider:', {
+      providerId,
+      pendingInvoices,
+      newLeads,
+      jobsNeedingAssignment,
+      overdueJobs,
+    });
+
     // Get recent activity (last 7 days)
     const sevenDaysAgo = new Date(now);
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
@@ -359,6 +414,8 @@ export async function GET(request: NextRequest) {
           newLeadsCount: newLeads,
           completedThisWeek: weeklyJobs.length,
           completedThisMonth: monthlyJobs.length,
+          jobsNeedingAssignment,
+          overdueJobsCount: overdueJobs,
         },
         recentActivity: activity,
         revenueHistory,
