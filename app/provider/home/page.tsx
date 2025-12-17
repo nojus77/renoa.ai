@@ -14,6 +14,9 @@ import {
   subMonths,
   isFuture,
   eachDayOfInterval,
+  isToday,
+  isTomorrow,
+  addDays,
 } from 'date-fns';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import {
@@ -44,6 +47,7 @@ import {
   ClockAlert,
   FileWarning,
   CalendarX,
+  Hash,
 } from 'lucide-react';
 
 interface Worker {
@@ -82,6 +86,9 @@ interface Stats {
   newLeadsCount: number;
   completedThisWeek: number;
   completedThisMonth: number;
+  activeJobsThisMonth?: number;
+  averageJobValue?: number;
+  totalJobValue?: number;
 }
 
 interface WorkerAlert {
@@ -145,7 +152,6 @@ interface DateBreakdown {
 }
 
 // Generate test data for a specific date range
-// Uses seeded random based on date for consistent values
 function generateTestDataForRange(startDate: Date, endDate: Date): RevenueDataPoint[] {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -154,7 +160,6 @@ function generateTestDataForRange(startDate: Date, endDate: Date): RevenueDataPo
     const dateStr = format(date, 'yyyy-MM-dd');
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
     const baseAmount = isWeekend ? 320 : 180;
-    // Use date string hash for consistent "random" variation
     const hash = dateStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const variation = ((hash % 180) - 60);
     const amount = Math.max(50, baseAmount + variation);
@@ -168,8 +173,8 @@ function generateTestDataForRange(startDate: Date, endDate: Date): RevenueDataPo
   });
 }
 
-// Custom tooltip for the chart with click hint
-function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; payload: RevenueDataPoint }>; label?: string }) {
+// Custom tooltip for the chart
+function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: RevenueDataPoint }>; label?: string }) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
@@ -197,7 +202,7 @@ export default function ProviderHome() {
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
 
-  // Date breakdown state (for graph click interaction)
+  // Date breakdown state
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [dateBreakdown, setDateBreakdown] = useState<DateBreakdown | null>(null);
   const [loadingBreakdown, setLoadingBreakdown] = useState(false);
@@ -206,8 +211,8 @@ export default function ProviderHome() {
   // Get date range based on view mode
   const dateRange = useMemo(() => {
     if (viewMode === 'week') {
-      const start = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday
-      const end = endOfWeek(currentDate, { weekStartsOn: 1 }); // Sunday
+      const start = startOfWeek(currentDate, { weekStartsOn: 1 });
+      const end = endOfWeek(currentDate, { weekStartsOn: 1 });
       return { start, end };
     } else {
       const start = startOfMonth(currentDate);
@@ -216,16 +221,14 @@ export default function ProviderHome() {
     }
   }, [viewMode, currentDate]);
 
-  // Format date label for display
   const dateLabel = useMemo(() => {
     if (viewMode === 'week') {
-      return `Week of ${format(dateRange.start, 'MMM d')}-${format(dateRange.end, 'd')}`;
+      return `${format(dateRange.start, 'MMM d')} - ${format(dateRange.end, 'MMM d')}`;
     } else {
       return format(currentDate, 'MMMM yyyy');
     }
   }, [viewMode, dateRange, currentDate]);
 
-  // Navigation handlers
   const canGoNext = useMemo(() => {
     if (viewMode === 'week') {
       const nextWeekStart = startOfWeek(addWeeks(currentDate, 1), { weekStartsOn: 1 });
@@ -253,11 +256,9 @@ export default function ProviderHome() {
     }
   };
 
-  // Handle graph click to show job breakdown
   const handleGraphClick = useCallback(async (data: RevenueDataPoint) => {
     if (!providerId || !data.date) return;
 
-    // Toggle off if clicking the same date
     if (selectedDate === data.date) {
       setSelectedDate(null);
       setDateBreakdown(null);
@@ -284,7 +285,6 @@ export default function ProviderHome() {
     }
   }, [providerId, selectedDate]);
 
-  // Close breakdown on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (breakdownRef.current && !breakdownRef.current.contains(event.target as Node)) {
@@ -302,7 +302,6 @@ export default function ProviderHome() {
     };
   }, [selectedDate]);
 
-  // Close breakdown when changing date range
   useEffect(() => {
     setSelectedDate(null);
     setDateBreakdown(null);
@@ -351,7 +350,6 @@ export default function ProviderHome() {
               ),
         });
       } else {
-        // Use test data for demonstration
         const testData = generateTestDataForRange(
           startOfMonth(subMonths(new Date(), 1)),
           new Date()
@@ -378,7 +376,6 @@ export default function ProviderHome() {
       }
     } catch (error) {
       console.error('Error loading home data:', error);
-      // Use test data on error
       const testData = generateTestDataForRange(
         startOfMonth(subMonths(new Date(), 1)),
         new Date()
@@ -441,16 +438,12 @@ export default function ProviderHome() {
     }).format(amount);
   };
 
-  // Filter chart data based on selected date range
   const chartData = useMemo(() => {
-    // Always generate the full date range for the selected period
     const fullRangeData = generateTestDataForRange(dateRange.start, dateRange.end);
 
-    // If we have real revenue history, merge it in
     if (homeData?.revenueHistory && homeData.revenueHistory.length > 0) {
       const revenueMap = new Map(homeData.revenueHistory.map(d => [d.date, d.amount]));
 
-      // Update generated data with real values where available
       fullRangeData.forEach(d => {
         const realAmount = revenueMap.get(d.date);
         if (realAmount !== undefined) {
@@ -459,15 +452,12 @@ export default function ProviderHome() {
       });
     }
 
-    // Add display labels
     if (viewMode === 'week') {
-      // Week: Show all 7 days with day abbreviation
       return fullRangeData.map(d => ({
         ...d,
-        displayLabel: format(new Date(d.date + 'T12:00:00'), 'EEE'), // Add time to avoid timezone issues
+        displayLabel: format(new Date(d.date + 'T12:00:00'), 'EEE'),
       }));
     } else {
-      // Month: Show every 5th day as number
       return fullRangeData.map((d, i) => {
         const dayNum = new Date(d.date + 'T12:00:00').getDate();
         const showLabel = dayNum === 1 || dayNum % 5 === 0 || i === fullRangeData.length - 1;
@@ -483,7 +473,6 @@ export default function ProviderHome() {
     return chartData.reduce((sum, d) => sum + d.amount, 0);
   }, [chartData]);
 
-  // Check if there's any revenue data to display
   const hasRevenueData = useMemo(() => {
     return chartData.some(d => d.amount > 0);
   }, [chartData]);
@@ -498,14 +487,32 @@ export default function ProviderHome() {
     return Math.round(totalRevenue / jobsCompleted);
   }, [totalRevenue, jobsCompleted]);
 
-  // Calculate week-over-week change
-  const weekChange = useMemo(() => {
-    if (!homeData?.revenueHistory || homeData.revenueHistory.length < 14) return 12;
-    const thisWeek = homeData.revenueHistory.slice(-7).reduce((sum, d) => sum + d.amount, 0);
-    const lastWeek = homeData.revenueHistory.slice(-14, -7).reduce((sum, d) => sum + d.amount, 0);
-    if (lastWeek === 0) return 100;
-    return Math.round(((thisWeek - lastWeek) / lastWeek) * 100);
-  }, [homeData?.revenueHistory]);
+  // Group upcoming jobs by date
+  const groupedUpcomingJobs = useMemo(() => {
+    if (!homeData?.upcomingJobs) return [];
+
+    const groups: { date: string; label: string; jobs: UpcomingJob[] }[] = [];
+    const jobsByDate = new Map<string, UpcomingJob[]>();
+
+    homeData.upcomingJobs.forEach(job => {
+      const dateKey = format(new Date(job.startTime), 'yyyy-MM-dd');
+      if (!jobsByDate.has(dateKey)) {
+        jobsByDate.set(dateKey, []);
+      }
+      jobsByDate.get(dateKey)!.push(job);
+    });
+
+    jobsByDate.forEach((jobs, dateKey) => {
+      const jobDate = new Date(dateKey + 'T12:00:00');
+      let label = format(jobDate, 'EEE, MMM d');
+      if (isToday(jobDate)) label = 'Today';
+      else if (isTomorrow(jobDate)) label = 'Tomorrow';
+
+      groups.push({ date: dateKey, label, jobs });
+    });
+
+    return groups.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 7);
+  }, [homeData?.upcomingJobs]);
 
   if (loading) {
     return (
@@ -527,545 +534,439 @@ export default function ProviderHome() {
     );
   }
 
-  const { todaysJobs, upcomingJobs, stats, alerts } = homeData;
+  const { todaysJobs, stats, alerts } = homeData;
+
+  // Calculate metrics
+  const numberOfJobs = viewMode === 'week' ? stats.completedThisWeek : stats.completedThisMonth;
+  const averageJobSize = avgPerJob;
+  const totalJobValue = totalRevenue;
+
+  // Check if there are any alerts
+  const hasAlerts = alerts.scheduleConflicts > 0 ||
+    alerts.unassignedJobs > 0 ||
+    alerts.unconfirmedSoonJobs > 0 ||
+    alerts.overdueInvoices > 0 ||
+    alerts.overdueJobs > 0;
 
   return (
     <ProviderLayout providerName={providerName}>
-      {/* Main Container */}
       <div className="w-full bg-background">
-        <div className="max-w-[1400px] mx-auto px-6 py-5">
+        <div className="px-6 py-5">
 
-          {/* Needs Attention - TOP OF PAGE */}
-          {(() => {
-            const hasAlerts = alerts.scheduleConflicts > 0 ||
-              alerts.overloadedWorkers.length > 0 ||
-              alerts.underutilizedWorkers.length > 0 ||
-              alerts.unassignedJobs > 0 ||
-              alerts.unconfirmedSoonJobs > 0 ||
-              alerts.overdueInvoices > 0 ||
-              alerts.overdueJobs > 0;
+          {/* TOP ROW: Metrics + Chart */}
+          <div className="flex flex-col lg:flex-row gap-6 mb-6">
 
-            if (!hasAlerts) return null;
-
-            return (
-              <div className="mb-5">
-                <div className="bg-card rounded-2xl border border-border shadow-sm p-4">
-                  <h3 className="text-sm font-semibold text-foreground mb-3">Needs Attention</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {/* Schedule Conflicts - Highest Priority */}
-                    {alerts.scheduleConflicts > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/calendar')}
-                        className="flex items-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors"
-                      >
-                        <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-                        <div className="text-left min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">
-                            {alerts.scheduleConflicts} schedule {alerts.scheduleConflicts === 1 ? 'conflict' : 'conflicts'}
-                          </p>
-                        </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-red-600 flex-shrink-0 ml-auto" />
-                      </button>
-                    )}
-
-                    {/* Overdue Jobs */}
-                    {alerts.overdueJobs > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/jobs?status=overdue')}
-                        className="flex items-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 rounded-lg transition-colors"
-                      >
-                        <CalendarX className="h-4 w-4 text-red-600 flex-shrink-0" />
-                        <div className="text-left min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">
-                            {alerts.overdueJobs} overdue {alerts.overdueJobs === 1 ? 'job' : 'jobs'}
-                          </p>
-                        </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-red-600 flex-shrink-0 ml-auto" />
-                      </button>
-                    )}
-
-                    {/* Jobs Starting Soon Without Confirmation */}
-                    {alerts.unconfirmedSoonJobs > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/jobs?status=pending')}
-                        className="flex items-center gap-2 px-3 py-2.5 bg-orange-500/10 hover:bg-orange-500/20 rounded-lg transition-colors"
-                      >
-                        <ClockAlert className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                        <div className="text-left min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">
-                            {alerts.unconfirmedSoonJobs} starting soon
-                          </p>
-                        </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-orange-600 flex-shrink-0 ml-auto" />
-                      </button>
-                    )}
-
-                    {/* Unassigned Jobs */}
-                    {alerts.unassignedJobs > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/calendar')}
-                        className="flex items-center gap-2 px-3 py-2.5 bg-orange-500/10 hover:bg-orange-500/20 rounded-lg transition-colors"
-                      >
-                        <UserX className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                        <div className="text-left min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">
-                            {alerts.unassignedJobs} {alerts.unassignedJobs === 1 ? 'job' : 'jobs'} unassigned
-                          </p>
-                        </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-orange-600 flex-shrink-0 ml-auto" />
-                      </button>
-                    )}
-
-                    {/* Overloaded Workers */}
-                    {alerts.overloadedWorkers.length > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/team')}
-                        className="flex items-center gap-2 px-3 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors"
-                      >
-                        <Users className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                        <div className="text-left min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">
-                            {alerts.overloadedWorkers.length} overloaded
-                          </p>
-                        </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-amber-600 flex-shrink-0 ml-auto" />
-                      </button>
-                    )}
-
-                    {/* Underutilized Workers */}
-                    {alerts.underutilizedWorkers.length > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/team')}
-                        className="flex items-center gap-2 px-3 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 rounded-lg transition-colors"
-                      >
-                        <User className="h-4 w-4 text-blue-600 flex-shrink-0" />
-                        <div className="text-left min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">
-                            {alerts.underutilizedWorkers.length} underutilized
-                          </p>
-                        </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-blue-600 flex-shrink-0 ml-auto" />
-                      </button>
-                    )}
-
-                    {/* Overdue Invoices (>30 days) */}
-                    {alerts.overdueInvoices > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/invoices?status=overdue')}
-                        className="flex items-center gap-2 px-3 py-2.5 bg-amber-500/10 hover:bg-amber-500/20 rounded-lg transition-colors"
-                      >
-                        <FileWarning className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                        <div className="text-left min-w-0">
-                          <p className="text-xs font-medium text-foreground truncate">
-                            {alerts.overdueInvoices} overdue 30d+
-                          </p>
-                        </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-amber-600 flex-shrink-0 ml-auto" />
-                      </button>
-                    )}
+            {/* Left: 3 Metric Cards */}
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-4 lg:w-[280px] flex-shrink-0">
+              {/* Number of Jobs */}
+              <div className="flex-1 bg-emerald-500 rounded-2xl p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-4xl font-bold text-white">{numberOfJobs}</p>
+                    <p className="text-sm text-emerald-100 mt-1">Jobs Completed</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white/20">
+                    <Hash className="h-5 w-5 text-white" />
                   </div>
                 </div>
               </div>
-            );
-          })()}
 
-          {/* Main Grid: Revenue + Sidebar */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-
-            {/* LEFT COLUMN - Revenue (8 cols) */}
-            <div className="lg:col-span-8">
-
-              {/* Revenue Card */}
-              <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
-
-                {/* Card Header with Tabs and Navigation */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    {/* Tabs: Week/Month toggle + Stats */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <div className="flex bg-muted rounded-lg p-1">
-                        <button
-                          onClick={() => {
-                            setViewMode('week');
-                            setCurrentDate(new Date());
-                          }}
-                          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
-                            viewMode === 'week'
-                              ? 'bg-background text-foreground shadow-sm'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          Week
-                        </button>
-                        <button
-                          onClick={() => {
-                            setViewMode('month');
-                            setCurrentDate(new Date());
-                          }}
-                          className={`px-4 py-1.5 text-sm font-medium rounded-md transition-all ${
-                            viewMode === 'month'
-                              ? 'bg-background text-foreground shadow-sm'
-                              : 'text-muted-foreground hover:text-foreground'
-                          }`}
-                        >
-                          Month
-                        </button>
-                      </div>
-
-                      {/* Divider */}
-                      <div className="h-6 w-px bg-border" />
-
-                      {/* Inline Stats */}
-                      <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">Today:</span>
-                          <span className="text-sm font-semibold text-foreground">{stats.todaysJobsCount} jobs</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">Completed:</span>
-                          <span className="text-sm font-semibold text-foreground">{viewMode === 'week' ? stats.completedThisWeek : stats.completedThisMonth}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs text-muted-foreground">{viewMode === 'week' ? 'Weekly' : 'Monthly'}:</span>
-                          <span className="text-sm font-semibold text-emerald-600">{formatCurrency(viewMode === 'week' ? stats.weeklyRevenue : stats.monthlyRevenue)}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Big Revenue Number */}
-                    <p className="text-4xl font-bold text-foreground">
-                      {formatCurrency(totalRevenue)}
-                    </p>
+              {/* Average Job Size */}
+              <div className="flex-1 bg-emerald-500 rounded-2xl p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-4xl font-bold text-white">{formatCurrency(averageJobSize)}</p>
+                    <p className="text-sm text-emerald-100 mt-1">Average Job Size</p>
                   </div>
-
-                  {/* Date Navigation */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handlePrev}
-                      className="w-8 h-8 flex items-center justify-center rounded-lg bg-muted/50 border border-border hover:bg-muted transition-colors"
-                      aria-label="Previous period"
-                    >
-                      <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                    </button>
-
-                    <span className="text-sm text-muted-foreground min-w-[140px] text-center">
-                      {dateLabel}
-                    </span>
-
-                    <button
-                      onClick={handleNext}
-                      disabled={!canGoNext}
-                      className={`w-8 h-8 flex items-center justify-center rounded-lg border border-border transition-colors ${
-                        canGoNext
-                          ? 'bg-muted/50 hover:bg-muted'
-                          : 'opacity-30 cursor-not-allowed'
-                      }`}
-                      aria-label="Next period"
-                    >
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </button>
-
-                    {/* Trend Indicator */}
-                    <div className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ml-2 ${
-                      weekChange >= 0
-                        ? 'bg-emerald-500/10 text-emerald-600'
-                        : 'bg-red-500/10 text-red-600'
-                    }`}>
-                      {weekChange >= 0 ? (
-                        <TrendingUp className="h-3 w-3" />
-                      ) : (
-                        <TrendingDown className="h-3 w-3" />
-                      )}
-                      {weekChange >= 0 ? '+' : ''}{weekChange}%
-                    </div>
+                  <div className="p-2 rounded-lg bg-white/20">
+                    <TrendingUp className="h-5 w-5 text-white" />
                   </div>
                 </div>
-
-                {/* Chart Container - Compact height */}
-                <div className="h-[240px] w-full">
-                  {hasRevenueData ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <AreaChart
-                        data={chartData}
-                        margin={{ top: 10, right: 20, left: 10, bottom: 10 }}
-                        onClick={(data) => {
-                          const payload = (data as { activePayload?: Array<{ payload: RevenueDataPoint }> })?.activePayload?.[0]?.payload;
-                          if (payload) {
-                            handleGraphClick(payload);
-                          }
-                        }}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <defs>
-                          <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#1A5F4F" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="#1A5F4F" stopOpacity={0} />
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid
-                          strokeDasharray="3 3"
-                          stroke="currentColor"
-                          strokeOpacity={0.06}
-                          vertical={false}
-                        />
-                        <XAxis
-                          dataKey="displayLabel"
-                          stroke="currentColor"
-                          strokeOpacity={0.5}
-                          tick={{ fill: 'currentColor', opacity: 0.6, fontSize: 11 }}
-                          tickLine={false}
-                          axisLine={false}
-                          tickMargin={8}
-                        />
-                        <YAxis
-                          domain={[0, 'auto']}
-                          stroke="currentColor"
-                          strokeOpacity={0.5}
-                          tick={{ fill: 'currentColor', opacity: 0.6, fontSize: 11 }}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(value) => `$${value}`}
-                          width={55}
-                        />
-                        <Tooltip content={<CustomTooltip />} />
-                        <Area
-                          type="monotone"
-                          dataKey="amount"
-                          stroke="#1A5F4F"
-                          strokeWidth={2.5}
-                          fill="url(#colorRevenue)"
-                          dot={false}
-                          activeDot={{
-                            r: 6,
-                            fill: '#1A5F4F',
-                            strokeWidth: 2,
-                            stroke: '#fff',
-                            cursor: 'pointer',
-                          }}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                      <DollarSign className="h-12 w-12 mb-3 opacity-30" />
-                      <p className="text-sm font-medium">No revenue data for this period</p>
-                      <p className="text-xs mt-1">Complete jobs to see revenue here</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Date Breakdown Dropdown */}
-                {selectedDate && (
-                  <div
-                    ref={breakdownRef}
-                    className="mt-4 bg-muted/30 rounded-xl border border-border overflow-hidden"
-                  >
-                    {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
-                      <div className="flex items-center gap-3">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium text-foreground">
-                          {format(new Date(selectedDate + 'T12:00:00'), 'EEEE, MMMM d, yyyy')}
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setSelectedDate(null);
-                          setDateBreakdown(null);
-                        }}
-                        className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
-                      >
-                        <X className="h-4 w-4 text-muted-foreground" />
-                      </button>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-4">
-                      {loadingBreakdown ? (
-                        <div className="flex items-center justify-center py-8">
-                          <div className="animate-pulse text-muted-foreground">Loading jobs...</div>
-                        </div>
-                      ) : dateBreakdown?.jobs.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                          <Briefcase className="h-8 w-8 mb-2 opacity-50" />
-                          <p className="text-sm">No jobs scheduled for this day</p>
-                        </div>
-                      ) : (
-                        <>
-                          {/* Summary */}
-                          {dateBreakdown && (
-                            <div className="grid grid-cols-3 gap-4 mb-4">
-                              <div className="text-center p-3 bg-background rounded-lg">
-                                <p className="text-lg font-bold text-foreground">{dateBreakdown.summary.totalJobs}</p>
-                                <p className="text-xs text-muted-foreground">Total Jobs</p>
-                              </div>
-                              <div className="text-center p-3 bg-background rounded-lg">
-                                <p className="text-lg font-bold text-emerald-600">{dateBreakdown.summary.completedJobs}</p>
-                                <p className="text-xs text-muted-foreground">Completed</p>
-                              </div>
-                              <div className="text-center p-3 bg-background rounded-lg">
-                                <p className="text-lg font-bold text-foreground">{formatCurrency(dateBreakdown.summary.totalRevenue)}</p>
-                                <p className="text-xs text-muted-foreground">Revenue</p>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Job Cards */}
-                          <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                            {dateBreakdown?.jobs.map((job) => (
-                              <button
-                                key={job.id}
-                                onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                                className="w-full p-4 bg-background hover:bg-muted/40 rounded-xl text-left transition-colors border border-border/50"
-                              >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <p className="font-medium text-foreground truncate">{job.serviceType}</p>
-                                      <span className={`px-2 py-0.5 text-[10px] font-medium rounded-full ${
-                                        job.status === 'completed'
-                                          ? 'bg-emerald-500/10 text-emerald-600'
-                                          : job.status === 'in_progress'
-                                          ? 'bg-orange-500/10 text-orange-600'
-                                          : job.status === 'cancelled'
-                                          ? 'bg-red-500/10 text-red-600'
-                                          : 'bg-blue-500/10 text-blue-600'
-                                      }`}>
-                                        {job.status.replace('_', ' ')}
-                                      </span>
-                                    </div>
-                                    <p className="text-sm text-muted-foreground truncate">{job.customerName}</p>
-                                    {job.address && (
-                                      <div className="flex items-center gap-1.5 mt-1.5 text-xs text-muted-foreground">
-                                        <MapPin className="h-3 w-3 flex-shrink-0" />
-                                        <span className="truncate">{job.address}</span>
-                                      </div>
-                                    )}
-                                    <div className="flex items-center gap-3 mt-2">
-                                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                        <Clock className="h-3 w-3" />
-                                        <span>{format(new Date(job.startTime), 'h:mm a')} - {format(new Date(job.endTime), 'h:mm a')}</span>
-                                      </div>
-                                      {job.assignedUsers.length > 0 && (
-                                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                          <User className="h-3 w-3" />
-                                          <span>{job.assignedUsers.map(u => `${u.firstName} ${u.lastName.charAt(0)}.`).join(', ')}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div className="text-right flex-shrink-0">
-                                    {job.amount !== null && (
-                                      <p className="text-sm font-semibold text-emerald-600">{formatCurrency(job.amount)}</p>
-                                    )}
-                                    <ChevronRight className="h-4 w-4 text-muted-foreground mt-1 ml-auto" />
-                                  </div>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                )}
-
               </div>
 
+              {/* Total Job Value */}
+              <div className="flex-1 bg-emerald-500 rounded-2xl p-5">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-4xl font-bold text-white">{formatCurrency(totalJobValue)}</p>
+                    <p className="text-sm text-emerald-100 mt-1">Total Revenue</p>
+                  </div>
+                  <div className="p-2 rounded-lg bg-white/20">
+                    <DollarSign className="h-5 w-5 text-white" />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            {/* RIGHT COLUMN - Today & Coming Up (4 cols) */}
-            <div className="lg:col-span-4 flex flex-col gap-4">
-
-              {/* Today's Jobs */}
-              <div className="bg-card rounded-2xl border border-border shadow-sm p-4 flex-1 min-h-0 flex flex-col">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-base font-semibold text-foreground">Today</h3>
-                  <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-                    {todaysJobs.length} jobs
-                  </span>
+            {/* Right: Revenue Chart */}
+            <div className="flex-1 bg-card rounded-2xl border border-border shadow-sm p-5">
+              {/* Chart Header */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-4">
+                  <h2 className="text-lg font-semibold text-foreground">Revenue</h2>
+                  <div className="flex bg-muted rounded-lg p-1">
+                    <button
+                      onClick={() => {
+                        setViewMode('week');
+                        setCurrentDate(new Date());
+                      }}
+                      className={`px-3 py-1 text-sm font-medium rounded-md transition-all ${
+                        viewMode === 'week'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Week
+                    </button>
+                    <button
+                      onClick={() => {
+                        setViewMode('month');
+                        setCurrentDate(new Date());
+                      }}
+                      className={`px-3 py-1 text-sm font-medium rounded-md transition-all ${
+                        viewMode === 'month'
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      Month
+                    </button>
+                  </div>
+                  <div className="h-5 w-px bg-border" />
+                  <span className="text-sm text-muted-foreground">{jobsCompleted} completed</span>
+                  <span className="text-sm font-medium text-emerald-600">{formatCurrency(viewMode === 'week' ? stats.weeklyRevenue : stats.monthlyRevenue)}</span>
                 </div>
 
-                {todaysJobs.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                    <p className="text-sm">No jobs scheduled today</p>
-                  </div>
+                {/* Date Navigation */}
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handlePrev}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                  >
+                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                  <span className="text-sm text-muted-foreground min-w-[120px] text-center">{dateLabel}</span>
+                  <button
+                    onClick={handleNext}
+                    disabled={!canGoNext}
+                    className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
+                      canGoNext ? 'bg-muted/50 hover:bg-muted' : 'opacity-30 cursor-not-allowed'
+                    }`}
+                  >
+                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Chart */}
+              <div className="h-[200px] w-full">
+                {hasRevenueData ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart
+                      data={chartData}
+                      margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                      onClick={(data) => {
+                        const payload = (data as { activePayload?: Array<{ payload: RevenueDataPoint }> })?.activePayload?.[0]?.payload;
+                        if (payload) handleGraphClick(payload);
+                      }}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <defs>
+                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
+                      <XAxis
+                        dataKey="displayLabel"
+                        stroke="currentColor"
+                        strokeOpacity={0.5}
+                        tick={{ fill: 'currentColor', opacity: 0.6, fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis
+                        domain={[0, 'auto']}
+                        stroke="currentColor"
+                        strokeOpacity={0.5}
+                        tick={{ fill: 'currentColor', opacity: 0.6, fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => `$${value}`}
+                        width={50}
+                      />
+                      <Tooltip content={<CustomTooltip />} />
+                      <Area
+                        type="monotone"
+                        dataKey="amount"
+                        stroke="#10b981"
+                        strokeWidth={2}
+                        fill="url(#colorRevenue)"
+                        dot={false}
+                        activeDot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
                 ) : (
-                  <div className={`space-y-2 flex-1 ${todaysJobs.length > 3 ? 'overflow-y-auto pr-1' : ''}`}>
-                    {todaysJobs.slice(0, 3).map((job) => (
-                      <button
-                        key={job.id}
-                        onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                        className="w-full p-3 bg-muted/40 hover:bg-muted/60 rounded-xl text-left transition-colors"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1 min-w-0">
+                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                    <DollarSign className="h-10 w-10 mb-2 opacity-30" />
+                    <p className="text-sm">No revenue data for this period</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Date Breakdown */}
+              {selectedDate && (
+                <div ref={breakdownRef} className="mt-4 bg-muted/30 rounded-xl border border-border overflow-hidden">
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
+                    <div className="flex items-center gap-3">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium text-foreground">
+                        {format(new Date(selectedDate + 'T12:00:00'), 'EEEE, MMMM d, yyyy')}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => { setSelectedDate(null); setDateBreakdown(null); }}
+                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
+                    >
+                      <X className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                  <div className="p-4">
+                    {loadingBreakdown ? (
+                      <div className="flex items-center justify-center py-6">
+                        <div className="animate-pulse text-muted-foreground">Loading...</div>
+                      </div>
+                    ) : dateBreakdown?.jobs.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                        <Briefcase className="h-8 w-8 mb-2 opacity-50" />
+                        <p className="text-sm">No jobs scheduled</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-[200px] overflow-y-auto">
+                        {dateBreakdown?.jobs.map((job) => (
+                          <button
+                            key={job.id}
+                            onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                            className="w-full p-3 bg-background hover:bg-muted/40 rounded-lg text-left transition-colors"
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="font-medium text-foreground text-sm">{job.serviceType}</p>
+                                <p className="text-xs text-muted-foreground">{job.customerName}</p>
+                              </div>
+                              {job.amount !== null && (
+                                <p className="text-sm font-semibold text-emerald-600">{formatCurrency(job.amount)}</p>
+                              )}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* BOTTOM ROW: 3 Columns */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            {/* Column 1: Jobs Scheduled Today */}
+            <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
+                <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                  {todaysJobs.length}
+                </span>
+              </div>
+
+              {todaysJobs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <Calendar className="h-10 w-10 mb-2 opacity-30" />
+                  <p className="text-sm">No jobs scheduled today</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {todaysJobs.map((job) => (
+                    <button
+                      key={job.id}
+                      onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                      className="w-full p-3 bg-muted/40 hover:bg-muted/60 rounded-xl text-left transition-colors"
+                    >
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
                             <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
-                            <p className="text-xs text-muted-foreground truncate">{job.customerName}</p>
-                          </div>
-                          <div className="text-right ml-2">
-                            <p className="text-sm font-semibold text-emerald-600">{formatTime(job.startTime)}</p>
                             {job.status === 'in_progress' && (
                               <span className="inline-flex items-center text-[10px] text-orange-500 font-medium">
-                                <span className="w-1 h-1 bg-orange-500 rounded-full mr-1 animate-pulse" />
+                                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1 animate-pulse" />
                                 Active
                               </span>
                             )}
                           </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Coming Up */}
-              <div className="bg-card rounded-2xl border border-border shadow-sm p-4 flex-1 min-h-0 flex flex-col">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-base font-semibold text-foreground">Coming Up</h3>
-                  <button
-                    onClick={() => router.push('/provider/calendar')}
-                    className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
-                  >
-                    View all
-                    <ChevronRight className="h-3.5 w-3.5" />
-                  </button>
-                </div>
-
-                {upcomingJobs.length === 0 ? (
-                  <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground py-4">
-                    <Calendar className="h-8 w-8 mb-2 opacity-50" />
-                    <p className="text-sm">No upcoming jobs</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1.5 overflow-y-auto flex-1 pr-1">
-                    {upcomingJobs.slice(0, 4).map((job) => (
-                      <button
-                        key={job.id}
-                        onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                        className="w-full flex items-center justify-between p-2.5 hover:bg-muted/40 rounded-xl transition-colors"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-9 h-9 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0">
-                            <Briefcase className="h-4 w-4 text-muted-foreground" />
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {job.customerName && <span>{job.customerName} · </span>}
-                              {format(new Date(job.startTime), 'EEE, MMM d')} · {formatTime(job.startTime)}
-                            </p>
+                          <p className="text-xs text-muted-foreground truncate">{job.customerName}</p>
+                          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>{formatTime(job.startTime)}</span>
                           </div>
                         </div>
                         <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
+            {/* Column 2: Coming Up */}
+            <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-foreground">Coming Up</h3>
+                <button
+                  onClick={() => router.push('/provider/calendar')}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
+                >
+                  View all
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {groupedUpcomingJobs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <Calendar className="h-10 w-10 mb-2 opacity-30" />
+                  <p className="text-sm">No upcoming jobs</p>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                  {groupedUpcomingJobs.map((group) => (
+                    <div key={group.date}>
+                      <p className="text-xs font-medium text-muted-foreground mb-1.5">{group.label}</p>
+                      <div className="space-y-1">
+                        {group.jobs.map((job) => (
+                          <button
+                            key={job.id}
+                            onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                            className="w-full flex items-center justify-between p-2 hover:bg-muted/40 rounded-lg transition-colors"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0">
+                                <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
+                                <p className="text-xs text-muted-foreground">{formatTime(job.startTime)}</p>
+                              </div>
+                            </div>
+                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Column 3: Needs Attention */}
+            <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
+              <h3 className="text-base font-semibold text-foreground mb-4">Needs Attention</h3>
+
+              {!hasAlerts ? (
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                  <AlertTriangle className="h-10 w-10 mb-2 opacity-30" />
+                  <p className="text-sm">No issues to address</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {/* Schedule Conflicts */}
+                  {alerts.scheduleConflicts > 0 && (
+                    <button
+                      onClick={() => router.push('/provider/calendar')}
+                      className="w-full flex items-center gap-3 p-3 bg-red-500/10 hover:bg-red-500/15 rounded-lg transition-colors"
+                    >
+                      <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                      <div className="text-left flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {alerts.scheduleConflicts} schedule {alerts.scheduleConflicts === 1 ? 'conflict' : 'conflicts'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Overlapping jobs</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-red-600" />
+                    </button>
+                  )}
+
+                  {/* Overdue Jobs */}
+                  {alerts.overdueJobs > 0 && (
+                    <button
+                      onClick={() => router.push('/provider/jobs?status=overdue')}
+                      className="w-full flex items-center gap-3 p-3 bg-red-500/10 hover:bg-red-500/15 rounded-lg transition-colors"
+                    >
+                      <CalendarX className="h-4 w-4 text-red-600 flex-shrink-0" />
+                      <div className="text-left flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {alerts.overdueJobs} overdue {alerts.overdueJobs === 1 ? 'job' : 'jobs'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Past scheduled time</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-red-600" />
+                    </button>
+                  )}
+
+                  {/* Jobs Starting Soon */}
+                  {alerts.unconfirmedSoonJobs > 0 && (
+                    <button
+                      onClick={() => router.push('/provider/jobs?status=pending')}
+                      className="w-full flex items-center gap-3 p-3 bg-orange-500/10 hover:bg-orange-500/15 rounded-lg transition-colors"
+                    >
+                      <ClockAlert className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                      <div className="text-left flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {alerts.unconfirmedSoonJobs} starting soon
+                        </p>
+                        <p className="text-xs text-muted-foreground">Within 2 hours</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-orange-600" />
+                    </button>
+                  )}
+
+                  {/* Unassigned Jobs */}
+                  {alerts.unassignedJobs > 0 && (
+                    <button
+                      onClick={() => router.push('/provider/calendar')}
+                      className="w-full flex items-center gap-3 p-3 bg-orange-500/10 hover:bg-orange-500/15 rounded-lg transition-colors"
+                    >
+                      <UserX className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                      <div className="text-left flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {alerts.unassignedJobs} unassigned {alerts.unassignedJobs === 1 ? 'job' : 'jobs'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">No worker assigned</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-orange-600" />
+                    </button>
+                  )}
+
+                  {/* Overdue Invoices */}
+                  {alerts.overdueInvoices > 0 && (
+                    <button
+                      onClick={() => router.push('/provider/invoices?status=overdue')}
+                      className="w-full flex items-center gap-3 p-3 bg-amber-500/10 hover:bg-amber-500/15 rounded-lg transition-colors"
+                    >
+                      <FileWarning className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                      <div className="text-left flex-1">
+                        <p className="text-sm font-medium text-foreground">
+                          {alerts.overdueInvoices} overdue {alerts.overdueInvoices === 1 ? 'invoice' : 'invoices'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">30+ days unpaid</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-amber-600" />
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
