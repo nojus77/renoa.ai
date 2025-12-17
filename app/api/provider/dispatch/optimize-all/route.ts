@@ -27,6 +27,12 @@ interface JobWithCoords {
   lng: number;
   assignedUserIds: string[];
   customer: { name: string | null } | null;
+  // Skill requirements from job
+  requiredSkillIds: string[];
+  preferredSkillIds: string[];
+  requiredWorkerCount: number;
+  bufferMinutes: number;
+  allowUnqualified: boolean;
 }
 
 interface WorkerData {
@@ -36,6 +42,7 @@ interface WorkerData {
   homeLatitude: number | null;
   homeLongitude: number | null;
   skills: string[];
+  skillIds: string[]; // Worker's skill IDs for direct matching
   assignedJobs: JobWithCoords[];
   startPoint: Coordinates | null;
 }
@@ -74,6 +81,7 @@ function getRequiredSkillsForJob(serviceType: string): string[] {
 
 /**
  * Check if worker has skills for a job (with fuzzy matching)
+ * DEPRECATED: Use workerHasRequiredSkillIds for explicit skill matching
  */
 function workerCanDoJob(workerSkills: string[], serviceType: string): boolean {
   const requiredSkills = getRequiredSkillsForJob(serviceType);
@@ -91,6 +99,43 @@ function workerCanDoJob(workerSkills: string[], serviceType: string): boolean {
         reqLower.includes(skillLower);
     })
   );
+}
+
+/**
+ * Check if worker has ALL required skills (explicit ID matching)
+ * This is the preferred method when job has requiredSkillIds set
+ */
+function workerHasRequiredSkillIds(workerSkillIds: string[], requiredSkillIds: string[]): boolean {
+  // If no required skills, any worker can do it
+  if (!requiredSkillIds || requiredSkillIds.length === 0) return true;
+
+  // Worker must have ALL required skills
+  return requiredSkillIds.every(skillId => workerSkillIds.includes(skillId));
+}
+
+/**
+ * Get missing skill IDs that worker doesn't have
+ */
+function getMissingSkillIds(workerSkillIds: string[], requiredSkillIds: string[]): string[] {
+  if (!requiredSkillIds || requiredSkillIds.length === 0) return [];
+  return requiredSkillIds.filter(skillId => !workerSkillIds.includes(skillId));
+}
+
+/**
+ * Determine if worker is qualified for a job
+ * Uses explicit skill IDs if available, falls back to fuzzy matching
+ */
+function workerIsQualifiedForJob(worker: WorkerData, job: JobWithCoords): boolean {
+  // If job has allowUnqualified flag, anyone can do it
+  if (job.allowUnqualified) return true;
+
+  // Prefer explicit skill ID matching if job has requiredSkillIds
+  if (job.requiredSkillIds && job.requiredSkillIds.length > 0) {
+    return workerHasRequiredSkillIds(worker.skillIds, job.requiredSkillIds);
+  }
+
+  // Fall back to fuzzy matching for legacy jobs without skill IDs
+  return workerCanDoJob(worker.skills, job.serviceType);
 }
 
 /**
@@ -420,6 +465,12 @@ export async function POST(req: Request) {
         lng: j.longitude || j.customer?.longitude || 0,
         assignedUserIds: j.assignedUserIds,
         customer: j.customer,
+        // Include skill fields from job
+        requiredSkillIds: j.requiredSkillIds || [],
+        preferredSkillIds: j.preferredSkillIds || [],
+        requiredWorkerCount: j.requiredWorkerCount || 1,
+        bufferMinutes: j.bufferMinutes || 15,
+        allowUnqualified: j.allowUnqualified || false,
       }))
       .filter(j => j.lat !== 0 && j.lng !== 0);
 
@@ -439,10 +490,18 @@ export async function POST(req: Request) {
         homeLatitude: w.homeLatitude,
         homeLongitude: w.homeLongitude,
         skills: w.workerSkills.map(ws => ws.skill.name),
+        skillIds: w.workerSkills.map(ws => ws.skillId), // Include skill IDs for explicit matching
         assignedJobs: [],
         startPoint,
       });
     }
+
+    // Fetch all skills for this provider (for name lookups)
+    const allSkills = await prisma.skill.findMany({
+      where: { providerId },
+      select: { id: true, name: true },
+    });
+    const skillNameMap = new Map(allSkills.map(s => [s.id, s.name]));
 
     // Separate assigned vs unassigned jobs
     const assignedJobs: JobWithCoords[] = [];
@@ -456,20 +515,67 @@ export async function POST(req: Request) {
       assignedWorkerId: string;
       assignedWorkerName: string;
       workerSkills: string[];
+      workerSkillIds: string[];
       requiredSkills: string[];
+      requiredSkillIds: string[];
+      missingSkillIds: string[];
+      missingSkillNames: string[];
+    }> = [];
+
+    // Track jobs needing manual review
+    const needsReview: Array<{
+      jobId: string;
+      jobTitle: string;
+      serviceType: string;
+      reason: string;
+      message: string;
+      requiredWorkerCount?: number;
+      requiredSkillIds?: string[];
+      requiredSkillNames?: string[];
     }> = [];
 
     for (const job of jobsWithCoords) {
+      // Check for multi-worker jobs - these should never be auto-assigned
+      if (job.requiredWorkerCount > 1) {
+        needsReview.push({
+          jobId: job.id,
+          jobTitle: `${job.serviceType} - ${job.customer?.name || 'Unknown'}`,
+          serviceType: job.serviceType,
+          reason: 'MULTI_WORKER_REQUIRED',
+          message: `Requires ${job.requiredWorkerCount} workers`,
+          requiredWorkerCount: job.requiredWorkerCount,
+        });
+        // Still add to assigned jobs if it has assignments
+        if (job.assignedUserIds.length > 0) {
+          assignedJobs.push(job);
+          for (const workerId of job.assignedUserIds) {
+            const worker = workerMap.get(workerId);
+            if (worker) worker.assignedJobs.push(job);
+          }
+        } else {
+          unassignedJobs.push(job);
+        }
+        continue;
+      }
+
       if (job.assignedUserIds.length > 0) {
         // Find which worker(s) this job is assigned to
         for (const workerId of job.assignedUserIds) {
           const worker = workerMap.get(workerId);
           if (worker) {
-            // Check if worker has skills for this job
-            const requiredSkills = getRequiredSkillsForJob(job.serviceType);
-            const hasSkills = workerCanDoJob(worker.skills, job.serviceType);
+            // Use new explicit skill checking if job has requiredSkillIds
+            const hasSkills = workerIsQualifiedForJob(worker, job);
 
-            if (!hasSkills && requiredSkills.length > 0) {
+            if (!hasSkills && !job.allowUnqualified) {
+              // Get missing skill details
+              const missingIds = getMissingSkillIds(worker.skillIds, job.requiredSkillIds);
+              const missingNames = missingIds.map(id => skillNameMap.get(id) || id);
+
+              // Get required skill names for display
+              const requiredNames = job.requiredSkillIds.length > 0
+                ? job.requiredSkillIds.map(id => skillNameMap.get(id) || id)
+                : getRequiredSkillsForJob(job.serviceType);
+
               skillMismatches.push({
                 jobId: job.id,
                 jobTitle: `${job.serviceType} - ${job.customer?.name || 'Unknown'}`,
@@ -477,7 +583,11 @@ export async function POST(req: Request) {
                 assignedWorkerId: workerId,
                 assignedWorkerName: `${worker.firstName} ${worker.lastName}`,
                 workerSkills: worker.skills,
-                requiredSkills,
+                workerSkillIds: worker.skillIds,
+                requiredSkills: requiredNames,
+                requiredSkillIds: job.requiredSkillIds,
+                missingSkillIds: missingIds,
+                missingSkillNames: missingNames,
               });
             }
 
@@ -506,8 +616,11 @@ export async function POST(req: Request) {
 
     // If auto-assign enabled, assign unassigned jobs
     if (autoAssign && unassignedJobs.length > 0) {
-      // Sort jobs by priority/time - fixed appointments first
+      // Sort jobs by priority/time - fixed appointments first, then multi-worker jobs last
       const sortedUnassigned = [...unassignedJobs].sort((a, b) => {
+        // Multi-worker jobs last (they need manual review)
+        if (a.requiredWorkerCount > 1 && b.requiredWorkerCount === 1) return 1;
+        if (b.requiredWorkerCount > 1 && a.requiredWorkerCount === 1) return -1;
         // Fixed appointments first
         if (a.appointmentType === 'fixed' && b.appointmentType !== 'fixed') return -1;
         if (b.appointmentType === 'fixed' && a.appointmentType !== 'fixed') return 1;
@@ -519,21 +632,42 @@ export async function POST(req: Request) {
       const avgJobsPerWorker = totalJobs / workers.length;
 
       for (const job of sortedUnassigned) {
-        // Find eligible workers
+        // Skip multi-worker jobs - they need manual assignment
+        if (job.requiredWorkerCount > 1) {
+          // Already added to needsReview above
+          continue;
+        }
+
+        // Find eligible workers using new skill checking
         const eligibleWorkers: WorkerData[] = [];
 
         for (const worker of Array.from(workerMap.values())) {
-          if (workerCanDoJob(worker.skills, job.serviceType)) {
+          if (workerIsQualifiedForJob(worker, job)) {
             eligibleWorkers.push(worker);
           }
         }
 
         if (eligibleWorkers.length === 0) {
+          // Get required skill names for the error message
+          const requiredSkillNames = job.requiredSkillIds.length > 0
+            ? job.requiredSkillIds.map(id => skillNameMap.get(id) || id)
+            : getRequiredSkillsForJob(job.serviceType);
+
+          needsReview.push({
+            jobId: job.id,
+            jobTitle: `${job.serviceType} - ${job.customer?.name || 'Unknown'}`,
+            serviceType: job.serviceType,
+            reason: 'NO_QUALIFIED_WORKERS',
+            message: 'No workers have all required skills',
+            requiredSkillIds: job.requiredSkillIds,
+            requiredSkillNames: requiredSkillNames,
+          });
+
           unassignableJobs.push({
             id: job.id,
             service: job.serviceType,
             customer: job.customer?.name || null,
-            reason: `No workers have required skills for ${job.serviceType}`,
+            reason: `No workers have required skills: ${requiredSkillNames.join(', ')}`,
           });
           continue;
         }
@@ -657,6 +791,7 @@ export async function POST(req: Request) {
       workers: workerResults,
       unassignableJobs,
       skillMismatches,
+      needsReview,
       totalSavedMiles: Math.round(totalSavedMiles * 10) / 10,
       totalSavedMinutes,
       summary: {
@@ -664,6 +799,7 @@ export async function POST(req: Request) {
         totalJobs: workerResults.reduce((sum, w) => sum + w.jobCount, 0),
         unassignedCount: unassignableJobs.length,
         skillMismatchCount: skillMismatches.length,
+        needsReviewCount: needsReview.length,
         avgJobsPerWorker: workerResults.length > 0
           ? Math.round(workerResults.reduce((sum, w) => sum + w.jobCount, 0) / workerResults.length * 10) / 10
           : 0,

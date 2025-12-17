@@ -171,7 +171,21 @@ export default function DispatchPage() {
       assignedWorkerId: string;
       assignedWorkerName: string;
       workerSkills: string[];
+      workerSkillIds: string[];
       requiredSkills: string[];
+      requiredSkillIds: string[];
+      missingSkillIds: string[];
+      missingSkillNames: string[];
+    }>;
+    needsReview: Array<{
+      jobId: string;
+      jobTitle: string;
+      serviceType: string;
+      reason: string;
+      message: string;
+      requiredWorkerCount?: number;
+      requiredSkillIds?: string[];
+      requiredSkillNames?: string[];
     }>;
     totalSavedMiles: number;
     totalSavedMinutes: number;
@@ -180,10 +194,20 @@ export default function DispatchPage() {
       totalJobs: number;
       unassignedCount: number;
       skillMismatchCount: number;
+      needsReviewCount: number;
       avgJobsPerWorker: number;
     };
   } | null>(null);
   const [showSkillMismatchModal, setShowSkillMismatchModal] = useState(false);
+  const [showNeedsReviewModal, setShowNeedsReviewModal] = useState(false);
+  const [overrideModalJob, setOverrideModalJob] = useState<{
+    jobId: string;
+    jobTitle: string;
+    assignedWorkerId: string;
+    assignedWorkerName: string;
+    missingSkillNames: string[];
+  } | null>(null);
+  const [overrideReason, setOverrideReason] = useState('');
 
   // Check theme
   useEffect(() => {
@@ -575,9 +599,23 @@ export default function DispatchPage() {
             >
               <AlertTriangle className="w-4 h-4 text-amber-500" />
               <span className="text-sm text-amber-600 dark:text-amber-400 font-medium">
-                {optimizationResult.skillMismatches.length} job{optimizationResult.skillMismatches.length > 1 ? 's' : ''} assigned to workers without required skills
+                {optimizationResult.skillMismatches.length} skill mismatch{optimizationResult.skillMismatches.length > 1 ? 'es' : ''}
               </span>
               <ChevronRight className="w-4 h-4 text-amber-500" />
+            </button>
+          )}
+
+          {/* Needs Review Warning Banner */}
+          {optimizationResult?.needsReview && optimizationResult.needsReview.length > 0 && (
+            <button
+              onClick={() => setShowNeedsReviewModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/30 rounded-lg hover:bg-red-500/20 transition-colors"
+            >
+              <XCircle className="w-4 h-4 text-red-500" />
+              <span className="text-sm text-red-600 dark:text-red-400 font-medium">
+                {optimizationResult.needsReview.length} job{optimizationResult.needsReview.length > 1 ? 's' : ''} need{optimizationResult.needsReview.length === 1 ? 's' : ''} review
+              </span>
+              <ChevronRight className="w-4 h-4 text-red-500" />
             </button>
           )}
         </div>
@@ -986,33 +1024,48 @@ export default function DispatchPage() {
                       key={mismatch.jobId}
                       className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg"
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground text-sm truncate">
-                            {mismatch.jobTitle}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground text-sm truncate">
+                          {mismatch.jobTitle}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Assigned to: <span className="text-amber-600 font-medium">{mismatch.assignedWorkerName}</span>
+                        </p>
+                        <div className="mt-2 text-xs">
+                          <p className="text-muted-foreground">
+                            Worker skills: {mismatch.workerSkills.length > 0 ? mismatch.workerSkills.slice(0, 3).join(', ') : 'None'}
+                            {mismatch.workerSkills.length > 3 && ` +${mismatch.workerSkills.length - 3} more`}
                           </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Assigned to: <span className="text-amber-600 font-medium">{mismatch.assignedWorkerName}</span>
+                          <p className="text-amber-600 mt-0.5">
+                            Missing: {(mismatch.missingSkillNames || mismatch.requiredSkills).slice(0, 3).join(', ')}
                           </p>
-                          <div className="mt-2 text-xs">
-                            <p className="text-muted-foreground">
-                              Worker skills: {mismatch.workerSkills.length > 0 ? mismatch.workerSkills.slice(0, 3).join(', ') : 'None'}
-                              {mismatch.workerSkills.length > 3 && ` +${mismatch.workerSkills.length - 3} more`}
-                            </p>
-                            <p className="text-amber-600 mt-0.5">
-                              Needs: {mismatch.requiredSkills.slice(0, 3).join(' or ')}
-                            </p>
-                          </div>
                         </div>
-                        <button
-                          onClick={() => {
-                            router.push(`/provider/jobs/${mismatch.jobId}`);
-                            setShowSkillMismatchModal(false);
-                          }}
-                          className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
-                        >
-                          Reassign
-                        </button>
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={() => {
+                              router.push(`/provider/jobs/${mismatch.jobId}`);
+                              setShowSkillMismatchModal(false);
+                            }}
+                            className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
+                          >
+                            Reassign
+                          </button>
+                          <button
+                            onClick={() => {
+                              setOverrideModalJob({
+                                jobId: mismatch.jobId,
+                                jobTitle: mismatch.jobTitle,
+                                assignedWorkerId: mismatch.assignedWorkerId,
+                                assignedWorkerName: mismatch.assignedWorkerName,
+                                missingSkillNames: mismatch.missingSkillNames || mismatch.requiredSkills,
+                              });
+                              setShowSkillMismatchModal(false);
+                            }}
+                            className="px-2 py-1 text-xs bg-amber-500 text-white rounded hover:bg-amber-600"
+                          >
+                            Allow Override
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -1024,16 +1077,199 @@ export default function DispatchPage() {
                   variant="outline"
                   onClick={() => setShowSkillMismatchModal(false)}
                 >
-                  Ignore for Now
+                  Close
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Needs Review Modal */}
+        {showNeedsReviewModal && optimizationResult?.needsReview && optimizationResult.needsReview.length > 0 && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-card border border-border rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <XCircle className="w-5 h-5 text-red-500" />
+                  <h3 className="font-semibold text-foreground">
+                    Jobs Requiring Manual Review
+                  </h3>
+                </div>
+                <button
+                  onClick={() => setShowNeedsReviewModal(false)}
+                  className="p-1 hover:bg-accent rounded"
+                >
+                  <XCircle className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
+
+              <div className="p-4 overflow-y-auto flex-1">
+                <p className="text-sm text-muted-foreground mb-4">
+                  These jobs cannot be auto-assigned and need manual action:
+                </p>
+
+                <div className="space-y-3">
+                  {optimizationResult.needsReview.map((item) => (
+                    <div
+                      key={item.jobId}
+                      className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-foreground text-sm truncate">
+                          {item.jobTitle}
+                        </p>
+                        <div className="mt-2 text-xs">
+                          <p className={`font-medium ${
+                            item.reason === 'MULTI_WORKER_REQUIRED' ? 'text-blue-600' : 'text-red-600'
+                          }`}>
+                            {item.reason === 'MULTI_WORKER_REQUIRED' && (
+                              <span className="flex items-center gap-1">
+                                <Users className="w-3 h-3" />
+                                {item.message}
+                              </span>
+                            )}
+                            {item.reason === 'NO_QUALIFIED_WORKERS' && (
+                              <span>
+                                {item.message}
+                                {item.requiredSkillNames && item.requiredSkillNames.length > 0 && (
+                                  <span className="block mt-1 text-muted-foreground">
+                                    Required: {item.requiredSkillNames.join(', ')}
+                                  </span>
+                                )}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={() => {
+                              router.push(`/provider/jobs/${item.jobId}`);
+                              setShowNeedsReviewModal(false);
+                            }}
+                            className="px-2 py-1 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90"
+                          >
+                            {item.reason === 'MULTI_WORKER_REQUIRED' ? 'Assign Workers' : 'View Job'}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-border flex justify-end gap-2">
                 <Button
+                  variant="outline"
+                  onClick={() => setShowNeedsReviewModal(false)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Override Confirmation Modal */}
+        {overrideModalJob && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-card border border-border rounded-lg shadow-xl max-w-md w-full mx-4">
+              <div className="p-4 border-b border-border flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-amber-500" />
+                  <h3 className="font-semibold text-foreground">
+                    Override Skill Requirement
+                  </h3>
+                </div>
+                <button
                   onClick={() => {
-                    // Open calendar to reassign
-                    router.push('/provider/calendar');
-                    setShowSkillMismatchModal(false);
+                    setOverrideModalJob(null);
+                    setOverrideReason('');
+                  }}
+                  className="p-1 hover:bg-accent rounded"
+                >
+                  <XCircle className="w-5 h-5 text-muted-foreground" />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-4">
+                <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                  <p className="font-medium text-foreground text-sm">
+                    {overrideModalJob.jobTitle}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Worker: <span className="text-amber-600 font-medium">{overrideModalJob.assignedWorkerName}</span>
+                  </p>
+                  <p className="text-xs text-amber-600 mt-1">
+                    Missing: {overrideModalJob.missingSkillNames.join(', ')}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-foreground mb-1">
+                    Reason for override: *
+                  </label>
+                  <textarea
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                    placeholder="e.g., Customer requested specific technician"
+                    className="w-full px-3 py-2 border border-border rounded-lg bg-background text-foreground text-sm resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="p-2 bg-amber-500/10 rounded text-xs text-amber-700 dark:text-amber-400">
+                  <AlertTriangle className="w-3 h-3 inline mr-1" />
+                  This override will be logged for compliance purposes.
+                </div>
+              </div>
+
+              <div className="p-4 border-t border-border flex justify-end gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setOverrideModalJob(null);
+                    setOverrideReason('');
                   }}
                 >
-                  View Calendar
+                  Cancel
+                </Button>
+                <Button
+                  disabled={!overrideReason.trim()}
+                  onClick={async () => {
+                    try {
+                      const res = await fetch(`/api/provider/jobs/${overrideModalJob.jobId}/override`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          reason: overrideReason,
+                          assignedWorkerId: overrideModalJob.assignedWorkerId,
+                        }),
+                      });
+
+                      if (res.ok) {
+                        setNotification({ message: 'Skill override applied', type: 'success' });
+                        // Remove this job from mismatches in the local state
+                        if (optimizationResult) {
+                          setOptimizationResult({
+                            ...optimizationResult,
+                            skillMismatches: optimizationResult.skillMismatches.filter(
+                              m => m.jobId !== overrideModalJob.jobId
+                            ),
+                          });
+                        }
+                      } else {
+                        const data = await res.json();
+                        setNotification({ message: data.error || 'Failed to apply override', type: 'error' });
+                      }
+                    } catch (error) {
+                      setNotification({ message: 'Failed to apply override', type: 'error' });
+                    }
+                    setOverrideModalJob(null);
+                    setOverrideReason('');
+                  }}
+                  className="bg-amber-500 hover:bg-amber-600 text-white"
+                >
+                  Confirm Override
                 </Button>
               </div>
             </div>

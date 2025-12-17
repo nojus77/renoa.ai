@@ -93,7 +93,22 @@ export async function POST(request: NextRequest) {
       console.log('ℹ️ No users assigned to this job');
     }
 
-    // Create the job
+    // Fetch ServiceTypeConfig for skill requirements
+    const serviceConfig = await prisma.serviceTypeConfig.findFirst({
+      where: {
+        providerId,
+        serviceType,
+      },
+    });
+
+    console.log('📋 ServiceTypeConfig for', serviceType, ':', serviceConfig ? {
+      requiredSkills: serviceConfig.requiredSkills,
+      preferredSkills: serviceConfig.preferredSkills,
+      crewSizeMin: serviceConfig.crewSizeMin,
+      estimatedDuration: serviceConfig.estimatedDuration,
+    } : 'Not configured');
+
+    // Create the job with skill requirements from config
     const job = await prisma.job.create({
       data: {
         providerId,
@@ -112,6 +127,11 @@ export async function POST(request: NextRequest) {
         recurringFrequency: isRecurring ? recurringFrequency : null,
         recurringEndDate: isRecurring && recurringEndDate ? new Date(recurringEndDate) : null,
         assignedUserIds,
+        // Copy skill requirements from ServiceTypeConfig
+        requiredSkillIds: serviceConfig?.requiredSkills || [],
+        preferredSkillIds: serviceConfig?.preferredSkills || [],
+        requiredWorkerCount: serviceConfig?.crewSizeMin || 1,
+        estimatedDuration: serviceConfig?.estimatedDuration || duration,
       },
       include: {
         customer: true, // Include customer data in response

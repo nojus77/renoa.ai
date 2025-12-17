@@ -659,6 +659,18 @@ model Job {
   cancellationReason    String?                @map("cancellation_reason")
   cancelledAt           DateTime?              @map("cancelled_at")
   cancelledBy           String?                @map("cancelled_by")
+  // Skill requirements (copied from ServiceTypeConfig at creation)
+  requiredSkillIds      String[]               @default([]) @map("required_skill_ids")
+  preferredSkillIds     String[]               @default([]) @map("preferred_skill_ids")
+  // Multi-worker support
+  requiredWorkerCount   Int                    @default(1) @map("required_worker_count")
+  // Buffer time between jobs (minutes)
+  bufferMinutes         Int                    @default(15) @map("buffer_minutes")
+  // Audit trail for skill overrides
+  allowUnqualified          Boolean            @default(false) @map("allow_unqualified")
+  unqualifiedOverrideBy     String?            @map("unqualified_override_by")
+  unqualifiedOverrideAt     DateTime?          @map("unqualified_override_at")
+  unqualifiedOverrideReason String?            @map("unqualified_override_reason")
   invoices              Invoice?
   photos                JobPhoto[]             @relation("JobPhotos")
   customer              Customer               @relation("CustomerJobs", fields: [customerId], references: [id], onDelete: Cascade)
