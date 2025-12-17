@@ -214,7 +214,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Get jobs needing crew assignment (scheduled but no workers assigned)
-    const jobsNeedingAssignment = await prisma.job.count({
+    const unassignedJobs = await prisma.job.count({
       where: {
         providerId,
         status: {
@@ -243,12 +243,136 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Jobs starting in <2 hours without confirmation (status still pending)
+    const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
+    const unconfirmedSoonJobs = await prisma.job.count({
+      where: {
+        providerId,
+        status: 'pending',
+        startTime: {
+          gte: now,
+          lte: twoHoursFromNow,
+        },
+      },
+    });
+
+    // Unpaid invoices >30 days old
+    const invoiceThirtyDaysAgo = new Date(now);
+    invoiceThirtyDaysAgo.setDate(invoiceThirtyDaysAgo.getDate() - 30);
+    const overdueInvoices = await prisma.invoice.count({
+      where: {
+        providerId,
+        status: {
+          in: ['sent', 'viewed', 'overdue'],
+        },
+        dueDate: {
+          lt: invoiceThirtyDaysAgo,
+        },
+      },
+    });
+
+    // Get all jobs in next 7 days for worker analysis
+    const upcomingJobsForAnalysis = await prisma.job.findMany({
+      where: {
+        providerId,
+        status: {
+          notIn: ['completed', 'cancelled', 'no_show'],
+        },
+        startTime: {
+          gte: todayStart,
+          lte: next7Days,
+        },
+      },
+      select: {
+        id: true,
+        startTime: true,
+        endTime: true,
+        assignedUserIds: true,
+        address: true,
+      },
+    });
+
+    // Get all workers for this provider
+    const providerWorkers = await prisma.providerUser.findMany({
+      where: {
+        providerId,
+        status: 'active',
+        role: 'field',
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+
+    // Calculate job counts per worker
+    const workerJobCounts = new Map<string, number>();
+    providerWorkers.forEach(w => workerJobCounts.set(w.id, 0));
+
+    upcomingJobsForAnalysis.forEach(job => {
+      job.assignedUserIds.forEach(userId => {
+        if (workerJobCounts.has(userId)) {
+          workerJobCounts.set(userId, (workerJobCounts.get(userId) || 0) + 1);
+        }
+      });
+    });
+
+    // Overloaded workers (>8 jobs in next 7 days)
+    const overloadedWorkers = Array.from(workerJobCounts.entries())
+      .filter(([_, count]) => count > 8)
+      .map(([id, count]) => {
+        const worker = providerWorkers.find(w => w.id === id);
+        return { id, name: worker ? `${worker.firstName} ${worker.lastName}` : 'Unknown', jobCount: count };
+      });
+
+    // Underutilized workers (<2 jobs in next 7 days)
+    const underutilizedWorkers = Array.from(workerJobCounts.entries())
+      .filter(([_, count]) => count < 2)
+      .map(([id, count]) => {
+        const worker = providerWorkers.find(w => w.id === id);
+        return { id, name: worker ? `${worker.firstName} ${worker.lastName}` : 'Unknown', jobCount: count };
+      });
+
+    // Schedule conflicts: Find overlapping jobs for same worker
+    const conflictingJobs: { jobId1: string; jobId2: string; workerId: string }[] = [];
+
+    // Group jobs by worker
+    const jobsByWorker = new Map<string, typeof upcomingJobsForAnalysis>();
+    upcomingJobsForAnalysis.forEach(job => {
+      job.assignedUserIds.forEach(userId => {
+        if (!jobsByWorker.has(userId)) {
+          jobsByWorker.set(userId, []);
+        }
+        jobsByWorker.get(userId)!.push(job);
+      });
+    });
+
+    // Check for time overlaps within each worker's jobs
+    jobsByWorker.forEach((jobs, workerId) => {
+      for (let i = 0; i < jobs.length; i++) {
+        for (let j = i + 1; j < jobs.length; j++) {
+          const job1 = jobs[i];
+          const job2 = jobs[j];
+          // Check if times overlap
+          if (job1.startTime < job2.endTime && job2.startTime < job1.endTime) {
+            conflictingJobs.push({ jobId1: job1.id, jobId2: job2.id, workerId });
+          }
+        }
+      }
+    });
+
     console.log('🔔 DEBUG - Alerts for provider:', {
       providerId,
       pendingInvoices,
       newLeads,
-      jobsNeedingAssignment,
+      unassignedJobs,
       overdueJobs,
+      unconfirmedSoonJobs,
+      overdueInvoices,
+      overloadedWorkers: overloadedWorkers.length,
+      underutilizedWorkers: underutilizedWorkers.length,
+      scheduleConflicts: conflictingJobs.length,
     });
 
     // Get recent activity (last 7 days)
@@ -414,8 +538,15 @@ export async function GET(request: NextRequest) {
           newLeadsCount: newLeads,
           completedThisWeek: weeklyJobs.length,
           completedThisMonth: monthlyJobs.length,
-          jobsNeedingAssignment,
-          overdueJobsCount: overdueJobs,
+        },
+        alerts: {
+          scheduleConflicts: conflictingJobs.length,
+          overloadedWorkers,
+          underutilizedWorkers,
+          unassignedJobs,
+          unconfirmedSoonJobs,
+          overdueInvoices,
+          overdueJobs,
         },
         recentActivity: activity,
         revenueHistory,
