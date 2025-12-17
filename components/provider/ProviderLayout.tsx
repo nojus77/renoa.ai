@@ -171,7 +171,17 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
 
     // Poll every 30 seconds
     const interval = setInterval(fetchUnreadMessages, 30000);
-    return () => clearInterval(interval);
+
+    // Listen for messagesRead event to refresh immediately
+    const handleMessagesRead = () => {
+      fetchUnreadMessages();
+    };
+    window.addEventListener('messagesRead', handleMessagesRead);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('messagesRead', handleMessagesRead);
+    };
   }, [providerId, userId]);
 
   const handleLogout = () => {

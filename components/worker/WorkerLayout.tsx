@@ -80,7 +80,17 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
     if (userId) {
       fetchUnreadMessagesCount();
       const interval = setInterval(fetchUnreadMessagesCount, 30000);
-      return () => clearInterval(interval);
+
+      // Listen for messagesRead event to refresh immediately
+      const handleMessagesRead = () => {
+        fetchUnreadMessagesCount();
+      };
+      window.addEventListener('messagesRead', handleMessagesRead);
+
+      return () => {
+        clearInterval(interval);
+        window.removeEventListener('messagesRead', handleMessagesRead);
+      };
     }
   }, [userId, fetchUnreadMessagesCount]);
 

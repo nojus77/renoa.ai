@@ -300,6 +300,8 @@ export default function WorkerMessages() {
 
       if (data.messages) {
         setCustomerMessages(data.messages);
+        // Dispatch event to notify nav to refresh unread count (messages were marked as read)
+        window.dispatchEvent(new CustomEvent('messagesRead'));
       }
     } catch (error) {
       console.error('Failed to load messages:', error);
@@ -327,6 +329,8 @@ export default function WorkerMessages() {
 
       if (data.messages) {
         setTeamMessages(data.messages);
+        // Dispatch event to notify nav to refresh unread count (messages were marked as read)
+        window.dispatchEvent(new CustomEvent('messagesRead'));
       }
     } catch (error) {
       console.error('Failed to load team messages:', error);
