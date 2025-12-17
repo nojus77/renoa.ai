@@ -148,16 +148,22 @@ function generateTestDataForRange(startDate: Date, endDate: Date): RevenueDataPo
   });
 }
 
-// Custom tooltip for the chart
+// Custom tooltip for the chart with click hint
 function CustomTooltip({ active, payload, label }: { active?: boolean; payload?: Array<{ value: number; payload: RevenueDataPoint }>; label?: string }) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
     return (
-      <div className="bg-card border border-border rounded-lg shadow-lg p-3">
-        <p className="text-sm text-muted-foreground">{data.label} {data.day ? `(${data.day})` : ''}</p>
-        <p className="text-lg font-semibold text-foreground">
-          ${payload[0].value.toLocaleString()}
-        </p>
+      <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[140px]">
+        <p className="text-xs text-muted-foreground">{data.label} {data.day ? `(${data.day})` : ''}</p>
+        <div className="flex items-center justify-between gap-3 mt-1">
+          <p className="text-lg font-semibold text-foreground">
+            ${payload[0].value.toLocaleString()}
+          </p>
+          <div className="flex items-center gap-1 text-xs text-muted-foreground">
+            <span>Details</span>
+            <ChevronRight className="h-3 w-3" />
+          </div>
+        </div>
       </div>
     );
   }
@@ -487,18 +493,85 @@ export default function ProviderHome() {
 
   return (
     <ProviderLayout providerName={providerName}>
-      {/* Main Container - No scrolling needed */}
+      {/* Main Container */}
       <div className="w-full bg-background">
-        <div className="max-w-[1400px] mx-auto px-8 py-6">
+        <div className="max-w-[1400px] mx-auto px-6 py-5">
 
-          {/* Main Grid: 70% / 28% split using 12-col grid */}
+          {/* Needs Attention - TOP OF PAGE */}
+          {(stats.pendingInvoicesCount > 0 || stats.newLeadsCount > 0 || stats.jobsNeedingAssignment > 0 || stats.overdueJobsCount > 0) && (
+            <div className="mb-5">
+              <div className="bg-card rounded-2xl border border-border shadow-sm p-4">
+                <h3 className="text-sm font-semibold text-foreground mb-3">Needs Attention</h3>
+                <div className="flex flex-wrap gap-2">
+                  {stats.overdueJobsCount > 0 && (
+                    <button
+                      onClick={() => router.push('/provider/jobs')}
+                      className="flex items-center gap-2 px-3 py-2 bg-red-500/10 hover:bg-red-500/15 rounded-lg transition-colors"
+                    >
+                      <AlertTriangle className="h-4 w-4 text-red-600" />
+                      <div className="text-left">
+                        <p className="text-xs font-medium text-foreground">
+                          {stats.overdueJobsCount} overdue {stats.overdueJobsCount === 1 ? 'job' : 'jobs'}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-3.5 w-3.5 text-red-600" />
+                    </button>
+                  )}
+                  {stats.jobsNeedingAssignment > 0 && (
+                    <button
+                      onClick={() => router.push('/provider/calendar')}
+                      className="flex items-center gap-2 px-3 py-2 bg-orange-500/10 hover:bg-orange-500/15 rounded-lg transition-colors"
+                    >
+                      <Users className="h-4 w-4 text-orange-600" />
+                      <div className="text-left">
+                        <p className="text-xs font-medium text-foreground">
+                          {stats.jobsNeedingAssignment} {stats.jobsNeedingAssignment === 1 ? 'job needs' : 'jobs need'} crew
+                        </p>
+                      </div>
+                      <ChevronRight className="h-3.5 w-3.5 text-orange-600" />
+                    </button>
+                  )}
+                  {stats.pendingInvoicesCount > 0 && (
+                    <button
+                      onClick={() => router.push('/provider/invoices')}
+                      className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 hover:bg-amber-500/15 rounded-lg transition-colors"
+                    >
+                      <DollarSign className="h-4 w-4 text-amber-600" />
+                      <div className="text-left">
+                        <p className="text-xs font-medium text-foreground">
+                          {stats.pendingInvoicesCount} unpaid ({formatCurrency(stats.pendingInvoicesAmount)})
+                        </p>
+                      </div>
+                      <ChevronRight className="h-3.5 w-3.5 text-amber-600" />
+                    </button>
+                  )}
+                  {stats.newLeadsCount > 0 && (
+                    <button
+                      onClick={() => router.push('/provider/leads')}
+                      className="flex items-center gap-2 px-3 py-2 bg-purple-500/10 hover:bg-purple-500/15 rounded-lg transition-colors"
+                    >
+                      <TrendingUp className="h-4 w-4 text-purple-600" />
+                      <div className="text-left">
+                        <p className="text-xs font-medium text-foreground">
+                          {stats.newLeadsCount} new {stats.newLeadsCount === 1 ? 'lead' : 'leads'}
+                        </p>
+                      </div>
+                      <ChevronRight className="h-3.5 w-3.5 text-purple-600" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Main Grid: Revenue + Sidebar */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
 
-            {/* LEFT COLUMN - Revenue (8 cols = ~67%) */}
-            <div className="lg:col-span-8 space-y-5">
+            {/* LEFT COLUMN - Revenue (8 cols) */}
+            <div className="lg:col-span-8">
 
-              {/* Revenue Card - Main Focus */}
-              <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
+              {/* Revenue Card */}
+              <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
 
                 {/* Card Header with Navigation */}
                 <div className="flex items-start justify-between mb-4">
@@ -586,8 +659,8 @@ export default function ProviderHome() {
                   </div>
                 </div>
 
-                {/* Chart Container - Reduced to 320px */}
-                <div className="h-[320px] w-full">
+                {/* Chart Container - Compact height */}
+                <div className="h-[240px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={chartData}
@@ -786,11 +859,11 @@ export default function ProviderHome() {
 
             </div>
 
-            {/* RIGHT COLUMN - Jobs & Actions (4 cols = ~33%) */}
-            <div className="lg:col-span-4 space-y-5">
+            {/* RIGHT COLUMN - Today & Coming Up (4 cols) */}
+            <div className="lg:col-span-4 flex flex-col gap-4">
 
-              {/* Today's Jobs - Reduced height */}
-              <div className="bg-card rounded-2xl border border-border shadow-sm p-5 max-h-[200px] flex flex-col">
+              {/* Today's Jobs */}
+              <div className="bg-card rounded-2xl border border-border shadow-sm p-4 flex-1 min-h-0 flex flex-col">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-base font-semibold text-foreground">Today</h3>
                   <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
@@ -831,8 +904,8 @@ export default function ProviderHome() {
                 )}
               </div>
 
-              {/* Coming Up - Reduced height */}
-              <div className="bg-card rounded-2xl border border-border shadow-sm p-5 max-h-[220px] flex flex-col">
+              {/* Coming Up */}
+              <div className="bg-card rounded-2xl border border-border shadow-sm p-4 flex-1 min-h-0 flex flex-col">
                 <div className="flex items-center justify-between mb-3">
                   <h3 className="text-base font-semibold text-foreground">Coming Up</h3>
                   <button
@@ -880,110 +953,31 @@ export default function ProviderHome() {
 
             {/* FULL WIDTH ROW - Week at a Glance */}
             <div className="lg:col-span-12">
-              <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
+              <div className="bg-card rounded-2xl border border-border shadow-sm p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-base font-semibold text-foreground">Week at a Glance</h3>
+                  <h3 className="text-sm font-semibold text-foreground">Week at a Glance</h3>
                   <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </div>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-muted/40 rounded-xl">
-                    <p className="text-2xl font-bold text-foreground">{stats.todaysJobsCount}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Today</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="text-center p-3 bg-muted/40 rounded-xl">
+                    <p className="text-xl font-bold text-foreground">{stats.todaysJobsCount}</p>
+                    <p className="text-xs text-muted-foreground">Today</p>
                   </div>
-                  <div className="text-center p-4 bg-muted/40 rounded-xl">
-                    <p className="text-2xl font-bold text-foreground">{stats.completedThisWeek}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Completed</p>
+                  <div className="text-center p-3 bg-muted/40 rounded-xl">
+                    <p className="text-xl font-bold text-foreground">{stats.completedThisWeek}</p>
+                    <p className="text-xs text-muted-foreground">Completed</p>
                   </div>
-                  <div className="text-center p-4 bg-emerald-500/10 rounded-xl">
-                    <p className="text-2xl font-bold text-emerald-600">{formatCurrency(stats.weeklyRevenue)}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Weekly Revenue</p>
+                  <div className="text-center p-3 bg-emerald-500/10 rounded-xl">
+                    <p className="text-xl font-bold text-emerald-600">{formatCurrency(stats.weeklyRevenue)}</p>
+                    <p className="text-xs text-muted-foreground">Weekly Revenue</p>
                   </div>
-                  <div className="text-center p-4 bg-emerald-500/10 rounded-xl">
-                    <p className="text-2xl font-bold text-emerald-600">{formatCurrency(stats.monthlyRevenue)}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">Monthly Revenue</p>
+                  <div className="text-center p-3 bg-emerald-500/10 rounded-xl">
+                    <p className="text-xl font-bold text-emerald-600">{formatCurrency(stats.monthlyRevenue)}</p>
+                    <p className="text-xs text-muted-foreground">Monthly Revenue</p>
                   </div>
                 </div>
               </div>
             </div>
-
-            {/* FULL WIDTH ROW - Needs Attention */}
-            {(stats.pendingInvoicesCount > 0 || stats.newLeadsCount > 0 || stats.jobsNeedingAssignment > 0 || stats.overdueJobsCount > 0) && (
-              <div className="lg:col-span-12">
-                <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
-                  <h3 className="text-base font-semibold text-foreground mb-3">Needs Attention</h3>
-                  <div className="flex flex-wrap gap-3">
-                    {stats.overdueJobsCount > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/jobs')}
-                        className="flex items-center gap-3 px-4 py-3 bg-red-500/10 hover:bg-red-500/15 rounded-xl transition-colors"
-                      >
-                        <AlertTriangle className="h-5 w-5 text-red-600" />
-                        <div className="text-left">
-                          <p className="text-sm font-medium text-foreground">
-                            {stats.overdueJobsCount} overdue {stats.overdueJobsCount === 1 ? 'job' : 'jobs'}
-                          </p>
-                          <p className="text-xs text-red-600 font-semibold">
-                            Past scheduled time
-                          </p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-red-600 ml-2" />
-                      </button>
-                    )}
-                    {stats.jobsNeedingAssignment > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/calendar')}
-                        className="flex items-center gap-3 px-4 py-3 bg-orange-500/10 hover:bg-orange-500/15 rounded-xl transition-colors"
-                      >
-                        <Users className="h-5 w-5 text-orange-600" />
-                        <div className="text-left">
-                          <p className="text-sm font-medium text-foreground">
-                            {stats.jobsNeedingAssignment} {stats.jobsNeedingAssignment === 1 ? 'job needs' : 'jobs need'} crew
-                          </p>
-                          <p className="text-xs text-orange-600 font-semibold">
-                            No workers assigned
-                          </p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-orange-600 ml-2" />
-                      </button>
-                    )}
-                    {stats.pendingInvoicesCount > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/invoices')}
-                        className="flex items-center gap-3 px-4 py-3 bg-amber-500/10 hover:bg-amber-500/15 rounded-xl transition-colors"
-                      >
-                        <DollarSign className="h-5 w-5 text-amber-600" />
-                        <div className="text-left">
-                          <p className="text-sm font-medium text-foreground">
-                            {stats.pendingInvoicesCount} unpaid {stats.pendingInvoicesCount === 1 ? 'invoice' : 'invoices'}
-                          </p>
-                          <p className="text-xs text-amber-600 font-semibold">
-                            {formatCurrency(stats.pendingInvoicesAmount)}
-                          </p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-amber-600 ml-2" />
-                      </button>
-                    )}
-                    {stats.newLeadsCount > 0 && (
-                      <button
-                        onClick={() => router.push('/provider/leads')}
-                        className="flex items-center gap-3 px-4 py-3 bg-purple-500/10 hover:bg-purple-500/15 rounded-xl transition-colors"
-                      >
-                        <TrendingUp className="h-5 w-5 text-purple-600" />
-                        <div className="text-left">
-                          <p className="text-sm font-medium text-foreground">
-                            {stats.newLeadsCount} new {stats.newLeadsCount === 1 ? 'lead' : 'leads'}
-                          </p>
-                          <p className="text-xs text-purple-600 font-semibold">
-                            Review matches
-                          </p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-purple-600 ml-2" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
