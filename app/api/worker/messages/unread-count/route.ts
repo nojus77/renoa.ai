@@ -34,21 +34,53 @@ export async function GET(request: NextRequest) {
 
     const providerId = worker.providerId;
 
-    // Count unread team messages (DMs to this user + team broadcast + crew messages)
-    const teamUnread = await prisma.team_messages.count({
+    // Get crews this worker is a member of
+    const workerCrews = await prisma.crew.findMany({
+      where: {
+        providerId: providerId,
+        OR: [
+          { userIds: { has: userId } },
+          { leaderId: userId },
+        ],
+      },
+      select: { id: true },
+    });
+    const workerCrewIds = workerCrews.map(c => c.id);
+
+    // Count unread DMs to this user
+    const dmUnread = await prisma.team_messages.count({
       where: {
         provider_id: providerId,
         sender_user_id: { not: userId },
-        OR: [
-          // Direct messages to this user
-          { recipient_user_id: userId, read: false },
-          // Team broadcast messages not read by this user
-          { recipient_user_id: null, crew_id: null, NOT: { read_by: { has: userId } } },
-          // Crew messages not read by this user
-          { crew_id: { not: null }, NOT: { read_by: { has: userId } } },
-        ],
+        recipient_user_id: userId,
+        read: false,
       },
     });
+
+    // Count unread team broadcast messages (not sent by self)
+    const broadcastUnread = await prisma.team_messages.count({
+      where: {
+        provider_id: providerId,
+        sender_user_id: { not: userId },
+        recipient_user_id: null,
+        crew_id: null,
+        NOT: { read_by: { has: userId } },
+      },
+    });
+
+    // Count unread crew messages (only for crews worker is member of)
+    const crewUnread = workerCrewIds.length > 0
+      ? await prisma.team_messages.count({
+          where: {
+            provider_id: providerId,
+            sender_user_id: { not: userId },
+            crew_id: { in: workerCrewIds },
+            NOT: { read_by: { has: userId } },
+          },
+        })
+      : 0;
+
+    const teamUnread = dmUnread + broadcastUnread + crewUnread;
 
     // Get customer IDs from jobs assigned to this worker
     const assignedJobs = await prisma.job.findMany({
