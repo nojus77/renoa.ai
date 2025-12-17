@@ -354,8 +354,8 @@ export default function ProviderHome() {
           startOfMonth(subMonths(new Date(), 1)),
           new Date()
         );
-        const weekTotal = testData.slice(-7).reduce((sum, d) => sum + d.amount, 0);
-        const monthTotal = testData.slice(-30).reduce((sum, d) => sum + d.amount, 0);
+        const weekTotal = testData.slice(-7).reduce((sum, d) => sum + (d.amount ?? 0), 0);
+        const monthTotal = testData.slice(-30).reduce((sum, d) => sum + (d.amount ?? 0), 0);
 
         setHomeData({
           todaysJobs: [],
@@ -380,8 +380,8 @@ export default function ProviderHome() {
         startOfMonth(subMonths(new Date(), 1)),
         new Date()
       );
-      const weekTotal = testData.slice(-7).reduce((sum, d) => sum + d.amount, 0);
-      const monthTotal = testData.slice(-30).reduce((sum, d) => sum + d.amount, 0);
+      const weekTotal = testData.slice(-7).reduce((sum, d) => sum + (d.amount ?? 0), 0);
+      const monthTotal = testData.slice(-30).reduce((sum, d) => sum + (d.amount ?? 0), 0);
 
       setHomeData({
         todaysJobs: [],
