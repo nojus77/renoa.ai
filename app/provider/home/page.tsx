@@ -659,10 +659,11 @@ export default function ProviderHome() {
   return (
     <ProviderLayout providerName={providerName}>
       <div className="w-full bg-background">
-        <div className="px-6 py-5">
+        {/* ABOVE FOLD SECTION - Metrics + Chart + Alerts */}
+        <div className="min-h-[calc(100vh-64px)] px-6 py-5 flex flex-col">
 
           {/* TOP ROW: Metrics + Chart */}
-          <div className="flex flex-col lg:flex-row gap-6 mb-6">
+          <div className="flex flex-col lg:flex-row gap-6">
 
             {/* Left: 3 Metric Cards - Minimal Gray Design */}
             <div className="flex flex-col sm:flex-row lg:flex-col gap-4 lg:w-[280px] flex-shrink-0">
@@ -929,15 +930,118 @@ export default function ProviderHome() {
             </div>
           </div>
 
+          {/* Needs Attention - Full Width in Above Fold */}
+          <div className="bg-card rounded-2xl border border-border shadow-sm p-5 mt-6 flex-1">
+            <h3 className="text-base font-semibold text-foreground mb-4">Needs Attention</h3>
+
+            {!hasAlerts ? (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <AlertTriangle className="h-10 w-10 mb-2 opacity-30" />
+                <p className="text-sm">No issues to address</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
+                {/* Schedule Conflicts */}
+                {alerts.scheduleConflicts > 0 && (
+                  <button
+                    onClick={() => router.push('/provider/calendar')}
+                    className="flex items-center gap-3 p-3 bg-red-500/10 hover:bg-red-500/15 rounded-lg transition-colors"
+                  >
+                    <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {alerts.scheduleConflicts} schedule {alerts.scheduleConflicts === 1 ? 'conflict' : 'conflicts'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Overlapping jobs</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-red-600 flex-shrink-0" />
+                  </button>
+                )}
+
+                {/* Overdue Jobs */}
+                {alerts.overdueJobs > 0 && (
+                  <button
+                    onClick={() => router.push('/provider/jobs?status=overdue')}
+                    className="flex items-center gap-3 p-3 bg-red-500/10 hover:bg-red-500/15 rounded-lg transition-colors"
+                  >
+                    <CalendarX className="h-4 w-4 text-red-600 flex-shrink-0" />
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {alerts.overdueJobs} overdue {alerts.overdueJobs === 1 ? 'job' : 'jobs'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">Past scheduled time</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-red-600 flex-shrink-0" />
+                  </button>
+                )}
+
+                {/* Jobs Starting Soon */}
+                {alerts.unconfirmedSoonJobs > 0 && (
+                  <button
+                    onClick={() => router.push('/provider/jobs?status=pending')}
+                    className="flex items-center gap-3 p-3 bg-orange-500/10 hover:bg-orange-500/15 rounded-lg transition-colors"
+                  >
+                    <ClockAlert className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {alerts.unconfirmedSoonJobs} starting soon
+                      </p>
+                      <p className="text-xs text-muted-foreground">Within 2 hours</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                  </button>
+                )}
+
+                {/* Unassigned Jobs */}
+                {alerts.unassignedJobs > 0 && (
+                  <button
+                    onClick={() => router.push('/provider/calendar')}
+                    className="flex items-center gap-3 p-3 bg-orange-500/10 hover:bg-orange-500/15 rounded-lg transition-colors"
+                  >
+                    <UserX className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {alerts.unassignedJobs} unassigned {alerts.unassignedJobs === 1 ? 'job' : 'jobs'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">No worker assigned</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-orange-600 flex-shrink-0" />
+                  </button>
+                )}
+
+                {/* Overdue Invoices */}
+                {alerts.overdueInvoices > 0 && (
+                  <button
+                    onClick={() => router.push('/provider/invoices?status=overdue')}
+                    className="flex items-center gap-3 p-3 bg-amber-500/10 hover:bg-amber-500/15 rounded-lg transition-colors"
+                  >
+                    <FileWarning className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                    <div className="text-left flex-1 min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {alerts.overdueInvoices} overdue {alerts.overdueInvoices === 1 ? 'invoice' : 'invoices'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">30+ days unpaid</p>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-amber-600 flex-shrink-0" />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* BELOW FOLD SECTION - History & Schedules */}
+        <div className="px-6 py-5 border-t border-border">
+
           {/* Recent Jobs Table - Full Width */}
           {homeData.recentJobs && homeData.recentJobs.length > 0 && (
-            <div className="mt-8">
+            <div className="mb-8">
               <RecentJobsTable jobs={homeData.recentJobs} />
             </div>
           )}
 
-          {/* MIDDLE ROW: 2 Columns */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+          {/* Coming Up + Jobs Scheduled Today - 2 Columns */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
 
             {/* Column 1: Coming Up */}
             <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
@@ -958,7 +1062,7 @@ export default function ProviderHome() {
                   <p className="text-sm">No upcoming jobs</p>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[300px] overflow-y-auto">
+                <div className="space-y-3 max-h-[350px] overflow-y-auto">
                   {groupedUpcomingJobs.map((group) => (
                     <div key={group.date}>
                       <p className="text-xs font-medium text-muted-foreground mb-1.5">{group.label}</p>
@@ -988,151 +1092,52 @@ export default function ProviderHome() {
               )}
             </div>
 
-            {/* Column 2: Needs Attention */}
+            {/* Column 2: Jobs Scheduled Today */}
             <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
-              <h3 className="text-base font-semibold text-foreground mb-4">Needs Attention</h3>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
+                <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                  {todaysJobs.length}
+                </span>
+              </div>
 
-              {!hasAlerts ? (
+              {todaysJobs.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                  <AlertTriangle className="h-10 w-10 mb-2 opacity-30" />
-                  <p className="text-sm">No issues to address</p>
+                  <Calendar className="h-10 w-10 mb-2 opacity-30" />
+                  <p className="text-sm">No jobs scheduled today</p>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                  {/* Schedule Conflicts */}
-                  {alerts.scheduleConflicts > 0 && (
+                <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                  {todaysJobs.map((job) => (
                     <button
-                      onClick={() => router.push('/provider/calendar')}
-                      className="w-full flex items-center gap-3 p-3 bg-red-500/10 hover:bg-red-500/15 rounded-lg transition-colors"
+                      key={job.id}
+                      onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                      className="w-full p-3 bg-muted/40 hover:bg-muted/60 rounded-xl text-left transition-colors"
                     >
-                      <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-                      <div className="text-left flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          {alerts.scheduleConflicts} schedule {alerts.scheduleConflicts === 1 ? 'conflict' : 'conflicts'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Overlapping jobs</p>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
+                            {job.status === 'in_progress' && (
+                              <span className="inline-flex items-center text-[10px] text-orange-500 font-medium">
+                                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1 animate-pulse" />
+                                Active
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground truncate mt-1">{job.customerName}</p>
+                          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                            <Clock className="h-3 w-3" />
+                            <span>{formatTime(job.startTime)}</span>
+                          </div>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                       </div>
-                      <ChevronRight className="h-4 w-4 text-red-600" />
                     </button>
-                  )}
-
-                  {/* Overdue Jobs */}
-                  {alerts.overdueJobs > 0 && (
-                    <button
-                      onClick={() => router.push('/provider/jobs?status=overdue')}
-                      className="w-full flex items-center gap-3 p-3 bg-red-500/10 hover:bg-red-500/15 rounded-lg transition-colors"
-                    >
-                      <CalendarX className="h-4 w-4 text-red-600 flex-shrink-0" />
-                      <div className="text-left flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          {alerts.overdueJobs} overdue {alerts.overdueJobs === 1 ? 'job' : 'jobs'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Past scheduled time</p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-red-600" />
-                    </button>
-                  )}
-
-                  {/* Jobs Starting Soon */}
-                  {alerts.unconfirmedSoonJobs > 0 && (
-                    <button
-                      onClick={() => router.push('/provider/jobs?status=pending')}
-                      className="w-full flex items-center gap-3 p-3 bg-orange-500/10 hover:bg-orange-500/15 rounded-lg transition-colors"
-                    >
-                      <ClockAlert className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                      <div className="text-left flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          {alerts.unconfirmedSoonJobs} starting soon
-                        </p>
-                        <p className="text-xs text-muted-foreground">Within 2 hours</p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-orange-600" />
-                    </button>
-                  )}
-
-                  {/* Unassigned Jobs */}
-                  {alerts.unassignedJobs > 0 && (
-                    <button
-                      onClick={() => router.push('/provider/calendar')}
-                      className="w-full flex items-center gap-3 p-3 bg-orange-500/10 hover:bg-orange-500/15 rounded-lg transition-colors"
-                    >
-                      <UserX className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                      <div className="text-left flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          {alerts.unassignedJobs} unassigned {alerts.unassignedJobs === 1 ? 'job' : 'jobs'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">No worker assigned</p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-orange-600" />
-                    </button>
-                  )}
-
-                  {/* Overdue Invoices */}
-                  {alerts.overdueInvoices > 0 && (
-                    <button
-                      onClick={() => router.push('/provider/invoices?status=overdue')}
-                      className="w-full flex items-center gap-3 p-3 bg-amber-500/10 hover:bg-amber-500/15 rounded-lg transition-colors"
-                    >
-                      <FileWarning className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                      <div className="text-left flex-1">
-                        <p className="text-sm font-medium text-foreground">
-                          {alerts.overdueInvoices} overdue {alerts.overdueInvoices === 1 ? 'invoice' : 'invoices'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">30+ days unpaid</p>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-amber-600" />
-                    </button>
-                  )}
+                  ))}
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Jobs Scheduled Today - Full Width */}
-          <div className="bg-card rounded-2xl border border-border shadow-sm p-5 mt-8">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
-              <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-                {todaysJobs.length}
-              </span>
-            </div>
-
-            {todaysJobs.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <Calendar className="h-10 w-10 mb-2 opacity-30" />
-                <p className="text-sm">No jobs scheduled today</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto">
-                {todaysJobs.map((job) => (
-                  <button
-                    key={job.id}
-                    onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                    className="p-4 bg-muted/40 hover:bg-muted/60 rounded-xl text-left transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
-                          {job.status === 'in_progress' && (
-                            <span className="inline-flex items-center text-[10px] text-orange-500 font-medium">
-                              <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1 animate-pulse" />
-                              Active
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground truncate mt-1">{job.customerName}</p>
-                        <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          <span>{formatTime(job.startTime)}</span>
-                        </div>
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>

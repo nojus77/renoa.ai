@@ -476,18 +476,26 @@ export async function GET(request: NextRequest) {
     const revenueByDate = new Map<string, number>();
     const jobCountByDate = new Map<string, number>();
 
-    // Initialize all 30 days with 0
+    // Initialize all 30 days with 0 (using local dates)
     for (let i = 29; i >= 0; i--) {
       const date = new Date(now);
       date.setDate(date.getDate() - i);
-      const dateKey = date.toISOString().split('T')[0];
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
       revenueByDate.set(dateKey, 0);
       jobCountByDate.set(dateKey, 0);
     }
 
     // Sum up completed job revenues and counts by date
+    // Use local date to match frontend date calculations
     completedJobsLast30Days.forEach(job => {
-      const dateKey = job.endTime.toISOString().split('T')[0];
+      const endDate = new Date(job.endTime);
+      const year = endDate.getFullYear();
+      const month = String(endDate.getMonth() + 1).padStart(2, '0');
+      const day = String(endDate.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
       const amount = job.actualValue || job.estimatedValue || 0;
       revenueByDate.set(dateKey, (revenueByDate.get(dateKey) || 0) + amount);
       jobCountByDate.set(dateKey, (jobCountByDate.get(dateKey) || 0) + 1);

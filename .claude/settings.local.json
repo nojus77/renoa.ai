@@ -25,7 +25,8 @@
       "Bash(npm run dev:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nFix alerts/notifications to be provider-specific\n\n- Add debug logging to trace leads and alerts per provider\n- Add new alert types: overdue jobs and jobs needing crew assignment\n- Expand Needs Attention section with 4 alert categories:\n  - Overdue jobs (red) - past scheduled time but not completed\n  - Jobs needing crew (orange) - no workers assigned to upcoming jobs\n  - Unpaid invoices (amber) - pending/sent invoices\n  - New leads (purple) - matched/new leads for the provider\n- All alerts are properly filtered by providerId\n- Add proper singular/plural grammar for alert counts\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(npm run build:*)",
-      "Bash(npx next lint:*)"
+      "Bash(npx next lint:*)",
+      "Bash(cat:*)"
     ]
   }
 }
