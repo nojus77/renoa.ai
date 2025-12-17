@@ -617,6 +617,44 @@ export default function WorkerMessages() {
     teamMembers.reduce((sum, m) => sum + m.unreadCount, 0);
   const totalCustomerUnread = conversations.filter(c => c.unread).length;
 
+  // Create a unified sorted list of all chats with messages (team chat, crews, members)
+  // sorted by most recent message time
+  type ChatItem =
+    | { type: 'team'; data: TeamChat }
+    | { type: 'crew'; data: CrewChat }
+    | { type: 'member'; data: TeamMember };
+
+  const allChatsWithMessages: ChatItem[] = [
+    // Add team chat if it has messages
+    ...(teamChat?.lastMessageAt ? [{ type: 'team' as const, data: teamChat }] : []),
+    // Add crew chats that have messages
+    ...crews.filter(c => c.lastMessageAt).map(c => ({ type: 'crew' as const, data: c })),
+    // Add team members with messages
+    ...teamMembers.filter(m => m.lastMessageAt).map(m => ({ type: 'member' as const, data: m })),
+  ].sort((a, b) => {
+    const aTime = new Date(
+      a.type === 'team' ? a.data.lastMessageAt || '' :
+      a.type === 'crew' ? a.data.lastMessageAt || '' :
+      a.data.lastMessageAt || ''
+    ).getTime();
+    const bTime = new Date(
+      b.type === 'team' ? b.data.lastMessageAt || '' :
+      b.type === 'crew' ? b.data.lastMessageAt || '' :
+      b.data.lastMessageAt || ''
+    ).getTime();
+    return bTime - aTime; // Most recent first
+  });
+
+  // Chats without messages (for "Start a conversation" section)
+  const chatsWithoutMessages: ChatItem[] = [
+    // Team chat without messages
+    ...(teamChat && !teamChat.lastMessageAt ? [{ type: 'team' as const, data: teamChat }] : []),
+    // Crew chats without messages
+    ...crews.filter(c => !c.lastMessageAt).map(c => ({ type: 'crew' as const, data: c })),
+    // Team members without messages
+    ...teamMembers.filter(m => !m.lastMessageAt).map(m => ({ type: 'member' as const, data: m })),
+  ];
+
   const hasSelection = activeTab === 'team'
     ? selectedTeamChat !== null
     : selectedConversation !== null;
@@ -765,105 +803,204 @@ export default function WorkerMessages() {
           <div className="flex-1 overflow-y-auto pb-20">
             {activeTab === 'team' ? (
               <>
-                {/* Team Chat (broadcast) */}
-                {teamChat && (
-                  <button
-                    onClick={() => handleSelectTeamChat('team')}
-                    className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
-                  >
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: LIME_GREEN }}
-                    >
-                      <Users className="w-6 h-6 text-black" />
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <p className="font-semibold text-white">Team Chat</p>
-                      <p className="text-xs text-zinc-500 truncate">
-                        {teamChat.lastMessage || 'Everyone'}
-                      </p>
-                    </div>
-                    {teamChat.unreadCount > 0 && (
-                      <span
-                        className="px-2 py-1 text-xs rounded-full text-black font-medium"
-                        style={{ backgroundColor: LIME_GREEN }}
+                {/* All chats sorted by most recent message */}
+                {allChatsWithMessages.map((item) => {
+                  if (item.type === 'team') {
+                    const chat = item.data;
+                    return (
+                      <button
+                        key="team-chat"
+                        onClick={() => handleSelectTeamChat('team')}
+                        className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
                       >
-                        {teamChat.unreadCount}
-                      </span>
-                    )}
-                  </button>
-                )}
-
-                {/* Crew Chats */}
-                {crews.map(crew => (
-                  <button
-                    key={crew.id}
-                    onClick={() => handleSelectTeamChat(crew.id)}
-                    className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
-                  >
-                    <div
-                      className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ backgroundColor: crew.color }}
-                    >
-                      <Users className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-white truncate">{crew.name}</p>
-                        <span className="text-xs text-zinc-500">{crew.memberCount} members</span>
-                      </div>
-                      <p className="text-xs text-zinc-500 truncate">
-                        {crew.lastMessage || 'Crew chat'}
-                      </p>
-                    </div>
-                    {crew.unreadCount > 0 && (
-                      <span
-                        className="px-2 py-1 text-xs rounded-full text-black font-medium"
-                        style={{ backgroundColor: LIME_GREEN }}
+                        <div
+                          className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: LIME_GREEN }}
+                        >
+                          <Users className="w-6 h-6 text-black" />
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <p className="font-semibold text-white">Team Chat</p>
+                          <p className="text-xs text-zinc-500 truncate">
+                            {chat.lastMessage || 'Everyone'}
+                          </p>
+                        </div>
+                        {chat.unreadCount > 0 && (
+                          <span
+                            className="px-2 py-1 text-xs rounded-full text-black font-medium"
+                            style={{ backgroundColor: LIME_GREEN }}
+                          >
+                            {chat.unreadCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  }
+                  if (item.type === 'crew') {
+                    const crew = item.data;
+                    return (
+                      <button
+                        key={`crew-${crew.id}`}
+                        onClick={() => handleSelectTeamChat(crew.id)}
+                        className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
                       >
-                        {crew.unreadCount}
-                      </span>
-                    )}
-                  </button>
-                ))}
-
-                {/* Individual team members */}
-                {teamMembers.map(member => (
-                  <button
-                    key={member.id}
-                    onClick={() => handleSelectTeamChat(member.id)}
-                    className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
-                  >
-                    {member.avatar ? (
-                      <img
-                        src={member.avatar}
-                        alt={member.name}
-                        className="w-12 h-12 rounded-full object-cover flex-shrink-0"
-                      />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white font-semibold flex-shrink-0">
-                        {getInitials(member.name)}
-                      </div>
-                    )}
-                    <div className="flex-1 text-left min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-semibold text-white truncate">{member.name}</p>
-                        <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
-                      </div>
-                      {member.lastMessage && (
-                        <p className="text-xs text-zinc-500 truncate">{member.lastMessage}</p>
+                        <div
+                          className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                          style={{ backgroundColor: crew.color }}
+                        >
+                          <Users className="w-6 h-6 text-white" />
+                        </div>
+                        <div className="flex-1 text-left min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-white truncate">{crew.name}</p>
+                            <span className="text-xs text-zinc-500">{crew.memberCount} members</span>
+                          </div>
+                          <p className="text-xs text-zinc-500 truncate">
+                            {crew.lastMessage || 'Crew chat'}
+                          </p>
+                        </div>
+                        {crew.unreadCount > 0 && (
+                          <span
+                            className="px-2 py-1 text-xs rounded-full text-black font-medium"
+                            style={{ backgroundColor: LIME_GREEN }}
+                          >
+                            {crew.unreadCount}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  }
+                  // member type
+                  const member = item.data;
+                  return (
+                    <button
+                      key={`member-${member.id}`}
+                      onClick={() => handleSelectTeamChat(member.id)}
+                      className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
+                    >
+                      {member.avatar ? (
+                        <img
+                          src={member.avatar}
+                          alt={member.name}
+                          className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-12 h-12 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white font-semibold flex-shrink-0">
+                          {getInitials(member.name)}
+                        </div>
                       )}
+                      <div className="flex-1 text-left min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-white truncate">{member.name}</p>
+                          <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
+                        </div>
+                        {member.lastMessage && (
+                          <p className="text-xs text-zinc-500 truncate">{member.lastMessage}</p>
+                        )}
+                      </div>
+                      {member.unreadCount > 0 && (
+                        <span
+                          className="px-2 py-1 text-xs rounded-full text-black font-medium"
+                          style={{ backgroundColor: LIME_GREEN }}
+                        >
+                          {member.unreadCount}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+
+                {/* Chats without messages yet (Start a conversation section) */}
+                {chatsWithoutMessages.length > 0 && (
+                  <>
+                    <div className="px-4 py-2 bg-[#0A0A0A] border-b border-[#2A2A2A]">
+                      <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Start a conversation</p>
                     </div>
-                    {member.unreadCount > 0 && (
-                      <span
-                        className="px-2 py-1 text-xs rounded-full text-black font-medium"
-                        style={{ backgroundColor: LIME_GREEN }}
-                      >
-                        {member.unreadCount}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                    {chatsWithoutMessages.map((item) => {
+                      if (item.type === 'team') {
+                        const chat = item.data;
+                        return (
+                          <button
+                            key="team-chat-new"
+                            onClick={() => handleSelectTeamChat('team')}
+                            className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
+                          >
+                            <div
+                              className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: LIME_GREEN }}
+                            >
+                              <Users className="w-6 h-6 text-black" />
+                            </div>
+                            <div className="flex-1 text-left min-w-0">
+                              <p className="font-semibold text-white">Team Chat</p>
+                              <p className="text-xs text-zinc-500">Broadcast to everyone</p>
+                            </div>
+                            {chat.unreadCount > 0 && (
+                              <span
+                                className="px-2 py-1 text-xs rounded-full text-black font-medium"
+                                style={{ backgroundColor: LIME_GREEN }}
+                              >
+                                {chat.unreadCount}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      }
+                      if (item.type === 'crew') {
+                        const crew = item.data;
+                        return (
+                          <button
+                            key={`crew-new-${crew.id}`}
+                            onClick={() => handleSelectTeamChat(crew.id)}
+                            className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
+                          >
+                            <div
+                              className="w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: crew.color }}
+                            >
+                              <Users className="w-6 h-6 text-white" />
+                            </div>
+                            <div className="flex-1 text-left min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-semibold text-white truncate">{crew.name}</p>
+                                <span className="text-xs text-zinc-500">{crew.memberCount} members</span>
+                              </div>
+                              <p className="text-xs text-zinc-500">Crew chat</p>
+                            </div>
+                          </button>
+                        );
+                      }
+                      // member type
+                      const member = item.data;
+                      return (
+                        <button
+                          key={`member-new-${member.id}`}
+                          onClick={() => handleSelectTeamChat(member.id)}
+                          className="w-full p-4 flex items-center gap-3 border-b border-[#2A2A2A] hover:bg-[#1F1F1F] active:bg-[#2A2A2A] transition-colors"
+                        >
+                          {member.avatar ? (
+                            <img
+                              src={member.avatar}
+                              alt={member.name}
+                              className="w-12 h-12 rounded-full object-cover flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-12 h-12 rounded-full bg-[#2A2A2A] flex items-center justify-center text-white font-semibold flex-shrink-0">
+                              {getInitials(member.name)}
+                            </div>
+                          )}
+                          <div className="flex-1 text-left min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-semibold text-white truncate">{member.name}</p>
+                              <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
+                            </div>
+                            <p className="text-xs text-zinc-500">{member.role === 'owner' ? 'Owner' : member.role === 'office' ? 'Office' : 'Field Worker'}</p>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </>
+                )}
 
                 {teamMembers.length === 0 && crews.length === 0 && !teamChat && (
                   <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
