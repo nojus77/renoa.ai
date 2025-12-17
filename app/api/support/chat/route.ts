@@ -1,9 +1,5 @@
-import OpenAI from 'openai';
 import { NextResponse } from 'next/server';
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+import { openai } from '@/lib/openai-server';
 
 const SYSTEM_PROMPT = `You are Renoa's friendly AI support assistant for service professionals.
 

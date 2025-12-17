@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { Resend } from 'resend';
 import { customAlphabet } from 'nanoid';
 import { requireAuth, requirePermission } from '@/lib/auth';
+import { resend } from '@/lib/resend-server';
 
 const prisma = new PrismaClient();
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Generate random password (12 characters, alphanumeric + special chars)
 const generatePassword = customAlphabet('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*', 12);

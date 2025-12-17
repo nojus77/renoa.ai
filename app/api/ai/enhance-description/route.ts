@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import OpenAI from 'openai';
+import { openai } from '@/lib/openai-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,10 +13,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-
-    const openai = new OpenAI({
-      apiKey: process.env.OPENAI_API_KEY,
-    });
 
     const prompt = `You are a professional copywriter for service businesses. Take the following brief business description and expand it into a professional 2-3 sentence description that sounds trustworthy and competent. Keep it concise and avoid marketing fluff.
 

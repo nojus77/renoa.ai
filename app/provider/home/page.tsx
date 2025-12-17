@@ -19,6 +19,7 @@ import {
   addDays,
 } from 'date-fns';
 import ProviderLayout from '@/components/provider/ProviderLayout';
+import RecentJobsTable from '@/components/provider/RecentJobsTable';
 import {
   AreaChart,
   Area,
@@ -48,6 +49,7 @@ import {
   FileWarning,
   CalendarX,
   Hash,
+  Activity,
 } from 'lucide-react';
 
 interface Worker {
@@ -110,10 +112,57 @@ interface Alerts {
 interface RevenueDataPoint {
   date: string;
   amount: number | null;
+  jobCount?: number;
+  avgValue?: number;
+  utilization?: number;
   label?: string;
   day?: string;
   displayLabel?: string;
 }
+
+interface RecentJob {
+  id: string;
+  completedAt: string;
+  customerName: string;
+  serviceType: string;
+  workerName: string | null;
+  address: string;
+  amount: number | null;
+}
+
+type ChartMetric = 'revenue' | 'jobs' | 'avgValue' | 'utilization';
+
+const METRIC_CONFIG: Record<ChartMetric, {
+  label: string;
+  color: string;
+  formatter: (value: number) => string;
+  dataKey: string;
+}> = {
+  revenue: {
+    label: 'Revenue',
+    color: '#10b981',
+    formatter: (v) => `$${v.toLocaleString()}`,
+    dataKey: 'amount',
+  },
+  jobs: {
+    label: 'Jobs Completed',
+    color: '#3b82f6',
+    formatter: (v) => String(v),
+    dataKey: 'jobCount',
+  },
+  avgValue: {
+    label: 'Avg Job Value',
+    color: '#8b5cf6',
+    formatter: (v) => `$${v.toLocaleString()}`,
+    dataKey: 'avgValue',
+  },
+  utilization: {
+    label: 'Utilization Rate',
+    color: '#f97316',
+    formatter: (v) => `${v}%`,
+    dataKey: 'utilization',
+  },
+};
 
 interface HomeData {
   todaysJobs: TodayJob[];
@@ -121,6 +170,7 @@ interface HomeData {
   stats: Stats;
   alerts: Alerts;
   revenueHistory: RevenueDataPoint[];
+  recentJobs?: RecentJob[];
 }
 
 interface DateBreakdownJob {
@@ -174,18 +224,33 @@ function generateTestDataForRange(startDate: Date, endDate: Date): RevenueDataPo
 }
 
 // Custom tooltip for the chart - hide on zero values
-function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: RevenueDataPoint }>; label?: string }) {
+function CustomTooltip({
+  active,
+  payload,
+  metric,
+  metricColor
+}: {
+  active?: boolean;
+  payload?: Array<{ value: number; payload: RevenueDataPoint }>;
+  label?: string;
+  metric: ChartMetric;
+  metricColor: string;
+}) {
   if (active && payload && payload.length && payload[0].value > 0) {
     const data = payload[0].payload;
+    const config = METRIC_CONFIG[metric];
     return (
       <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
         <p className="text-xs text-muted-foreground mb-2">{data.label} {data.day ? `(${data.day})` : ''}</p>
-        <p className="text-xl font-bold text-foreground mb-2">
-          ${payload[0].value.toLocaleString()}
+        <p className="text-xl font-bold text-foreground mb-2" style={{ color: metricColor }}>
+          {config.formatter(payload[0].value)}
         </p>
-        <div className="flex items-center gap-2 px-2.5 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 rounded-md cursor-pointer transition-colors">
-          <span className="text-sm font-medium text-emerald-600">View Jobs</span>
-          <ChevronRight className="h-5 w-5 text-emerald-600" />
+        <div
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors"
+          style={{ backgroundColor: `${metricColor}15` }}
+        >
+          <span className="text-sm font-medium" style={{ color: metricColor }}>View Jobs</span>
+          <ChevronRight className="h-5 w-5" style={{ color: metricColor }} />
         </div>
       </div>
     );
@@ -201,6 +266,7 @@ export default function ProviderHome() {
   const [homeData, setHomeData] = useState<HomeData | null>(null);
   const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [chartMetric, setChartMetric] = useState<ChartMetric>('revenue');
 
   // Date breakdown state
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -348,6 +414,7 @@ export default function ProviderHome() {
                 startOfMonth(subMonths(new Date(), 1)),
                 new Date()
               ),
+          recentJobs: result.data.recentJobs || [],
         });
       } else {
         const testData = generateTestDataForRange(
@@ -441,26 +508,35 @@ export default function ProviderHome() {
   const chartData = useMemo(() => {
     const fullRangeData = generateTestDataForRange(dateRange.start, dateRange.end);
 
-    // Start with all zeros (will be converted to null later)
+    // Start with all zeros
     fullRangeData.forEach(d => {
       d.amount = 0;
+      d.jobCount = 0;
+      d.avgValue = 0;
+      d.utilization = 0;
     });
 
     if (homeData?.revenueHistory && homeData.revenueHistory.length > 0) {
-      const revenueMap = new Map(homeData.revenueHistory.map(d => [d.date, d.amount]));
+      const dataMap = new Map(homeData.revenueHistory.map(d => [d.date, d]));
 
       fullRangeData.forEach(d => {
-        const realAmount = revenueMap.get(d.date);
-        if (realAmount !== undefined) {
-          d.amount = realAmount;
+        const realData = dataMap.get(d.date);
+        if (realData) {
+          d.amount = realData.amount;
+          d.jobCount = realData.jobCount ?? 0;
+          d.avgValue = realData.avgValue ?? 0;
+          d.utilization = realData.utilization ?? 0;
         }
       });
     }
 
-    // Convert zero values to null so chart doesn't render them
+    // Convert zero values to null for the current metric so chart doesn't render them
     const processedData = fullRangeData.map(d => ({
       ...d,
       amount: d.amount === 0 ? null : d.amount,
+      jobCount: d.jobCount === 0 ? null : d.jobCount,
+      avgValue: d.avgValue === 0 ? null : d.avgValue,
+      utilization: d.utilization === 0 ? null : d.utilization,
     }));
 
     if (viewMode === 'week') {
@@ -484,9 +560,30 @@ export default function ProviderHome() {
     return chartData.reduce((sum, d) => sum + (d.amount || 0), 0);
   }, [chartData]);
 
-  const hasRevenueData = useMemo(() => {
-    return chartData.some(d => d.amount !== null && d.amount > 0);
-  }, [chartData]);
+  const hasChartData = useMemo(() => {
+    const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint;
+    return chartData.some(d => {
+      const val = d[dataKey];
+      return val !== null && val !== undefined && Number(val) > 0;
+    });
+  }, [chartData, chartMetric]);
+
+  const currentMetricTotal = useMemo(() => {
+    const config = METRIC_CONFIG[chartMetric];
+    if (chartMetric === 'revenue') {
+      return chartData.reduce((sum, d) => sum + (d.amount || 0), 0);
+    } else if (chartMetric === 'jobs') {
+      return chartData.reduce((sum, d) => sum + (d.jobCount || 0), 0);
+    } else if (chartMetric === 'avgValue') {
+      const total = chartData.reduce((sum, d) => sum + (d.avgValue || 0), 0);
+      const count = chartData.filter(d => d.avgValue && d.avgValue > 0).length;
+      return count > 0 ? Math.round(total / count) : 0;
+    } else {
+      const total = chartData.reduce((sum, d) => sum + (d.utilization || 0), 0);
+      const count = chartData.filter(d => d.utilization !== null).length;
+      return count > 0 ? Math.round(total / count) : 0;
+    }
+  }, [chartData, chartMetric]);
 
   const jobsCompleted = useMemo(() => {
     if (!homeData) return 0;
@@ -604,18 +701,70 @@ export default function ProviderHome() {
             </div>
 
             {/* Right: Revenue Chart */}
-            <div className="flex-1 bg-card rounded-2xl border border-border shadow-sm p-5">
+            <div className="flex-1 bg-card rounded-2xl border border-border shadow-sm p-5 overflow-hidden">
               {/* Chart Header */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-4">
-                  <h2 className="text-lg font-semibold text-foreground">Revenue</h2>
+              <div className="flex flex-col gap-3 mb-3">
+                {/* Top row: Title + Total + Date Navigation */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-lg font-semibold text-foreground">{METRIC_CONFIG[chartMetric].label}</h2>
+                    <span
+                      className="text-lg font-bold"
+                      style={{ color: METRIC_CONFIG[chartMetric].color }}
+                    >
+                      {METRIC_CONFIG[chartMetric].formatter(currentMetricTotal)}
+                    </span>
+                  </div>
+
+                  {/* Date Navigation */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handlePrev}
+                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-muted/50 hover:bg-muted transition-colors"
+                    >
+                      <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                    <span className="text-sm text-muted-foreground min-w-[120px] text-center">{dateLabel}</span>
+                    <button
+                      onClick={handleNext}
+                      disabled={!canGoNext}
+                      className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
+                        canGoNext ? 'bg-muted/50 hover:bg-muted' : 'opacity-30 cursor-not-allowed'
+                      }`}
+                    >
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Bottom row: Metric toggles + Time period */}
+                <div className="flex items-center justify-between">
+                  {/* Metric Toggles */}
+                  <div className="flex gap-1.5">
+                    {(Object.keys(METRIC_CONFIG) as ChartMetric[]).map((metric) => (
+                      <button
+                        key={metric}
+                        onClick={() => setChartMetric(metric)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                          chartMetric === metric
+                            ? 'text-white shadow-sm'
+                            : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                        }`}
+                        style={chartMetric === metric ? { backgroundColor: METRIC_CONFIG[metric].color } : {}}
+                      >
+                        {METRIC_CONFIG[metric].label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Time Period Toggle */}
                   <div className="flex bg-muted rounded-lg p-1">
                     <button
                       onClick={() => {
                         setViewMode('week');
                         setCurrentDate(new Date());
                       }}
-                      className={`px-3 py-1 text-sm font-medium rounded-md transition-all ${
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                         viewMode === 'week'
                           ? 'bg-background text-foreground shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
@@ -628,7 +777,7 @@ export default function ProviderHome() {
                         setViewMode('month');
                         setCurrentDate(new Date());
                       }}
-                      className={`px-3 py-1 text-sm font-medium rounded-md transition-all ${
+                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
                         viewMode === 'month'
                           ? 'bg-background text-foreground shadow-sm'
                           : 'text-muted-foreground hover:text-foreground'
@@ -637,39 +786,16 @@ export default function ProviderHome() {
                       Month
                     </button>
                   </div>
-                  <div className="h-5 w-px bg-border" />
-                  <span className="text-sm text-muted-foreground">{jobsCompleted} completed</span>
-                  <span className="text-sm font-medium text-emerald-600">{formatCurrency(viewMode === 'week' ? stats.weeklyRevenue : stats.monthlyRevenue)}</span>
-                </div>
-
-                {/* Date Navigation */}
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handlePrev}
-                    className="w-7 h-7 flex items-center justify-center rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                  >
-                    <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                  </button>
-                  <span className="text-sm text-muted-foreground min-w-[120px] text-center">{dateLabel}</span>
-                  <button
-                    onClick={handleNext}
-                    disabled={!canGoNext}
-                    className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
-                      canGoNext ? 'bg-muted/50 hover:bg-muted' : 'opacity-30 cursor-not-allowed'
-                    }`}
-                  >
-                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                  </button>
                 </div>
               </div>
 
               {/* Chart */}
-              <div className="h-[200px] w-full">
-                {hasRevenueData ? (
+              <div className="h-[180px] w-full -mx-2">
+                {hasChartData ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={chartData}
-                      margin={{ top: 5, right: 10, left: 0, bottom: 5 }}
+                      margin={{ top: 5, right: 15, left: 5, bottom: 5 }}
                       onClick={(data) => {
                         const payload = (data as { activePayload?: Array<{ payload: RevenueDataPoint }> })?.activePayload?.[0]?.payload;
                         if (payload) handleGraphClick(payload);
@@ -677,9 +803,9 @@ export default function ProviderHome() {
                       style={{ cursor: 'pointer' }}
                     >
                       <defs>
-                        <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                          <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                        <linearGradient id="colorMetric" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor={METRIC_CONFIG[chartMetric].color} stopOpacity={0.3} />
+                          <stop offset="95%" stopColor={METRIC_CONFIG[chartMetric].color} stopOpacity={0} />
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
@@ -698,32 +824,53 @@ export default function ProviderHome() {
                         tick={{ fill: 'currentColor', opacity: 0.6, fontSize: 11 }}
                         tickLine={false}
                         axisLine={false}
-                        tickFormatter={(value) => `$${value}`}
-                        width={50}
+                        tickFormatter={(value) => {
+                          if (chartMetric === 'revenue' || chartMetric === 'avgValue') return `$${value}`;
+                          if (chartMetric === 'utilization') return `${value}%`;
+                          return String(value);
+                        }}
+                        width={45}
                       />
-                      <Tooltip content={<CustomTooltip />} />
+                      <Tooltip
+                        content={
+                          <CustomTooltip
+                            metric={chartMetric}
+                            metricColor={METRIC_CONFIG[chartMetric].color}
+                          />
+                        }
+                      />
                       <Area
                         type="monotone"
-                        dataKey="amount"
-                        stroke="#10b981"
+                        dataKey={METRIC_CONFIG[chartMetric].dataKey}
+                        stroke={METRIC_CONFIG[chartMetric].color}
                         strokeWidth={2}
-                        fill="url(#colorRevenue)"
+                        fill="url(#colorMetric)"
                         dot={false}
                         connectNulls={false}
                         activeDot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint }) => {
-                          // Only show active dot for non-zero values
-                          if (props.payload?.amount === null || props.payload?.amount === 0) {
+                          const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint;
+                          const val = props.payload?.[dataKey];
+                          if (val === null || val === 0) {
                             return <g />;
                           }
-                          return <circle cx={props.cx} cy={props.cy} r={5} fill="#10b981" stroke="#fff" strokeWidth={2} />;
+                          return (
+                            <circle
+                              cx={props.cx}
+                              cy={props.cy}
+                              r={5}
+                              fill={METRIC_CONFIG[chartMetric].color}
+                              stroke="#fff"
+                              strokeWidth={2}
+                            />
+                          );
                         }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                    <DollarSign className="h-10 w-10 mb-2 opacity-30" />
-                    <p className="text-sm">No revenue data for this period</p>
+                    <Activity className="h-10 w-10 mb-2 opacity-30" />
+                    <p className="text-sm">No data for this period</p>
                   </div>
                 )}
               </div>
@@ -980,6 +1127,13 @@ export default function ProviderHome() {
               )}
             </div>
           </div>
+
+          {/* Recent Jobs Table */}
+          {homeData.recentJobs && homeData.recentJobs.length > 0 && (
+            <div className="mt-6">
+              <RecentJobsTable jobs={homeData.recentJobs} />
+            </div>
+          )}
         </div>
       </div>
     </ProviderLayout>

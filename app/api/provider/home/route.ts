@@ -472,8 +472,9 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Group revenue by date
+    // Group revenue and job counts by date
     const revenueByDate = new Map<string, number>();
+    const jobCountByDate = new Map<string, number>();
 
     // Initialize all 30 days with 0
     for (let i = 29; i >= 0; i--) {
@@ -481,22 +482,86 @@ export async function GET(request: NextRequest) {
       date.setDate(date.getDate() - i);
       const dateKey = date.toISOString().split('T')[0];
       revenueByDate.set(dateKey, 0);
+      jobCountByDate.set(dateKey, 0);
     }
 
-    // Sum up completed job revenues by date
+    // Sum up completed job revenues and counts by date
     completedJobsLast30Days.forEach(job => {
       const dateKey = job.endTime.toISOString().split('T')[0];
       const amount = job.actualValue || job.estimatedValue || 0;
       revenueByDate.set(dateKey, (revenueByDate.get(dateKey) || 0) + amount);
+      jobCountByDate.set(dateKey, (jobCountByDate.get(dateKey) || 0) + 1);
     });
 
-    // Convert to array sorted by date
+    // Convert to array sorted by date with all metrics
     const revenueHistory = Array.from(revenueByDate.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, amount]) => ({
-        date,
-        amount,
-      }));
+      .map(([date, amount]) => {
+        const jobCount = jobCountByDate.get(date) || 0;
+        const avgValue = jobCount > 0 ? Math.round(amount / jobCount) : 0;
+        return {
+          date,
+          amount,
+          jobCount,
+          avgValue,
+        };
+      });
+
+    // Calculate utilization rate (jobs scheduled vs capacity)
+    // Assume capacity is 8 jobs per worker per day
+    const activeWorkerCount = providerWorkers.length || 1;
+    const dailyCapacity = activeWorkerCount * 8;
+
+    // Add utilization to each day
+    const revenueHistoryWithUtilization = revenueHistory.map(day => ({
+      ...day,
+      utilization: Math.min(100, Math.round((day.jobCount / dailyCapacity) * 100)),
+    }));
+
+    // Get recent completed jobs for the table
+    const recentCompletedJobs = await prisma.job.findMany({
+      where: {
+        providerId,
+        status: 'completed',
+      },
+      include: {
+        customer: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        endTime: 'desc',
+      },
+      take: 10,
+    });
+
+    // Get worker names for recent jobs
+    const recentJobUserIds = Array.from(new Set(recentCompletedJobs.flatMap(job => job.assignedUserIds)));
+    const recentJobUsers = recentJobUserIds.length > 0 ? await prisma.providerUser.findMany({
+      where: {
+        id: {
+          in: recentJobUserIds,
+        },
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+      },
+    }) : [];
+    const recentJobUserMap = new Map(recentJobUsers.map(u => [u.id, `${u.firstName} ${u.lastName}`]));
+
+    const recentCompletedJobsForTable = recentCompletedJobs.map(job => ({
+      id: job.id,
+      completedAt: job.endTime.toISOString(),
+      customerName: job.customer?.name || 'Unknown Customer',
+      serviceType: job.serviceType,
+      workerName: job.assignedUserIds.length > 0 ? recentJobUserMap.get(job.assignedUserIds[0]) || null : null,
+      address: job.address,
+      amount: job.actualValue || job.estimatedValue || null,
+    }));
 
     return NextResponse.json({
       success: true,
@@ -549,7 +614,9 @@ export async function GET(request: NextRequest) {
           overdueJobs,
         },
         recentActivity: activity,
-        revenueHistory,
+        revenueHistory: revenueHistoryWithUtilization,
+        recentJobs: recentCompletedJobsForTable,
+        workerCount: activeWorkerCount,
       },
     });
   } catch (error) {

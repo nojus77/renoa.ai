@@ -1,9 +1,6 @@
 import Stripe from 'stripe';
 import { PrismaClient } from '@prisma/client';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-10-29.clover',
-});
+import { stripe } from '@/lib/stripe-server';
 
 const prisma = new PrismaClient();
 
