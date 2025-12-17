@@ -55,7 +55,7 @@ export default function RecentJobsTable({ jobs }: RecentJobsTableProps) {
       <div className="px-5 py-4 border-b border-border">
         <h3 className="text-base font-semibold text-foreground">Recent Jobs</h3>
       </div>
-      <div className="max-h-[320px] overflow-y-auto">
+      <div className="max-h-[400px] overflow-y-auto">
         <table className="w-full">
           <thead className="bg-muted/30 sticky top-0">
             <tr>

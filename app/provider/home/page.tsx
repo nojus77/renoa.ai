@@ -740,7 +740,7 @@ export default function ProviderHome() {
                 {/* Bottom row: Metric toggles + Time period */}
                 <div className="flex items-center justify-between">
                   {/* Metric Toggles */}
-                  <div className="flex gap-1.5">
+                  <div className="flex gap-2">
                     {(Object.keys(METRIC_CONFIG) as ChartMetric[]).map((metric) => (
                       <button
                         key={metric}
@@ -790,12 +790,12 @@ export default function ProviderHome() {
               </div>
 
               {/* Chart */}
-              <div className="h-[180px] w-full -mx-2">
+              <div className="h-[280px] w-full">
                 {hasChartData ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={chartData}
-                      margin={{ top: 5, right: 15, left: 5, bottom: 5 }}
+                      margin={{ top: 20, right: 20, left: 10, bottom: 20 }}
                       onClick={(data) => {
                         const payload = (data as { activePayload?: Array<{ payload: RevenueDataPoint }> })?.activePayload?.[0]?.payload;
                         if (payload) handleGraphClick(payload);
@@ -929,57 +929,17 @@ export default function ProviderHome() {
             </div>
           </div>
 
-          {/* BOTTOM ROW: 3 Columns */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-
-            {/* Column 1: Jobs Scheduled Today */}
-            <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
-                <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-                  {todaysJobs.length}
-                </span>
-              </div>
-
-              {todaysJobs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                  <Calendar className="h-10 w-10 mb-2 opacity-30" />
-                  <p className="text-sm">No jobs scheduled today</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-[300px] overflow-y-auto">
-                  {todaysJobs.map((job) => (
-                    <button
-                      key={job.id}
-                      onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                      className="w-full p-3 bg-muted/40 hover:bg-muted/60 rounded-xl text-left transition-colors"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
-                            {job.status === 'in_progress' && (
-                              <span className="inline-flex items-center text-[10px] text-orange-500 font-medium">
-                                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1 animate-pulse" />
-                                Active
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground truncate">{job.customerName}</p>
-                          <div className="flex items-center gap-1 mt-1 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            <span>{formatTime(job.startTime)}</span>
-                          </div>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
+          {/* Recent Jobs Table - Full Width */}
+          {homeData.recentJobs && homeData.recentJobs.length > 0 && (
+            <div className="mt-8">
+              <RecentJobsTable jobs={homeData.recentJobs} />
             </div>
+          )}
 
-            {/* Column 2: Coming Up */}
+          {/* MIDDLE ROW: 2 Columns */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+
+            {/* Column 1: Coming Up */}
             <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-base font-semibold text-foreground">Coming Up</h3>
@@ -1028,7 +988,7 @@ export default function ProviderHome() {
               )}
             </div>
 
-            {/* Column 3: Needs Attention */}
+            {/* Column 2: Needs Attention */}
             <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
               <h3 className="text-base font-semibold text-foreground mb-4">Needs Attention</h3>
 
@@ -1128,12 +1088,52 @@ export default function ProviderHome() {
             </div>
           </div>
 
-          {/* Recent Jobs Table */}
-          {homeData.recentJobs && homeData.recentJobs.length > 0 && (
-            <div className="mt-6">
-              <RecentJobsTable jobs={homeData.recentJobs} />
+          {/* Jobs Scheduled Today - Full Width */}
+          <div className="bg-card rounded-2xl border border-border shadow-sm p-5 mt-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
+              <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                {todaysJobs.length}
+              </span>
             </div>
-          )}
+
+            {todaysJobs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <Calendar className="h-10 w-10 mb-2 opacity-30" />
+                <p className="text-sm">No jobs scheduled today</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 max-h-[400px] overflow-y-auto">
+                {todaysJobs.map((job) => (
+                  <button
+                    key={job.id}
+                    onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                    className="p-4 bg-muted/40 hover:bg-muted/60 rounded-xl text-left transition-colors"
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
+                          {job.status === 'in_progress' && (
+                            <span className="inline-flex items-center text-[10px] text-orange-500 font-medium">
+                              <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1 animate-pulse" />
+                              Active
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-1">{job.customerName}</p>
+                        <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          <span>{formatTime(job.startTime)}</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </ProviderLayout>
