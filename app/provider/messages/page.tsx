@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
+import WorkerProfileModal from '@/components/provider/WorkerProfileModal';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -159,6 +160,9 @@ export default function ProviderMessages() {
   const [showGroupInfo, setShowGroupInfo] = useState(false);
   const [groupInfo, setGroupInfo] = useState<GroupInfo | null>(null);
   const [loadingGroupInfo, setLoadingGroupInfo] = useState(false);
+
+  // Worker profile modal
+  const [profileWorkerId, setProfileWorkerId] = useState<string | null>(null);
 
   // UI state
   const [searchQuery, setSearchQuery] = useState('');
@@ -1546,45 +1550,78 @@ export default function ProviderMessages() {
               <div className="overflow-y-auto max-h-[60vh]">
                 <div className="p-2">
                   <p className="text-xs font-medium text-zinc-500 px-3 py-2">Members</p>
-                  {groupInfo.members.map((member) => (
-                    <div
-                      key={member.id}
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-zinc-800/50"
-                    >
-                      {member.avatar ? (
-                        <img
-                          src={member.avatar}
-                          alt={member.name}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium">
-                          {getInitials(member.name)}
+                  {groupInfo.members.map((member) => {
+                    // Field workers are clickable to view profile
+                    const isClickable = member.role === 'field' && !member.isCurrentUser;
+
+                    return (
+                      <button
+                        key={member.id}
+                        onClick={() => {
+                          if (isClickable) {
+                            setProfileWorkerId(member.id);
+                          }
+                        }}
+                        disabled={!isClickable}
+                        className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+                          isClickable
+                            ? 'hover:bg-zinc-800/50 cursor-pointer'
+                            : 'cursor-default'
+                        }`}
+                      >
+                        {member.avatar ? (
+                          <img
+                            src={member.avatar}
+                            alt={member.name}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium">
+                            {getInitials(member.name)}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-white truncate">{member.name}</p>
+                            {member.isLead && (
+                              <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">
+                                <Crown className="w-3 h-3" />
+                                Lead
+                              </span>
+                            )}
+                            {member.isCurrentUser && (
+                              <span className="text-xs text-zinc-500">(You)</span>
+                            )}
+                          </div>
+                          <p className="text-xs text-zinc-400">{getRoleLabel(member.role)}</p>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-white truncate">{member.name}</p>
-                          {member.isLead && (
-                            <span className="flex items-center gap-1 px-1.5 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">
-                              <Crown className="w-3 h-3" />
-                              Lead
-                            </span>
-                          )}
-                          {member.isCurrentUser && (
-                            <span className="text-xs text-zinc-500">(You)</span>
-                          )}
-                        </div>
-                        <p className="text-xs text-zinc-400">{getRoleLabel(member.role)}</p>
-                      </div>
-                      <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
-                    </div>
-                  ))}
+                        <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* Worker Profile Modal */}
+        <WorkerProfileModal
+          workerId={profileWorkerId}
+          isOpen={!!profileWorkerId}
+          onClose={() => setProfileWorkerId(null)}
+          onUpdate={() => {
+            // Refresh team conversations after update
+            if (providerId && userId) {
+              fetch(`/api/provider/messages/team/conversations?providerId=${providerId}&userId=${userId}`)
+                .then(res => res.json())
+                .then(data => {
+                  if (data.conversations) setTeamMembers(data.conversations);
+                })
+                .catch(console.error);
+            }
+          }}
+        />
       </div>
     </ProviderLayout>
   );
