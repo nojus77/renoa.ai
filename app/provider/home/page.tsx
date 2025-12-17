@@ -20,6 +20,7 @@ import {
 } from 'date-fns';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import RecentJobsTable from '@/components/provider/RecentJobsTable';
+import NeedsAttentionTable from '@/components/provider/NeedsAttentionTable';
 import {
   AreaChart,
   Area,
@@ -378,6 +379,15 @@ export default function ProviderHome() {
       const res = await fetch(`/api/provider/home?providerId=${id}`);
       const result = await res.json();
 
+      // Debug: Log API response
+      console.log('🔍 API Response Debug:', {
+        success: result.success,
+        hasRevenueHistory: !!result.data?.revenueHistory,
+        revenueHistoryLength: result.data?.revenueHistory?.length,
+        revenueHistorySample: result.data?.revenueHistory?.slice(-7),
+        stats: result.data?.stats,
+      });
+
       const defaultAlerts: Alerts = {
         scheduleConflicts: 0,
         overloadedWorkers: [],
@@ -519,6 +529,14 @@ export default function ProviderHome() {
     if (homeData?.revenueHistory && homeData.revenueHistory.length > 0) {
       const dataMap = new Map(homeData.revenueHistory.map(d => [d.date, d]));
 
+      // Debug: Log data mapping
+      console.log('📊 Chart Data Debug:', {
+        dateRangeStart: format(dateRange.start, 'yyyy-MM-dd'),
+        dateRangeEnd: format(dateRange.end, 'yyyy-MM-dd'),
+        revenueHistoryDates: homeData.revenueHistory.slice(0, 5).map(d => ({ date: d.date, amount: d.amount, jobCount: d.jobCount })),
+        fullRangeDates: fullRangeData.map(d => d.date),
+      });
+
       fullRangeData.forEach(d => {
         const realData = dataMap.get(d.date);
         if (realData) {
@@ -528,6 +546,10 @@ export default function ProviderHome() {
           d.utilization = realData.utilization ?? 0;
         }
       });
+
+      // Debug: Log after merging
+      const nonZeroData = fullRangeData.filter(d => d.amount && d.amount > 0);
+      console.log('📈 Non-zero data after merge:', nonZeroData.map(d => ({ date: d.date, amount: d.amount, jobCount: d.jobCount })));
     }
 
     // Convert zero values to null for the current metric so chart doesn't render them
@@ -930,122 +952,28 @@ export default function ProviderHome() {
             </div>
           </div>
 
-          {/* Needs Attention - Full Width in Above Fold */}
-          <div className="bg-card rounded-2xl border border-border shadow-sm p-5 mt-6 flex-1">
-            <h3 className="text-base font-semibold text-foreground mb-4">Needs Attention</h3>
-
-            {!hasAlerts ? (
-              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
-                <AlertTriangle className="h-10 w-10 mb-2 opacity-30" />
-                <p className="text-sm">No issues to address</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
-                {/* Schedule Conflicts */}
-                {alerts.scheduleConflicts > 0 && (
-                  <button
-                    onClick={() => router.push('/provider/calendar')}
-                    className="flex items-center gap-3 p-3 bg-red-500/10 hover:bg-red-500/15 rounded-lg transition-colors"
-                  >
-                    <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
-                    <div className="text-left flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {alerts.scheduleConflicts} schedule {alerts.scheduleConflicts === 1 ? 'conflict' : 'conflicts'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Overlapping jobs</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-red-600 flex-shrink-0" />
-                  </button>
-                )}
-
-                {/* Overdue Jobs */}
-                {alerts.overdueJobs > 0 && (
-                  <button
-                    onClick={() => router.push('/provider/jobs?status=overdue')}
-                    className="flex items-center gap-3 p-3 bg-red-500/10 hover:bg-red-500/15 rounded-lg transition-colors"
-                  >
-                    <CalendarX className="h-4 w-4 text-red-600 flex-shrink-0" />
-                    <div className="text-left flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {alerts.overdueJobs} overdue {alerts.overdueJobs === 1 ? 'job' : 'jobs'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">Past scheduled time</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-red-600 flex-shrink-0" />
-                  </button>
-                )}
-
-                {/* Jobs Starting Soon */}
-                {alerts.unconfirmedSoonJobs > 0 && (
-                  <button
-                    onClick={() => router.push('/provider/jobs?status=pending')}
-                    className="flex items-center gap-3 p-3 bg-orange-500/10 hover:bg-orange-500/15 rounded-lg transition-colors"
-                  >
-                    <ClockAlert className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                    <div className="text-left flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {alerts.unconfirmedSoonJobs} starting soon
-                      </p>
-                      <p className="text-xs text-muted-foreground">Within 2 hours</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                  </button>
-                )}
-
-                {/* Unassigned Jobs */}
-                {alerts.unassignedJobs > 0 && (
-                  <button
-                    onClick={() => router.push('/provider/calendar')}
-                    className="flex items-center gap-3 p-3 bg-orange-500/10 hover:bg-orange-500/15 rounded-lg transition-colors"
-                  >
-                    <UserX className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                    <div className="text-left flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {alerts.unassignedJobs} unassigned {alerts.unassignedJobs === 1 ? 'job' : 'jobs'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">No worker assigned</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-orange-600 flex-shrink-0" />
-                  </button>
-                )}
-
-                {/* Overdue Invoices */}
-                {alerts.overdueInvoices > 0 && (
-                  <button
-                    onClick={() => router.push('/provider/invoices?status=overdue')}
-                    className="flex items-center gap-3 p-3 bg-amber-500/10 hover:bg-amber-500/15 rounded-lg transition-colors"
-                  >
-                    <FileWarning className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                    <div className="text-left flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">
-                        {alerts.overdueInvoices} overdue {alerts.overdueInvoices === 1 ? 'invoice' : 'invoices'}
-                      </p>
-                      <p className="text-xs text-muted-foreground">30+ days unpaid</p>
-                    </div>
-                    <ChevronRight className="h-4 w-4 text-amber-600 flex-shrink-0" />
-                  </button>
-                )}
-              </div>
-            )}
+          {/* Needs Attention Table - Full Width in Above Fold */}
+          <div className="mt-6 flex-1">
+            <NeedsAttentionTable alerts={alerts} />
           </div>
         </div>
 
         {/* BELOW FOLD SECTION - History & Schedules */}
-        <div className="px-6 py-5 border-t border-border">
+        <div className="px-6 py-8 border-t border-border bg-muted/5">
 
           {/* Recent Jobs Table - Full Width */}
           {homeData.recentJobs && homeData.recentJobs.length > 0 && (
-            <div className="mb-8">
+            <div className="mb-10">
               <RecentJobsTable jobs={homeData.recentJobs} />
             </div>
           )}
 
-          {/* Coming Up + Jobs Scheduled Today - 2 Columns */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Coming Up + Jobs Scheduled Today - 2 Columns with equal height */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
 
             {/* Column 1: Coming Up */}
-            <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col min-h-[400px]">
+              <div className="flex items-center justify-between mb-5">
                 <h3 className="text-base font-semibold text-foreground">Coming Up</h3>
                 <button
                   onClick={() => router.push('/provider/calendar')}
@@ -1057,25 +985,25 @@ export default function ProviderHome() {
               </div>
 
               {groupedUpcomingJobs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
                   <Calendar className="h-10 w-10 mb-2 opacity-30" />
                   <p className="text-sm">No upcoming jobs</p>
                 </div>
               ) : (
-                <div className="space-y-3 max-h-[350px] overflow-y-auto">
+                <div className="flex-1 space-y-3 overflow-y-auto">
                   {groupedUpcomingJobs.map((group) => (
                     <div key={group.date}>
-                      <p className="text-xs font-medium text-muted-foreground mb-1.5">{group.label}</p>
-                      <div className="space-y-1">
+                      <p className="text-xs font-medium text-muted-foreground mb-2">{group.label}</p>
+                      <div className="space-y-2">
                         {group.jobs.map((job) => (
                           <button
                             key={job.id}
                             onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                            className="w-full flex items-center justify-between p-2 hover:bg-muted/40 rounded-lg transition-colors"
+                            className="w-full flex items-center justify-between p-3 hover:bg-muted/40 rounded-lg transition-colors"
                           >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0">
-                                <Briefcase className="h-3.5 w-3.5 text-muted-foreground" />
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0">
+                                <Briefcase className="h-4 w-4 text-muted-foreground" />
                               </div>
                               <div className="min-w-0">
                                 <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
@@ -1093,8 +1021,8 @@ export default function ProviderHome() {
             </div>
 
             {/* Column 2: Jobs Scheduled Today */}
-            <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
-              <div className="flex items-center justify-between mb-4">
+            <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col min-h-[400px]">
+              <div className="flex items-center justify-between mb-5">
                 <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
                 <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
                   {todaysJobs.length}
@@ -1102,17 +1030,17 @@ export default function ProviderHome() {
               </div>
 
               {todaysJobs.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
                   <Calendar className="h-10 w-10 mb-2 opacity-30" />
                   <p className="text-sm">No jobs scheduled today</p>
                 </div>
               ) : (
-                <div className="space-y-2 max-h-[350px] overflow-y-auto">
+                <div className="flex-1 space-y-3 overflow-y-auto">
                   {todaysJobs.map((job) => (
                     <button
                       key={job.id}
                       onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                      className="w-full p-3 bg-muted/40 hover:bg-muted/60 rounded-xl text-left transition-colors"
+                      className="w-full p-4 bg-muted/40 hover:bg-muted/60 rounded-xl text-left transition-colors"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1 min-w-0">
