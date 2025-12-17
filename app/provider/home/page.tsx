@@ -323,7 +323,7 @@ export default function ProviderHome() {
       };
 
       if (result.success && result.data) {
-        const hasRealData = result.data.revenueHistory?.some((d: RevenueDataPoint) => d.amount > 0);
+        const hasRealData = result.data.revenueHistory?.some((d: RevenueDataPoint) => (d.amount ?? 0) > 0);
 
         setHomeData({
           todaysJobs: result.data.todaysJobs || [],

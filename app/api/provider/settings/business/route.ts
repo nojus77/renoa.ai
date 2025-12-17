@@ -27,19 +27,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate required fields
-    if (!businessName?.trim()) {
-      return NextResponse.json(
-        { error: 'Business name is required' },
-        { status: 400 }
-      );
-    }
-    if (!taxId?.trim()) {
-      return NextResponse.json(
-        { error: 'EIN/Tax ID is required' },
-        { status: 400 }
-      );
-    }
+    // Validate required fields for business address
+    // Note: businessName, taxId, and businessEntity are optional here since they may be set from the profile section
     if (!businessAddress?.trim()) {
       return NextResponse.json(
         { error: 'Business address is required' },
@@ -61,12 +50,6 @@ export async function POST(request: NextRequest) {
     if (!zipCode?.trim()) {
       return NextResponse.json(
         { error: 'ZIP code is required' },
-        { status: 400 }
-      );
-    }
-    if (!businessEntity) {
-      return NextResponse.json(
-        { error: 'Business entity type is required' },
         { status: 400 }
       );
     }
@@ -94,13 +77,15 @@ export async function POST(request: NextRequest) {
     const provider = await prisma.provider.update({
       where: { id: providerId },
       data: {
-        businessName: businessName.trim(),
+        // Optional fields - only update if provided
+        ...(businessName?.trim() && { businessName: businessName.trim() }),
+        ...(taxId?.trim() && { taxId: taxId.trim() }),
+        ...(businessEntity && { businessEntity }),
+        // Required address fields
         businessAddress: businessAddress.trim(),
         city: city.trim(),
         state: state.trim(),
         zipCode: zipCode.trim(),
-        taxId: taxId.trim(),
-        businessEntity: businessEntity,
         serviceRadius: serviceRadius !== undefined ? parseInt(serviceRadius) : undefined,
         website: website || undefined,
         businessHours: businessHours || undefined,
