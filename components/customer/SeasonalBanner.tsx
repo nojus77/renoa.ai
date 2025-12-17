@@ -40,7 +40,7 @@ export default function SeasonalBanner() {
                 {season.title} - Save {campaign.discountPercent}%!
               </p>
               <p className="text-sm text-emerald-700">
-                {campaign.emailBody.substring(0, 100)}...
+                {campaign.emailBody?.substring(0, 100) || 'Check out our seasonal offers!'}...
               </p>
             </div>
           </div>
