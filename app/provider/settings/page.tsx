@@ -239,6 +239,8 @@ export default function ProviderSettings() {
 
   // Legacy fields for other tabs
   const [businessAddress, setBusinessAddress] = useState('');
+  const [businessCity, setBusinessCity] = useState('');
+  const [businessState, setBusinessState] = useState('');
   const [businessZip, setBusinessZip] = useState('');
   const [taxId, setTaxId] = useState('');
   const [serviceRadius, setServiceRadius] = useState(25);
@@ -418,6 +420,8 @@ export default function ProviderSettings() {
       if (businessData.provider) {
         const provider = businessData.provider;
         setBusinessAddress(provider.businessAddress || '');
+        setBusinessCity(provider.city || '');
+        setBusinessState(provider.state || '');
         setBusinessZip(provider.zipCode || '');
         setTaxId(provider.taxId || '');
         setServiceRadius(provider.serviceRadius || 25);
@@ -813,6 +817,43 @@ export default function ProviderSettings() {
     } catch (error) {
       console.error('Error saving team settings:', error);
       toast.error('Failed to save team settings');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const saveBusinessLocation = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/provider/settings/business', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId,
+          businessName,
+          businessAddress,
+          city: businessCity,
+          state: businessState,
+          zipCode: businessZip,
+          taxId,
+          businessEntity,
+          serviceRadius,
+          website,
+          businessHours,
+          timeZone,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to save business location');
+      }
+
+      toast.success('Business location saved');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save business location';
+      console.error('Error saving business location:', error);
+      toast.error(errorMessage);
     } finally {
       setSaving(false);
     }
@@ -1400,8 +1441,8 @@ export default function ProviderSettings() {
                           </label>
                           <input
                             type="text"
-                            value={primaryCity}
-                            onChange={(e) => setPrimaryCity(e.target.value)}
+                            value={businessCity}
+                            onChange={(e) => setBusinessCity(e.target.value)}
                             className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
                             placeholder="Austin"
                           />
@@ -1413,8 +1454,8 @@ export default function ProviderSettings() {
                               State
                             </label>
                             <select
-                              value=""
-                              onChange={() => {}}
+                              value={businessState}
+                              onChange={(e) => setBusinessState(e.target.value)}
                               className="w-full px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 focus:outline-none focus:border-emerald-500"
                             >
                               <option value="">Select</option>
@@ -1457,6 +1498,24 @@ export default function ProviderSettings() {
                           <option value="Pacific/Honolulu">Hawaii Time (HST)</option>
                         </select>
                       </div>
+
+                      <Button
+                        onClick={saveBusinessLocation}
+                        disabled={saving}
+                        className="bg-emerald-600 hover:bg-emerald-500 w-full mt-4"
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          <>
+                            <Save className="h-4 w-4 mr-2" />
+                            Save Business Address
+                          </>
+                        )}
+                      </Button>
                     </CardContent>
                   </Card>
 
