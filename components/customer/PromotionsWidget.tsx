@@ -41,7 +41,7 @@ export default function PromotionsWidget() {
       }
 
       const data = await response.json();
-      setPromotions(data.promotions.slice(0, 3)); // Show top 3
+      setPromotions((data.promotions || []).slice(0, 3)); // Show top 3
     } catch (error: any) {
       console.error('Error fetching promotions:', error);
     } finally {

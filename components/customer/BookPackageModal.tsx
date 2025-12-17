@@ -124,7 +124,7 @@ export default function BookPackageModal({
           <div className="bg-purple-50 rounded-lg p-4 border border-purple-200">
             <h3 className="font-semibold text-zinc-900 mb-3">What&apos;s Included</h3>
             <div className="grid grid-cols-2 gap-2">
-              {bundle.serviceTypes.map((service, idx) => (
+              {(bundle.serviceTypes || []).map((service, idx) => (
                 <div key={idx} className="flex items-center gap-2 text-sm">
                   <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
                   <span>{service}</span>

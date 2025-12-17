@@ -151,11 +151,11 @@ export default function PackagesPage() {
                 <Accordion type="single" collapsible className="mb-4">
                   <AccordionItem value="services" className="border-none">
                     <AccordionTrigger className="text-sm font-semibold text-purple-600 hover:text-purple-700 py-2">
-                      What&apos;s Included ({bundle.serviceTypes.length} services)
+                      What&apos;s Included ({(bundle.serviceTypes || []).length} services)
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-2 pt-2">
-                        {bundle.serviceTypes.map((service, idx) => (
+                        {(bundle.serviceTypes || []).map((service, idx) => (
                           <div key={idx} className="flex items-center gap-2 text-sm text-zinc-700">
                             <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
                             <span>{service}</span>

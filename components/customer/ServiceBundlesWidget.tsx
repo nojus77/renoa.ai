@@ -94,15 +94,15 @@ export default function ServiceBundlesWidget({ onSelectBundle }: ServiceBundlesW
 
             {/* Services List */}
             <div className="space-y-1.5 mb-4">
-              {bundle.serviceTypes.slice(0, 3).map((service, idx) => (
+              {(bundle.serviceTypes || []).slice(0, 3).map((service, idx) => (
                 <div key={idx} className="flex items-center gap-2 text-sm text-zinc-600">
                   <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
                   <span>{service}</span>
                 </div>
               ))}
-              {bundle.serviceTypes.length > 3 && (
+              {(bundle.serviceTypes?.length || 0) > 3 && (
                 <div className="flex items-center gap-2 text-sm text-zinc-500 italic">
-                  <span className="ml-6">+ {bundle.serviceTypes.length - 3} more</span>
+                  <span className="ml-6">+ {(bundle.serviceTypes?.length || 0) - 3} more</span>
                 </div>
               )}
             </div>

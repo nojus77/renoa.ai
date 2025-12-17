@@ -63,8 +63,8 @@ export default function LoyaltyWidget() {
             <Trophy className="h-5 w-5 text-emerald-600" />
             Your Rewards
           </span>
-          <Badge className={TIER_COLORS[loyalty.tier as keyof typeof TIER_COLORS]}>
-            {loyalty.tier.toUpperCase()}
+          <Badge className={TIER_COLORS[(loyalty.tier || 'bronze') as keyof typeof TIER_COLORS]}>
+            {(loyalty.tier || 'bronze').toUpperCase()}
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -72,11 +72,11 @@ export default function LoyaltyWidget() {
         <div className="space-y-4">
           <div>
             <p className="text-4xl font-bold text-emerald-600">
-              {loyalty.points.toLocaleString()}
+              {(loyalty.points || 0).toLocaleString()}
               <span className="text-sm text-zinc-500 ml-2 font-normal">points</span>
             </p>
             <p className="text-xs text-zinc-500 mt-1">
-              Lifetime: {loyalty.lifetimePoints.toLocaleString()} points
+              Lifetime: {(loyalty.lifetimePoints || 0).toLocaleString()} points
             </p>
           </div>
 

@@ -147,9 +147,9 @@ export default function RewardsPage() {
     );
   }
 
-  const tierConfig = TIER_CONFIG[loyalty.tier as keyof typeof TIER_CONFIG];
-  const progressToNext = tierConfig.nextThreshold
-    ? (loyalty.lifetimePoints / tierConfig.nextThreshold) * 100
+  const tierConfig = TIER_CONFIG[(loyalty.tier || 'bronze') as keyof typeof TIER_CONFIG];
+  const progressToNext = tierConfig?.nextThreshold
+    ? ((loyalty.lifetimePoints || 0) / tierConfig.nextThreshold) * 100
     : 100;
 
   return (
@@ -168,8 +168,8 @@ export default function RewardsPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-2xl">Your Points</CardTitle>
-            <Badge className={tierConfig.color}>
-              {tierConfig.icon} {loyalty.tier.toUpperCase()}
+            <Badge className={tierConfig?.color || 'bg-amber-700 text-white'}>
+              {tierConfig?.icon || '🥉'} {(loyalty.tier || 'bronze').toUpperCase()}
             </Badge>
           </div>
         </CardHeader>
@@ -177,19 +177,19 @@ export default function RewardsPage() {
           <div className="space-y-4">
             <div>
               <p className="text-5xl font-bold text-emerald-600">
-                {loyalty.points.toLocaleString()}
+                {(loyalty.points || 0).toLocaleString()}
               </p>
               <p className="text-sm text-zinc-500 mt-1">
-                {loyalty.lifetimePoints.toLocaleString()} lifetime points earned
+                {(loyalty.lifetimePoints || 0).toLocaleString()} lifetime points earned
               </p>
             </div>
 
-            {tierConfig.nextTier && (
+            {tierConfig?.nextTier && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-zinc-600">Progress to {tierConfig.nextTier}</span>
                   <span className="font-medium">
-                    {loyalty.lifetimePoints} / {tierConfig.nextThreshold}
+                    {loyalty.lifetimePoints || 0} / {tierConfig.nextThreshold}
                   </span>
                 </div>
                 <Progress value={progressToNext} className="h-3" />
@@ -242,11 +242,11 @@ export default function RewardsPage() {
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {rewards
+            {(rewards || [])
               .filter((r) => r.active)
               .sort((a, b) => a.pointsCost - b.pointsCost)
               .map((reward) => {
-                const canAfford = loyalty.points >= reward.pointsCost;
+                const canAfford = (loyalty.points || 0) >= reward.pointsCost;
                 return (
                   <Card
                     key={reward.id}
@@ -270,7 +270,7 @@ export default function RewardsPage() {
                         disabled={!canAfford}
                         onClick={() => canAfford && setSelectedReward(reward)}
                       >
-                        {canAfford ? 'Redeem' : `Need ${(reward.pointsCost - loyalty.points).toLocaleString()} more`}
+                        {canAfford ? 'Redeem' : `Need ${(reward.pointsCost - (loyalty.points || 0)).toLocaleString()} more`}
                       </Button>
                     </CardContent>
                   </Card>
@@ -354,7 +354,7 @@ export default function RewardsPage() {
               <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg">
                 <span className="text-zinc-600">Remaining Balance:</span>
                 <span className="font-bold">
-                  {(loyalty.points - selectedReward.pointsCost).toLocaleString()} points
+                  {((loyalty.points || 0) - selectedReward.pointsCost).toLocaleString()} points
                 </span>
               </div>
             </div>
