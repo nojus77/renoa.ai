@@ -340,6 +340,12 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                   onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
                   className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-accent dark:hover:bg-zinc-800 transition-colors"
                 >
+                  {/* User greeting */}
+                  {userName && (
+                    <span className="text-sm font-medium text-muted-foreground dark:text-zinc-300">
+                      Hi, {userName.split(' ')[0]}
+                    </span>
+                  )}
                   {profilePhotoUrl ? (
                     <img
                       src={profilePhotoUrl}
