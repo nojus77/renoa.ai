@@ -21,6 +21,7 @@ import {
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import RecentJobsTable from '@/components/provider/RecentJobsTable';
 import NeedsAttentionTable from '@/components/provider/NeedsAttentionTable';
+import JobPreviewModal from '@/components/provider/JobPreviewModal';
 import {
   AreaChart,
   Area,
@@ -75,9 +76,16 @@ interface TodayJob {
 interface UpcomingJob {
   id: string;
   startTime: string;
+  endTime?: string;
   serviceType: string;
   customerName?: string;
   address?: string;
+  status?: string;
+  estimatedValue?: number | null;
+  actualValue?: number | null;
+  workerName?: string | null;
+  phone?: string;
+  notes?: string;
 }
 
 interface Stats {
@@ -274,6 +282,47 @@ export default function ProviderHome() {
   const [dateBreakdown, setDateBreakdown] = useState<DateBreakdown | null>(null);
   const [loadingBreakdown, setLoadingBreakdown] = useState(false);
   const breakdownRef = useRef<HTMLDivElement>(null);
+
+  // Job preview modal state
+  const [previewJob, setPreviewJob] = useState<{
+    id: string;
+    customerName: string;
+    serviceType: string;
+    address: string;
+    startTime: string;
+    endTime?: string;
+    status?: string;
+    estimatedValue?: number | null;
+    actualValue?: number | null;
+    workerName?: string | null;
+    phone?: string;
+    notes?: string;
+  } | null>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+
+  const openJobPreview = (job: UpcomingJob | TodayJob) => {
+    const previewData = {
+      id: job.id,
+      customerName: 'customerName' in job ? (job.customerName || 'Unknown') : (job as TodayJob).customerName,
+      serviceType: job.serviceType,
+      address: 'address' in job ? (job.address || '') : (job as TodayJob).address,
+      startTime: job.startTime,
+      endTime: 'endTime' in job ? job.endTime : undefined,
+      status: 'status' in job ? job.status : undefined,
+      estimatedValue: 'estimatedValue' in job ? job.estimatedValue : null,
+      actualValue: 'actualValue' in job ? job.actualValue : null,
+      workerName: 'workerName' in job ? job.workerName : ('workers' in job && job.workers?.length > 0 ? `${job.workers[0].firstName} ${job.workers[0].lastName}` : null),
+      phone: 'phone' in job ? job.phone : ('customerPhone' in job ? (job as TodayJob).customerPhone : undefined),
+      notes: 'notes' in job ? job.notes : undefined,
+    };
+    setPreviewJob(previewData);
+    setIsPreviewOpen(true);
+  };
+
+  const closeJobPreview = () => {
+    setIsPreviewOpen(false);
+    setTimeout(() => setPreviewJob(null), 300); // Clear after animation
+  };
 
   // Get date range based on view mode
   const dateRange = useMemo(() => {
@@ -680,6 +729,13 @@ export default function ProviderHome() {
 
   return (
     <ProviderLayout providerName={providerName}>
+      {/* Job Preview Modal */}
+      <JobPreviewModal
+        job={previewJob}
+        isOpen={isPreviewOpen}
+        onClose={closeJobPreview}
+      />
+
       <div className="w-full bg-background">
         {/* ABOVE FOLD SECTION - Metrics + Chart + Alerts */}
         <div className="min-h-[calc(100vh-64px)] px-6 py-5 flex flex-col">
@@ -971,7 +1027,7 @@ export default function ProviderHome() {
           {/* Coming Up + Jobs Scheduled Today - 2 Columns with equal height */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
 
-            {/* Column 1: Coming Up */}
+            {/* Column 1: Coming Up - Enhanced Cards */}
             <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col min-h-[400px]">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-base font-semibold text-foreground">Coming Up</h3>
@@ -990,27 +1046,69 @@ export default function ProviderHome() {
                   <p className="text-sm">No upcoming jobs</p>
                 </div>
               ) : (
-                <div className="flex-1 space-y-3 overflow-y-auto">
+                <div className="flex-1 space-y-4 overflow-y-auto">
                   {groupedUpcomingJobs.map((group) => (
                     <div key={group.date}>
-                      <p className="text-xs font-medium text-muted-foreground mb-2">{group.label}</p>
-                      <div className="space-y-2">
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">{group.label}</p>
+                      <div className="space-y-3">
                         {group.jobs.map((job) => (
                           <button
                             key={job.id}
-                            onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                            className="w-full flex items-center justify-between p-3 hover:bg-muted/40 rounded-lg transition-colors"
+                            onClick={() => openJobPreview(job)}
+                            className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-4 text-left transition-all group"
                           >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-9 h-9 rounded-lg bg-muted/60 flex items-center justify-center flex-shrink-0">
-                                <Briefcase className="h-4 w-4 text-muted-foreground" />
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0 space-y-2">
+                                {/* Customer Name - Bold at top */}
+                                <p className="text-sm font-bold text-foreground truncate">
+                                  {job.customerName || 'Unknown Customer'}
+                                </p>
+
+                                {/* Service Type with icon */}
+                                <div className="flex items-center gap-2 text-primary">
+                                  <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
+                                  <span className="text-xs font-medium truncate">{job.serviceType}</span>
+                                </div>
+
+                                {/* Address - gray with location icon */}
+                                {job.address && (
+                                  <div className="flex items-start gap-2 text-muted-foreground">
+                                    <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                                    <span className="text-xs truncate">{job.address}</span>
+                                  </div>
+                                )}
+
+                                {/* Date AND Time - Both visible */}
+                                <div className="flex items-center gap-2 text-muted-foreground">
+                                  <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                                  <span className="text-xs">
+                                    {format(new Date(job.startTime), 'MMM d')} at {formatTime(job.startTime)}
+                                    {job.endTime && ` - ${formatTime(job.endTime)}`}
+                                  </span>
+                                </div>
+
+                                {/* Worker and Amount row */}
+                                <div className="flex items-center justify-between pt-1">
+                                  {/* Worker assigned */}
+                                  {job.workerName && (
+                                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                                      <User className="h-3 w-3 flex-shrink-0" />
+                                      <span className="text-xs">{job.workerName}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Estimated amount */}
+                                  {(job.estimatedValue || job.actualValue) && (
+                                    <span className="text-xs font-semibold text-emerald-500">
+                                      {formatCurrency(job.actualValue || job.estimatedValue || 0)}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <div className="min-w-0">
-                                <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
-                                <p className="text-xs text-muted-foreground">{formatTime(job.startTime)}</p>
-                              </div>
+
+                              {/* Arrow on right */}
+                              <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
                             </div>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                           </button>
                         ))}
                       </div>
@@ -1020,7 +1118,7 @@ export default function ProviderHome() {
               )}
             </div>
 
-            {/* Column 2: Jobs Scheduled Today */}
+            {/* Column 2: Jobs Scheduled Today - Enhanced Cards */}
             <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col min-h-[400px]">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
@@ -1039,27 +1137,68 @@ export default function ProviderHome() {
                   {todaysJobs.map((job) => (
                     <button
                       key={job.id}
-                      onClick={() => router.push(`/provider/jobs/${job.id}`)}
-                      className="w-full p-4 bg-muted/40 hover:bg-muted/60 rounded-xl text-left transition-colors"
+                      onClick={() => openJobPreview(job)}
+                      className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-4 text-left transition-all group"
                     >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0 space-y-2">
+                          {/* Customer Name - Bold at top */}
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-foreground truncate">{job.serviceType}</p>
+                            <p className="text-sm font-bold text-foreground truncate">{job.customerName}</p>
                             {job.status === 'in_progress' && (
-                              <span className="inline-flex items-center text-[10px] text-orange-500 font-medium">
+                              <span className="inline-flex items-center text-[10px] text-orange-500 font-medium bg-orange-500/10 px-1.5 py-0.5 rounded-full">
                                 <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1 animate-pulse" />
                                 Active
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground truncate mt-1">{job.customerName}</p>
-                          <div className="flex items-center gap-1 mt-2 text-xs text-muted-foreground">
-                            <Clock className="h-3 w-3" />
-                            <span>{formatTime(job.startTime)}</span>
+
+                          {/* Service Type with icon */}
+                          <div className="flex items-center gap-2 text-primary">
+                            <Briefcase className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="text-xs font-medium truncate">{job.serviceType}</span>
+                          </div>
+
+                          {/* Address - gray with location icon */}
+                          {job.address && (
+                            <div className="flex items-start gap-2 text-muted-foreground">
+                              <MapPin className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                              <span className="text-xs truncate">{job.address}</span>
+                            </div>
+                          )}
+
+                          {/* Time - show time range */}
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <Clock className="h-3.5 w-3.5 flex-shrink-0" />
+                            <span className="text-xs">
+                              {formatTime(job.startTime)}
+                              {job.endTime && ` - ${formatTime(job.endTime)}`}
+                            </span>
+                          </div>
+
+                          {/* Worker and Amount row */}
+                          <div className="flex items-center justify-between pt-1">
+                            {/* Worker assigned */}
+                            {job.workers && job.workers.length > 0 && (
+                              <div className="flex items-center gap-1.5 text-muted-foreground">
+                                <User className="h-3 w-3 flex-shrink-0" />
+                                <span className="text-xs">
+                                  {job.workers.map(w => `${w.firstName} ${w.lastName}`).join(', ')}
+                                </span>
+                              </div>
+                            )}
+
+                            {/* Amount */}
+                            {job.totalAmount && (
+                              <span className="text-xs font-semibold text-emerald-500">
+                                {formatCurrency(job.totalAmount)}
+                              </span>
+                            )}
                           </div>
                         </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+
+                        {/* Arrow on right */}
+                        <ChevronRight className="h-5 w-5 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
                       </div>
                     </button>
                   ))}

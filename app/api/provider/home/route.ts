@@ -99,20 +99,41 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         startTime: true,
+        endTime: true,
         serviceType: true,
         address: true,
         status: true,
+        estimatedValue: true,
+        actualValue: true,
+        assignedUserIds: true,
         customer: {
           select: {
             name: true,
+            phone: true,
           },
         },
       },
       orderBy: {
         startTime: 'asc',
       },
-      take: 5,
+      take: 10,
     });
+
+    // Get worker names for upcoming jobs
+    const upcomingJobUserIds = Array.from(new Set(upcomingJobs.flatMap(job => job.assignedUserIds)));
+    const upcomingJobUsers = upcomingJobUserIds.length > 0 ? await prisma.providerUser.findMany({
+      where: {
+        id: {
+          in: upcomingJobUserIds,
+        },
+      },
+      select: {
+        id: true,
+        firstName: true,
+        lastName: true,
+      },
+    }) : [];
+    const upcomingJobUserMap = new Map(upcomingJobUsers.map(u => [u.id, `${u.firstName} ${u.lastName}`]));
 
     console.log('📅 Upcoming jobs result:', {
       count: upcomingJobs.length,
@@ -596,9 +617,15 @@ export async function GET(request: NextRequest) {
         upcomingJobs: upcomingJobs.map(job => ({
           id: job.id,
           startTime: job.startTime.toISOString(),
+          endTime: job.endTime?.toISOString(),
           serviceType: job.serviceType,
           customerName: job.customer?.name || 'Unknown Customer',
           address: job.address || '',
+          status: job.status,
+          estimatedValue: job.estimatedValue,
+          actualValue: job.actualValue,
+          workerName: job.assignedUserIds.length > 0 ? upcomingJobUserMap.get(job.assignedUserIds[0]) || null : null,
+          phone: job.customer?.phone || '',
         })),
         stats: {
           todaysJobsCount: todaysJobs.length,
