@@ -616,6 +616,44 @@ export default function ProviderMessages() {
   const activeTeamMembers = teamMembers.filter(m => m.lastMessageAt);
   const pinnedTeamMembers = teamMembers.filter(m => !m.lastMessageAt);
 
+  // Create a unified sorted list of all chats with messages (team chat, crews, members)
+  // sorted by most recent message time
+  type ChatItem =
+    | { type: 'team'; data: TeamChat }
+    | { type: 'crew'; data: CrewChat }
+    | { type: 'member'; data: TeamMember };
+
+  const allChatsWithMessages: ChatItem[] = [
+    // Add team chat if it has messages
+    ...(teamChat?.lastMessageAt ? [{ type: 'team' as const, data: teamChat }] : []),
+    // Add crew chats that have messages
+    ...crewChats.filter(c => c.lastMessageAt).map(c => ({ type: 'crew' as const, data: c })),
+    // Add active team members
+    ...activeTeamMembers.map(m => ({ type: 'member' as const, data: m })),
+  ].sort((a, b) => {
+    const aTime = new Date(
+      a.type === 'team' ? a.data.lastMessageAt || '' :
+      a.type === 'crew' ? a.data.lastMessageAt || '' :
+      a.data.lastMessageAt || ''
+    ).getTime();
+    const bTime = new Date(
+      b.type === 'team' ? b.data.lastMessageAt || '' :
+      b.type === 'crew' ? b.data.lastMessageAt || '' :
+      b.data.lastMessageAt || ''
+    ).getTime();
+    return bTime - aTime; // Most recent first
+  });
+
+  // Chats without messages (for "Start a conversation" section)
+  const chatsWithoutMessages: ChatItem[] = [
+    // Team chat without messages
+    ...(teamChat && !teamChat.lastMessageAt ? [{ type: 'team' as const, data: teamChat }] : []),
+    // Crew chats without messages
+    ...crewChats.filter(c => !c.lastMessageAt).map(c => ({ type: 'crew' as const, data: c })),
+    // Team members without messages
+    ...pinnedTeamMembers.map(m => ({ type: 'member' as const, data: m })),
+  ];
+
   const totalCrewUnread = crewChats.reduce((sum, c) => sum + c.unreadCount, 0);
   const totalTeamUnread = (teamChat?.unreadCount || 0) + totalCrewUnread + teamMembers.reduce((sum, m) => sum + m.unreadCount, 0);
   const totalCustomerUnread = conversations.filter(c => c.unread).length;
@@ -795,128 +833,188 @@ export default function ProviderMessages() {
             <div className="flex-1 overflow-y-auto">
               {activeTab === 'team' ? (
                 <>
-                  {/* Team Chat (broadcast) */}
-                  {teamChat && (
-                    <button
-                      onClick={() => handleSelectTeamChat({ type: 'team', id: 'team' })}
-                      className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
-                        selectedTeamChat?.type === 'team' ? 'bg-zinc-800' : ''
-                      }`}
-                    >
-                      <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
-                        <Users className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1 text-left min-w-0">
-                        <p className="font-medium text-white">Team Chat</p>
-                        <p className="text-xs text-zinc-400 truncate">
-                          {teamChat.lastMessage || 'Everyone'}
-                        </p>
-                      </div>
-                      {teamChat.unreadCount > 0 && (
-                        <Badge className="bg-emerald-500 text-white">{teamChat.unreadCount}</Badge>
-                      )}
-                    </button>
-                  )}
-
-                  {/* Crew Chats */}
-                  {crewChats.map(crew => (
-                    <button
-                      key={crew.id}
-                      onClick={() => handleSelectTeamChat({ type: 'crew', id: crew.id, crewId: crew.crewId })}
-                      className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
-                        selectedTeamChat?.crewId === crew.crewId ? 'bg-zinc-800' : ''
-                      }`}
-                    >
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ backgroundColor: crew.color || '#6b7280' }}
+                  {/* All chats sorted by most recent message */}
+                  {allChatsWithMessages.map((item) => {
+                    if (item.type === 'team') {
+                      const chat = item.data;
+                      return (
+                        <button
+                          key="team-chat"
+                          onClick={() => handleSelectTeamChat({ type: 'team', id: 'team' })}
+                          className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
+                            selectedTeamChat?.type === 'team' ? 'bg-zinc-800' : ''
+                          }`}
+                        >
+                          <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
+                            <Users className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <p className="font-medium text-white">Team Chat</p>
+                            <p className="text-xs text-zinc-400 truncate">
+                              {chat.lastMessage || 'Everyone'}
+                            </p>
+                          </div>
+                          {chat.unreadCount > 0 && (
+                            <Badge className="bg-emerald-500 text-white">{chat.unreadCount}</Badge>
+                          )}
+                        </button>
+                      );
+                    }
+                    if (item.type === 'crew') {
+                      const crew = item.data;
+                      return (
+                        <button
+                          key={`crew-${crew.id}`}
+                          onClick={() => handleSelectTeamChat({ type: 'crew', id: crew.id, crewId: crew.crewId })}
+                          className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
+                            selectedTeamChat?.crewId === crew.crewId ? 'bg-zinc-800' : ''
+                          }`}
+                        >
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                            style={{ backgroundColor: crew.color || '#6b7280' }}
+                          >
+                            <Users className="w-5 h-5 text-white" />
+                          </div>
+                          <div className="flex-1 text-left min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-white truncate">{crew.name}</p>
+                              <span className="text-xs text-zinc-500">{crew.memberCount}</span>
+                            </div>
+                            <p className="text-xs text-zinc-400 truncate">
+                              {crew.lastMessage || 'Crew chat'}
+                            </p>
+                          </div>
+                          {crew.unreadCount > 0 && (
+                            <Badge className="bg-emerald-500 text-white">{crew.unreadCount}</Badge>
+                          )}
+                        </button>
+                      );
+                    }
+                    // member type
+                    const member = item.data;
+                    return (
+                      <button
+                        key={`member-${member.id}`}
+                        onClick={() => handleSelectTeamChat({ type: 'member', id: member.id })}
+                        className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
+                          selectedTeamChat?.type === 'member' && selectedTeamChat?.id === member.id ? 'bg-zinc-800' : ''
+                        }`}
                       >
-                        <Users className="w-5 h-5 text-white" />
-                      </div>
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-white truncate">{crew.name}</p>
-                          <span className="text-xs text-zinc-500">{crew.memberCount}</span>
-                        </div>
-                        <p className="text-xs text-zinc-400 truncate">
-                          {crew.lastMessage || 'Crew chat'}
-                        </p>
-                      </div>
-                      {crew.unreadCount > 0 && (
-                        <Badge className="bg-emerald-500 text-white">{crew.unreadCount}</Badge>
-                      )}
-                    </button>
-                  ))}
-
-                  {/* Active team members (has messages) */}
-                  {activeTeamMembers.map(member => (
-                    <button
-                      key={member.id}
-                      onClick={() => handleSelectTeamChat({ type: 'member', id: member.id })}
-                      className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
-                        selectedTeamChat?.type === 'member' && selectedTeamChat?.id === member.id ? 'bg-zinc-800' : ''
-                      }`}
-                    >
-                      {member.avatar ? (
-                        <img
-                          src={member.avatar}
-                          alt={member.name}
-                          className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium flex-shrink-0">
-                          {getInitials(member.name)}
-                        </div>
-                      )}
-                      <div className="flex-1 text-left min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-white truncate">{member.name}</p>
-                          <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
-                        </div>
-                        {member.lastMessage && (
-                          <p className="text-xs text-zinc-400 truncate">{member.lastMessage}</p>
+                        {member.avatar ? (
+                          <img
+                            src={member.avatar}
+                            alt={member.name}
+                            className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium flex-shrink-0">
+                            {getInitials(member.name)}
+                          </div>
                         )}
-                      </div>
-                      {member.unreadCount > 0 && (
-                        <Badge className="bg-emerald-500 text-white">{member.unreadCount}</Badge>
-                      )}
-                    </button>
-                  ))}
+                        <div className="flex-1 text-left min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-white truncate">{member.name}</p>
+                            <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
+                          </div>
+                          {member.lastMessage && (
+                            <p className="text-xs text-zinc-400 truncate">{member.lastMessage}</p>
+                          )}
+                        </div>
+                        {member.unreadCount > 0 && (
+                          <Badge className="bg-emerald-500 text-white">{member.unreadCount}</Badge>
+                        )}
+                      </button>
+                    );
+                  })}
 
-                  {/* Pinned team members (no messages yet) */}
-                  {pinnedTeamMembers.length > 0 && (
+                  {/* Chats without messages yet (Start a conversation section) */}
+                  {chatsWithoutMessages.length > 0 && (
                     <>
                       <div className="px-3 py-2 bg-zinc-900/50 border-b border-zinc-800">
                         <p className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Start a conversation</p>
                       </div>
-                      {pinnedTeamMembers.map(member => (
-                        <button
-                          key={member.id}
-                          onClick={() => handleSelectTeamChat({ type: 'member', id: member.id })}
-                          className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
-                            selectedTeamChat?.type === 'member' && selectedTeamChat?.id === member.id ? 'bg-zinc-800' : ''
-                          }`}
-                        >
-                          {member.avatar ? (
-                            <img
-                              src={member.avatar}
-                              alt={member.name}
-                              className="w-10 h-10 rounded-full object-cover flex-shrink-0"
-                            />
-                          ) : (
-                            <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium flex-shrink-0">
-                              {getInitials(member.name)}
+                      {chatsWithoutMessages.map((item) => {
+                        if (item.type === 'team') {
+                          const chat = item.data;
+                          return (
+                            <button
+                              key="team-chat-new"
+                              onClick={() => handleSelectTeamChat({ type: 'team', id: 'team' })}
+                              className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
+                                selectedTeamChat?.type === 'team' ? 'bg-zinc-800' : ''
+                              }`}
+                            >
+                              <div className="w-10 h-10 rounded-full bg-emerald-600 flex items-center justify-center flex-shrink-0">
+                                <Users className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="flex-1 text-left min-w-0">
+                                <p className="font-medium text-white">Team Chat</p>
+                                <p className="text-xs text-zinc-500">Broadcast to everyone</p>
+                              </div>
+                              {chat.unreadCount > 0 && (
+                                <Badge className="bg-emerald-500 text-white">{chat.unreadCount}</Badge>
+                              )}
+                            </button>
+                          );
+                        }
+                        if (item.type === 'crew') {
+                          const crew = item.data;
+                          return (
+                            <button
+                              key={`crew-new-${crew.id}`}
+                              onClick={() => handleSelectTeamChat({ type: 'crew', id: crew.id, crewId: crew.crewId })}
+                              className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
+                                selectedTeamChat?.crewId === crew.crewId ? 'bg-zinc-800' : ''
+                              }`}
+                            >
+                              <div
+                                className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: crew.color || '#6b7280' }}
+                              >
+                                <Users className="w-5 h-5 text-white" />
+                              </div>
+                              <div className="flex-1 text-left min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium text-white truncate">{crew.name}</p>
+                                  <span className="text-xs text-zinc-500">{crew.memberCount}</span>
+                                </div>
+                                <p className="text-xs text-zinc-500">Crew chat</p>
+                              </div>
+                            </button>
+                          );
+                        }
+                        // member type
+                        const member = item.data;
+                        return (
+                          <button
+                            key={`member-new-${member.id}`}
+                            onClick={() => handleSelectTeamChat({ type: 'member', id: member.id })}
+                            className={`w-full p-3 flex items-center gap-3 border-b border-zinc-800 hover:bg-zinc-800/50 transition-colors ${
+                              selectedTeamChat?.type === 'member' && selectedTeamChat?.id === member.id ? 'bg-zinc-800' : ''
+                            }`}
+                          >
+                            {member.avatar ? (
+                              <img
+                                src={member.avatar}
+                                alt={member.name}
+                                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                              />
+                            ) : (
+                              <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-white font-medium flex-shrink-0">
+                                {getInitials(member.name)}
+                              </div>
+                            )}
+                            <div className="flex-1 text-left min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-white truncate">{member.name}</p>
+                                <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
+                              </div>
+                              <p className="text-xs text-zinc-500">{getRoleLabel(member.role)}</p>
                             </div>
-                          )}
-                          <div className="flex-1 text-left min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-white truncate">{member.name}</p>
-                              <span className="text-zinc-500">{getRoleIcon(member.role)}</span>
-                            </div>
-                            <p className="text-xs text-zinc-500">{getRoleLabel(member.role)}</p>
-                          </div>
-                        </button>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </>
                   )}
 
