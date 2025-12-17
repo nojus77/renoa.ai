@@ -54,6 +54,8 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
   const [providerServiceTypes, setProviderServiceTypes] = useState<string[]>([]);
   const [userEmail, setUserEmail] = useState<string>('');
   const [userName, setUserName] = useState<string>('');
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [userId, setUserId] = useState<string>('');
 
   // Close mobile menu on route change
   useEffect(() => {
@@ -91,6 +93,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
   useEffect(() => {
     const fetchProviderData = async () => {
       const id = localStorage.getItem('providerId');
+      const uid = localStorage.getItem('userId');
       const role = localStorage.getItem('userRole') || 'owner';
       const email = localStorage.getItem('userEmail') || '';
       const name = localStorage.getItem('userName') || '';
@@ -98,6 +101,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
       setUserRole(role);
       setUserEmail(email);
       setUserName(name);
+      setUserId(uid || id || '');
 
       if (!id) return;
       setProviderId(id);
@@ -145,6 +149,30 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
     const interval = setInterval(fetchUnreadCount, 60000);
     return () => clearInterval(interval);
   }, [providerId]);
+
+  // Fetch and poll for unread message count every 30 seconds
+  useEffect(() => {
+    if (!providerId || !userId) return;
+
+    const fetchUnreadMessages = async () => {
+      try {
+        const res = await fetch(`/api/provider/messages/unread-count?providerId=${providerId}&userId=${userId}`);
+        const data = await res.json();
+        if (res.ok) {
+          setUnreadMessageCount(data.total || 0);
+        }
+      } catch (error) {
+        // Silently ignore polling errors
+      }
+    };
+
+    // Fetch immediately
+    fetchUnreadMessages();
+
+    // Poll every 30 seconds
+    const interval = setInterval(fetchUnreadMessages, 30000);
+    return () => clearInterval(interval);
+  }, [providerId, userId]);
 
   const handleLogout = () => {
     localStorage.removeItem('providerId');
@@ -540,6 +568,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
               {navItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
+                const showMessageBadge = item.name === 'Messages' && unreadMessageCount > 0;
 
                 return (
                   <Link
@@ -559,7 +588,14 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                       else setMobileMenuOpen(false);
                     }}
                   >
-                    <Icon className="h-5 w-5 flex-shrink-0" />
+                    <div className="relative flex-shrink-0">
+                      <Icon className="h-5 w-5" />
+                      {showMessageBadge && (
+                        <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                          {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                        </span>
+                      )}
+                    </div>
                     <span className="font-medium">{item.name}</span>
                   </Link>
                 );
@@ -591,6 +627,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
             {bottomNavItems.map((item) => {
               const Icon = item.icon;
               const active = isActive(item.href);
+              const showMessageBadge = item.name === 'Messages' && unreadMessageCount > 0;
 
               return (
                 <Link
@@ -609,7 +646,14 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                     if (item.disabled) e.preventDefault();
                   }}
                 >
-                  <Icon className="h-5 w-5" />
+                  <div className="relative">
+                    <Icon className="h-5 w-5" />
+                    {showMessageBadge && (
+                      <span className="absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-1">
+                        {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[10px] font-medium">{item.name}</span>
                 </Link>
               );

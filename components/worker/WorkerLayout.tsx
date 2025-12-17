@@ -43,17 +43,15 @@ export default function WorkerLayout({ children }: WorkerLayoutProps) {
     }
   }, [providerId, userId]);
 
-  // Fetch unread messages count
+  // Fetch unread messages count using dedicated API
   const fetchUnreadMessagesCount = useCallback(async () => {
     if (!userId) return;
 
     try {
-      const res = await fetch(`/api/worker/messages/team/conversations?userId=${userId}`);
+      const res = await fetch(`/api/worker/messages/unread-count?userId=${userId}`);
       const data = await res.json();
-      if (data.teamChat && data.conversations) {
-        const teamUnread = data.teamChat.unreadCount || 0;
-        const directUnread = data.conversations.reduce((sum: number, c: { unreadCount: number }) => sum + (c.unreadCount || 0), 0);
-        setUnreadMessagesCount(teamUnread + directUnread);
+      if (res.ok) {
+        setUnreadMessagesCount(data.total || 0);
       }
     } catch (error) {
       console.error('Error fetching message count:', error);
