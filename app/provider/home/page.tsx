@@ -109,7 +109,7 @@ interface Alerts {
 
 interface RevenueDataPoint {
   date: string;
-  amount: number;
+  amount: number | null;
   label?: string;
   day?: string;
   displayLabel?: string;
@@ -173,9 +173,9 @@ function generateTestDataForRange(startDate: Date, endDate: Date): RevenueDataPo
   });
 }
 
-// Custom tooltip for the chart
+// Custom tooltip for the chart - hide on zero values
 function CustomTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: RevenueDataPoint }>; label?: string }) {
-  if (active && payload && payload.length) {
+  if (active && payload && payload.length && payload[0].value > 0) {
     const data = payload[0].payload;
     return (
       <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
@@ -441,6 +441,11 @@ export default function ProviderHome() {
   const chartData = useMemo(() => {
     const fullRangeData = generateTestDataForRange(dateRange.start, dateRange.end);
 
+    // Start with all zeros (will be converted to null later)
+    fullRangeData.forEach(d => {
+      d.amount = 0;
+    });
+
     if (homeData?.revenueHistory && homeData.revenueHistory.length > 0) {
       const revenueMap = new Map(homeData.revenueHistory.map(d => [d.date, d.amount]));
 
@@ -452,15 +457,21 @@ export default function ProviderHome() {
       });
     }
 
+    // Convert zero values to null so chart doesn't render them
+    const processedData = fullRangeData.map(d => ({
+      ...d,
+      amount: d.amount === 0 ? null : d.amount,
+    }));
+
     if (viewMode === 'week') {
-      return fullRangeData.map(d => ({
+      return processedData.map(d => ({
         ...d,
         displayLabel: format(new Date(d.date + 'T12:00:00'), 'EEE'),
       }));
     } else {
-      return fullRangeData.map((d, i) => {
+      return processedData.map((d, i) => {
         const dayNum = new Date(d.date + 'T12:00:00').getDate();
-        const showLabel = dayNum === 1 || dayNum % 5 === 0 || i === fullRangeData.length - 1;
+        const showLabel = dayNum === 1 || dayNum % 5 === 0 || i === processedData.length - 1;
         return {
           ...d,
           displayLabel: showLabel ? String(dayNum) : '',
@@ -470,11 +481,11 @@ export default function ProviderHome() {
   }, [homeData?.revenueHistory, dateRange, viewMode]);
 
   const totalRevenue = useMemo(() => {
-    return chartData.reduce((sum, d) => sum + d.amount, 0);
+    return chartData.reduce((sum, d) => sum + (d.amount || 0), 0);
   }, [chartData]);
 
   const hasRevenueData = useMemo(() => {
-    return chartData.some(d => d.amount > 0);
+    return chartData.some(d => d.amount !== null && d.amount > 0);
   }, [chartData]);
 
   const jobsCompleted = useMemo(() => {
@@ -556,44 +567,38 @@ export default function ProviderHome() {
           {/* TOP ROW: Metrics + Chart */}
           <div className="flex flex-col lg:flex-row gap-6 mb-6">
 
-            {/* Left: 3 Metric Cards */}
+            {/* Left: 3 Metric Cards - Minimal Gray Design */}
             <div className="flex flex-col sm:flex-row lg:flex-col gap-4 lg:w-[280px] flex-shrink-0">
               {/* Number of Jobs */}
-              <div className="flex-1 bg-emerald-500 rounded-2xl p-5">
+              <div className="flex-1 bg-[#18181b] rounded-2xl p-5 border border-[#27272a]">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-4xl font-bold text-white">{numberOfJobs}</p>
-                    <p className="text-sm text-emerald-100 mt-1">Jobs Completed</p>
+                    <p className="text-sm text-[#71717a] mt-1">Jobs Completed</p>
                   </div>
-                  <div className="p-2 rounded-lg bg-white/20">
-                    <Hash className="h-5 w-5 text-white" />
-                  </div>
+                  <Hash className="h-5 w-5 text-[#71717a]" />
                 </div>
               </div>
 
               {/* Average Job Size */}
-              <div className="flex-1 bg-emerald-500 rounded-2xl p-5">
+              <div className="flex-1 bg-[#18181b] rounded-2xl p-5 border border-[#27272a]">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-4xl font-bold text-white">{formatCurrency(averageJobSize)}</p>
-                    <p className="text-sm text-emerald-100 mt-1">Average Job Size</p>
+                    <p className="text-sm text-[#71717a] mt-1">Average Job Size</p>
                   </div>
-                  <div className="p-2 rounded-lg bg-white/20">
-                    <TrendingUp className="h-5 w-5 text-white" />
-                  </div>
+                  <TrendingUp className="h-5 w-5 text-[#71717a]" />
                 </div>
               </div>
 
               {/* Total Job Value */}
-              <div className="flex-1 bg-emerald-500 rounded-2xl p-5">
+              <div className="flex-1 bg-[#18181b] rounded-2xl p-5 border border-[#27272a]">
                 <div className="flex items-start justify-between">
                   <div>
                     <p className="text-4xl font-bold text-white">{formatCurrency(totalJobValue)}</p>
-                    <p className="text-sm text-emerald-100 mt-1">Total Revenue</p>
+                    <p className="text-sm text-[#71717a] mt-1">Total Revenue</p>
                   </div>
-                  <div className="p-2 rounded-lg bg-white/20">
-                    <DollarSign className="h-5 w-5 text-white" />
-                  </div>
+                  <DollarSign className="h-5 w-5 text-[#71717a]" />
                 </div>
               </div>
             </div>
@@ -704,7 +709,14 @@ export default function ProviderHome() {
                         strokeWidth={2}
                         fill="url(#colorRevenue)"
                         dot={false}
-                        activeDot={{ r: 5, fill: '#10b981', strokeWidth: 2, stroke: '#fff' }}
+                        connectNulls={false}
+                        activeDot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint }) => {
+                          // Only show active dot for non-zero values
+                          if (props.payload?.amount === null || props.payload?.amount === 0) {
+                            return <g />;
+                          }
+                          return <circle cx={props.cx} cy={props.cy} r={5} fill="#10b981" stroke="#fff" strokeWidth={2} />;
+                        }}
                       />
                     </AreaChart>
                   </ResponsiveContainer>
