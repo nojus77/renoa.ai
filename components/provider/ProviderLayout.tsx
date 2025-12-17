@@ -299,6 +299,7 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
               {topNavItems.map((item) => {
                 const Icon = item.icon;
                 const active = isActive(item.href);
+                const showMessageBadge = item.name === 'Messages' && unreadMessageCount > 0;
 
                 return (
                   <Link
@@ -318,7 +319,14 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                       if (item.disabled) e.preventDefault();
                     }}
                   >
-                    <Icon className="h-4 w-4" />
+                    <div className="relative">
+                      <Icon className="h-4 w-4" />
+                      {showMessageBadge && (
+                        <span className="absolute -top-1.5 -right-1.5 bg-emerald-500 text-white text-[9px] font-bold rounded-full min-w-[14px] h-[14px] flex items-center justify-center px-0.5">
+                          {unreadMessageCount > 99 ? '99+' : unreadMessageCount}
+                        </span>
+                      )}
+                    </div>
                     <span>{item.name}</span>
                   </Link>
                 );
