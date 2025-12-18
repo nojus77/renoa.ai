@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import {
   MapPin, Navigation, Clock, ChevronRight, Route, Loader2, Calendar,
   CheckCircle, XCircle, Users, AlertTriangle, Lock, Unlock, GripVertical,
-  ChevronDown, ChevronUp, Filter, RefreshCw, Zap
+  ChevronDown, ChevronUp, Filter, RefreshCw, Zap, Building2
 } from 'lucide-react';
 import { format, parseISO, isToday, isTomorrow, startOfDay, addDays } from 'date-fns';
 
@@ -57,6 +57,13 @@ interface Worker {
   color: string;
   homeLatitude?: number | null;
   homeLongitude?: number | null;
+}
+
+interface OfficeLocation {
+  name: string | null;
+  address: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 interface WorkerRoute {
@@ -147,6 +154,7 @@ export default function DispatchPage() {
   const [providerId, setProviderId] = useState<string>('');
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [providerName, setProviderName] = useState<string>('');
+  const [officeLocation, setOfficeLocation] = useState<OfficeLocation | null>(null);
   const [autoAssign, setAutoAssign] = useState(true);
   const [optimizationResult, setOptimizationResult] = useState<{
     workers: Array<{
@@ -262,12 +270,15 @@ export default function DispatchPage() {
       setJobs(data.jobs || []);
       setWorkers(data.workers || []);
       setUnassignedJobs(data.unassignedJobs || []);
+      setOfficeLocation(data.office || null);
 
-      // Center on first job with coordinates
+      // Center on: first job with coordinates, or office location, or default
       const allJobs = [...(data.jobs || []), ...(data.unassignedJobs || [])];
       const firstWithCoords = allJobs.find((j: Job) => j.latitude && j.longitude);
       if (firstWithCoords) {
         setCenter({ lat: firstWithCoords.latitude!, lng: firstWithCoords.longitude! });
+      } else if (data.office?.latitude && data.office?.longitude) {
+        setCenter({ lat: data.office.latitude, lng: data.office.longitude });
       }
     } catch (error) {
       console.error('Failed to fetch dispatch data:', error);
@@ -589,6 +600,13 @@ export default function DispatchPage() {
             {workerRoutes.length === 0 && workers.length > 0 && (
               <p className="text-sm text-muted-foreground">No jobs assigned yet</p>
             )}
+            {/* Office location legend */}
+            {officeLocation?.latitude && officeLocation?.longitude && (
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium bg-indigo-500/10 text-indigo-600 border border-indigo-500/30">
+                <Building2 className="w-3 h-3" />
+                Office
+              </div>
+            )}
           </div>
 
           {/* Skill Mismatch Warning Banner */}
@@ -711,14 +729,6 @@ export default function DispatchPage() {
               <div className="flex items-center justify-center h-full bg-muted">
                 <Loader2 className="w-8 h-8 animate-spin text-primary" />
               </div>
-            ) : allJobsWithCoords.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-muted">
-                <MapPin className="w-16 h-16 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">No Jobs Found</h3>
-                <p className="text-muted-foreground">
-                  No jobs scheduled for {format(selectedDate, 'MMMM d, yyyy')}
-                </p>
-              </div>
             ) : (
               <GoogleMap
                 mapContainerStyle={mapContainerStyle}
@@ -807,6 +817,23 @@ export default function DispatchPage() {
                     />
                   ))}
 
+                {/* Office location marker */}
+                {officeLocation?.latitude && officeLocation?.longitude && (
+                  <Marker
+                    position={{ lat: officeLocation.latitude, lng: officeLocation.longitude }}
+                    icon={{
+                      path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+                      fillColor: '#6366f1',
+                      fillOpacity: 1,
+                      strokeWeight: 2,
+                      strokeColor: '#fff',
+                      scale: 2,
+                      anchor: new google.maps.Point(12, 24),
+                    }}
+                    title={`Office: ${officeLocation.name || 'Company HQ'}`}
+                  />
+                )}
+
                 {/* Info window */}
                 {selectedJob && selectedJob.latitude && selectedJob.longitude && (
                   <InfoWindow
@@ -870,6 +897,19 @@ export default function DispatchPage() {
                   </InfoWindow>
                 )}
               </GoogleMap>
+            )}
+
+            {/* No jobs overlay message */}
+            {allJobsWithCoords.length === 0 && !loading && (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-card/95 backdrop-blur border border-border rounded-lg shadow-lg flex items-center gap-3">
+                <Calendar className="w-5 h-5 text-muted-foreground" />
+                <div>
+                  <p className="font-medium text-foreground">No jobs scheduled</p>
+                  <p className="text-sm text-muted-foreground">
+                    {format(selectedDate, 'MMMM d, yyyy')}
+                  </p>
+                </div>
+              </div>
             )}
 
             {/* Toggle unassigned panel */}

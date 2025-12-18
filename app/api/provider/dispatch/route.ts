@@ -69,6 +69,17 @@ export async function GET(request: NextRequest) {
       ],
     });
 
+    // Fetch provider info for office location
+    const provider = await prisma.provider.findUnique({
+      where: { id: providerId },
+      select: {
+        businessName: true,
+        businessAddress: true,
+        officeLatitude: true,
+        officeLongitude: true,
+      },
+    });
+
     // Fetch all field workers
     const workers = await prisma.providerUser.findMany({
       where: {
@@ -137,6 +148,12 @@ export async function GET(request: NextRequest) {
     }));
 
     return NextResponse.json({
+      office: provider ? {
+        name: provider.businessName,
+        address: provider.businessAddress,
+        latitude: provider.officeLatitude,
+        longitude: provider.officeLongitude,
+      } : null,
       jobs: assignedJobs.map(job => ({
         id: job.id,
         serviceType: job.serviceType,
