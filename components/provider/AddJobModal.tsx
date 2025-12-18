@@ -125,7 +125,15 @@ export default function AddJobModal({
   const [showCustomDuration, setShowCustomDuration] = useState(false);
   const [customDurationValue, setCustomDurationValue] = useState('');
   const [averageDuration, setAverageDuration] = useState<{ average: number; count: number } | null>(null);
-  const DURATION_OPTIONS = [30, 45, 60, 90, 120, 150, 180];
+  const DURATION_OPTIONS = [
+    { minutes: 30, label: '30min' },
+    { minutes: 45, label: '45min' },
+    { minutes: 60, label: '1h' },
+    { minutes: 90, label: '1h 30min' },
+    { minutes: 120, label: '2h' },
+    { minutes: 150, label: '2h 30min' },
+    { minutes: 180, label: '3h' },
+  ];
 
   // Job details - structured fields
   const [jobDetails, setJobDetails] = useState({
@@ -1008,15 +1016,15 @@ export default function AddJobModal({
                           Estimated Duration <span className="text-red-400">*</span>
                         </label>
                         <div className="flex flex-wrap gap-2">
-                          {DURATION_OPTIONS.map(mins => {
-                            const isSelected = jobDetails.durationMinutes === mins && !showCustomDuration;
-                            const isDefault = selectedServiceConfig && Math.round(selectedServiceConfig.estimatedDuration * 60) === mins;
+                          {DURATION_OPTIONS.map(opt => {
+                            const isSelected = jobDetails.durationMinutes === opt.minutes && !showCustomDuration;
+                            const isDefault = selectedServiceConfig && Math.round(selectedServiceConfig.estimatedDuration * 60) === opt.minutes;
                             return (
                               <button
-                                key={mins}
+                                key={opt.minutes}
                                 type="button"
                                 onClick={() => {
-                                  setJobDetails(prev => ({ ...prev, durationMinutes: mins }));
+                                  setJobDetails(prev => ({ ...prev, durationMinutes: opt.minutes }));
                                   setShowCustomDuration(false);
                                   setCustomDurationValue('');
                                 }}
@@ -1028,7 +1036,7 @@ export default function AddJobModal({
                                       : 'bg-zinc-700/50 border border-zinc-600 text-zinc-300 hover:bg-zinc-700'
                                 }`}
                               >
-                                {mins}
+                                {opt.label}
                               </button>
                             );
                           })}

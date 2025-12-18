@@ -22,6 +22,7 @@ interface JobWithCoords {
   startTime: Date;
   endTime: Date;
   appointmentType: string;
+  status: string;
   estimatedDuration: number | null;
   lat: number;
   lng: number;
@@ -174,7 +175,51 @@ function calculateTotalRouteDistance(startPoint: Coordinates | null, jobs: JobWi
 }
 
 /**
- * Get last location in worker's route
+ * Get worker's current location using priority order:
+ * 1. Active job (IN_PROGRESS, ON_THE_WAY) location
+ * 2. Last completed job location (for today)
+ * 3. Last job in assigned route
+ * 4. Worker's start point (home or office)
+ */
+function getWorkerCurrentLocation(
+  worker: WorkerData,
+  allJobs: JobWithCoords[],
+  officeLocation: Coordinates | null
+): Coordinates | null {
+  // 1. Check for active job (in_progress or on_the_way)
+  const activeJob = allJobs.find(j =>
+    j.assignedUserIds.includes(worker.id) &&
+    ['in_progress', 'on_the_way'].includes(j.status.toLowerCase())
+  );
+  if (activeJob && activeJob.lat && activeJob.lng) {
+    return { latitude: activeJob.lat, longitude: activeJob.lng };
+  }
+
+  // 2. Check for last completed job today
+  // (Jobs should already be filtered to today's date in the API)
+  const completedJobs = allJobs
+    .filter(j => j.assignedUserIds.includes(worker.id))
+    .filter(j => j.status.toLowerCase() === 'completed');
+
+  if (completedJobs.length > 0) {
+    const lastCompleted = completedJobs[completedJobs.length - 1];
+    if (lastCompleted.lat && lastCompleted.lng) {
+      return { latitude: lastCompleted.lat, longitude: lastCompleted.lng };
+    }
+  }
+
+  // 3. Last job in their assigned route
+  if (worker.assignedJobs.length > 0) {
+    const lastJob = worker.assignedJobs[worker.assignedJobs.length - 1];
+    return { latitude: lastJob.lat, longitude: lastJob.lng };
+  }
+
+  // 4. Worker's start point (home or office)
+  return worker.startPoint;
+}
+
+/**
+ * Get last location in worker's route (for route building)
  */
 function getWorkerLastLocation(worker: WorkerData): Coordinates | null {
   if (worker.assignedJobs.length > 0) {
@@ -186,18 +231,25 @@ function getWorkerLastLocation(worker: WorkerData): Coordinates | null {
 
 /**
  * Calculate cost to add a job to a worker's route
+ * Uses smarter worker location when allJobs is provided
  */
 function calculateAssignmentCost(
   worker: WorkerData,
   job: JobWithCoords,
-  avgJobsPerWorker: number
+  avgJobsPerWorker: number,
+  allJobs?: JobWithCoords[],
+  officeLocation?: Coordinates | null
 ): number {
-  // Distance cost: miles from last location to job
-  const lastLocation = getWorkerLastLocation(worker);
+  // Distance cost: miles from current/last location to job
+  // Use smart location if we have all jobs data, otherwise fall back to route-based
+  const workerLocation = allJobs
+    ? getWorkerCurrentLocation(worker, allJobs, officeLocation || null)
+    : getWorkerLastLocation(worker);
+
   let distanceCost = 0;
 
-  if (lastLocation) {
-    const dist = calculateHaversineDistance(lastLocation, {
+  if (workerLocation) {
+    const dist = calculateHaversineDistance(workerLocation, {
       latitude: job.lat,
       longitude: job.lng,
     });
@@ -460,6 +512,7 @@ export async function POST(req: Request) {
         startTime: j.startTime,
         endTime: j.endTime,
         appointmentType: j.appointmentType,
+        status: j.status,
         estimatedDuration: j.estimatedDuration,
         lat: j.latitude || j.customer?.latitude || 0,
         lng: j.longitude || j.customer?.longitude || 0,
@@ -672,12 +725,12 @@ export async function POST(req: Request) {
           continue;
         }
 
-        // Find best worker based on cost
+        // Find best worker based on cost (uses smart worker location)
         let bestWorker: WorkerData | null = null;
         let bestCost = Infinity;
 
         for (const worker of eligibleWorkers) {
-          const cost = calculateAssignmentCost(worker, job, avgJobsPerWorker);
+          const cost = calculateAssignmentCost(worker, job, avgJobsPerWorker, jobsWithCoords, officeLocation);
           if (cost < bestCost) {
             bestCost = cost;
             bestWorker = worker;

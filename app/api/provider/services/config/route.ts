@@ -55,10 +55,33 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch all skills for this provider to get names
-    const skills = await prisma.skill.findMany({
-      where: { providerId },
-      select: { id: true, name: true, category: true },
+    // Fetch skills that at least one worker has (company's available skills)
+    // This ensures the dropdown only shows skills workers can actually fulfill
+    const workerSkills = await prisma.providerUserSkill.findMany({
+      where: {
+        user: {
+          providerId,
+          status: 'active',
+        },
+      },
+      select: {
+        skillId: true,
+        skill: {
+          select: { id: true, name: true, category: true },
+        },
+      },
+      distinct: ['skillId'],
+    });
+
+    // Extract unique skills that workers have
+    const skills = workerSkills.map(ws => ws.skill);
+
+    // Sort by category then name
+    skills.sort((a, b) => {
+      if (a.category && b.category && a.category !== b.category) {
+        return a.category.localeCompare(b.category);
+      }
+      return a.name.localeCompare(b.name);
     });
 
     const skillMap = new Map(skills.map(s => [s.id, s]));
