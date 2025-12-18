@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 /**
  * GET /api/provider/services/config
  * Returns all ServiceTypeConfig records for a provider with skill names
+ * Auto-creates configs from provider.serviceTypes if none exist (migration)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -15,10 +16,44 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all service type configs for this provider
-    const configs = await prisma.serviceTypeConfig.findMany({
+    let configs = await prisma.serviceTypeConfig.findMany({
       where: { providerId },
       orderBy: { serviceType: 'asc' },
     });
+
+    // If no configs exist, auto-create from provider.serviceTypes
+    if (configs.length === 0) {
+      const provider = await prisma.provider.findUnique({
+        where: { id: providerId },
+        select: { serviceTypes: true },
+      });
+
+      if (provider?.serviceTypes && provider.serviceTypes.length > 0) {
+        console.log('[ServiceConfig API] Auto-creating configs for provider:', providerId);
+
+        // Create configs for each service type
+        await prisma.serviceTypeConfig.createMany({
+          data: provider.serviceTypes.map(serviceType => ({
+            providerId,
+            serviceType,
+            estimatedDuration: 1.0, // Default 1 hour
+            crewSizeMin: 1,
+            crewSizeMax: 4,
+            requiredSkills: [],
+            preferredSkills: [],
+          })),
+          skipDuplicates: true,
+        });
+
+        // Fetch the newly created configs
+        configs = await prisma.serviceTypeConfig.findMany({
+          where: { providerId },
+          orderBy: { serviceType: 'asc' },
+        });
+
+        console.log('[ServiceConfig API] Created', configs.length, 'configs');
+      }
+    }
 
     // Fetch all skills for this provider to get names
     const skills = await prisma.skill.findMany({
