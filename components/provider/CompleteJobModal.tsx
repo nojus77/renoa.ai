@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { AlertCircle, Camera, CheckCircle, DollarSign, FileText } from 'lucide-react';
+import { AlertCircle, Camera, CheckCircle, DollarSign, FileText, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
@@ -11,11 +11,15 @@ interface CompleteJobModalProps {
   onComplete: (result: { invoiceId?: string; invoiceNumber?: string }) => void;
   hasAfterPhotos: boolean;
   estimatedValue?: number;
+  estimatedDuration?: number; // hours
+  existingActualDuration?: number; // minutes - if worker already recorded
   jobId: string;
   customerId: string;
   providerId: string;
   serviceType: string;
 }
+
+const DURATION_OPTIONS = [30, 45, 60, 90, 120, 150, 180];
 
 export default function CompleteJobModal({
   isOpen,
@@ -23,26 +27,32 @@ export default function CompleteJobModal({
   onComplete,
   hasAfterPhotos,
   estimatedValue = 0,
+  estimatedDuration,
+  existingActualDuration,
   jobId,
   customerId,
   providerId,
   serviceType,
 }: CompleteJobModalProps) {
-  const [step, setStep] = useState<'photos' | 'price' | 'invoice'>('photos');
+  const [step, setStep] = useState<'photos' | 'price' | 'duration' | 'invoice'>('photos');
   const [actualValue, setActualValue] = useState(estimatedValue.toString());
+  const [actualDurationMinutes, setActualDurationMinutes] = useState<number | null>(existingActualDuration || null);
+  const [showCustomDuration, setShowCustomDuration] = useState(false);
+  const [customDurationValue, setCustomDurationValue] = useState('');
   const [creatingInvoice, setCreatingInvoice] = useState(false);
 
   if (!isOpen) return null;
 
   const handleCompleteWithoutInvoice = async () => {
     try {
-      // Update job with actual value and mark complete
+      // Update job with actual value, actual duration, and mark complete
       const response = await fetch(`/api/provider/jobs/${jobId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: 'completed',
           actualValue: parseFloat(actualValue) || estimatedValue,
+          actualDurationMinutes: actualDurationMinutes || undefined,
         }),
       });
 
@@ -60,13 +70,14 @@ export default function CompleteJobModal({
     try {
       setCreatingInvoice(true);
 
-      // First, complete the job with actual value
+      // First, complete the job with actual value and duration
       const jobResponse = await fetch(`/api/provider/jobs/${jobId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           status: 'completed',
           actualValue: parseFloat(actualValue) || estimatedValue,
+          actualDurationMinutes: actualDurationMinutes || undefined,
         }),
       });
 
@@ -228,11 +239,11 @@ export default function CompleteJobModal({
             </div>
 
             <Button
-              onClick={() => setStep('invoice')}
+              onClick={() => setStep('duration')}
               className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-6 text-base font-semibold mb-2"
               disabled={!actualValue || parseFloat(actualValue) <= 0}
             >
-              Confirm Amount
+              Continue
             </Button>
             <Button
               onClick={() => setStep('photos')}
@@ -247,7 +258,117 @@ export default function CompleteJobModal({
     );
   }
 
-  // Step 3: Invoice options
+  // Step 3: Duration (optional)
+  if (step === 'duration') {
+    return (
+      <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="bg-zinc-900 rounded-2xl border border-zinc-800 max-w-md w-full shadow-2xl">
+          <div className="p-6 border-b border-zinc-800">
+            <h2 className="text-2xl font-bold text-zinc-100">
+              Actual time spent
+            </h2>
+            <p className="text-sm text-zinc-400 mt-1">
+              How long did this job take? (optional)
+            </p>
+          </div>
+
+          <div className="p-6">
+            {existingActualDuration && (
+              <div className="flex items-start gap-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg mb-4">
+                <Clock className="h-4 w-4 text-blue-400 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-blue-300">
+                  Worker recorded: {existingActualDuration} minutes
+                </p>
+              </div>
+            )}
+
+            <div className="mb-4">
+              <div className="flex flex-wrap gap-2">
+                {DURATION_OPTIONS.map(mins => {
+                  const isSelected = actualDurationMinutes === mins && !showCustomDuration;
+                  return (
+                    <button
+                      key={mins}
+                      type="button"
+                      onClick={() => {
+                        setActualDurationMinutes(mins);
+                        setShowCustomDuration(false);
+                        setCustomDurationValue('');
+                      }}
+                      className={`min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        isSelected
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-zinc-700/50 border border-zinc-600 text-zinc-300 hover:bg-zinc-700'
+                      }`}
+                    >
+                      {mins}
+                    </button>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCustomDuration(true);
+                    setCustomDurationValue(actualDurationMinutes?.toString() || '');
+                  }}
+                  className={`min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    showCustomDuration
+                      ? 'bg-emerald-500 text-white'
+                      : 'bg-zinc-700/50 border border-zinc-600 text-zinc-300 hover:bg-zinc-700'
+                  }`}
+                >
+                  Custom
+                </button>
+              </div>
+
+              {showCustomDuration && (
+                <div className="flex items-center gap-2 mt-3">
+                  <input
+                    type="number"
+                    value={customDurationValue}
+                    onChange={(e) => {
+                      setCustomDurationValue(e.target.value);
+                      const val = parseInt(e.target.value);
+                      if (val && val >= 15 && val <= 480) {
+                        setActualDurationMinutes(val);
+                      }
+                    }}
+                    placeholder="Minutes"
+                    className="w-32 px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    min="15"
+                    max="480"
+                  />
+                  <span className="text-sm text-zinc-400">min (15-480)</span>
+                </div>
+              )}
+
+              {estimatedDuration && (
+                <p className="text-xs text-zinc-500 mt-3">
+                  Estimated: {Math.round(estimatedDuration * 60)} min
+                </p>
+              )}
+            </div>
+
+            <Button
+              onClick={() => setStep('invoice')}
+              className="w-full bg-emerald-600 hover:bg-emerald-500 text-white py-6 text-base font-semibold mb-2"
+            >
+              Continue
+            </Button>
+            <Button
+              onClick={() => setStep('price')}
+              variant="outline"
+              className="w-full border-zinc-700 hover:bg-zinc-800 py-3 text-zinc-300"
+            >
+              Back
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Step 4: Invoice options
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-zinc-900 rounded-2xl border border-zinc-800 max-w-md w-full shadow-2xl">
@@ -291,7 +412,7 @@ export default function CompleteJobModal({
               Complete Without Invoice
             </Button>
             <Button
-              onClick={() => setStep('price')}
+              onClick={() => setStep('duration')}
               disabled={creatingInvoice}
               variant="ghost"
               className="w-full text-zinc-500 hover:text-zinc-300"

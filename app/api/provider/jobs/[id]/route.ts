@@ -109,6 +109,7 @@ export async function PATCH(
       completedByUserId,
       completedAt,
       actualValue,
+      actualDurationMinutes,
       internalNotes,
       customerNotes,
       // Calendar drag-and-drop support
@@ -160,6 +161,10 @@ export async function PATCH(
 
     if (actualValue !== undefined) {
       updateData.actualValue = actualValue;
+    }
+
+    if (actualDurationMinutes !== undefined) {
+      updateData.actualDurationMinutes = actualDurationMinutes ? parseInt(actualDurationMinutes) : null;
     }
 
     if (internalNotes !== undefined) {

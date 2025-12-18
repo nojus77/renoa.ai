@@ -47,7 +47,7 @@ async function triggerReoptimize(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { jobId, userId, paymentMethod, tipAmount } = body;
+    const { jobId, userId, paymentMethod, tipAmount, actualDurationMinutes } = body;
 
     if (!jobId || !userId) {
       return NextResponse.json(
@@ -186,6 +186,7 @@ export async function POST(request: NextRequest) {
         paymentMethod: paymentMethod || null,
         paymentStatus,
         tipAmount: tipAmount ? Math.round(tipAmount * 100) / 100 : null,
+        actualDurationMinutes: actualDurationMinutes ? parseInt(actualDurationMinutes) : null,
       },
     });
 

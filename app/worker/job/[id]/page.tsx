@@ -251,6 +251,12 @@ export default function JobDetailPage() {
   // Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
+  // Actual duration tracking
+  const [actualDurationMinutes, setActualDurationMinutes] = useState<number | null>(null);
+  const [showCustomActualDuration, setShowCustomActualDuration] = useState(false);
+  const [customActualDuration, setCustomActualDuration] = useState('');
+  const DURATION_OPTIONS = [30, 45, 60, 90, 120, 150, 180];
+
   // Customer info modal state
   const [showCustomerModal, setShowCustomerModal] = useState(false);
 
@@ -631,6 +637,26 @@ export default function JobDetailPage() {
       }
     }
 
+    // Pre-fill actual duration from on-site timer (convert seconds to minutes)
+    const currentOnSiteTime = onSiteStartTime
+      ? Math.floor((Date.now() - onSiteStartTime) / 1000)
+      : onSiteTime;
+    const suggestedMinutes = Math.round(currentOnSiteTime / 60);
+
+    // Find closest duration option or use custom
+    const closestOption = DURATION_OPTIONS.reduce((prev, curr) =>
+      Math.abs(curr - suggestedMinutes) < Math.abs(prev - suggestedMinutes) ? curr : prev
+    );
+
+    if (Math.abs(closestOption - suggestedMinutes) <= 10) {
+      setActualDurationMinutes(closestOption);
+      setShowCustomActualDuration(false);
+    } else if (suggestedMinutes >= 15) {
+      setActualDurationMinutes(suggestedMinutes);
+      setShowCustomActualDuration(true);
+      setCustomActualDuration(suggestedMinutes.toString());
+    }
+
     // Show confirmation modal
     setShowConfirmModal(true);
   };
@@ -655,6 +681,7 @@ export default function JobDetailPage() {
         partsCount: parts.length,
         paymentMethod,
         tipAmount: parseFloat(tipAmount) || 0,
+        actualDurationMinutes,
       });
 
       const res = await fetch('/api/worker/clock-out', {
@@ -667,6 +694,7 @@ export default function JobDetailPage() {
           onSiteDuration: finalOnSiteTime,
           paymentMethod,
           tipAmount: parseFloat(tipAmount) || 0,
+          actualDurationMinutes: actualDurationMinutes || undefined,
         }),
       });
 
@@ -2559,6 +2587,72 @@ export default function JobDetailPage() {
                   </p>
                 </div>
               )}
+
+              {/* Actual Duration Input */}
+              <div className="bg-[#2A2A2A]/50 rounded-lg p-4">
+                <p className="text-zinc-400 text-xs font-medium mb-3">Actual Time Spent (optional)</p>
+                <div className="flex flex-wrap gap-2">
+                  {DURATION_OPTIONS.map(mins => {
+                    const isSelected = actualDurationMinutes === mins && !showCustomActualDuration;
+                    return (
+                      <button
+                        key={mins}
+                        type="button"
+                        onClick={() => {
+                          setActualDurationMinutes(mins);
+                          setShowCustomActualDuration(false);
+                          setCustomActualDuration('');
+                        }}
+                        className={`min-h-[44px] px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                          isSelected
+                            ? 'text-zinc-900'
+                            : 'bg-[#3A3A3A] text-zinc-300 hover:bg-[#4A4A4A]'
+                        }`}
+                        style={isSelected ? { backgroundColor: LIME_GREEN } : undefined}
+                      >
+                        {mins}
+                      </button>
+                    );
+                  })}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowCustomActualDuration(true);
+                      setCustomActualDuration(actualDurationMinutes?.toString() || '');
+                    }}
+                    className={`min-h-[44px] px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                      showCustomActualDuration
+                        ? 'text-zinc-900'
+                        : 'bg-[#3A3A3A] text-zinc-300 hover:bg-[#4A4A4A]'
+                    }`}
+                    style={showCustomActualDuration ? { backgroundColor: LIME_GREEN } : undefined}
+                  >
+                    Custom
+                  </button>
+                </div>
+                {showCustomActualDuration && (
+                  <div className="flex items-center gap-2 mt-3">
+                    <input
+                      type="number"
+                      value={customActualDuration}
+                      onChange={(e) => {
+                        setCustomActualDuration(e.target.value);
+                        const val = parseInt(e.target.value);
+                        if (val && val >= 15 && val <= 480) {
+                          setActualDurationMinutes(val);
+                        }
+                      }}
+                      placeholder="Minutes"
+                      className="w-24 px-3 py-2 bg-[#3A3A3A] border border-[#4A4A4A] rounded-lg text-white text-sm focus:outline-none focus:ring-2"
+                      style={{ focusRingColor: LIME_GREEN } as any}
+                      min="15"
+                      max="480"
+                    />
+                    <span className="text-xs text-zinc-400">min</span>
+                  </div>
+                )}
+                <p className="text-xs text-zinc-500 mt-2">Helps improve future job estimates</p>
+              </div>
             </div>
 
             {/* Modal Actions */}

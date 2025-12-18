@@ -121,6 +121,12 @@ export default function AddJobModal({
   });
   const [savingCustomer, setSavingCustomer] = useState(false);
 
+  // Duration picker state
+  const [showCustomDuration, setShowCustomDuration] = useState(false);
+  const [customDurationValue, setCustomDurationValue] = useState('');
+  const [averageDuration, setAverageDuration] = useState<{ average: number; count: number } | null>(null);
+  const DURATION_OPTIONS = [30, 45, 60, 90, 120, 150, 180];
+
   // Job details - structured fields
   const [jobDetails, setJobDetails] = useState({
     // From service config
@@ -223,10 +229,13 @@ export default function AddJobModal({
   };
 
   // Handle service selection
-  const handleSelectService = (config: ServiceConfig) => {
+  const handleSelectService = async (config: ServiceConfig) => {
     setSelectedServiceConfig(config);
     setShowServiceDropdown(false);
     setServiceSearchQuery('');
+    setShowCustomDuration(false);
+    setCustomDurationValue('');
+    setAverageDuration(null);
 
     // Auto-fill from config
     setJobDetails(prev => ({
@@ -236,6 +245,20 @@ export default function AddJobModal({
       requiredSkillIds: config.requiredSkillIds,
       preferredSkillIds: config.preferredSkillIds,
     }));
+
+    // Fetch average duration for this service type
+    try {
+      const res = await fetch(`/api/provider/services/average-duration?providerId=${providerId}&serviceType=${encodeURIComponent(config.serviceType)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.average && data.count >= 3) {
+          setAverageDuration({ average: data.average, count: data.count });
+        }
+      }
+    } catch (error) {
+      // Silently fail - average hint is optional
+      console.error('Error fetching average duration:', error);
+    }
   };
 
   // Create new service
@@ -979,37 +1002,96 @@ export default function AddJobModal({
                   {/* Selected Service Details */}
                   {selectedServiceConfig && (
                     <div className="space-y-4 p-4 bg-zinc-800/30 border border-zinc-700 rounded-lg">
-                      {/* Duration & Workers */}
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-zinc-300 mb-2">
-                            Duration <span className="text-red-400">*</span>
-                          </label>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="number"
-                              value={jobDetails.durationMinutes}
-                              onChange={(e) => setJobDetails(prev => ({ ...prev, durationMinutes: parseInt(e.target.value) || 60 }))}
-                              className="w-20 px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                              min="15"
-                              step="15"
-                            />
-                            <span className="text-sm text-zinc-400">min</span>
-                          </div>
+                      {/* Duration Quick Buttons */}
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Estimated Duration <span className="text-red-400">*</span>
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          {DURATION_OPTIONS.map(mins => {
+                            const isSelected = jobDetails.durationMinutes === mins && !showCustomDuration;
+                            const isDefault = selectedServiceConfig && Math.round(selectedServiceConfig.estimatedDuration * 60) === mins;
+                            return (
+                              <button
+                                key={mins}
+                                type="button"
+                                onClick={() => {
+                                  setJobDetails(prev => ({ ...prev, durationMinutes: mins }));
+                                  setShowCustomDuration(false);
+                                  setCustomDurationValue('');
+                                }}
+                                className={`min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                  isSelected
+                                    ? 'bg-emerald-500 text-white'
+                                    : isDefault
+                                      ? 'bg-emerald-500/20 border border-emerald-500/50 text-emerald-300 hover:bg-emerald-500/30'
+                                      : 'bg-zinc-700/50 border border-zinc-600 text-zinc-300 hover:bg-zinc-700'
+                                }`}
+                              >
+                                {mins}
+                              </button>
+                            );
+                          })}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setShowCustomDuration(true);
+                              setCustomDurationValue(jobDetails.durationMinutes.toString());
+                            }}
+                            className={`min-h-[44px] px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                              showCustomDuration
+                                ? 'bg-emerald-500 text-white'
+                                : 'bg-zinc-700/50 border border-zinc-600 text-zinc-300 hover:bg-zinc-700'
+                            }`}
+                          >
+                            Custom
+                          </button>
                         </div>
 
-                        <div>
-                          <label className="block text-sm font-medium text-zinc-300 mb-2">Workers Needed</label>
-                          <select
-                            value={jobDetails.requiredWorkerCount}
-                            onChange={(e) => setJobDetails(prev => ({ ...prev, requiredWorkerCount: parseInt(e.target.value) }))}
-                            className="w-full px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                          >
-                            {[1, 2, 3, 4, 5, 6].map(n => (
-                              <option key={n} value={n}>{n}</option>
-                            ))}
-                          </select>
-                        </div>
+                        {/* Custom duration input */}
+                        {showCustomDuration && (
+                          <div className="flex items-center gap-2 mt-3">
+                            <input
+                              type="number"
+                              value={customDurationValue}
+                              onChange={(e) => {
+                                setCustomDurationValue(e.target.value);
+                                const val = parseInt(e.target.value);
+                                if (val && val >= 15 && val <= 480) {
+                                  setJobDetails(prev => ({ ...prev, durationMinutes: val }));
+                                }
+                              }}
+                              placeholder="Enter minutes"
+                              className="w-32 px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                              min="15"
+                              max="480"
+                            />
+                            <span className="text-sm text-zinc-400">min (15-480)</span>
+                          </div>
+                        )}
+
+                        {/* Average duration hint */}
+                        {averageDuration && (
+                          <div className="mt-3 px-3 py-2 bg-blue-500/10 border border-blue-500/20 rounded-lg">
+                            <p className="text-xs text-blue-300">
+                              Similar jobs average: {averageDuration.average} min ({averageDuration.count} jobs)
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Workers Needed */}
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">Workers Needed</label>
+                        <select
+                          value={jobDetails.requiredWorkerCount}
+                          onChange={(e) => setJobDetails(prev => ({ ...prev, requiredWorkerCount: parseInt(e.target.value) }))}
+                          className="w-full px-3 py-2 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        >
+                          {[1, 2, 3, 4, 5, 6].map(n => (
+                            <option key={n} value={n}>{n}</option>
+                          ))}
+                        </select>
                       </div>
 
                       {/* Multi-worker warning */}

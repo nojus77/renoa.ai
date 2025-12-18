@@ -645,6 +645,7 @@ model Job {
   longitude             Float? // For distance calculations
   zone                  String? // ZIP code or service area
   estimatedDuration     Float?                 @map("estimated_duration") // hours
+  actualDurationMinutes Int?                   @map("actual_duration_minutes") // Actual time spent (minutes)
   // Dispatch/Route fields
   appointmentType       String                 @default("anytime") @map("appointment_type") // "fixed", "anytime", "window"
   routeOrder            Int?                   @map("route_order") // Position in worker's route for the day

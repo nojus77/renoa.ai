@@ -27,6 +27,8 @@ interface Job {
   address: string;
   estimatedValue?: number;
   actualValue?: number;
+  estimatedDuration?: number; // hours
+  actualDurationMinutes?: number | null;
   createdAt: string;
   notes?: string;
   customerNotes?: string;
@@ -507,7 +509,27 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-400">Duration</span>
-                <span className="font-medium text-zinc-200">{getDuration()} hours</span>
+                <span className="font-medium text-zinc-200">
+                  {job.status === 'completed' && job.actualDurationMinutes ? (
+                    <>
+                      {job.estimatedDuration ? `${Math.round(job.estimatedDuration * 60)} min est` : `${getDuration()} hr est`}
+                      {' → '}
+                      <span className={job.actualDurationMinutes > (job.estimatedDuration ? job.estimatedDuration * 60 : getDuration() * 60)
+                        ? 'text-amber-400'
+                        : 'text-emerald-400'
+                      }>
+                        {job.actualDurationMinutes} min actual
+                      </span>
+                    </>
+                  ) : job.status === 'completed' ? (
+                    <>
+                      {job.estimatedDuration ? `${Math.round(job.estimatedDuration * 60)} min` : `${getDuration()} hours`}
+                      <span className="text-zinc-500 ml-1">(actual not recorded)</span>
+                    </>
+                  ) : (
+                    job.estimatedDuration ? `${Math.round(job.estimatedDuration * 60)} min` : `${getDuration()} hours`
+                  )}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-400">Created</span>
