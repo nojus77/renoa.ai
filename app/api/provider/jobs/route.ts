@@ -9,10 +9,14 @@ export async function POST(request: NextRequest) {
       providerId: body.providerId,
       customerId: body.customerId,
       serviceType: body.serviceType,
+      serviceTypeConfigId: body.serviceTypeConfigId,
       assignedUserIds: body.assignedUserIds,
       hasCustomerId: !!body.customerId,
       assignedUserIdsType: typeof body.assignedUserIds,
       assignedUserIdsLength: body.assignedUserIds?.length,
+      requiredSkillIds: body.requiredSkillIds,
+      requiredWorkerCount: body.requiredWorkerCount,
+      allowUnqualified: body.allowUnqualified,
     });
 
     const {
@@ -23,8 +27,10 @@ export async function POST(request: NextRequest) {
       customerPhone,
       customerAddress,
       serviceType,
+      // serviceTypeConfigId - logged above but not stored (no field in schema)
       startTime,
       duration = 2, // Duration in hours, default 2
+      estimatedDuration, // NEW: Duration in minutes from modal
       estimatedValue,
       internalNotes,
       customerNotes,
@@ -34,10 +40,25 @@ export async function POST(request: NextRequest) {
       recurringFrequency,
       recurringEndDate,
       assignedUserIds = [],
+      // NEW: Structured skill fields from modal
+      requiredSkillIds,
+      preferredSkillIds,
+      requiredWorkerCount,
+      bufferMinutes,
+      // NEW: Override fields
+      allowUnqualified = false,
+      unqualifiedOverrideReason,
     } = body;
 
+    // Validation
     if (!providerId || !serviceType || !startTime) {
       return NextResponse.json({ error: 'Missing required fields: providerId, serviceType, startTime' }, { status: 400 });
+    }
+
+    // Duration validation
+    const durationHours = estimatedDuration ? estimatedDuration / 60 : duration;
+    if (!durationHours || durationHours <= 0) {
+      return NextResponse.json({ error: 'Duration is required and must be positive' }, { status: 400 });
     }
 
     let finalCustomerId = customerId;
@@ -64,7 +85,7 @@ export async function POST(request: NextRequest) {
 
     // Calculate endTime from startTime + duration
     const startDate = new Date(startTime);
-    const endDate = new Date(startDate.getTime() + duration * 60 * 60 * 1000);
+    const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
 
     // Verify assigned user IDs belong to this provider (if any)
     if (assignedUserIds && assignedUserIds.length > 0) {
@@ -108,7 +129,8 @@ export async function POST(request: NextRequest) {
       estimatedDuration: serviceConfig.estimatedDuration,
     } : 'Not configured');
 
-    // Create the job with skill requirements from config
+    // Create the job with skill requirements
+    // Use explicit values from request if provided, otherwise fall back to ServiceTypeConfig
     const job = await prisma.job.create({
       data: {
         providerId,
@@ -127,11 +149,15 @@ export async function POST(request: NextRequest) {
         recurringFrequency: isRecurring ? recurringFrequency : null,
         recurringEndDate: isRecurring && recurringEndDate ? new Date(recurringEndDate) : null,
         assignedUserIds,
-        // Copy skill requirements from ServiceTypeConfig
-        requiredSkillIds: serviceConfig?.requiredSkills || [],
-        preferredSkillIds: serviceConfig?.preferredSkills || [],
-        requiredWorkerCount: serviceConfig?.crewSizeMin || 1,
-        estimatedDuration: serviceConfig?.estimatedDuration || duration,
+        // Skill requirements: prefer explicit values, fall back to ServiceTypeConfig
+        requiredSkillIds: requiredSkillIds ?? serviceConfig?.requiredSkills ?? [],
+        preferredSkillIds: preferredSkillIds ?? serviceConfig?.preferredSkills ?? [],
+        requiredWorkerCount: requiredWorkerCount ?? serviceConfig?.crewSizeMin ?? 1,
+        bufferMinutes: bufferMinutes ?? 15,
+        estimatedDuration: estimatedDuration ? estimatedDuration / 60 : (serviceConfig?.estimatedDuration || durationHours),
+        // Override fields
+        allowUnqualified: allowUnqualified || false,
+        unqualifiedOverrideReason: allowUnqualified ? (unqualifiedOverrideReason || null) : null,
       },
       include: {
         customer: true, // Include customer data in response
