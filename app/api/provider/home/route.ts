@@ -234,8 +234,8 @@ export async function GET(request: NextRequest) {
       })),
     });
 
-    // Get jobs needing crew assignment (scheduled but no workers assigned)
-    const unassignedJobs = await prisma.job.count({
+    // Get jobs needing crew assignment (scheduled but no workers assigned) with latest date
+    const unassignedJobsData = await prisma.job.findMany({
       where: {
         providerId,
         status: {
@@ -249,10 +249,19 @@ export async function GET(request: NextRequest) {
           isEmpty: true,
         },
       },
+      select: {
+        id: true,
+        startTime: true,
+      },
+      orderBy: {
+        startTime: 'asc',
+      },
     });
+    const unassignedJobs = unassignedJobsData.length;
+    const unassignedJobsLatest = unassignedJobsData[0]?.startTime?.toISOString() || null;
 
-    // Get overdue jobs (past end time but not completed)
-    const overdueJobs = await prisma.job.count({
+    // Get overdue jobs (past end time but not completed) with latest date
+    const overdueJobsData = await prisma.job.findMany({
       where: {
         providerId,
         status: {
@@ -262,11 +271,20 @@ export async function GET(request: NextRequest) {
           lt: now,
         },
       },
+      select: {
+        id: true,
+        endTime: true,
+      },
+      orderBy: {
+        endTime: 'desc',
+      },
     });
+    const overdueJobs = overdueJobsData.length;
+    const overdueJobsLatest = overdueJobsData[0]?.endTime?.toISOString() || null;
 
-    // Jobs starting in <2 hours without confirmation (status still pending)
+    // Jobs starting in <2 hours without confirmation (status still pending) with latest date
     const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-    const unconfirmedSoonJobs = await prisma.job.count({
+    const unconfirmedSoonJobsData = await prisma.job.findMany({
       where: {
         providerId,
         status: 'pending',
@@ -275,12 +293,21 @@ export async function GET(request: NextRequest) {
           lte: twoHoursFromNow,
         },
       },
+      select: {
+        id: true,
+        startTime: true,
+      },
+      orderBy: {
+        startTime: 'asc',
+      },
     });
+    const unconfirmedSoonJobs = unconfirmedSoonJobsData.length;
+    const unconfirmedSoonLatest = unconfirmedSoonJobsData[0]?.startTime?.toISOString() || null;
 
-    // Unpaid invoices >30 days old
+    // Unpaid invoices >30 days old with latest date
     const invoiceThirtyDaysAgo = new Date(now);
     invoiceThirtyDaysAgo.setDate(invoiceThirtyDaysAgo.getDate() - 30);
-    const overdueInvoices = await prisma.invoice.count({
+    const overdueInvoicesData = await prisma.invoice.findMany({
       where: {
         providerId,
         status: {
@@ -290,7 +317,16 @@ export async function GET(request: NextRequest) {
           lt: invoiceThirtyDaysAgo,
         },
       },
+      select: {
+        id: true,
+        dueDate: true,
+      },
+      orderBy: {
+        dueDate: 'desc',
+      },
     });
+    const overdueInvoices = overdueInvoicesData.length;
+    const overdueInvoicesLatest = overdueInvoicesData[0]?.dueDate?.toISOString() || null;
 
     // Get all jobs in next 7 days for worker analysis
     const upcomingJobsForAnalysis = await prisma.job.findMany({
@@ -641,12 +677,19 @@ export async function GET(request: NextRequest) {
         },
         alerts: {
           scheduleConflicts: conflictingJobs.length,
+          scheduleConflictsLatest: conflictingJobs.length > 0
+            ? upcomingJobsForAnalysis.find(j => j.id === conflictingJobs[0]?.jobId1)?.startTime?.toISOString() || null
+            : null,
           overloadedWorkers,
           underutilizedWorkers,
           unassignedJobs,
+          unassignedJobsLatest,
           unconfirmedSoonJobs,
+          unconfirmedSoonLatest,
           overdueInvoices,
+          overdueInvoicesLatest,
           overdueJobs,
+          overdueJobsLatest,
         },
         recentActivity: activity,
         revenueHistory: revenueHistoryWithUtilization,

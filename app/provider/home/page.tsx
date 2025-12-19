@@ -22,7 +22,7 @@ import ProviderLayout from '@/components/provider/ProviderLayout';
 import RecentJobsTable from '@/components/provider/RecentJobsTable';
 import NeedsAttentionTable, { type AlertType } from '@/components/provider/NeedsAttentionTable';
 import JobPreviewModal from '@/components/provider/JobPreviewModal';
-import AlertJobsSidebar from '@/components/provider/AlertJobsSidebar';
+import JobDetailsSidebar, { type SidebarMode } from '@/components/provider/JobDetailsSidebar';
 import {
   AreaChart,
   Area,
@@ -331,22 +331,34 @@ export default function ProviderHome() {
     setTimeout(() => setPreviewJob(null), 300); // Clear after animation
   };
 
-  // Alert sidebar state
-  const [alertSidebarOpen, setAlertSidebarOpen] = useState(false);
+  // Unified sidebar state for both chart and alerts
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarMode, setSidebarMode] = useState<SidebarMode>('date');
+  const [selectedSidebarDate, setSelectedSidebarDate] = useState<string | null>(null);
   const [selectedAlertType, setSelectedAlertType] = useState<AlertType | null>(null);
-  const [selectedAlertDetails, setSelectedAlertDetails] = useState<{ count: number; href: string } | null>(null);
+  const [selectedAlertCount, setSelectedAlertCount] = useState(0);
 
-  const handleAlertClick = (alertType: AlertType, alertDetails: { count: number; href: string }) => {
-    setSelectedAlertType(alertType);
-    setSelectedAlertDetails(alertDetails);
-    setAlertSidebarOpen(true);
+  const openSidebarForDate = (date: string) => {
+    setSidebarMode('date');
+    setSelectedSidebarDate(date);
+    setSelectedAlertType(null);
+    setSidebarOpen(true);
   };
 
-  const closeAlertSidebar = () => {
-    setAlertSidebarOpen(false);
+  const handleAlertClick = (alertType: AlertType, alertDetails: { count: number; href: string }) => {
+    setSidebarMode('alert');
+    setSelectedAlertType(alertType);
+    setSelectedAlertCount(alertDetails.count);
+    setSelectedSidebarDate(null);
+    setSidebarOpen(true);
+  };
+
+  const closeSidebar = () => {
+    setSidebarOpen(false);
     setTimeout(() => {
+      setSelectedSidebarDate(null);
       setSelectedAlertType(null);
-      setSelectedAlertDetails(null);
+      setSelectedAlertCount(0);
     }, 300);
   };
 
@@ -401,6 +413,10 @@ export default function ProviderHome() {
   const handleGraphClick = useCallback(async (data: RevenueDataPoint) => {
     if (!providerId || !data.date) return;
 
+    // Open the sidebar for this date
+    openSidebarForDate(data.date);
+
+    // Also update the inline breakdown for reference
     if (selectedDate === data.date) {
       setSelectedDate(null);
       setDateBreakdown(null);
@@ -425,7 +441,7 @@ export default function ProviderHome() {
     } finally {
       setLoadingBreakdown(false);
     }
-  }, [providerId, selectedDate]);
+  }, [providerId, selectedDate, openSidebarForDate]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -762,12 +778,14 @@ export default function ProviderHome() {
         onClose={closeJobPreview}
       />
 
-      {/* Alert Jobs Sidebar */}
-      <AlertJobsSidebar
-        isOpen={alertSidebarOpen}
-        onClose={closeAlertSidebar}
+      {/* Unified Jobs Sidebar - slides from right */}
+      <JobDetailsSidebar
+        isOpen={sidebarOpen}
+        onClose={closeSidebar}
+        mode={sidebarMode}
+        selectedDate={selectedSidebarDate}
         alertType={selectedAlertType}
-        alertDetails={selectedAlertDetails}
+        alertCount={selectedAlertCount}
       />
 
       <div className="w-full bg-background">
