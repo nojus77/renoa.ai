@@ -506,25 +506,35 @@ export async function POST(req: Request) {
 
     // Convert to JobWithCoords
     const jobsWithCoords: JobWithCoords[] = allJobs
-      .map(j => ({
-        id: j.id,
-        serviceType: j.serviceType,
-        startTime: j.startTime,
-        endTime: j.endTime,
-        appointmentType: j.appointmentType,
-        status: j.status,
-        estimatedDuration: j.estimatedDuration,
-        lat: j.latitude || j.customer?.latitude || 0,
-        lng: j.longitude || j.customer?.longitude || 0,
-        assignedUserIds: j.assignedUserIds,
-        customer: j.customer,
-        // Include skill fields from job
-        requiredSkillIds: j.requiredSkillIds || [],
-        preferredSkillIds: j.preferredSkillIds || [],
-        requiredWorkerCount: j.requiredWorkerCount || 1,
-        bufferMinutes: j.bufferMinutes || 15,
-        allowUnqualified: j.allowUnqualified || false,
-      }))
+      .map(j => {
+        // Type assertion to access full Job fields that include returns
+        const job = j as typeof j & {
+          requiredSkillIds?: string[];
+          preferredSkillIds?: string[];
+          requiredWorkerCount?: number;
+          bufferMinutes?: number;
+          allowUnqualified?: boolean;
+        };
+        return {
+          id: job.id,
+          serviceType: job.serviceType,
+          startTime: job.startTime,
+          endTime: job.endTime,
+          appointmentType: job.appointmentType,
+          status: job.status,
+          estimatedDuration: job.estimatedDuration,
+          lat: job.latitude || job.customer?.latitude || 0,
+          lng: job.longitude || job.customer?.longitude || 0,
+          assignedUserIds: job.assignedUserIds,
+          customer: job.customer,
+          // Include skill fields from job
+          requiredSkillIds: job.requiredSkillIds || [],
+          preferredSkillIds: job.preferredSkillIds || [],
+          requiredWorkerCount: job.requiredWorkerCount || 1,
+          bufferMinutes: job.bufferMinutes || 15,
+          allowUnqualified: job.allowUnqualified || false,
+        };
+      })
       .filter(j => j.lat !== 0 && j.lng !== 0);
 
     // Build worker data structures

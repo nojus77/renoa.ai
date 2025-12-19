@@ -27,19 +27,23 @@ interface Alerts {
   overdueJobs: number;
 }
 
+export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices';
+
 interface NeedsAttentionTableProps {
   alerts: Alerts;
+  onAlertClick?: (alertType: AlertType, alertDetails: { count: number; href: string }) => void;
 }
 
 type Priority = 'urgent' | 'medium' | 'low';
 
 interface AlertRow {
-  id: string;
+  id: AlertType;
   type: string;
   icon: React.ReactNode;
   details: string;
   priority: Priority;
   href: string;
+  count: number;
 }
 
 const priorityColors: Record<Priority, { bg: string; text: string; badge: string }> = {
@@ -48,7 +52,7 @@ const priorityColors: Record<Priority, { bg: string; text: string; badge: string
   low: { bg: 'bg-amber-500/10', text: 'text-amber-600', badge: 'bg-amber-100 text-amber-700' },
 };
 
-export default function NeedsAttentionTable({ alerts }: NeedsAttentionTableProps) {
+export default function NeedsAttentionTable({ alerts, onAlertClick }: NeedsAttentionTableProps) {
   const router = useRouter();
 
   // Build alert rows from alerts data
@@ -62,6 +66,7 @@ export default function NeedsAttentionTable({ alerts }: NeedsAttentionTableProps
       details: `${alerts.scheduleConflicts} overlapping ${alerts.scheduleConflicts === 1 ? 'job' : 'jobs'}`,
       priority: 'urgent',
       href: '/provider/calendar',
+      count: alerts.scheduleConflicts,
     });
   }
 
@@ -73,6 +78,7 @@ export default function NeedsAttentionTable({ alerts }: NeedsAttentionTableProps
       details: `${alerts.overdueJobs} past scheduled time`,
       priority: 'urgent',
       href: '/provider/jobs?status=overdue',
+      count: alerts.overdueJobs,
     });
   }
 
@@ -84,6 +90,7 @@ export default function NeedsAttentionTable({ alerts }: NeedsAttentionTableProps
       details: `${alerts.unconfirmedSoonJobs} within 2 hours`,
       priority: 'medium',
       href: '/provider/jobs?status=pending',
+      count: alerts.unconfirmedSoonJobs,
     });
   }
 
@@ -95,6 +102,7 @@ export default function NeedsAttentionTable({ alerts }: NeedsAttentionTableProps
       details: `${alerts.unassignedJobs} ${alerts.unassignedJobs === 1 ? 'job needs' : 'jobs need'} worker`,
       priority: 'medium',
       href: '/provider/calendar',
+      count: alerts.unassignedJobs,
     });
   }
 
@@ -106,8 +114,17 @@ export default function NeedsAttentionTable({ alerts }: NeedsAttentionTableProps
       details: `${alerts.overdueInvoices} unpaid 30+ days`,
       priority: 'low',
       href: '/provider/invoices?status=overdue',
+      count: alerts.overdueInvoices,
     });
   }
+
+  const handleAlertClick = (alert: AlertRow) => {
+    if (onAlertClick) {
+      onAlertClick(alert.id, { count: alert.count, href: alert.href });
+    } else {
+      router.push(alert.href);
+    }
+  };
 
   // Empty state
   if (alertRows.length === 0) {
@@ -146,7 +163,7 @@ export default function NeedsAttentionTable({ alerts }: NeedsAttentionTableProps
               return (
                 <tr
                   key={alert.id}
-                  onClick={() => router.push(alert.href)}
+                  onClick={() => handleAlertClick(alert)}
                   className={`cursor-pointer hover:bg-muted/40 transition-colors ${
                     index % 2 === 0 ? 'bg-background' : 'bg-muted/20'
                   }`}

@@ -20,8 +20,9 @@ import {
 } from 'date-fns';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import RecentJobsTable from '@/components/provider/RecentJobsTable';
-import NeedsAttentionTable from '@/components/provider/NeedsAttentionTable';
+import NeedsAttentionTable, { type AlertType } from '@/components/provider/NeedsAttentionTable';
 import JobPreviewModal from '@/components/provider/JobPreviewModal';
+import AlertJobsSidebar from '@/components/provider/AlertJobsSidebar';
 import {
   AreaChart,
   Area,
@@ -237,13 +238,15 @@ function CustomTooltip({
   active,
   payload,
   metric,
-  metricColor
+  metricColor,
+  onViewJobs
 }: {
   active?: boolean;
   payload?: Array<{ value: number; payload: RevenueDataPoint }>;
   label?: string;
   metric: ChartMetric;
   metricColor: string;
+  onViewJobs?: (data: RevenueDataPoint) => void;
 }) {
   if (active && payload && payload.length && payload[0].value > 0) {
     const data = payload[0].payload;
@@ -254,13 +257,17 @@ function CustomTooltip({
         <p className="text-xl font-bold text-foreground mb-2" style={{ color: metricColor }}>
           {config.formatter(payload[0].value)}
         </p>
-        <div
-          className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors"
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onViewJobs?.(data);
+          }}
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors hover:opacity-80 w-full"
           style={{ backgroundColor: `${metricColor}15` }}
         >
           <span className="text-sm font-medium" style={{ color: metricColor }}>View Jobs</span>
           <ChevronRight className="h-5 w-5" style={{ color: metricColor }} />
-        </div>
+        </button>
       </div>
     );
   }
@@ -322,6 +329,25 @@ export default function ProviderHome() {
   const closeJobPreview = () => {
     setIsPreviewOpen(false);
     setTimeout(() => setPreviewJob(null), 300); // Clear after animation
+  };
+
+  // Alert sidebar state
+  const [alertSidebarOpen, setAlertSidebarOpen] = useState(false);
+  const [selectedAlertType, setSelectedAlertType] = useState<AlertType | null>(null);
+  const [selectedAlertDetails, setSelectedAlertDetails] = useState<{ count: number; href: string } | null>(null);
+
+  const handleAlertClick = (alertType: AlertType, alertDetails: { count: number; href: string }) => {
+    setSelectedAlertType(alertType);
+    setSelectedAlertDetails(alertDetails);
+    setAlertSidebarOpen(true);
+  };
+
+  const closeAlertSidebar = () => {
+    setAlertSidebarOpen(false);
+    setTimeout(() => {
+      setSelectedAlertType(null);
+      setSelectedAlertDetails(null);
+    }, 300);
   };
 
   // Get date range based on view mode
@@ -736,6 +762,14 @@ export default function ProviderHome() {
         onClose={closeJobPreview}
       />
 
+      {/* Alert Jobs Sidebar */}
+      <AlertJobsSidebar
+        isOpen={alertSidebarOpen}
+        onClose={closeAlertSidebar}
+        alertType={selectedAlertType}
+        alertDetails={selectedAlertDetails}
+      />
+
       <div className="w-full bg-background">
         {/* ABOVE FOLD SECTION - Metrics + Chart + Alerts */}
         <div className="min-h-[calc(100vh-64px)] px-6 py-5 flex flex-col">
@@ -915,6 +949,7 @@ export default function ProviderHome() {
                           <CustomTooltip
                             metric={chartMetric}
                             metricColor={METRIC_CONFIG[chartMetric].color}
+                            onViewJobs={handleGraphClick}
                           />
                         }
                       />
@@ -922,10 +957,28 @@ export default function ProviderHome() {
                         type="monotone"
                         dataKey={METRIC_CONFIG[chartMetric].dataKey}
                         stroke={METRIC_CONFIG[chartMetric].color}
-                        strokeWidth={2}
+                        strokeWidth={3}
                         fill="url(#colorMetric)"
-                        dot={false}
-                        connectNulls={false}
+                        dot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint; index?: number }) => {
+                          const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint;
+                          const val = props.payload?.[dataKey];
+                          // Only show dots for data points that have values
+                          if (val === null || val === 0) {
+                            return <g key={props.index} />;
+                          }
+                          return (
+                            <circle
+                              key={props.index}
+                              cx={props.cx}
+                              cy={props.cy}
+                              r={4}
+                              fill={METRIC_CONFIG[chartMetric].color}
+                              stroke="#fff"
+                              strokeWidth={2}
+                            />
+                          );
+                        }}
+                        connectNulls={true}
                         activeDot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint }) => {
                           const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint;
                           const val = props.payload?.[dataKey];
@@ -936,7 +989,7 @@ export default function ProviderHome() {
                             <circle
                               cx={props.cx}
                               cy={props.cy}
-                              r={5}
+                              r={6}
                               fill={METRIC_CONFIG[chartMetric].color}
                               stroke="#fff"
                               strokeWidth={2}
@@ -1010,7 +1063,7 @@ export default function ProviderHome() {
 
           {/* Needs Attention Table - Full Width in Above Fold */}
           <div className="mt-6 flex-1">
-            <NeedsAttentionTable alerts={alerts} />
+            <NeedsAttentionTable alerts={alerts} onAlertClick={handleAlertClick} />
           </div>
         </div>
 
