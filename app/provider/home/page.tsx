@@ -234,20 +234,18 @@ function generateTestDataForRange(startDate: Date, endDate: Date): RevenueDataPo
   });
 }
 
-// Custom tooltip for the chart
+// Custom tooltip for the chart - simple date + value display
 function CustomTooltip({
   active,
   payload,
   metric,
   metricColor,
-  onViewJobs
 }: {
   active?: boolean;
   payload?: Array<{ value: number; payload: RevenueDataPoint }>;
   label?: string;
   metric: ChartMetric;
   metricColor: string;
-  onViewJobs?: (data: RevenueDataPoint) => void;
 }) {
   if (active && payload && payload.length) {
     const data = payload[0].payload;
@@ -256,25 +254,14 @@ function CustomTooltip({
     const hasValue = value > 0;
 
     return (
-      <div className="bg-card border border-border rounded-xl shadow-xl p-4 min-w-[180px]">
+      <div className="bg-card border border-border rounded-xl shadow-lg px-4 py-3 min-w-[140px]">
         <p className="text-sm font-medium text-foreground mb-1">
           {data.label || data.displayLabel}
           {data.day ? ` (${data.day})` : ''}
         </p>
-        <p className="text-2xl font-bold mb-3" style={{ color: hasValue ? metricColor : '#6b7280' }}>
+        <p className="text-2xl font-bold" style={{ color: hasValue ? metricColor : '#6b7280' }}>
           {hasValue ? config.formatter(value) : 'No data'}
         </p>
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            onViewJobs?.(data);
-          }}
-          className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all hover:opacity-90 w-full"
-          style={{ backgroundColor: metricColor, color: '#fff' }}
-        >
-          <span className="text-sm font-medium">View Jobs</span>
-          <ChevronRight className="h-4 w-4" />
-        </button>
       </div>
     );
   }
@@ -905,18 +892,17 @@ export default function ProviderHome() {
 
                 {/* Bottom row: Metric toggles + Time period */}
                 <div className="flex items-center justify-between">
-                  {/* Metric Toggles */}
+                  {/* Metric Toggles - Outline style with emerald accent */}
                   <div className="flex gap-2">
                     {(Object.keys(METRIC_CONFIG) as ChartMetric[]).map((metric) => (
                       <button
                         key={metric}
                         onClick={() => setChartMetric(metric)}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
+                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all border ${
                           chartMetric === metric
-                            ? 'text-white shadow-sm'
-                            : 'bg-muted/50 text-muted-foreground hover:text-foreground hover:bg-muted'
+                            ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10'
+                            : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground bg-transparent'
                         }`}
-                        style={chartMetric === metric ? { backgroundColor: METRIC_CONFIG[metric].color } : {}}
                       >
                         {METRIC_CONFIG[metric].label}
                       </button>
@@ -1023,7 +1009,6 @@ export default function ProviderHome() {
                           <CustomTooltip
                             metric={chartMetric}
                             metricColor={METRIC_CONFIG[chartMetric].color}
-                            onViewJobs={handleGraphClick}
                           />
                         }
                       />
