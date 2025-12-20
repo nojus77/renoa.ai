@@ -963,8 +963,8 @@ export default function ProviderHome() {
                       <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
                       <XAxis
                         dataKey="displayLabel"
-                        stroke="currentColor"
-                        strokeOpacity={0.5}
+                        stroke="#6b7280"
+                        strokeOpacity={0.3}
                         tickLine={false}
                         axisLine={false}
                         interval={0}
@@ -981,8 +981,7 @@ export default function ProviderHome() {
                               x={props.x}
                               y={props.y + 12}
                               textAnchor="middle"
-                              fill="currentColor"
-                              opacity={0.6}
+                              fill="#6b7280"
                               fontSize={11}
                             >
                               {props.payload.value}
@@ -992,9 +991,9 @@ export default function ProviderHome() {
                       />
                       <YAxis
                         domain={[0, 'auto']}
-                        stroke="currentColor"
-                        strokeOpacity={0.5}
-                        tick={{ fill: 'currentColor', opacity: 0.6, fontSize: 11 }}
+                        stroke="#6b7280"
+                        strokeOpacity={0.3}
+                        tick={{ fill: '#6b7280', fontSize: 11 }}
                         tickLine={false}
                         axisLine={false}
                         tickFormatter={(value) => {

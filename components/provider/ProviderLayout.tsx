@@ -316,12 +316,12 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                     key={item.name}
                     href={item.disabled ? '#' : item.href}
                     className={`
-                      flex items-center gap-2 px-4 py-4 rounded-full transition-all font-medium whitespace-nowrap
+                      flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all font-medium whitespace-nowrap
                       ${active
-                        ? 'bg-primary text-primary-foreground'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                         : item.disabled
-                        ? 'text-muted-foreground cursor-not-allowed'
-                        : 'text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-emerald-800/50 hover:text-foreground dark:hover:text-white'
+                        ? 'text-muted-foreground cursor-not-allowed border border-transparent'
+                        : 'text-zinc-400 hover:text-zinc-300 border border-transparent'
                       }
                     `}
                     style={{ fontSize: '14px' }}
@@ -595,10 +595,10 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                     className={`
                       flex items-center gap-3 px-4 py-3 rounded-lg transition-all min-h-[44px]
                       ${active
-                        ? 'bg-primary text-primary-foreground'
+                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
                         : item.disabled
-                        ? 'text-muted-foreground cursor-not-allowed'
-                        : 'text-muted-foreground dark:text-zinc-300 hover:bg-accent dark:hover:bg-zinc-800 hover:text-foreground dark:hover:text-white'
+                        ? 'text-muted-foreground cursor-not-allowed border border-transparent'
+                        : 'text-zinc-400 hover:text-zinc-300 border border-transparent'
                       }
                     `}
                     onClick={(e) => {
@@ -654,10 +654,10 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
                   className={`
                     flex flex-col items-center justify-center gap-1 px-3 py-2 rounded-lg transition-colors min-w-[60px] min-h-[44px]
                     ${active
-                      ? 'text-primary'
+                      ? 'text-emerald-400'
                       : item.disabled
                       ? 'text-muted-foreground/50 cursor-not-allowed'
-                      : 'text-muted-foreground dark:text-zinc-400 active:bg-accent dark:active:bg-zinc-800'
+                      : 'text-zinc-400 active:bg-zinc-800'
                     }
                   `}
                   onClick={(e) => {
