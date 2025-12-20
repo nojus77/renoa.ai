@@ -818,37 +818,37 @@ export default function ProviderHome() {
           <div className="flex flex-col lg:flex-row gap-6">
 
             {/* Left: 3 Metric Cards - Minimal Gray Design */}
-            <div className="flex flex-col sm:flex-row lg:flex-col gap-4 lg:w-[280px] flex-shrink-0">
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 lg:w-[260px] flex-shrink-0">
               {/* Number of Jobs */}
-              <div className="flex-1 bg-[#18181b] rounded-2xl p-5 border border-[#27272a]">
-                <div className="flex items-start justify-between">
+              <div className="h-fit bg-[#18181b] rounded-xl p-4 border border-[#27272a]">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-4xl font-bold text-white">{numberOfJobs}</p>
-                    <p className="text-sm text-[#71717a] mt-1">Jobs Completed</p>
+                    <p className="text-3xl font-bold text-white">{numberOfJobs}</p>
+                    <p className="text-xs text-[#71717a] mt-0.5">Jobs Completed</p>
                   </div>
-                  <Hash className="h-5 w-5 text-[#71717a]" />
+                  <Hash className="h-5 w-5 text-[#52525b]" />
                 </div>
               </div>
 
               {/* Average Job Size */}
-              <div className="flex-1 bg-[#18181b] rounded-2xl p-5 border border-[#27272a]">
-                <div className="flex items-start justify-between">
+              <div className="h-fit bg-[#18181b] rounded-xl p-4 border border-[#27272a]">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-4xl font-bold text-white">{formatCurrency(averageJobSize)}</p>
-                    <p className="text-sm text-[#71717a] mt-1">Average Job Size</p>
+                    <p className="text-3xl font-bold text-white">{formatCurrency(averageJobSize)}</p>
+                    <p className="text-xs text-[#71717a] mt-0.5">Average Job Size</p>
                   </div>
-                  <TrendingUp className="h-5 w-5 text-[#71717a]" />
+                  <TrendingUp className="h-5 w-5 text-[#52525b]" />
                 </div>
               </div>
 
               {/* Total Job Value */}
-              <div className="flex-1 bg-[#18181b] rounded-2xl p-5 border border-[#27272a]">
-                <div className="flex items-start justify-between">
+              <div className="h-fit bg-[#18181b] rounded-xl p-4 border border-[#27272a]">
+                <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-4xl font-bold text-white">{formatCurrency(totalJobValue)}</p>
-                    <p className="text-sm text-[#71717a] mt-1">Total Revenue</p>
+                    <p className="text-3xl font-bold text-white">{formatCurrency(totalJobValue)}</p>
+                    <p className="text-xs text-[#71717a] mt-0.5">Total Revenue</p>
                   </div>
-                  <DollarSign className="h-5 w-5 text-[#71717a]" />
+                  <DollarSign className="h-5 w-5 text-[#52525b]" />
                 </div>
               </div>
             </div>
