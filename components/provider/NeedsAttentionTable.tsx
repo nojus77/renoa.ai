@@ -11,7 +11,9 @@ import {
   UserX,
   FileWarning,
   CheckCircle2,
-  Clock
+  Clock,
+  UserPlus,
+  UserMinus,
 } from 'lucide-react';
 
 interface WorkerAlert {
@@ -35,7 +37,7 @@ interface Alerts {
   overdueJobsLatest?: string | null;
 }
 
-export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices';
+export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices' | 'overloaded-workers' | 'underutilized-workers';
 
 interface NeedsAttentionTableProps {
   alerts: Alerts;
@@ -154,6 +156,38 @@ export default function NeedsAttentionTable({ alerts, onAlertClick }: NeedsAtten
         href: '/provider/invoices?status=overdue',
         count: alerts.overdueInvoices,
         latestDate: alerts.overdueInvoicesLatest ? new Date(alerts.overdueInvoicesLatest) : null,
+      });
+    }
+
+    // Overloaded workers (>8 jobs in next 7 days)
+    if (alerts.overloadedWorkers && alerts.overloadedWorkers.length > 0) {
+      const workerNames = alerts.overloadedWorkers.slice(0, 2).map(w => w.name.split(' ')[0]).join(', ');
+      const moreCount = alerts.overloadedWorkers.length > 2 ? ` +${alerts.overloadedWorkers.length - 2}` : '';
+      rows.push({
+        id: 'overloaded-workers',
+        type: 'Overloaded Workers',
+        icon: <UserPlus className="h-4 w-4" />,
+        details: `${workerNames}${moreCount} have 8+ jobs`,
+        priority: 'medium',
+        href: '/provider/team',
+        count: alerts.overloadedWorkers.length,
+        latestDate: null, // No specific date for this alert
+      });
+    }
+
+    // Underutilized workers (<2 jobs in next 7 days)
+    if (alerts.underutilizedWorkers && alerts.underutilizedWorkers.length > 0) {
+      const workerNames = alerts.underutilizedWorkers.slice(0, 2).map(w => w.name.split(' ')[0]).join(', ');
+      const moreCount = alerts.underutilizedWorkers.length > 2 ? ` +${alerts.underutilizedWorkers.length - 2}` : '';
+      rows.push({
+        id: 'underutilized-workers',
+        type: 'Underutilized Workers',
+        icon: <UserMinus className="h-4 w-4" />,
+        details: `${workerNames}${moreCount} have <2 jobs`,
+        priority: 'low',
+        href: '/provider/team',
+        count: alerts.underutilizedWorkers.length,
+        latestDate: null, // No specific date for this alert
       });
     }
 

@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 export type SidebarMode = 'date' | 'alert';
-export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices';
+export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices' | 'overloaded-workers' | 'underutilized-workers';
 
 interface Job {
   id: string;
@@ -86,6 +86,20 @@ const alertConfig: Record<AlertType, { title: string; icon: React.ReactNode; des
     description: 'Invoices unpaid for 30+ days',
     color: 'text-amber-500',
     actionLabel: 'View Invoices',
+  },
+  'overloaded-workers': {
+    title: 'Overloaded Workers',
+    icon: <User className="h-5 w-5" />,
+    description: 'Workers with 8+ jobs this week',
+    color: 'text-orange-500',
+    actionLabel: 'View Team',
+  },
+  'underutilized-workers': {
+    title: 'Underutilized Workers',
+    icon: <User className="h-5 w-5" />,
+    description: 'Workers with less than 2 jobs',
+    color: 'text-amber-500',
+    actionLabel: 'View Team',
   },
 };
 
@@ -233,6 +247,8 @@ export default function JobDetailsSidebar({
       case 'unconfirmed-soon': return '/provider/jobs?status=pending';
       case 'unassigned-jobs': return '/provider/calendar';
       case 'overdue-invoices': return '/provider/invoices?status=overdue';
+      case 'overloaded-workers': return '/provider/team';
+      case 'underutilized-workers': return '/provider/team';
       default: return '/provider/jobs';
     }
   };

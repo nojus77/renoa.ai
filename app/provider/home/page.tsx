@@ -624,8 +624,9 @@ export default function ProviderHome() {
       console.log('📊 Chart Data Debug:', {
         dateRangeStart: format(dateRange.start, 'yyyy-MM-dd'),
         dateRangeEnd: format(dateRange.end, 'yyyy-MM-dd'),
-        revenueHistoryDates: homeData.revenueHistory.slice(0, 5).map(d => ({ date: d.date, amount: d.amount, jobCount: d.jobCount })),
+        revenueHistoryDates: homeData.revenueHistory.map(d => ({ date: d.date, amount: d.amount, jobCount: d.jobCount })),
         fullRangeDates: fullRangeData.map(d => d.date),
+        dataMapKeys: Array.from(dataMap.keys()),
       });
 
       fullRangeData.forEach(d => {
@@ -635,12 +636,21 @@ export default function ProviderHome() {
           d.jobCount = realData.jobCount ?? 0;
           d.avgValue = realData.avgValue ?? 0;
           d.utilization = realData.utilization ?? 0;
+          console.log('✅ Matched date:', d.date, 'amount:', d.amount, 'jobCount:', d.jobCount);
         }
       });
 
       // Debug: Log after merging
       const nonZeroData = fullRangeData.filter(d => d.amount && d.amount > 0);
-      console.log('📈 Non-zero data after merge:', nonZeroData.map(d => ({ date: d.date, amount: d.amount, jobCount: d.jobCount })));
+      console.log('📈 Non-zero data after merge:', nonZeroData.length, 'entries:', nonZeroData.map(d => ({ date: d.date, amount: d.amount, jobCount: d.jobCount })));
+
+      // Check if we have ANY non-null data
+      if (nonZeroData.length === 0) {
+        console.warn('⚠️ WARNING: No non-zero data found! Chart line will not render.');
+        console.log('📊 Full revenue history from API:', homeData.revenueHistory);
+      }
+    } else {
+      console.warn('⚠️ No revenueHistory data available from API');
     }
 
     // Convert zero values to null for the current metric so chart doesn't render them
@@ -651,6 +661,13 @@ export default function ProviderHome() {
       avgValue: d.avgValue === 0 ? null : d.avgValue,
       utilization: d.utilization === 0 ? null : d.utilization,
     }));
+
+    console.log('🎨 Final processed chart data:', processedData.filter(d => d.amount !== null || d.jobCount !== null).map(d => ({
+      date: d.date,
+      displayLabel: d.displayLabel,
+      amount: d.amount,
+      jobCount: d.jobCount
+    })));
 
     if (viewMode === 'week') {
       return processedData.map(d => ({
@@ -977,11 +994,13 @@ export default function ProviderHome() {
                         stroke={METRIC_CONFIG[chartMetric].color}
                         strokeWidth={3}
                         fill="url(#colorMetric)"
+                        fillOpacity={0.3}
+                        isAnimationActive={false}
                         dot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint; index?: number }) => {
                           const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint;
                           const val = props.payload?.[dataKey];
                           // Only show dots for data points that have values
-                          if (val === null || val === 0) {
+                          if (val === null || val === undefined || val === 0) {
                             return <g key={props.index} />;
                           }
                           return (
@@ -989,7 +1008,7 @@ export default function ProviderHome() {
                               key={props.index}
                               cx={props.cx}
                               cy={props.cy}
-                              r={4}
+                              r={5}
                               fill={METRIC_CONFIG[chartMetric].color}
                               stroke="#fff"
                               strokeWidth={2}
@@ -1000,14 +1019,14 @@ export default function ProviderHome() {
                         activeDot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint }) => {
                           const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint;
                           const val = props.payload?.[dataKey];
-                          if (val === null || val === 0) {
+                          if (val === null || val === undefined || val === 0) {
                             return <g />;
                           }
                           return (
                             <circle
                               cx={props.cx}
                               cy={props.cy}
-                              r={6}
+                              r={7}
                               fill={METRIC_CONFIG[chartMetric].color}
                               stroke="#fff"
                               strokeWidth={2}
