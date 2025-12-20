@@ -146,30 +146,35 @@ type ChartMetric = 'revenue' | 'jobs' | 'avgValue' | 'utilization';
 const METRIC_CONFIG: Record<ChartMetric, {
   label: string;
   color: string;
+  buttonActive: string;
   formatter: (value: number) => string;
   dataKey: string;
 }> = {
   revenue: {
     label: 'Revenue',
     color: '#10b981',
+    buttonActive: 'border-emerald-500 text-emerald-400 bg-emerald-500/10',
     formatter: (v) => `$${v.toLocaleString()}`,
     dataKey: 'amount',
   },
   jobs: {
     label: 'Jobs Completed',
     color: '#3b82f6',
+    buttonActive: 'border-blue-500 text-blue-400 bg-blue-500/10',
     formatter: (v) => String(v),
     dataKey: 'jobCount',
   },
   avgValue: {
     label: 'Avg Job Value',
     color: '#8b5cf6',
+    buttonActive: 'border-purple-500 text-purple-400 bg-purple-500/10',
     formatter: (v) => `$${v.toLocaleString()}`,
     dataKey: 'avgValue',
   },
   utilization: {
     label: 'Utilization Rate',
     color: '#f97316',
+    buttonActive: 'border-orange-500 text-orange-400 bg-orange-500/10',
     formatter: (v) => `${v}%`,
     dataKey: 'utilization',
   },
@@ -817,39 +822,33 @@ export default function ProviderHome() {
           {/* TOP ROW: Metrics + Chart */}
           <div className="flex flex-col lg:flex-row gap-6">
 
-            {/* Left: 3 Metric Cards - Minimal Gray Design */}
-            <div className="flex flex-col sm:flex-row lg:flex-col gap-3 lg:w-[260px] flex-shrink-0">
+            {/* Left: 3 Metric Cards - Original Size */}
+            <div className="flex flex-col sm:flex-row lg:flex-col gap-4 lg:w-[280px] flex-shrink-0">
               {/* Number of Jobs */}
-              <div className="h-fit bg-[#18181b] rounded-xl p-4 border border-[#27272a]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-3xl font-bold text-white">{numberOfJobs}</p>
-                    <p className="text-xs text-[#71717a] mt-0.5">Jobs Completed</p>
-                  </div>
-                  <Hash className="h-5 w-5 text-[#52525b]" />
+              <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-4xl font-bold text-white">{numberOfJobs}</div>
+                  <Hash className="h-6 w-6 text-[#52525b]" />
                 </div>
+                <div className="text-sm text-[#71717a]">Jobs Completed</div>
               </div>
 
               {/* Average Job Size */}
-              <div className="h-fit bg-[#18181b] rounded-xl p-4 border border-[#27272a]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-3xl font-bold text-white">{formatCurrency(averageJobSize)}</p>
-                    <p className="text-xs text-[#71717a] mt-0.5">Average Job Size</p>
-                  </div>
-                  <TrendingUp className="h-5 w-5 text-[#52525b]" />
+              <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-4xl font-bold text-white">{formatCurrency(averageJobSize)}</div>
+                  <TrendingUp className="h-6 w-6 text-[#52525b]" />
                 </div>
+                <div className="text-sm text-[#71717a]">Average Job Size</div>
               </div>
 
               {/* Total Job Value */}
-              <div className="h-fit bg-[#18181b] rounded-xl p-4 border border-[#27272a]">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-3xl font-bold text-white">{formatCurrency(totalJobValue)}</p>
-                    <p className="text-xs text-[#71717a] mt-0.5">Total Revenue</p>
-                  </div>
-                  <DollarSign className="h-5 w-5 text-[#52525b]" />
+              <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="text-4xl font-bold text-white">{formatCurrency(totalJobValue)}</div>
+                  <DollarSign className="h-6 w-6 text-[#52525b]" />
                 </div>
+                <div className="text-sm text-[#71717a]">Total Revenue</div>
               </div>
             </div>
 
@@ -892,7 +891,7 @@ export default function ProviderHome() {
 
                 {/* Bottom row: Metric toggles + Time period */}
                 <div className="flex items-center justify-between">
-                  {/* Metric Toggles - Outline style with emerald accent */}
+                  {/* Metric Toggles - Color matches chart */}
                   <div className="flex gap-2">
                     {(Object.keys(METRIC_CONFIG) as ChartMetric[]).map((metric) => (
                       <button
@@ -900,7 +899,7 @@ export default function ProviderHome() {
                         onClick={() => setChartMetric(metric)}
                         className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all border ${
                           chartMetric === metric
-                            ? 'border-emerald-500 text-emerald-500 bg-emerald-500/10'
+                            ? METRIC_CONFIG[metric].buttonActive
                             : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground bg-transparent'
                         }`}
                       >
