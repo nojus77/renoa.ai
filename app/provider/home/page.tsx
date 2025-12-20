@@ -128,6 +128,7 @@ interface RevenueDataPoint {
   label?: string;
   day?: string;
   displayLabel?: string;
+  showTick?: boolean;
 }
 
 interface RecentJob {
@@ -233,7 +234,7 @@ function generateTestDataForRange(startDate: Date, endDate: Date): RevenueDataPo
   });
 }
 
-// Custom tooltip for the chart - hide on zero values
+// Custom tooltip for the chart
 function CustomTooltip({
   active,
   payload,
@@ -248,25 +249,31 @@ function CustomTooltip({
   metricColor: string;
   onViewJobs?: (data: RevenueDataPoint) => void;
 }) {
-  if (active && payload && payload.length && payload[0].value > 0) {
+  if (active && payload && payload.length) {
     const data = payload[0].payload;
+    const value = payload[0].value;
     const config = METRIC_CONFIG[metric];
+    const hasValue = value > 0;
+
     return (
-      <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
-        <p className="text-xs text-muted-foreground mb-2">{data.label} {data.day ? `(${data.day})` : ''}</p>
-        <p className="text-xl font-bold text-foreground mb-2" style={{ color: metricColor }}>
-          {config.formatter(payload[0].value)}
+      <div className="bg-card border border-border rounded-xl shadow-xl p-4 min-w-[180px]">
+        <p className="text-sm font-medium text-foreground mb-1">
+          {data.label || data.displayLabel}
+          {data.day ? ` (${data.day})` : ''}
+        </p>
+        <p className="text-2xl font-bold mb-3" style={{ color: hasValue ? metricColor : '#6b7280' }}>
+          {hasValue ? config.formatter(value) : 'No data'}
         </p>
         <button
           onClick={(e) => {
             e.stopPropagation();
             onViewJobs?.(data);
           }}
-          className="flex items-center gap-2 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors hover:opacity-80 w-full"
-          style={{ backgroundColor: `${metricColor}15` }}
+          className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all hover:opacity-90 w-full"
+          style={{ backgroundColor: metricColor, color: '#fff' }}
         >
-          <span className="text-sm font-medium" style={{ color: metricColor }}>View Jobs</span>
-          <ChevronRight className="h-5 w-5" style={{ color: metricColor }} />
+          <span className="text-sm font-medium">View Jobs</span>
+          <ChevronRight className="h-4 w-4" />
         </button>
       </div>
     );
@@ -680,14 +687,18 @@ export default function ProviderHome() {
         displayLabel: format(new Date(d.date + 'T12:00:00'), 'EEE'),
       }));
     } else {
-      // For month view, show all day numbers but skip some for readability
+      // For month view, show day numbers at regular intervals
+      // Show 1, 5, 10, 15, 20, 25, and last day
       return processedData.map((d, i) => {
         const dayNum = new Date(d.date + 'T12:00:00').getDate();
-        // Show day 1, every 5th day, and last day
-        const showLabel = dayNum === 1 || dayNum % 5 === 0 || i === processedData.length - 1;
+        const isLastDay = i === processedData.length - 1;
+        const showLabel = dayNum === 1 || dayNum % 5 === 0 || isLastDay;
         return {
           ...d,
-          displayLabel: showLabel ? String(dayNum) : '',
+          // Always set displayLabel to the day number for proper spacing
+          displayLabel: String(dayNum),
+          // Use a separate flag to control visibility in XAxis tick
+          showTick: showLabel,
         };
       });
     }
@@ -968,9 +979,30 @@ export default function ProviderHome() {
                         dataKey="displayLabel"
                         stroke="currentColor"
                         strokeOpacity={0.5}
-                        tick={{ fill: 'currentColor', opacity: 0.6, fontSize: 11 }}
                         tickLine={false}
                         axisLine={false}
+                        interval={0}
+                        tick={(props: { x: number; y: number; payload: { value: string; index: number } }) => {
+                          // For month view, only show certain tick labels
+                          if (viewMode === 'month') {
+                            const dataPoint = chartData[props.payload.index];
+                            if (dataPoint && !dataPoint.showTick) {
+                              return <g />;
+                            }
+                          }
+                          return (
+                            <text
+                              x={props.x}
+                              y={props.y + 12}
+                              textAnchor="middle"
+                              fill="currentColor"
+                              opacity={0.6}
+                              fontSize={11}
+                            >
+                              {props.payload.value}
+                            </text>
+                          );
+                        }}
                       />
                       <YAxis
                         domain={[0, 'auto']}
@@ -996,12 +1028,12 @@ export default function ProviderHome() {
                         }
                       />
                       <Area
-                        type="monotone"
+                        type="monotoneX"
                         dataKey={METRIC_CONFIG[chartMetric].dataKey}
                         stroke={METRIC_CONFIG[chartMetric].color}
-                        strokeWidth={3}
+                        strokeWidth={2.5}
                         fill="url(#colorMetric)"
-                        fillOpacity={0.3}
+                        fillOpacity={0.2}
                         isAnimationActive={false}
                         dot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint; index?: number }) => {
                           const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint;
@@ -1015,7 +1047,7 @@ export default function ProviderHome() {
                               key={props.index}
                               cx={props.cx}
                               cy={props.cy}
-                              r={5}
+                              r={4}
                               fill={METRIC_CONFIG[chartMetric].color}
                               stroke="#fff"
                               strokeWidth={2}
