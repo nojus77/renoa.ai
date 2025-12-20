@@ -338,6 +338,10 @@ export default function ProviderHome() {
   const [selectedAlertCount, setSelectedAlertCount] = useState(0);
   const [selectedSidebarJob, setSelectedSidebarJob] = useState<JobDetail | null>(null);
 
+  // View All expand state (no navigation)
+  const [showAllComingUp, setShowAllComingUp] = useState(false);
+  const [showAllToday, setShowAllToday] = useState(false);
+
   const openSidebarForDate = (date: string) => {
     setSidebarMode('date');
     setSelectedSidebarDate(date);
@@ -362,6 +366,48 @@ export default function ProviderHome() {
       workerName: 'workerName' in job ? job.workerName : ('workers' in job && job.workers?.length > 0 ? `${job.workers[0].firstName} ${job.workers[0].lastName}` : null),
       workers: 'workers' in job ? job.workers : undefined,
       notes: 'notes' in job ? job.notes : undefined,
+    };
+
+    setSidebarMode('job');
+    setSelectedSidebarJob(jobDetail);
+    setSelectedSidebarDate(null);
+    setSelectedAlertType(null);
+    setSidebarOpen(true);
+  };
+
+  // Open sidebar for a recent job (completed jobs)
+  const openSidebarForRecentJob = (job: RecentJob) => {
+    const jobDetail: JobDetail = {
+      id: job.id,
+      customerName: job.customerName,
+      serviceType: job.serviceType,
+      address: job.address,
+      startTime: job.completedAt, // Use completedAt as the time reference
+      status: 'completed',
+      amount: job.amount,
+      workerName: job.workerName,
+    };
+
+    setSidebarMode('job');
+    setSelectedSidebarJob(jobDetail);
+    setSelectedSidebarDate(null);
+    setSelectedAlertType(null);
+    setSidebarOpen(true);
+  };
+
+  // Open sidebar for a date breakdown job (from chart click)
+  const openSidebarForBreakdownJob = (job: DateBreakdownJob) => {
+    const jobDetail: JobDetail = {
+      id: job.id,
+      customerName: job.customerName,
+      customerPhone: job.customerPhone,
+      serviceType: job.serviceType,
+      address: job.address,
+      startTime: job.startTime,
+      endTime: job.endTime,
+      status: job.status,
+      amount: job.amount,
+      workers: job.assignedUsers?.map(u => ({ id: u.id, firstName: u.firstName, lastName: u.lastName })),
     };
 
     setSidebarMode('job');
@@ -1128,7 +1174,7 @@ export default function ProviderHome() {
                         {dateBreakdown?.jobs.map((job) => (
                           <button
                             key={job.id}
-                            onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                            onClick={() => openSidebarForBreakdownJob(job)}
                             className="w-full p-3 bg-background hover:bg-muted/40 rounded-lg text-left transition-colors"
                           >
                             <div className="flex items-center justify-between">
@@ -1164,7 +1210,7 @@ export default function ProviderHome() {
             <div className="mb-10">
               <RecentJobsTable
                 jobs={homeData.recentJobs}
-                onJobClick={(job) => openSidebarForDate(format(new Date(job.completedAt), 'yyyy-MM-dd'))}
+                onJobClick={(job) => openSidebarForRecentJob(job)}
               />
             </div>
           )}
@@ -1176,13 +1222,15 @@ export default function ProviderHome() {
             <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col min-h-[400px]">
               <div className="flex items-center justify-between mb-5">
                 <h3 className="text-base font-semibold text-foreground">Coming Up</h3>
-                <button
-                  onClick={() => router.push('/provider/calendar')}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
-                >
-                  View all
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
+                {groupedUpcomingJobs.length > 3 && (
+                  <button
+                    onClick={() => setShowAllComingUp(!showAllComingUp)}
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5"
+                  >
+                    {showAllComingUp ? 'Show less' : `View all (${homeData?.upcomingJobs?.length || 0})`}
+                    <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAllComingUp ? 'rotate-90' : ''}`} />
+                  </button>
+                )}
               </div>
 
               {groupedUpcomingJobs.length === 0 ? (
@@ -1191,8 +1239,8 @@ export default function ProviderHome() {
                   <p className="text-sm">No upcoming jobs</p>
                 </div>
               ) : (
-                <div className="flex-1 space-y-4 overflow-y-auto">
-                  {groupedUpcomingJobs.map((group) => (
+                <div className={`flex-1 space-y-4 overflow-y-auto ${showAllComingUp ? 'max-h-none' : 'max-h-[350px]'}`}>
+                  {(showAllComingUp ? groupedUpcomingJobs : groupedUpcomingJobs.slice(0, 3)).map((group) => (
                     <div key={group.date}>
                       <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">{group.label}</p>
                       <div className="space-y-3">
@@ -1290,13 +1338,15 @@ export default function ProviderHome() {
                     {todaysJobs.length}
                   </span>
                 </div>
-                <button
-                  onClick={() => router.push('/provider/calendar')}
-                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
-                >
-                  View all
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </button>
+                {todaysJobs.length > 3 && (
+                  <button
+                    onClick={() => setShowAllToday(!showAllToday)}
+                    className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5"
+                  >
+                    {showAllToday ? 'Show less' : `View all (${todaysJobs.length})`}
+                    <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAllToday ? 'rotate-90' : ''}`} />
+                  </button>
+                )}
               </div>
 
               {todaysJobs.length === 0 ? (
@@ -1305,8 +1355,8 @@ export default function ProviderHome() {
                   <p className="text-sm">No jobs scheduled today</p>
                 </div>
               ) : (
-                <div className="flex-1 space-y-3 overflow-y-auto">
-                  {todaysJobs.map((job) => (
+                <div className={`flex-1 space-y-3 overflow-y-auto ${showAllToday ? 'max-h-none' : 'max-h-[350px]'}`}>
+                  {(showAllToday ? todaysJobs : todaysJobs.slice(0, 3)).map((job) => (
                     <button
                       key={job.id}
                       onClick={() => openSidebarForJob(job)}
