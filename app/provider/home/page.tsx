@@ -1132,7 +1132,10 @@ export default function ProviderHome() {
           {/* Recent Jobs Table - Full Width */}
           {homeData.recentJobs && homeData.recentJobs.length > 0 && (
             <div className="mb-10">
-              <RecentJobsTable jobs={homeData.recentJobs} />
+              <RecentJobsTable
+                jobs={homeData.recentJobs}
+                onJobClick={(job) => openSidebarForDate(format(new Date(job.completedAt), 'yyyy-MM-dd'))}
+              />
             </div>
           )}
 
@@ -1166,7 +1169,7 @@ export default function ProviderHome() {
                         {group.jobs.map((job) => (
                           <button
                             key={job.id}
-                            onClick={() => openJobPreview(job)}
+                            onClick={() => openSidebarForDate(format(new Date(job.startTime), 'yyyy-MM-dd'))}
                             className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-4 text-left transition-all group"
                           >
                             <div className="flex items-start justify-between gap-3">
@@ -1261,7 +1264,13 @@ export default function ProviderHome() {
                   {todaysJobs.map((job) => (
                     <button
                       key={job.id}
-                      onClick={() => openJobPreview(job)}
+                      onClick={() => {
+                        setSidebarMode('alert');
+                        setSelectedAlertType('today-jobs');
+                        setSelectedAlertCount(todaysJobs.length);
+                        setSelectedSidebarDate(null);
+                        setSidebarOpen(true);
+                      }}
                       className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-4 text-left transition-all group"
                     >
                       <div className="flex items-start justify-between gap-3">

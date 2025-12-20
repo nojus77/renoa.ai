@@ -1,6 +1,5 @@
 "use client";
 
-import { useRouter } from 'next/navigation';
 import { format } from 'date-fns';
 import { ChevronRight } from 'lucide-react';
 
@@ -16,10 +15,10 @@ interface RecentJob {
 
 interface RecentJobsTableProps {
   jobs: RecentJob[];
+  onJobClick?: (job: RecentJob) => void;
 }
 
-export default function RecentJobsTable({ jobs }: RecentJobsTableProps) {
-  const router = useRouter();
+export default function RecentJobsTable({ jobs, onJobClick }: RecentJobsTableProps) {
 
   const formatDateTime = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -72,7 +71,7 @@ export default function RecentJobsTable({ jobs }: RecentJobsTableProps) {
             {jobs.map((job, index) => (
               <tr
                 key={job.id}
-                onClick={() => router.push(`/provider/jobs/${job.id}`)}
+                onClick={() => onJobClick?.(job)}
                 className={`cursor-pointer hover:bg-muted/40 transition-colors ${
                   index % 2 === 0 ? 'bg-background' : 'bg-muted/20'
                 }`}
