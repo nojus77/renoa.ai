@@ -22,7 +22,7 @@ import ProviderLayout from '@/components/provider/ProviderLayout';
 import RecentJobsTable from '@/components/provider/RecentJobsTable';
 import NeedsAttentionTable, { type AlertType } from '@/components/provider/NeedsAttentionTable';
 import JobPreviewModal from '@/components/provider/JobPreviewModal';
-import JobDetailsSidebar, { type SidebarMode } from '@/components/provider/JobDetailsSidebar';
+import JobDetailsSidebar, { type SidebarMode, type JobDetail } from '@/components/provider/JobDetailsSidebar';
 import {
   AreaChart,
   Area,
@@ -336,10 +336,37 @@ export default function ProviderHome() {
   const [selectedSidebarDate, setSelectedSidebarDate] = useState<string | null>(null);
   const [selectedAlertType, setSelectedAlertType] = useState<AlertType | null>(null);
   const [selectedAlertCount, setSelectedAlertCount] = useState(0);
+  const [selectedSidebarJob, setSelectedSidebarJob] = useState<JobDetail | null>(null);
 
   const openSidebarForDate = (date: string) => {
     setSidebarMode('date');
     setSelectedSidebarDate(date);
+    setSelectedAlertType(null);
+    setSelectedSidebarJob(null);
+    setSidebarOpen(true);
+  };
+
+  const openSidebarForJob = (job: UpcomingJob | TodayJob) => {
+    // Convert to JobDetail format
+    const jobDetail: JobDetail = {
+      id: job.id,
+      customerName: 'customerName' in job ? (job.customerName || 'Unknown') : (job as TodayJob).customerName,
+      customerPhone: 'phone' in job ? job.phone : ('customerPhone' in job ? (job as TodayJob).customerPhone : undefined),
+      serviceType: job.serviceType,
+      address: 'address' in job ? (job.address || '') : (job as TodayJob).address,
+      startTime: job.startTime,
+      endTime: 'endTime' in job ? job.endTime : undefined,
+      status: 'status' in job ? (job.status || 'scheduled') : 'scheduled',
+      amount: 'actualValue' in job ? job.actualValue : ('totalAmount' in job ? (job as TodayJob).totalAmount : null),
+      estimatedValue: 'estimatedValue' in job ? job.estimatedValue : null,
+      workerName: 'workerName' in job ? job.workerName : ('workers' in job && job.workers?.length > 0 ? `${job.workers[0].firstName} ${job.workers[0].lastName}` : null),
+      workers: 'workers' in job ? job.workers : undefined,
+      notes: 'notes' in job ? job.notes : undefined,
+    };
+
+    setSidebarMode('job');
+    setSelectedSidebarJob(jobDetail);
+    setSelectedSidebarDate(null);
     setSelectedAlertType(null);
     setSidebarOpen(true);
   };
@@ -349,6 +376,7 @@ export default function ProviderHome() {
     setSelectedAlertType(alertType);
     setSelectedAlertCount(alertDetails.count);
     setSelectedSidebarDate(null);
+    setSelectedSidebarJob(null);
     setSidebarOpen(true);
   };
 
@@ -358,6 +386,7 @@ export default function ProviderHome() {
       setSelectedSidebarDate(null);
       setSelectedAlertType(null);
       setSelectedAlertCount(0);
+      setSelectedSidebarJob(null);
     }, 300);
   };
 
@@ -813,6 +842,7 @@ export default function ProviderHome() {
         selectedDate={selectedSidebarDate}
         alertType={selectedAlertType}
         alertCount={selectedAlertCount}
+        selectedJob={selectedSidebarJob}
       />
 
       <div className="w-full bg-background">
@@ -1169,15 +1199,28 @@ export default function ProviderHome() {
                         {group.jobs.map((job) => (
                           <button
                             key={job.id}
-                            onClick={() => openSidebarForDate(format(new Date(job.startTime), 'yyyy-MM-dd'))}
+                            onClick={() => openSidebarForJob(job)}
                             className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-4 text-left transition-all group"
                           >
                             <div className="flex items-start justify-between gap-3">
                               <div className="flex-1 min-w-0 space-y-2">
-                                {/* Customer Name - Bold at top */}
-                                <p className="text-sm font-bold text-foreground truncate">
-                                  {job.customerName || 'Unknown Customer'}
-                                </p>
+                                {/* Customer Name + Status */}
+                                <div className="flex items-center gap-2">
+                                  <p className="text-sm font-bold text-foreground truncate">
+                                    {job.customerName || 'Unknown Customer'}
+                                  </p>
+                                  {job.status && (
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${
+                                      job.status === 'scheduled' ? 'bg-blue-500/20 text-blue-400' :
+                                      job.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                                      job.status === 'in_progress' ? 'bg-orange-500/20 text-orange-400' :
+                                      job.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
+                                      'bg-muted text-muted-foreground'
+                                    }`}>
+                                      {job.status.replace('_', ' ')}
+                                    </span>
+                                  )}
+                                </div>
 
                                 {/* Service Type with icon */}
                                 <div className="flex items-center gap-2 text-primary">
@@ -1205,10 +1248,15 @@ export default function ProviderHome() {
                                 {/* Worker and Amount row */}
                                 <div className="flex items-center justify-between pt-1">
                                   {/* Worker assigned */}
-                                  {job.workerName && (
+                                  {job.workerName ? (
                                     <div className="flex items-center gap-1.5 text-muted-foreground">
                                       <User className="h-3 w-3 flex-shrink-0" />
                                       <span className="text-xs">{job.workerName}</span>
+                                    </div>
+                                  ) : (
+                                    <div className="flex items-center gap-1.5 text-orange-500">
+                                      <UserX className="h-3 w-3 flex-shrink-0" />
+                                      <span className="text-xs font-medium">Needs worker</span>
                                     </div>
                                   )}
 
@@ -1235,24 +1283,21 @@ export default function ProviderHome() {
 
             {/* Column 2: Jobs Scheduled Today - Enhanced Cards */}
             <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col min-h-[400px]">
-              <button
-                onClick={() => {
-                  setSidebarMode('alert');
-                  setSelectedAlertType('today-jobs');
-                  setSelectedAlertCount(todaysJobs.length);
-                  setSelectedSidebarDate(null);
-                  setSidebarOpen(true);
-                }}
-                className="flex items-center justify-between mb-5 w-full text-left hover:opacity-80 transition-opacity group"
-              >
-                <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">Jobs Scheduled Today</h3>
+              <div className="flex items-center justify-between mb-5">
                 <div className="flex items-center gap-2">
+                  <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
                   <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
                     {todaysJobs.length}
                   </span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
-              </button>
+                <button
+                  onClick={() => router.push('/provider/calendar')}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5"
+                >
+                  View all
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+              </div>
 
               {todaysJobs.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
@@ -1264,26 +1309,26 @@ export default function ProviderHome() {
                   {todaysJobs.map((job) => (
                     <button
                       key={job.id}
-                      onClick={() => {
-                        setSidebarMode('alert');
-                        setSelectedAlertType('today-jobs');
-                        setSelectedAlertCount(todaysJobs.length);
-                        setSelectedSidebarDate(null);
-                        setSidebarOpen(true);
-                      }}
+                      onClick={() => openSidebarForJob(job)}
                       className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-4 text-left transition-all group"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0 space-y-2">
-                          {/* Customer Name - Bold at top */}
+                          {/* Customer Name + Status */}
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-bold text-foreground truncate">{job.customerName}</p>
-                            {job.status === 'in_progress' && (
-                              <span className="inline-flex items-center text-[10px] text-orange-500 font-medium bg-orange-500/10 px-1.5 py-0.5 rounded-full">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium capitalize ${
+                              job.status === 'scheduled' ? 'bg-blue-500/20 text-blue-400' :
+                              job.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
+                              job.status === 'in_progress' ? 'bg-orange-500/20 text-orange-400' :
+                              job.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
+                              'bg-muted text-muted-foreground'
+                            }`}>
+                              {job.status === 'in_progress' && (
                                 <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1 animate-pulse" />
-                                Active
-                              </span>
-                            )}
+                              )}
+                              {job.status.replace('_', ' ')}
+                            </span>
                           </div>
 
                           {/* Service Type with icon */}
@@ -1312,12 +1357,17 @@ export default function ProviderHome() {
                           {/* Worker and Amount row */}
                           <div className="flex items-center justify-between pt-1">
                             {/* Worker assigned */}
-                            {job.workers && job.workers.length > 0 && (
+                            {job.workers && job.workers.length > 0 ? (
                               <div className="flex items-center gap-1.5 text-muted-foreground">
                                 <User className="h-3 w-3 flex-shrink-0" />
                                 <span className="text-xs">
                                   {job.workers.map(w => `${w.firstName} ${w.lastName}`).join(', ')}
                                 </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 text-orange-500">
+                                <UserX className="h-3 w-3 flex-shrink-0" />
+                                <span className="text-xs font-medium">Needs worker</span>
                               </div>
                             )}
 

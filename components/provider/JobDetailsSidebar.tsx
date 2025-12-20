@@ -22,10 +22,33 @@ import {
   ExternalLink,
   CheckCircle,
   AlertTriangle,
+  Pencil,
+  Save,
+  XCircle,
+  FileText,
+  Users,
 } from 'lucide-react';
 
-export type SidebarMode = 'date' | 'alert';
+export type SidebarMode = 'date' | 'alert' | 'job';
 export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices' | 'overloaded-workers' | 'underutilized-workers' | 'today-jobs';
+
+// Single job detail for the job mode
+export interface JobDetail {
+  id: string;
+  customerName: string;
+  customerPhone?: string;
+  serviceType: string;
+  address: string;
+  startTime: string;
+  endTime?: string;
+  status: string;
+  amount?: number | null;
+  estimatedValue?: number | null;
+  workerName?: string | null;
+  workers?: { id: string; firstName: string; lastName: string }[];
+  notes?: string;
+  estimatedDuration?: number;
+}
 
 interface Job {
   id: string;
@@ -49,6 +72,9 @@ interface JobDetailsSidebarProps {
   // For alert mode
   alertType?: AlertType | null;
   alertCount?: number;
+  // For job mode - single job detail view
+  selectedJob?: JobDetail | null;
+  onJobUpdate?: (updatedJob: JobDetail) => void;
 }
 
 const alertConfig: Record<AlertType, { title: string; icon: React.ReactNode; description: string; color: string; actionLabel: string }> = {
@@ -116,12 +142,34 @@ export default function JobDetailsSidebar({
   mode,
   selectedDate,
   alertType,
-  alertCount
+  alertCount,
+  selectedJob,
+  onJobUpdate,
 }: JobDetailsSidebarProps) {
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(false);
   const [totalRevenue, setTotalRevenue] = useState(0);
+
+  // Edit mode state for single job view
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<JobDetail | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Reset edit state when sidebar closes or job changes
+  useEffect(() => {
+    if (!isOpen || mode !== 'job') {
+      setIsEditing(false);
+      setEditForm(null);
+    }
+  }, [isOpen, mode]);
+
+  // Initialize edit form when selected job changes
+  useEffect(() => {
+    if (selectedJob && mode === 'job') {
+      setEditForm({ ...selectedJob });
+    }
+  }, [selectedJob, mode]);
 
   useEffect(() => {
     if (isOpen) {
@@ -222,8 +270,50 @@ export default function JobDetailsSidebar({
 
   const config = alertType ? alertConfig[alertType] : null;
 
+  // Handle save for job edit
+  const handleSaveJob = async () => {
+    if (!editForm || !selectedJob) return;
+
+    setSaving(true);
+    try {
+      const providerId = localStorage.getItem('providerId');
+      const res = await fetch(`/api/provider/jobs/${selectedJob.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          providerId,
+          ...editForm,
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setIsEditing(false);
+        if (onJobUpdate) {
+          onJobUpdate(editForm);
+        }
+      } else {
+        console.error('Failed to save job');
+      }
+    } catch (error) {
+      console.error('Error saving job:', error);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    if (selectedJob) {
+      setEditForm({ ...selectedJob });
+    }
+  };
+
   // Determine title and subtitle based on mode
   const getTitle = () => {
+    if (mode === 'job' && selectedJob) {
+      return selectedJob.customerName;
+    }
     if (mode === 'date' && selectedDate) {
       return format(new Date(selectedDate + 'T12:00:00'), 'EEEE, MMMM d');
     }
@@ -231,6 +321,9 @@ export default function JobDetailsSidebar({
   };
 
   const getSubtitle = () => {
+    if (mode === 'job' && selectedJob) {
+      return selectedJob.serviceType;
+    }
     if (mode === 'date') {
       return `${jobs.length} job${jobs.length !== 1 ? 's' : ''} • ${formatCurrency(totalRevenue)} total`;
     }
@@ -238,6 +331,9 @@ export default function JobDetailsSidebar({
   };
 
   const getIcon = () => {
+    if (mode === 'job') {
+      return <Briefcase className="h-5 w-5 text-primary" />;
+    }
     if (mode === 'date') {
       return <Calendar className="h-5 w-5 text-primary" />;
     }
@@ -289,22 +385,251 @@ export default function JobDetailsSidebar({
                 <p className="text-xs text-muted-foreground">{getSubtitle()}</p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-muted rounded-lg transition-colors"
-            >
-              <X className="h-5 w-5 text-muted-foreground" />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Edit button for job mode */}
+              {mode === 'job' && selectedJob && !isEditing && (
+                <button
+                  onClick={() => setIsEditing(true)}
+                  className="p-2 hover:bg-primary/10 text-primary rounded-lg transition-colors"
+                  title="Edit job"
+                >
+                  <Pencil className="h-5 w-5" />
+                </button>
+              )}
+              <button
+                onClick={onClose}
+                className="p-2 hover:bg-muted rounded-lg transition-colors"
+              >
+                <X className="h-5 w-5 text-muted-foreground" />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Content */}
         <div className="flex-1 p-4 space-y-3 overflow-y-auto">
-          {loading ? (
+          {/* Job Detail Mode */}
+          {mode === 'job' && selectedJob && editForm ? (
+            <div className="space-y-4">
+              {/* Status Badge */}
+              <div className="flex items-center justify-between">
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium capitalize ${getStatusColor(selectedJob.status)}`}>
+                  {getStatusIcon(selectedJob.status)}
+                  {selectedJob.status.replace('_', ' ')}
+                </span>
+                {isEditing && (
+                  <select
+                    value={editForm.status}
+                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                    className="text-xs bg-muted border border-border rounded-lg px-2 py-1 text-foreground"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                )}
+              </div>
+
+              {/* Customer Info */}
+              <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <User className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Customer</span>
+                </div>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <input
+                      type="text"
+                      value={editForm.customerName}
+                      onChange={(e) => setEditForm({ ...editForm, customerName: e.target.value })}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                      placeholder="Customer name"
+                    />
+                    <input
+                      type="tel"
+                      value={editForm.customerPhone || ''}
+                      onChange={(e) => setEditForm({ ...editForm, customerPhone: e.target.value })}
+                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                      placeholder="Phone number"
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-base font-semibold text-foreground">{selectedJob.customerName}</p>
+                    {selectedJob.customerPhone && (
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <Phone className="h-3.5 w-3.5" />
+                        <a href={`tel:${selectedJob.customerPhone}`} className="text-sm hover:text-primary transition-colors">
+                          {selectedJob.customerPhone}
+                        </a>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Service Type */}
+              <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <Briefcase className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Service</span>
+                </div>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editForm.serviceType}
+                    onChange={(e) => setEditForm({ ...editForm, serviceType: e.target.value })}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    placeholder="Service type"
+                  />
+                ) : (
+                  <p className="text-sm font-medium text-primary">{selectedJob.serviceType}</p>
+                )}
+              </div>
+
+              {/* Schedule */}
+              <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <Calendar className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Schedule</span>
+                </div>
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <div>
+                      <label className="text-xs text-muted-foreground">Start Time</label>
+                      <input
+                        type="datetime-local"
+                        value={editForm.startTime ? format(new Date(editForm.startTime), "yyyy-MM-dd'T'HH:mm") : ''}
+                        onChange={(e) => setEditForm({ ...editForm, startTime: new Date(e.target.value).toISOString() })}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground">End Time</label>
+                      <input
+                        type="datetime-local"
+                        value={editForm.endTime ? format(new Date(editForm.endTime), "yyyy-MM-dd'T'HH:mm") : ''}
+                        onChange={(e) => setEditForm({ ...editForm, endTime: new Date(e.target.value).toISOString() })}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-sm text-foreground">
+                      {format(new Date(selectedJob.startTime), 'EEEE, MMMM d, yyyy')}
+                    </p>
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span className="text-sm">
+                        {formatDateTime(selectedJob.startTime)}
+                        {selectedJob.endTime && ` - ${formatDateTime(selectedJob.endTime)}`}
+                      </span>
+                    </div>
+                    {selectedJob.estimatedDuration && (
+                      <p className="text-xs text-muted-foreground">
+                        Est. duration: {selectedJob.estimatedDuration} min
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Location */}
+              <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <MapPin className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Location</span>
+                </div>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={editForm.address}
+                    onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    placeholder="Address"
+                  />
+                ) : (
+                  <p className="text-sm text-foreground">{selectedJob.address}</p>
+                )}
+              </div>
+
+              {/* Assigned Workers */}
+              <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <Users className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Assigned Workers</span>
+                </div>
+                {selectedJob.workers && selectedJob.workers.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {selectedJob.workers.map((worker) => (
+                      <span key={worker.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+                        <User className="h-3 w-3" />
+                        {worker.firstName} {worker.lastName}
+                      </span>
+                    ))}
+                  </div>
+                ) : selectedJob.workerName ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+                    <User className="h-3 w-3" />
+                    {selectedJob.workerName}
+                  </span>
+                ) : (
+                  <p className="text-sm text-orange-500 flex items-center gap-1.5">
+                    <UserX className="h-4 w-4" />
+                    No workers assigned
+                  </p>
+                )}
+              </div>
+
+              {/* Amount */}
+              <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <DollarSign className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Amount</span>
+                </div>
+                {isEditing ? (
+                  <input
+                    type="number"
+                    value={editForm.amount || editForm.estimatedValue || ''}
+                    onChange={(e) => setEditForm({ ...editForm, amount: parseFloat(e.target.value) || null })}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    placeholder="Amount"
+                  />
+                ) : (
+                  <p className="text-lg font-bold text-emerald-500">
+                    {formatCurrency(selectedJob.amount || selectedJob.estimatedValue || 0)}
+                  </p>
+                )}
+              </div>
+
+              {/* Notes */}
+              <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-border">
+                <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                  <FileText className="h-4 w-4" />
+                  <span className="text-xs font-medium uppercase tracking-wide">Notes</span>
+                </div>
+                {isEditing ? (
+                  <textarea
+                    value={editForm.notes || ''}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground min-h-[80px] resize-none"
+                    placeholder="Add notes..."
+                  />
+                ) : selectedJob.notes ? (
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{selectedJob.notes}</p>
+                ) : (
+                  <p className="text-sm text-muted-foreground italic">No notes</p>
+                )}
+              </div>
+            </div>
+          ) : loading ? (
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : jobs.length === 0 ? (
+          ) : jobs.length === 0 && mode !== 'job' ? (
             <div className="flex flex-col items-center justify-center py-12 text-muted-foreground">
               <Briefcase className="h-12 w-12 mb-3 opacity-30" />
               <p className="text-sm font-medium">No jobs found</p>
@@ -388,6 +713,45 @@ export default function JobDetailsSidebar({
 
         {/* Footer with total and action */}
         <div className="flex-shrink-0 bg-card border-t border-border p-4 space-y-3">
+          {/* Job mode - Edit actions */}
+          {mode === 'job' && selectedJob && (
+            isEditing ? (
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancelEdit}
+                  disabled={saving}
+                  className="flex-1 py-3 bg-muted hover:bg-muted/80 text-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  <XCircle className="h-4 w-4" />
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveJob}
+                  disabled={saving}
+                  className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  router.push(`/provider/jobs/${selectedJob.id}`);
+                  onClose();
+                }}
+                className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                View Full Details
+                <ChevronRight className="h-4 w-4" />
+              </button>
+            )
+          )}
+
           {/* Total Revenue for date mode */}
           {mode === 'date' && totalRevenue > 0 && (
             <div className="flex items-center justify-between px-2 py-2 bg-emerald-500/10 rounded-lg">
@@ -396,16 +760,19 @@ export default function JobDetailsSidebar({
             </div>
           )}
 
-          <button
-            onClick={() => {
-              router.push(getViewAllHref());
-              onClose();
-            }}
-            className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-          >
-            {mode === 'alert' ? config?.actionLabel : 'View in Calendar'}
-            <ChevronRight className="h-4 w-4" />
-          </button>
+          {/* Navigation button for date and alert modes */}
+          {mode !== 'job' && (
+            <button
+              onClick={() => {
+                router.push(getViewAllHref());
+                onClose();
+              }}
+              className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              {mode === 'alert' ? config?.actionLabel : 'View in Calendar'}
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
         </div>
       </div>
     </>
