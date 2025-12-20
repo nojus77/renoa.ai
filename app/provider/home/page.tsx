@@ -653,21 +653,26 @@ export default function ProviderHome() {
       console.warn('⚠️ No revenueHistory data available from API');
     }
 
-    // Convert zero values to null for the current metric so chart doesn't render them
+    // Keep all data points (including zeros) so the line renders
+    // We'll hide dots for zero values in the chart component
     const processedData = fullRangeData.map(d => ({
       ...d,
-      amount: d.amount === 0 ? null : d.amount,
-      jobCount: d.jobCount === 0 ? null : d.jobCount,
-      avgValue: d.avgValue === 0 ? null : d.avgValue,
-      utilization: d.utilization === 0 ? null : d.utilization,
+      // Keep numeric values, don't convert to null
+      amount: d.amount ?? 0,
+      jobCount: d.jobCount ?? 0,
+      avgValue: d.avgValue ?? 0,
+      utilization: d.utilization ?? 0,
     }));
 
-    console.log('🎨 Final processed chart data:', processedData.filter(d => d.amount !== null || d.jobCount !== null).map(d => ({
-      date: d.date,
-      displayLabel: d.displayLabel,
-      amount: d.amount,
-      jobCount: d.jobCount
-    })));
+    console.log('🎨 Final processed chart data:', {
+      total: processedData.length,
+      withData: processedData.filter(d => d.amount > 0 || d.jobCount > 0).length,
+      sample: processedData.slice(0, 3).map(d => ({
+        date: d.date,
+        amount: d.amount,
+        jobCount: d.jobCount
+      }))
+    });
 
     if (viewMode === 'week') {
       return processedData.map(d => ({
@@ -675,8 +680,10 @@ export default function ProviderHome() {
         displayLabel: format(new Date(d.date + 'T12:00:00'), 'EEE'),
       }));
     } else {
+      // For month view, show all day numbers but skip some for readability
       return processedData.map((d, i) => {
         const dayNum = new Date(d.date + 'T12:00:00').getDate();
+        // Show day 1, every 5th day, and last day
         const showLabel = dayNum === 1 || dayNum % 5 === 0 || i === processedData.length - 1;
         return {
           ...d,
@@ -939,7 +946,7 @@ export default function ProviderHome() {
 
               {/* Chart */}
               <div className="h-[280px] w-full">
-                {hasChartData ? (
+                {chartData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={chartData}
