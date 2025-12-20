@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 
 export type SidebarMode = 'date' | 'alert';
-export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices' | 'overloaded-workers' | 'underutilized-workers';
+export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices' | 'overloaded-workers' | 'underutilized-workers' | 'today-jobs';
 
 interface Job {
   id: string;
@@ -100,6 +100,13 @@ const alertConfig: Record<AlertType, { title: string; icon: React.ReactNode; des
     description: 'Workers with less than 2 jobs',
     color: 'text-amber-500',
     actionLabel: 'View Team',
+  },
+  'today-jobs': {
+    title: 'Jobs Scheduled Today',
+    icon: <Calendar className="h-5 w-5" />,
+    description: 'All jobs scheduled for today',
+    color: 'text-primary',
+    actionLabel: 'View Calendar',
   },
 };
 
@@ -249,6 +256,7 @@ export default function JobDetailsSidebar({
       case 'overdue-invoices': return '/provider/invoices?status=overdue';
       case 'overloaded-workers': return '/provider/team';
       case 'underutilized-workers': return '/provider/team';
+      case 'today-jobs': return '/provider/calendar';
       default: return '/provider/jobs';
     }
   };

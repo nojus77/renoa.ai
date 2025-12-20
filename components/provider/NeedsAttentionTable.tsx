@@ -37,7 +37,7 @@ interface Alerts {
   overdueJobsLatest?: string | null;
 }
 
-export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices' | 'overloaded-workers' | 'underutilized-workers';
+export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices' | 'overloaded-workers' | 'underutilized-workers' | 'today-jobs';
 
 interface NeedsAttentionTableProps {
   alerts: Alerts;

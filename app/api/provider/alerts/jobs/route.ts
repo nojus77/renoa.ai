@@ -213,6 +213,44 @@ export async function GET(request: NextRequest) {
         break;
       }
 
+      case 'today-jobs': {
+        const todaysJobs = await prisma.job.findMany({
+          where: {
+            providerId,
+            startTime: { gte: todayStart, lte: todayEnd },
+            status: { notIn: ['cancelled'] },
+          },
+          include: {
+            customer: { select: { name: true, phone: true } },
+          },
+          orderBy: { startTime: 'asc' },
+        });
+
+        // Get worker names
+        const userIds = Array.from(new Set(todaysJobs.flatMap(job => job.assignedUserIds)));
+        const users = userIds.length > 0 ? await prisma.providerUser.findMany({
+          where: { id: { in: userIds } },
+          select: { id: true, firstName: true, lastName: true },
+        }) : [];
+        const userMap = new Map(users.map(u => [u.id, `${u.firstName} ${u.lastName}`]));
+
+        jobs = todaysJobs.map(job => ({
+          id: job.id,
+          customerName: job.customer?.name || 'Unknown Customer',
+          serviceType: job.serviceType,
+          address: job.address,
+          startTime: job.startTime.toISOString(),
+          endTime: job.endTime?.toISOString(),
+          status: job.status,
+          amount: job.actualValue || job.estimatedValue || null,
+          workerName: job.assignedUserIds.length > 0
+            ? job.assignedUserIds.map(id => userMap.get(id)).filter(Boolean).join(', ')
+            : null,
+          phone: job.customer?.phone || '',
+        }));
+        break;
+      }
+
       default:
         return NextResponse.json(
           { error: 'Invalid alert type' },

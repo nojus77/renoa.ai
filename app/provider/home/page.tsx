@@ -1210,12 +1210,24 @@ export default function ProviderHome() {
 
             {/* Column 2: Jobs Scheduled Today - Enhanced Cards */}
             <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col min-h-[400px]">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
-                <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-                  {todaysJobs.length}
-                </span>
-              </div>
+              <button
+                onClick={() => {
+                  setSidebarMode('alert');
+                  setSelectedAlertType('today-jobs');
+                  setSelectedAlertCount(todaysJobs.length);
+                  setSelectedSidebarDate(null);
+                  setSidebarOpen(true);
+                }}
+                className="flex items-center justify-between mb-5 w-full text-left hover:opacity-80 transition-opacity group"
+              >
+                <h3 className="text-base font-semibold text-foreground group-hover:text-primary transition-colors">Jobs Scheduled Today</h3>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
+                    {todaysJobs.length}
+                  </span>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+              </button>
 
               {todaysJobs.length === 0 ? (
                 <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
