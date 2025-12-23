@@ -30,7 +30,7 @@ export async function GET(
         status: true,
         actualValue: true,
         estimatedValue: true,
-        internalNotes: true,
+        jobInstructions: true,
         assignedUserIds: true,
       },
     });
@@ -54,8 +54,8 @@ export async function GET(
 
       // Parse notes to extract clean content (remove ALL metadata)
       let cleanNotes: string | null = null;
-      if (job.internalNotes) {
-        let notes = job.internalNotes;
+      if (job.jobInstructions) {
+        let notes = job.jobInstructions;
 
         // Remove patterns like "[Created by Name]", "[12/13/2025, 10:47:29 AM]"
         notes = notes.replace(/\[Created by [^\]]+\]/g, '');

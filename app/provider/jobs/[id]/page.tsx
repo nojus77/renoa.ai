@@ -50,7 +50,7 @@ interface Job {
   isRenoaLead: boolean;
   estimatedValue: number | null;
   actualValue: number | null;
-  internalNotes: string | null;
+  jobInstructions: string | null;
   customerNotes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -78,7 +78,7 @@ interface Job {
     invoiceNumber: string;
     status: string;
   } | null;
-  estimatedDuration?: number | null;
+  durationMinutes?: number | null;
   actualDurationMinutes?: number | null;
   completedAt?: string | null;
   completedByUser?: {
@@ -116,7 +116,7 @@ export default function JobDetailPage() {
   const [updating, setUpdating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [notesTab, setNotesTab] = useState<'internal' | 'customer'>('internal');
-  const [internalNotes, setInternalNotes] = useState('');
+  const [jobInstructions, setInternalNotes] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
   const [actualValue, setActualValue] = useState('');
   const [elapsedTime, setElapsedTime] = useState(0); // For in-progress timer
@@ -155,7 +155,7 @@ export default function JobDetailPage() {
 
       // API returns job data at root level, not wrapped in 'job' property
       setJob(data);
-      setInternalNotes(data.internalNotes || '');
+      setInternalNotes(data.jobInstructions || '');
       setCustomerNotes(data.customerNotes || '');
       setActualValue(data.actualValue?.toString() || '');
     } catch (error: any) {
@@ -240,7 +240,7 @@ export default function JobDetailPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          internalNotes,
+          jobInstructions,
           customerNotes,
           actualValue: actualValue ? parseFloat(actualValue) : null,
         }),
@@ -254,7 +254,7 @@ export default function JobDetailPage() {
 
       setJob({
         ...job,
-        internalNotes,
+        jobInstructions,
         customerNotes,
         actualValue: actualValue ? parseFloat(actualValue) : null,
       });
@@ -542,16 +542,16 @@ export default function JobDetailPage() {
                     <p className="text-lg font-bold text-zinc-100">
                       {job.actualDurationMinutes} min
                     </p>
-                    {job.estimatedDuration && (
+                    {job.durationMinutes && (
                       <p className="text-xs text-zinc-500 mt-1">
-                        Estimated: {Math.round(job.estimatedDuration * 60)} min
-                        {job.actualDurationMinutes > job.estimatedDuration * 60 ? (
+                        Estimated: {Math.round(job.durationMinutes * 60)} min
+                        {job.actualDurationMinutes > job.durationMinutes * 60 ? (
                           <span className="text-amber-400 ml-1">
-                            (+{job.actualDurationMinutes - Math.round(job.estimatedDuration * 60)} min)
+                            (+{job.actualDurationMinutes - Math.round(job.durationMinutes * 60)} min)
                           </span>
-                        ) : job.actualDurationMinutes < job.estimatedDuration * 60 ? (
+                        ) : job.actualDurationMinutes < job.durationMinutes * 60 ? (
                           <span className="text-emerald-400 ml-1">
-                            (-{Math.round(job.estimatedDuration * 60) - job.actualDurationMinutes} min)
+                            (-{Math.round(job.durationMinutes * 60) - job.actualDurationMinutes} min)
                           </span>
                         ) : null}
                       </p>
@@ -930,7 +930,7 @@ export default function JobDetailPage() {
               {/* Notes Content */}
               {notesTab === 'internal' ? (
                 <textarea
-                  value={internalNotes}
+                  value={jobInstructions}
                   onChange={(e) => setInternalNotes(e.target.value)}
                   className="w-full px-4 py-4 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent min-h-[180px] font-mono text-sm"
                   placeholder="E.g., Customer wants extra mulch around roses&#10;Remember to check irrigation system&#10;Needs fall cleanup quote"

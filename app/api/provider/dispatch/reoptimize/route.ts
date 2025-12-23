@@ -16,7 +16,7 @@ interface JobWithCoords {
   startTime: Date;
   endTime: Date;
   appointmentType: string;
-  estimatedDuration: number | null;
+  durationMinutes: number | null;
   lat: number;
   lng: number;
   status: string;
@@ -84,7 +84,7 @@ async function calculateETAsWithTraffic(
     const eta = addMinutes(runningTime, travelTimeMinutes);
 
     // Job duration in minutes
-    const durationMinutes = (job.estimatedDuration || 1) * 60;
+    const durationMinutes = (job.durationMinutes || 1) * 60;
     const etaEnd = addMinutes(eta, durationMinutes);
 
     // Check if this job has a fixed/window time and we'd be late
@@ -208,7 +208,7 @@ export async function POST(req: Request) {
         startTime: j.startTime,
         endTime: j.endTime,
         appointmentType: j.appointmentType,
-        estimatedDuration: j.estimatedDuration,
+        durationMinutes: j.durationMinutes,
         lat: j.latitude || j.customer?.latitude || 0,
         lng: j.longitude || j.customer?.longitude || 0,
         status: j.status,
@@ -287,7 +287,7 @@ export async function POST(req: Request) {
 
         // Estimate if we can fit this job before the fixed appointment
         const travelTime = Math.ceil(nearestDist / AVG_SPEED_MPH * 60);
-        const jobDuration = (remainingFlexible[nearestIdx].estimatedDuration || 1) * 60;
+        const jobDuration = (remainingFlexible[nearestIdx].durationMinutes || 1) * 60;
         const currentTimeMs = optimizedJobs.length === 0
           ? now.getTime()
           : optimizedJobs[optimizedJobs.length - 1].endTime.getTime();
@@ -389,7 +389,7 @@ export async function POST(req: Request) {
       }
 
       // Update job in database
-      const durationMinutes = (sj.estimatedDuration || 1) * 60;
+      const durationMinutes = (sj.durationMinutes || 1) * 60;
       const newEndTime = addMinutes(sj.eta, durationMinutes);
 
       await prisma.job.update({

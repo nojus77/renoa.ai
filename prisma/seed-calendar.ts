@@ -109,7 +109,7 @@ async function main() {
     estimatedValue: number
     source: string
     assignedUserIds: string[]
-    internalNotes: string
+    jobInstructions: string
   }> = []
 
   // Generate jobs across this week and next week (14 days)
@@ -182,7 +182,7 @@ async function main() {
         estimatedValue: service.value,
         source: 'seed',
         assignedUserIds,
-        internalNotes: `Test job ${jobNum + 1} for ${customer.name}`,
+        jobInstructions: `Test job ${jobNum + 1} for ${customer.name}`,
       })
     }
   }

@@ -30,9 +30,9 @@ export async function POST(request: NextRequest) {
       // serviceTypeConfigId - logged above but not stored (no field in schema)
       startTime,
       duration = 2, // Duration in hours, default 2
-      estimatedDuration, // NEW: Duration in minutes from modal
+      durationMinutes, // Duration in minutes
       estimatedValue,
-      internalNotes,
+      jobInstructions, // Office → worker instructions
       customerNotes,
       status = 'scheduled',
       appointmentType = 'anytime', // 'fixed', 'anytime', 'window'
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Duration validation
-    const durationHours = estimatedDuration ? estimatedDuration / 60 : duration;
+    const durationHours = durationMinutes ? durationMinutes / 60 : duration;
     if (!durationHours || durationHours <= 0) {
       return NextResponse.json({ error: 'Duration is required and must be positive' }, { status: 400 });
     }
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
       requiredSkills: serviceConfig.requiredSkills,
       preferredSkills: serviceConfig.preferredSkills,
       crewSizeMin: serviceConfig.crewSizeMin,
-      estimatedDuration: serviceConfig.estimatedDuration,
+      estimatedDuration: serviceConfig.estimatedDuration, // ServiceTypeConfig stores in hours
     } : 'Not configured');
 
     // Create the job with skill requirements
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
         source: 'own', // Provider manually created this job
         appointmentType, // 'fixed', 'anytime', 'window'
         estimatedValue: estimatedValue ? parseFloat(estimatedValue) : null,
-        internalNotes: internalNotes || null,
+        jobInstructions: jobInstructions || null,
         customerNotes: customerNotes || null,
         isRecurring,
         recurringFrequency: isRecurring ? recurringFrequency : null,
@@ -154,7 +154,7 @@ export async function POST(request: NextRequest) {
         preferredSkillIds: preferredSkillIds ?? serviceConfig?.preferredSkills ?? [],
         requiredWorkerCount: requiredWorkerCount ?? serviceConfig?.crewSizeMin ?? 1,
         bufferMinutes: bufferMinutes ?? 15,
-        estimatedDuration: estimatedDuration ? estimatedDuration / 60 : (serviceConfig?.estimatedDuration || durationHours),
+        durationMinutes: durationMinutes ?? (serviceConfig?.estimatedDuration ? Math.round(serviceConfig.estimatedDuration * 60) : Math.round(durationHours * 60)),
         // Override fields
         allowUnqualified: allowUnqualified || false,
         unqualifiedOverrideReason: allowUnqualified ? (unqualifiedOverrideReason || null) : null,
@@ -348,7 +348,7 @@ export async function GET(request: NextRequest) {
         isRenoaLead: job.source === 'renoa',
         estimatedValue: job.estimatedValue,
         actualValue: job.actualValue,
-        internalNotes: job.internalNotes,
+        jobInstructions: job.jobInstructions,
         customerNotes: job.customerNotes,
         createdAt: job.createdAt,
         updatedAt: job.updatedAt,

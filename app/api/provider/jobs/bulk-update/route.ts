@@ -158,7 +158,7 @@ export async function PATCH(request: NextRequest) {
         source: job.source,
         estimatedValue: job.estimatedValue,
         actualValue: job.actualValue,
-        internalNotes: job.internalNotes,
+        jobInstructions: job.jobInstructions,
         customerNotes: job.customerNotes,
         assignedUserIds: job.assignedUserIds,
         assignedUsers,

@@ -140,7 +140,7 @@ export async function PATCH(
       completedAt,
       actualValue,
       actualDurationMinutes,
-      internalNotes,
+      jobInstructions,
       customerNotes,
       // Calendar drag-and-drop support
       startTime,
@@ -197,8 +197,8 @@ export async function PATCH(
       updateData.actualDurationMinutes = actualDurationMinutes ? parseInt(actualDurationMinutes) : null;
     }
 
-    if (internalNotes !== undefined) {
-      updateData.internalNotes = internalNotes;
+    if (jobInstructions !== undefined) {
+      updateData.jobInstructions = jobInstructions;
     }
 
     if (customerNotes !== undefined) {

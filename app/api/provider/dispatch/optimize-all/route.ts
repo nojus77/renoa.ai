@@ -23,7 +23,7 @@ interface JobWithCoords {
   endTime: Date;
   appointmentType: string;
   status: string;
-  estimatedDuration: number | null;
+  durationMinutes: number | null;
   lat: number;
   lng: number;
   assignedUserIds: string[];
@@ -309,7 +309,7 @@ function optimizeWorkerRoute(worker: WorkerData, dateObj: Date): JobWithCoords[]
 
         // Check if job fits before anchor
         const travelTime = Math.ceil(nearestDist / AVG_SPEED_MPH * 60);
-        const jobDuration = (remaining[nearestIdx].estimatedDuration || 1) * 60;
+        const jobDuration = (remaining[nearestIdx].durationMinutes || 1) * 60;
         const currentTime = optimized.length > 0
           ? new Date(optimized[optimized.length - 1].endTime).getTime()
           : startOfDay(dateObj).getTime() + DEFAULT_START_HOUR * 60 * 60 * 1000;
@@ -408,7 +408,7 @@ function calculateETAs(jobs: JobWithCoords[], startPoint: Coordinates | null, da
     }
 
     const eta = addMinutes(currentTime, travelTimeMinutes);
-    const durationMinutes = (job.estimatedDuration || 1) * 60;
+    const durationMinutes = (job.durationMinutes || 1) * 60;
     const etaEnd = addMinutes(eta, durationMinutes);
 
     scheduled.push({
@@ -522,7 +522,7 @@ export async function POST(req: Request) {
           endTime: job.endTime,
           appointmentType: job.appointmentType,
           status: job.status,
-          estimatedDuration: job.estimatedDuration,
+          durationMinutes: job.durationMinutes,
           lat: job.latitude || job.customer?.latitude || 0,
           lng: job.longitude || job.customer?.longitude || 0,
           assignedUserIds: job.assignedUserIds,
@@ -790,13 +790,13 @@ export async function POST(req: Request) {
       // Calculate total time
       let totalMinutes = 0;
       for (const sj of scheduledJobs) {
-        totalMinutes += sj.travelTimeMinutes + (sj.estimatedDuration || 1) * 60;
+        totalMinutes += sj.travelTimeMinutes + (sj.durationMinutes || 1) * 60;
       }
 
       // Update database
       for (let i = 0; i < scheduledJobs.length; i++) {
         const sj = scheduledJobs[i];
-        const durationMinutes = (sj.estimatedDuration || 1) * 60;
+        const durationMinutes = (sj.durationMinutes || 1) * 60;
         const newEndTime = addMinutes(sj.eta, durationMinutes);
 
         // Check if this is a newly assigned job

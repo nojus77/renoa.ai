@@ -108,9 +108,9 @@ interface Job {
   arrivedAt: string | null;
   completedAt: string | null;
   customerNotes: string | null;
-  internalNotes: string | null;
+  jobInstructions: string | null;
   estimatedValue: number | null;
-  estimatedDuration: number | null;
+  durationMinutes: number | null;
   customer: {
     id: string;
     name: string;
@@ -2617,7 +2617,7 @@ export default function JobDetailPage() {
           providerId={providerId}
           customerId={job.customer.id}
           customerName={job.customer.name}
-          estimatedDuration={job.estimatedDuration ?? undefined}
+          durationMinutes={job.durationMinutes ?? undefined}
           existingPhotos={media.filter(m => m.type === 'after').map(m => m.url)}
           requireCompletionPhotos={requireCompletionPhotos}
           paymentMethod={paymentMethod}

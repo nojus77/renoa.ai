@@ -14,7 +14,7 @@ interface JobCompletionFlowProps {
   providerId: string;
   customerId: string;
   customerName: string;
-  estimatedDuration?: number; // hours
+  durationMinutes?: number; // minutes
   existingPhotos?: string[];
   requireCompletionPhotos?: boolean;
   paymentMethod?: string; // 'card' | 'cash' | 'check' - signature only for card
@@ -48,7 +48,7 @@ export default function JobCompletionFlow({
   onComplete,
   jobId,
   customerName: initialCustomerName,
-  estimatedDuration,
+  durationMinutes,
   existingPhotos = [],
   requireCompletionPhotos = false,
   paymentMethod = '',
@@ -362,9 +362,9 @@ export default function JobCompletionFlow({
                 </div>
               )}
 
-              {estimatedDuration && (
+              {durationMinutes && (
                 <p className="text-xs text-zinc-500">
-                  Estimated: {Math.round(estimatedDuration * 60)} min
+                  Estimated: {durationMinutes} min
                 </p>
               )}
             </div>

@@ -40,7 +40,7 @@ async function main() {
       status: 'scheduled',
       jobPriority: 7, // medium-high priority (1-10 scale)
       crewSizeRequired: 1,
-      estimatedDuration: 1.0, // 1 hour in decimal
+      durationMinutes: 1.0, // 1 hour in decimal
     },
     {
       customerId: customers[1].id,
@@ -52,7 +52,7 @@ async function main() {
       status: 'scheduled',
       jobPriority: 4, // low priority
       crewSizeRequired: 1,
-      estimatedDuration: 1.0,
+      durationMinutes: 1.0,
     },
     {
       customerId: customers[2].id,
@@ -64,7 +64,7 @@ async function main() {
       status: 'scheduled',
       jobPriority: 9, // high priority
       crewSizeRequired: 1,
-      estimatedDuration: 2.0,
+      durationMinutes: 2.0,
     },
     {
       customerId: customers[3].id,
@@ -76,7 +76,7 @@ async function main() {
       status: 'scheduled',
       jobPriority: 6, // medium priority
       crewSizeRequired: 2,
-      estimatedDuration: 2.0,
+      durationMinutes: 2.0,
     },
     {
       customerId: customers[4].id,
@@ -88,7 +88,7 @@ async function main() {
       status: 'scheduled',
       jobPriority: 8, // high priority
       crewSizeRequired: 1,
-      estimatedDuration: 1.5,
+      durationMinutes: 1.5,
     },
     {
       customerId: customers[5].id,
@@ -100,7 +100,7 @@ async function main() {
       status: 'scheduled',
       jobPriority: 6, // medium priority
       crewSizeRequired: 1,
-      estimatedDuration: 1.5,
+      durationMinutes: 1.5,
     },
   ];
 
@@ -116,7 +116,7 @@ async function main() {
     console.log(`   Customer: ${customer?.name}`);
     console.log(`   Address: ${job.address}`);
     console.log(`   Time: ${job.startTime.toLocaleString('en-US', { timeZone: 'America/New_York' })}`);
-    console.log(`   Duration: ${job.estimatedDuration} hours`);
+    console.log(`   Duration: ${job.durationMinutes} hours`);
     console.log(`   Crew Size: ${job.crewSizeRequired}`);
     console.log(`   Priority: ${job.jobPriority}/10`);
     console.log('');

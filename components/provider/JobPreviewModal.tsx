@@ -256,14 +256,14 @@ export default function JobPreviewModal({ job, isOpen, onClose }: JobPreviewModa
               )}
 
               {/* Notes */}
-              {(displayJob.notes || displayJob.internalNotes) && (
+              {(displayJob.notes || displayJob.jobInstructions) && (
                 <div className="bg-muted/30 rounded-xl p-4 border border-border">
                   <div className="flex items-start gap-3">
                     <FileText className="h-5 w-5 text-muted-foreground mt-0.5" />
                     <div>
                       <p className="text-xs text-muted-foreground">Notes</p>
                       <p className="text-sm text-foreground mt-1">
-                        {displayJob.notes || displayJob.internalNotes}
+                        {displayJob.notes || displayJob.jobInstructions}
                       </p>
                     </div>
                   </div>

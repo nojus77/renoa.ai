@@ -337,7 +337,7 @@ export async function GET(
         service: job.serviceType,
         status: job.status,
         address: job.address,
-        duration: job.estimatedDuration,
+        duration: job.durationMinutes,
         earnings: job.actualValue || job.estimatedValue,
       })),
       earnings: {

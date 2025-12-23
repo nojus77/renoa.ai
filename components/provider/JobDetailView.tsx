@@ -40,7 +40,7 @@ interface Job {
   isRenoaLead?: boolean;
   estimatedValue?: number;
   actualValue?: number;
-  internalNotes?: string;
+  jobInstructions?: string;
   customerNotes?: string;
   assignedUserIds?: string[];
   assignedUsers?: AssignedUser[];
@@ -678,11 +678,11 @@ function OverviewTab({ job }: { job: Job }) {
           )}
 
           {/* Internal Notes */}
-          {job.internalNotes && (
+          {job.jobInstructions && (
             <div>
               <label className="text-xs text-zinc-500 mb-1 block">Internal Notes</label>
               <div className="p-3 bg-zinc-900/50 border border-zinc-700 rounded text-sm text-zinc-300 whitespace-pre-wrap">
-                {job.internalNotes}
+                {job.jobInstructions}
               </div>
             </div>
           )}
@@ -1101,7 +1101,7 @@ function HistoryTab({ job }: { job: Job }) {
 
 // NOTES TAB - Internal and Customer notes with history
 function NotesTab({ job, onJobUpdated }: { job: Job; onJobUpdated: () => void }) {
-  const [internalNote, setInternalNote] = useState(job.internalNotes || '');
+  const [internalNote, setInternalNote] = useState(job.jobInstructions || '');
   const [customerNote, setCustomerNote] = useState(job.customerNotes || '');
   const [saving, setSaving] = useState(false);
   const [customerHistory, setCustomerHistory] = useState<Array<{ notes: string; date: string; serviceType: string }>>([]);
@@ -1136,7 +1136,7 @@ function NotesTab({ job, onJobUpdated }: { job: Job; onJobUpdated: () => void })
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          internalNotes: internalNote,
+          jobInstructions: internalNote,
           customerNotes: customerNote,
         }),
       });

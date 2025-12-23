@@ -51,7 +51,7 @@ interface SkillInfo {
 interface ServiceConfig {
   id: string;
   serviceType: string;
-  estimatedDuration: number; // in hours
+  durationMinutes: number; // in hours
   crewSizeMin: number;
   crewSizeMax: number;
   requiredSkillIds: string[];
@@ -154,7 +154,7 @@ export default function AddJobModal({
     windowEnd: '12:00',
     // Notes - separated
     customerNotes: '',
-    internalNotes: '',
+    jobInstructions: '',
     // Other
     estimatedValue: '',
     status: 'scheduled' as 'scheduled' | 'in_progress' | 'completed',
@@ -248,7 +248,7 @@ export default function AddJobModal({
     // Auto-fill from config
     setJobDetails(prev => ({
       ...prev,
-      durationMinutes: Math.round(config.estimatedDuration * 60),
+      durationMinutes: Math.round(config.durationMinutes * 60),
       requiredWorkerCount: config.crewSizeMin,
       requiredSkillIds: config.requiredSkillIds,
       preferredSkillIds: config.preferredSkillIds,
@@ -284,7 +284,7 @@ export default function AddJobModal({
         body: JSON.stringify({
           providerId,
           serviceType: newServiceName.trim(),
-          estimatedDuration: newServiceDuration,
+          durationMinutes: newServiceDuration,
           crewSizeMin: newServiceWorkers,
           requiredSkillIds: newServiceSkills,
         }),
@@ -300,7 +300,7 @@ export default function AddJobModal({
       const newConfig: ServiceConfig = {
         id: data.config.id,
         serviceType: data.config.serviceType,
-        estimatedDuration: data.config.estimatedDuration,
+        durationMinutes: data.config.durationMinutes,
         crewSizeMin: data.config.crewSizeMin || newServiceWorkers,
         crewSizeMax: data.config.crewSizeMax || 4,
         requiredSkillIds: data.config.requiredSkillIds || newServiceSkills,
@@ -609,7 +609,7 @@ export default function AddJobModal({
         // Time
         startTime: startDateTime.toISOString(),
         duration: durationHours,
-        estimatedDuration: jobDetails.durationMinutes,
+        durationMinutes: jobDetails.durationMinutes,
         appointmentType: jobDetails.appointmentType,
         arrivalWindowStart: jobDetails.appointmentType === 'window'
           ? new Date(`${jobDetails.date}T${jobDetails.windowStart}`).toISOString()
@@ -619,7 +619,7 @@ export default function AddJobModal({
           : null,
         // Notes - separated
         customerNotes: jobDetails.customerNotes || null,
-        internalNotes: jobDetails.internalNotes || null,
+        jobInstructions: jobDetails.jobInstructions || null,
         // Other
         estimatedValue: jobDetails.estimatedValue ? parseFloat(jobDetails.estimatedValue) : null,
         status: jobDetails.status,
@@ -686,7 +686,7 @@ export default function AddJobModal({
       windowStart: '08:00',
       windowEnd: '12:00',
       customerNotes: '',
-      internalNotes: '',
+      jobInstructions: '',
       estimatedValue: '',
       status: 'scheduled',
       isRecurring: false,
@@ -980,7 +980,7 @@ export default function AddJobModal({
                               >
                                 <p className="text-sm font-medium text-zinc-100">{config.serviceType}</p>
                                 <p className="text-xs text-zinc-400 mt-0.5">
-                                  {formatDuration(Math.round(config.estimatedDuration * 60))} • {config.crewSizeMin} worker{config.crewSizeMin !== 1 ? 's' : ''}
+                                  {formatDuration(Math.round(config.durationMinutes * 60))} • {config.crewSizeMin} worker{config.crewSizeMin !== 1 ? 's' : ''}
                                   {config.requiredSkills.length > 0 && ` • ${config.requiredSkills.length} skill${config.requiredSkills.length !== 1 ? 's' : ''} required`}
                                 </p>
                               </button>
@@ -1018,7 +1018,7 @@ export default function AddJobModal({
                         <div className="flex flex-wrap gap-2">
                           {DURATION_OPTIONS.map(opt => {
                             const isSelected = jobDetails.durationMinutes === opt.minutes && !showCustomDuration;
-                            const isDefault = selectedServiceConfig && Math.round(selectedServiceConfig.estimatedDuration * 60) === opt.minutes;
+                            const isDefault = selectedServiceConfig && Math.round(selectedServiceConfig.durationMinutes * 60) === opt.minutes;
                             return (
                               <button
                                 key={opt.minutes}
@@ -1631,8 +1631,8 @@ export default function AddJobModal({
                 </summary>
                 <div className="px-4 pb-4 pt-2">
                   <textarea
-                    value={jobDetails.internalNotes}
-                    onChange={(e) => setJobDetails(prev => ({ ...prev, internalNotes: e.target.value }))}
+                    value={jobDetails.jobInstructions}
+                    onChange={(e) => setJobDetails(prev => ({ ...prev, jobInstructions: e.target.value }))}
                     className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px] text-sm resize-none"
                     placeholder="Internal notes, equipment needed, special instructions..."
                   />

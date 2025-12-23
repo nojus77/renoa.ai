@@ -11,7 +11,7 @@ interface CompleteJobModalProps {
   onComplete: (result: { invoiceId?: string; invoiceNumber?: string }) => void;
   hasAfterPhotos: boolean;
   estimatedValue?: number;
-  estimatedDuration?: number; // hours
+  durationMinutes?: number; // estimated minutes
   existingActualDuration?: number; // minutes - if worker already recorded
   jobId: string;
   customerId: string;
@@ -27,7 +27,7 @@ export default function CompleteJobModal({
   onComplete,
   hasAfterPhotos,
   estimatedValue = 0,
-  estimatedDuration,
+  durationMinutes,
   existingActualDuration,
   jobId,
   customerId,
@@ -342,9 +342,9 @@ export default function CompleteJobModal({
                 </div>
               )}
 
-              {estimatedDuration && (
+              {durationMinutes && (
                 <p className="text-xs text-zinc-500 mt-3">
-                  Estimated: {Math.round(estimatedDuration * 60)} min
+                  Estimated: {durationMinutes} min
                 </p>
               )}
             </div>

@@ -288,7 +288,7 @@ export async function GET(req: Request) {
         }
 
         // Update for next job
-        const duration = (job.estimatedDuration || 1) * 60;
+        const duration = (job.durationMinutes || 1) * 60;
         currentTime = addMinutes(eta, duration);
         currentLocation = { latitude: jobLat, longitude: jobLng };
       }

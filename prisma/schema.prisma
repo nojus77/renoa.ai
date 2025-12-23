@@ -615,8 +615,9 @@ model Job {
   source                String                 @default("own")
   estimatedValue        Float?                 @map("estimated_value")
   actualValue           Float?                 @map("actual_value")
-  internalNotes         String?                @map("internal_notes")
-  customerNotes         String?                @map("customer_notes")
+  jobInstructions       String?                @map("job_instructions") // Office → worker instructions (renamed from internalNotes)
+  customerNotes         String?                @map("customer_notes")   // Customer leaves, both see
+  fieldNotes            String?                @map("field_notes")      // Worker writes, visible in history
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
   booking_source        String?
@@ -646,7 +647,7 @@ model Job {
   latitude              Float? // For distance calculations
   longitude             Float? // For distance calculations
   zone                  String? // ZIP code or service area
-  estimatedDuration     Float?                 @map("estimated_duration") // hours
+  durationMinutes       Int?                   @map("duration_minutes") // Estimated duration in minutes
   actualDurationMinutes Int?                   @map("actual_duration_minutes") // Actual time spent (minutes)
   // Dispatch/Route fields
   appointmentType       String                 @default("anytime") @map("appointment_type") // "fixed", "anytime", "window"

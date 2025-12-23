@@ -47,7 +47,7 @@ export interface JobDetail {
   workerName?: string | null;
   workers?: { id: string; firstName: string; lastName: string }[];
   notes?: string;
-  estimatedDuration?: number;
+  durationMinutes?: number;
 }
 
 interface Job {
@@ -531,9 +531,9 @@ export default function JobDetailsSidebar({
                         {selectedJob.endTime && ` - ${formatDateTime(selectedJob.endTime)}`}
                       </span>
                     </div>
-                    {selectedJob.estimatedDuration && (
+                    {selectedJob.durationMinutes && (
                       <p className="text-xs text-muted-foreground">
-                        Est. duration: {selectedJob.estimatedDuration} min
+                        Est. duration: {selectedJob.durationMinutes} min
                       </p>
                     )}
                   </>

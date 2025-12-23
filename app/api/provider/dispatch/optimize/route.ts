@@ -21,7 +21,7 @@ interface JobWithCoords {
   startTime: Date;
   endTime: Date;
   appointmentType: string;
-  estimatedDuration: number | null;
+  durationMinutes: number | null;
   lat: number;
   lng: number;
   customer: { name: string | null } | null;
@@ -164,7 +164,7 @@ function calculateETAs(
     const eta = addMinutes(currentTime, travelTimeMinutes);
 
     // Job duration in minutes (estimatedDuration is in hours)
-    const durationMinutes = (job.estimatedDuration || 1) * 60;
+    const durationMinutes = (job.durationMinutes || 1) * 60;
     const etaEnd = addMinutes(eta, durationMinutes);
 
     // Check if this job has a fixed/window time and we'd be late
@@ -329,7 +329,7 @@ export async function POST(req: Request) {
           startTime: j.startTime,
           endTime: j.endTime,
           appointmentType: j.appointmentType,
-          estimatedDuration: j.estimatedDuration,
+          durationMinutes: j.durationMinutes,
           lat: j.latitude || j.customer?.latitude || 0,
           lng: j.longitude || j.customer?.longitude || 0,
           customer: j.customer,
@@ -407,7 +407,7 @@ export async function POST(req: Request) {
 
             // Estimate time needed for this flexible job
             const travelTime = Math.ceil(nearestDist / AVG_SPEED_MPH * 60);
-            const jobDuration = (remainingFlexible[nearestIdx].estimatedDuration || 1) * 60;
+            const jobDuration = (remainingFlexible[nearestIdx].durationMinutes || 1) * 60;
             const neededTime = currentTimeEstimate + (travelTime + jobDuration) * 60 * 1000;
 
             // Check if we can fit this job before the anchor
@@ -521,7 +521,7 @@ export async function POST(req: Request) {
         const scheduledJob = scheduledJobs[o];
 
         // Calculate new end time based on ETA and duration
-        const durationMinutes = (scheduledJob.estimatedDuration || 1) * 60;
+        const durationMinutes = (scheduledJob.durationMinutes || 1) * 60;
         const newEndTime = addMinutes(scheduledJob.eta, durationMinutes);
 
         await prisma.job.update({

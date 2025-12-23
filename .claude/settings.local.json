@@ -27,7 +27,8 @@
       "Bash(npm run build:*)",
       "Bash(npx next lint:*)",
       "Bash(cat:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.ysouziryzfstlwiclolc:qovhyp-datsib-7jyzkY@aws-1-us-east-2.pooler.supabase.com:5432/postgres\" npx tsx:*)"
     ]
   }
 }

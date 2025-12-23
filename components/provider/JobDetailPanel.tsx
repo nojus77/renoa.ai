@@ -27,7 +27,7 @@ interface Job {
   address: string;
   estimatedValue?: number;
   actualValue?: number;
-  estimatedDuration?: number; // hours
+  durationMinutes?: number; // hours
   actualDurationMinutes?: number | null;
   createdAt: string;
   notes?: string;
@@ -513,9 +513,9 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
                 <span className="font-medium text-zinc-200">
                   {job.status === 'completed' && job.actualDurationMinutes ? (
                     <>
-                      {job.estimatedDuration ? `${Math.round(job.estimatedDuration * 60)} min est` : `${getDuration()} hr est`}
+                      {job.durationMinutes ? `${Math.round(job.durationMinutes * 60)} min est` : `${getDuration()} hr est`}
                       {' → '}
-                      <span className={job.actualDurationMinutes > (job.estimatedDuration ? job.estimatedDuration * 60 : getDuration() * 60)
+                      <span className={job.actualDurationMinutes > (job.durationMinutes ? job.durationMinutes * 60 : getDuration() * 60)
                         ? 'text-amber-400'
                         : 'text-emerald-400'
                       }>
@@ -524,11 +524,11 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
                     </>
                   ) : job.status === 'completed' ? (
                     <>
-                      {job.estimatedDuration ? `${Math.round(job.estimatedDuration * 60)} min` : `${getDuration()} hours`}
+                      {job.durationMinutes ? `${Math.round(job.durationMinutes * 60)} min` : `${getDuration()} hours`}
                       <span className="text-zinc-500 ml-1">(actual not recorded)</span>
                     </>
                   ) : (
-                    job.estimatedDuration ? `${Math.round(job.estimatedDuration * 60)} min` : `${getDuration()} hours`
+                    job.durationMinutes ? `${Math.round(job.durationMinutes * 60)} min` : `${getDuration()} hours`
                   )}
                 </span>
               </div>
@@ -928,7 +928,7 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
             startTime: job.startTime,
             endTime: job.endTime,
             estimatedValue: job.estimatedValue,
-            internalNotes: job.notes,
+            jobInstructions: job.notes,
             customerNotes: job.customerNotes,
             status: job.status as 'scheduled' | 'completed' | 'in_progress' | 'cancelled',
           }}

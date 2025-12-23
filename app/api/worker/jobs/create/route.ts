@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
         status: jobStatus,
         source: 'worker',
         appointmentType: 'anytime', // Worker-created jobs default to anytime (flexible)
-        internalNotes: notes
+        jobInstructions: notes
           ? `[Created by ${worker.firstName} ${worker.lastName}] ${notes}`
           : `[Created by ${worker.firstName} ${worker.lastName}]`,
         assignedUserIds: [userId], // Auto-assign to the worker who created it

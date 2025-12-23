@@ -15,7 +15,7 @@ interface EditJobModalProps {
     startTime: string;
     endTime: string;
     estimatedValue?: number;
-    internalNotes?: string;
+    jobInstructions?: string;
     customerNotes?: string;
     status: 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
   };
@@ -45,7 +45,7 @@ export default function EditJobModal({
     duration: durationHours.toString(),
     endTime: '',
     estimatedValue: initialData.estimatedValue?.toString() || '',
-    internalNotes: initialData.internalNotes || '',
+    jobInstructions: initialData.jobInstructions || '',
     customerNotes: initialData.customerNotes || '',
     status: initialData.status,
   });
@@ -119,7 +119,7 @@ export default function EditJobModal({
           startTime: jobDetails.startTime,
           duration: jobDetails.duration,
           estimatedValue: jobDetails.estimatedValue,
-          internalNotes: jobDetails.internalNotes,
+          jobInstructions: jobDetails.jobInstructions,
           customerNotes: jobDetails.customerNotes,
           status: jobDetails.status,
         }),
@@ -319,8 +319,8 @@ export default function EditJobModal({
                 </summary>
                 <div className="px-4 pb-4 pt-2">
                   <textarea
-                    value={jobDetails.internalNotes}
-                    onChange={(e) => setJobDetails(prev => ({ ...prev, internalNotes: e.target.value }))}
+                    value={jobDetails.jobInstructions}
+                    onChange={(e) => setJobDetails(prev => ({ ...prev, jobInstructions: e.target.value }))}
                     className="w-full px-4 py-3 bg-zinc-800/50 border border-zinc-700 rounded-lg text-zinc-100 placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 min-h-[80px] text-sm md:text-base resize-none"
                     placeholder="Equipment needed, special instructions, etc."
                   />

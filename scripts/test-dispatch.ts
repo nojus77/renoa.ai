@@ -152,7 +152,7 @@ async function testDispatch() {
       select: {
         routeOrder: true,
         appointmentType: true,
-        estimatedDuration: true,
+        durationMinutes: true,
       },
     });
     results.push({
