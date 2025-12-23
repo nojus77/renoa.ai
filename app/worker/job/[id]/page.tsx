@@ -256,6 +256,9 @@ export default function JobDetailPage() {
   // New completion flow state
   const [showCompletionFlow, setShowCompletionFlow] = useState(false);
 
+  // Provider settings for completion flow
+  const [requireCompletionPhotos, setRequireCompletionPhotos] = useState(false);
+
   // Actual duration tracking
   const [actualDurationMinutes, setActualDurationMinutes] = useState<number | null>(null);
   const [showCustomActualDuration, setShowCustomActualDuration] = useState(false);
@@ -392,6 +395,10 @@ export default function JobDetailPage() {
       if (res.ok && data.job) {
         const foundJob = data.job;
         setJob(foundJob);
+        // Set provider settings for completion flow
+        if (data.providerSettings) {
+          setRequireCompletionPhotos(data.providerSettings.requireCompletionPhotos ?? false);
+        }
         // Initialize timer state based on job state
         if (foundJob.completedAt) {
           setTimerState('completed');
@@ -2612,6 +2619,7 @@ export default function JobDetailPage() {
           customerName={job.customer.name}
           estimatedDuration={job.estimatedDuration ?? undefined}
           existingPhotos={media.filter(m => m.type === 'after').map(m => m.url)}
+          requireCompletionPhotos={requireCompletionPhotos}
         />
       )}
 

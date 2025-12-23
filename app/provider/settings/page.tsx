@@ -331,6 +331,7 @@ export default function ProviderSettings() {
   const [workersCanEditSkills, setWorkersCanEditSkills] = useState(false);
   const [workersCanEditAvailability, setWorkersCanEditAvailability] = useState(true);
   const [workersCanViewTeamSchedule, setWorkersCanViewTeamSchedule] = useState(false);
+  const [requireCompletionPhotos, setRequireCompletionPhotos] = useState(false);
 
   useEffect(() => {
     const id = localStorage.getItem('providerId');
@@ -449,6 +450,7 @@ export default function ProviderSettings() {
         setWorkersCanEditSkills(p.workersCanEditSkills ?? false);
         setWorkersCanEditAvailability(p.workersCanEditAvailability ?? true);
         setWorkersCanViewTeamSchedule(p.workersCanViewTeamSchedule ?? false);
+        setRequireCompletionPhotos(p.requireCompletionPhotos ?? false);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -808,6 +810,7 @@ export default function ProviderSettings() {
           workersCanEditSkills,
           workersCanEditAvailability,
           workersCanViewTeamSchedule,
+          requireCompletionPhotos,
         }),
       });
 
@@ -2132,6 +2135,28 @@ export default function ProviderSettings() {
                           <div
                             className={`w-5 h-5 rounded-full bg-white transition-transform ${
                               workersCanViewTeamSchedule ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Require Completion Photos */}
+                      <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-200">Require photos when completing jobs</p>
+                          <p className="text-xs text-zinc-500 mt-1">
+                            Workers must upload at least one photo before they can finish a job. If disabled, photos are optional but workers will see a reminder.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setRequireCompletionPhotos(!requireCompletionPhotos)}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            requireCompletionPhotos ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              requireCompletionPhotos ? 'translate-x-6' : 'translate-x-1'
                             }`}
                           />
                         </button>

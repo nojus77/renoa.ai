@@ -433,6 +433,7 @@ model Provider {
   workersCanEditSkills       Boolean                      @default(false) @map("workers_can_edit_skills")
   workersCanEditAvailability Boolean                      @default(true) @map("workers_can_edit_availability")
   workersCanViewTeamSchedule Boolean                      @default(false) @map("workers_can_view_team_schedule")
+  requireCompletionPhotos    Boolean                      @default(false) @map("require_completion_photos")
   ownerId                    String?                      @map("owner_id")
   activeSeats                Int                          @default(1) @map("active_seats")
   stripeCustomerId           String?                      @map("stripe_customer_id")

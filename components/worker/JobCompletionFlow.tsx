@@ -17,6 +17,7 @@ interface JobCompletionFlowProps {
   customerName: string;
   estimatedDuration?: number; // hours
   existingPhotos?: string[];
+  requireCompletionPhotos?: boolean;
 }
 
 interface CompletionResult {
@@ -86,6 +87,7 @@ export default function JobCompletionFlow({
   customerName: initialCustomerName,
   estimatedDuration,
   existingPhotos = [],
+  requireCompletionPhotos = false,
 }: JobCompletionFlowProps) {
   const [step, setStep] = useState<Step>('checklist');
   const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
@@ -145,7 +147,8 @@ export default function JobCompletionFlow({
       case 'checklist':
         return requiredChecklistComplete;
       case 'photos':
-        return photos.length >= 1;
+        // If photos are required, need at least 1. Otherwise always allow proceeding.
+        return requireCompletionPhotos ? photos.length >= 1 : true;
       case 'duration':
         return true; // Duration is optional
       case 'signature':
@@ -180,19 +183,20 @@ export default function JobCompletionFlow({
       for (const file of Array.from(files)) {
         const formData = new FormData();
         formData.append('file', file);
-        formData.append('jobId', jobId);
-        formData.append('type', 'completion');
+        formData.append('type', 'after'); // Use 'after' type for completion photos
 
-        const res = await fetch('/api/upload/job-photo', {
+        // Use the existing job photos upload endpoint
+        const res = await fetch(`/api/provider/jobs/${jobId}/photos/upload`, {
           method: 'POST',
           body: formData,
         });
 
         if (res.ok) {
           const data = await res.json();
-          setPhotos(prev => [...prev, data.url]);
+          setPhotos(prev => [...prev, data.photo.url]);
         } else {
-          toast.error('Failed to upload photo');
+          const errorData = await res.json().catch(() => ({}));
+          toast.error(errorData.error || 'Failed to upload photo');
         }
       }
     } catch (error) {
@@ -308,7 +312,9 @@ export default function JobCompletionFlow({
                   Completion Photos
                 </h3>
                 <p className="text-sm text-zinc-400">
-                  Take photos of the completed work (min 1)
+                  {requireCompletionPhotos
+                    ? 'Take photos of the completed work (min 1)'
+                    : 'Add photos of the completed work (optional but recommended)'}
                 </p>
               </div>
 
@@ -356,10 +362,20 @@ export default function JobCompletionFlow({
               />
 
               {photos.length === 0 && (
-                <div className="flex items-center gap-2 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                  <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                  <p className="text-xs text-amber-400">
-                    At least 1 photo is required
+                <div className={`flex items-center gap-2 p-3 rounded-lg ${
+                  requireCompletionPhotos
+                    ? 'bg-amber-500/10 border border-amber-500/30'
+                    : 'bg-blue-500/10 border border-blue-500/30'
+                }`}>
+                  <AlertCircle className={`w-4 h-4 flex-shrink-0 ${
+                    requireCompletionPhotos ? 'text-amber-500' : 'text-blue-500'
+                  }`} />
+                  <p className={`text-xs ${
+                    requireCompletionPhotos ? 'text-amber-400' : 'text-blue-400'
+                  }`}>
+                    {requireCompletionPhotos
+                      ? 'At least 1 photo is required'
+                      : 'Adding photos helps document your work'}
                   </p>
                 </div>
               )}

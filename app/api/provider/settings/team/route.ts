@@ -25,6 +25,7 @@ export async function GET(request: NextRequest) {
         workersCanEditSkills: true,
         workersCanEditAvailability: true,
         workersCanViewTeamSchedule: true,
+        requireCompletionPhotos: true,
       },
     });
 
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
       workersCanEditSkills,
       workersCanEditAvailability,
       workersCanViewTeamSchedule,
+      requireCompletionPhotos,
     } = body;
 
     if (!providerId) {
@@ -73,6 +75,7 @@ export async function POST(request: NextRequest) {
         workersCanEditSkills: workersCanEditSkills ?? undefined,
         workersCanEditAvailability: workersCanEditAvailability ?? undefined,
         workersCanViewTeamSchedule: workersCanViewTeamSchedule ?? undefined,
+        requireCompletionPhotos: requireCompletionPhotos ?? undefined,
         updatedAt: new Date(),
       },
       select: {
@@ -82,6 +85,7 @@ export async function POST(request: NextRequest) {
         workersCanEditSkills: true,
         workersCanEditAvailability: true,
         workersCanViewTeamSchedule: true,
+        requireCompletionPhotos: true,
       },
     });
 
