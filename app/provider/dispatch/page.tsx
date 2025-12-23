@@ -155,7 +155,14 @@ export default function DispatchPage() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [providerName, setProviderName] = useState<string>('');
   const [officeLocation, setOfficeLocation] = useState<OfficeLocation | null>(null);
-  const [autoAssign, setAutoAssign] = useState(true);
+  const [autoAssign, setAutoAssign] = useState(() => {
+    // Load from localStorage on mount (client-side only)
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('dispatchAutoAssign');
+      return saved !== null ? saved === 'true' : true;
+    }
+    return true;
+  });
   const [optimizationResult, setOptimizationResult] = useState<{
     workers: Array<{
       id: string;
@@ -534,7 +541,11 @@ export default function DispatchPage() {
               {/* Auto-assign toggle */}
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setAutoAssign(!autoAssign)}
+                  onClick={() => {
+                    const newValue = !autoAssign;
+                    setAutoAssign(newValue);
+                    localStorage.setItem('dispatchAutoAssign', String(newValue));
+                  }}
                   className={`relative w-10 h-5 rounded-full transition-colors ${
                     autoAssign ? 'bg-primary' : 'bg-muted'
                   }`}
