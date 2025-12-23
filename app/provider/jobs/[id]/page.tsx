@@ -255,7 +255,8 @@ export default function JobDetailPage() {
   const handleDeleteJob = async () => {
     try {
       setUpdating(true);
-      const response = await fetch(`/api/provider/jobs/${jobId}`, {
+      const providerId = job?.provider?.id || localStorage.getItem('providerId');
+      const response = await fetch(`/api/provider/jobs/${jobId}?providerId=${providerId}`, {
         method: 'DELETE',
       });
 

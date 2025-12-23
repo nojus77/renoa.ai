@@ -253,7 +253,7 @@ export default function ProviderCalendar() {
 
   const handleDeleteJob = async (jobId: string) => {
     try {
-      const res = await fetch(`/api/provider/jobs/${jobId}`, {
+      const res = await fetch(`/api/provider/jobs/${jobId}?providerId=${providerId}`, {
         method: 'DELETE',
       });
 

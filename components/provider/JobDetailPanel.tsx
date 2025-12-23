@@ -228,7 +228,8 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
     }
 
     try {
-      const res = await fetch(`/api/provider/jobs/${job.id}`, {
+      const providerId = localStorage.getItem('providerId');
+      const res = await fetch(`/api/provider/jobs/${job.id}?providerId=${providerId}`, {
         method: 'DELETE',
       });
 
