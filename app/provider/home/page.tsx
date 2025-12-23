@@ -889,6 +889,13 @@ export default function ProviderHome() {
         alertType={selectedAlertType}
         alertCount={selectedAlertCount}
         selectedJob={selectedSidebarJob}
+        onJobSelect={(job) => {
+          // Switch sidebar to job detail mode
+          setSidebarMode('job');
+          setSelectedSidebarJob(job);
+          setSelectedSidebarDate(null);
+          setSelectedAlertType(null);
+        }}
       />
 
       <div className="w-full bg-background">

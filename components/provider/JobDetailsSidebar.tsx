@@ -75,6 +75,8 @@ interface JobDetailsSidebarProps {
   // For job mode - single job detail view
   selectedJob?: JobDetail | null;
   onJobUpdate?: (updatedJob: JobDetail) => void;
+  // Callback when a job is clicked in list view - switches to job detail mode
+  onJobSelect?: (job: JobDetail) => void;
 }
 
 const alertConfig: Record<AlertType, { title: string; icon: React.ReactNode; description: string; color: string; actionLabel: string }> = {
@@ -145,6 +147,7 @@ export default function JobDetailsSidebar({
   alertCount,
   selectedJob,
   onJobUpdate,
+  onJobSelect,
 }: JobDetailsSidebarProps) {
   const router = useRouter();
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -642,8 +645,22 @@ export default function JobDetailsSidebar({
               <button
                 key={job.id}
                 onClick={() => {
-                  router.push(`/provider/jobs/${job.id}`);
-                  onClose();
+                  // Convert Job to JobDetail and call onJobSelect to switch to job detail mode
+                  if (onJobSelect) {
+                    const jobDetail: JobDetail = {
+                      id: job.id,
+                      customerName: job.customerName,
+                      customerPhone: job.phone,
+                      serviceType: job.serviceType,
+                      address: job.address,
+                      startTime: job.startTime,
+                      endTime: job.endTime,
+                      status: job.status,
+                      amount: job.amount,
+                      workerName: job.workerName,
+                    };
+                    onJobSelect(jobDetail);
+                  }
                 }}
                 className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-4 text-left transition-all group"
               >
@@ -713,43 +730,40 @@ export default function JobDetailsSidebar({
 
         {/* Footer with total and action */}
         <div className="flex-shrink-0 bg-card border-t border-border p-4 space-y-3">
-          {/* Job mode - Edit actions */}
-          {mode === 'job' && selectedJob && (
-            isEditing ? (
-              <div className="flex gap-3">
-                <button
-                  onClick={handleCancelEdit}
-                  disabled={saving}
-                  className="flex-1 py-3 bg-muted hover:bg-muted/80 text-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-                >
-                  <XCircle className="h-4 w-4" />
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveJob}
-                  disabled={saving}
-                  className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-                >
-                  {saving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </button>
-              </div>
-            ) : (
+          {/* Job mode - Edit actions (only show when editing) */}
+          {mode === 'job' && selectedJob && isEditing && (
+            <div className="flex gap-3">
               <button
-                onClick={() => {
-                  router.push(`/provider/jobs/${selectedJob.id}`);
-                  onClose();
-                }}
-                className="w-full py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+                onClick={handleCancelEdit}
+                disabled={saving}
+                className="flex-1 py-3 bg-muted hover:bg-muted/80 text-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
               >
-                View Full Details
-                <ChevronRight className="h-4 w-4" />
+                <XCircle className="h-4 w-4" />
+                Cancel
               </button>
-            )
+              <button
+                onClick={handleSaveJob}
+                disabled={saving}
+                className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                {saving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Save className="h-4 w-4" />
+                )}
+                {saving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          )}
+
+          {/* Job mode - Close button when not editing (NO navigation) */}
+          {mode === 'job' && selectedJob && !isEditing && (
+            <button
+              onClick={onClose}
+              className="w-full py-3 bg-muted hover:bg-muted/80 text-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+            >
+              Close
+            </button>
           )}
 
           {/* Total Revenue for date mode */}
