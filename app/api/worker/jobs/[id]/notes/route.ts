@@ -68,13 +68,23 @@ export async function GET(
             authorRole: match[2].toLowerCase().includes('dispatcher') ? 'dispatcher' : 'worker',
           });
         } else {
+          // Skip metadata blocks like "[Created by Name]" - these are not instructions
+          const trimmedBlock = block.trim();
+          if (trimmedBlock.match(/^\[Created by [^\]]+\]$/)) {
+            continue;
+          }
+
           // This is dispatcher instructions (plain text without timestamp format)
           // Accumulate all non-timestamped text as dispatcher instructions
-          if (block.trim()) {
-            if (dispatcherInstructions) {
-              dispatcherInstructions += '\n\n' + block.trim();
-            } else {
-              dispatcherInstructions = block.trim();
+          if (trimmedBlock) {
+            // Also strip out any "[Created by Name]" prefix from actual instructions
+            const cleanedBlock = trimmedBlock.replace(/^\[Created by [^\]]+\]\s*/, '');
+            if (cleanedBlock) {
+              if (dispatcherInstructions) {
+                dispatcherInstructions += '\n\n' + cleanedBlock;
+              } else {
+                dispatcherInstructions = cleanedBlock;
+              }
             }
           }
         }
