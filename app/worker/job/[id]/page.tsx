@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PropertyPhoto } from '@/components/PropertyPhoto';
+import JobCompletionFlow from '@/components/worker/JobCompletionFlow';
 
 // Renoa Design System - Lime green brand color
 const LIME_GREEN = '#C4F542';
@@ -109,6 +110,7 @@ interface Job {
   customerNotes: string | null;
   internalNotes: string | null;
   estimatedValue: number | null;
+  estimatedDuration: number | null;
   customer: {
     id: string;
     name: string;
@@ -250,6 +252,9 @@ export default function JobDetailPage() {
 
   // Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // New completion flow state
+  const [showCompletionFlow, setShowCompletionFlow] = useState(false);
 
   // Actual duration tracking
   const [actualDurationMinutes, setActualDurationMinutes] = useState<number | null>(null);
@@ -657,8 +662,107 @@ export default function JobDetailPage() {
       setCustomActualDuration(suggestedMinutes.toString());
     }
 
-    // Show confirmation modal
-    setShowConfirmModal(true);
+    // Show completion flow (includes checklist, photos, signature)
+    setShowCompletionFlow(true);
+  };
+
+  // Handler for completion flow result
+  const handleCompletionFlowComplete = async (data: {
+    checklistCompleted: Record<string, boolean>;
+    completionPhotos: string[];
+    actualDurationMinutes: number | null;
+    signatureDataUrl: string | null;
+    signedByName: string | null;
+    skipSignature: boolean;
+    completionNotes: string;
+  }) => {
+    if (!job) return;
+
+    setShowCompletionFlow(false);
+    setActionLoading('complete');
+
+    try {
+      // Save final job value before completing
+      await updateJobValue(totalPrice);
+
+      // Stop on-site timer
+      const finalOnSiteTime = onSiteStartTime ? Math.floor((Date.now() - onSiteStartTime) / 1000) : onSiteTime;
+
+      // Call the new complete API endpoint
+      const completeRes = await fetch(`/api/provider/jobs/${job.id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          completedByUserId: userId,
+          createInvoice: true,
+        }),
+      });
+
+      if (!completeRes.ok) {
+        throw new Error('Failed to save completion data');
+      }
+
+      // Also call clock-out to handle earnings and work logs
+      const res = await fetch('/api/worker/clock-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: job.id,
+          userId,
+          travelDuration: travelTime,
+          onSiteDuration: finalOnSiteTime,
+          paymentMethod,
+          tipAmount: parseFloat(tipAmount) || 0,
+          actualDurationMinutes: data.actualDurationMinutes || undefined,
+        }),
+      });
+
+      const clockOutData = await res.json();
+
+      if (clockOutData.success) {
+        setOnSiteTime(finalOnSiteTime);
+        setOnSiteStartTime(null);
+        setTimerState('completed');
+
+        // Handle card payment - send payment link
+        if (paymentMethod === 'card') {
+          try {
+            const paymentRes = await fetch(`/api/worker/jobs/${job.id}/send-payment-link`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount: totalPrice,
+                tipAmount: parseFloat(tipAmount) || 0,
+              }),
+            });
+            const paymentData = await paymentRes.json();
+            if (paymentData.success) {
+              toast.success('Job completed! Payment link sent to customer.');
+            } else {
+              toast.success(`Job completed! Earned $${clockOutData.earnings?.toFixed(2) || '0.00'}. Note: Payment link could not be sent.`);
+            }
+          } catch (paymentError) {
+            console.error('Error sending payment link:', paymentError);
+            toast.success(`Job completed! Earned $${clockOutData.earnings?.toFixed(2) || '0.00'}. Note: Payment link could not be sent.`);
+          }
+        } else {
+          toast.success(`Job completed! Earned $${clockOutData.earnings?.toFixed(2) || '0.00'}`);
+        }
+
+        fetchJob(userId, jobId);
+
+        // Clear draft since job is done
+        localStorage.removeItem(`jobDraft_${jobId}`);
+      } else {
+        toast.error(clockOutData.error || 'Action failed');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleCompleteJob = async () => {
@@ -2493,6 +2597,22 @@ export default function JobDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Job Completion Flow (Checklist, Photos, Signature) */}
+      {showCompletionFlow && job && (
+        <JobCompletionFlow
+          isOpen={showCompletionFlow}
+          onClose={() => setShowCompletionFlow(false)}
+          onComplete={handleCompletionFlowComplete}
+          jobId={job.id}
+          serviceType={job.serviceType}
+          providerId={providerId}
+          customerId={job.customer.id}
+          customerName={job.customer.name}
+          estimatedDuration={job.estimatedDuration ?? undefined}
+          existingPhotos={media.filter(m => m.type === 'after').map(m => m.url)}
+        />
       )}
 
       {/* Job Completion Confirmation Modal */}

@@ -459,6 +459,7 @@ model Provider {
   workLogs                   WorkLog[]                    @relation("ProviderWorkLogs")
   statusLogs                 UserStatusLog[]              @relation("ProviderStatusLogs")
   teamMessages               team_messages[]
+  serviceChecklists          ServiceChecklist[]           @relation("ProviderChecklists")
 }
 
 model Notification {
@@ -680,6 +681,7 @@ model Job {
   loyalty_transactions  loyalty_transactions[]
   reviews               reviews?
   workLogs              WorkLog[]              @relation("JobWorkLogs")
+  completionData        JobCompletionData?     @relation("JobCompletionData")
 
   @@index([providerId])
   @@index([assignedCrewId])
@@ -1584,6 +1586,39 @@ model PasswordResetToken {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("password_reset_tokens")
+}
+
+// Service completion checklists per service type
+model ServiceChecklist {
+  id          String   @id @default(cuid())
+  providerId  String   @map("provider_id")
+  serviceType String   @map("service_type")
+  items       Json     // Array of { id, label, required }
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  provider    Provider @relation("ProviderChecklists", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, serviceType])
+  @@index([providerId])
+  @@map("service_checklists")
+}
+
+// Job completion data - checklist, signature, photos
+model JobCompletionData {
+  id                 String    @id @default(cuid())
+  jobId              String    @unique @map("job_id")
+  checklistCompleted Json?     @map("checklist_completed") // { itemId: boolean }
+  signatureUrl       String?   @map("signature_url")
+  signedByName       String?   @map("signed_by_name")
+  signedAt           DateTime? @map("signed_at")
+  completionNotes    String?   @map("completion_notes")
+  completionPhotos   String[]  @default([]) @map("completion_photos")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  job                Job       @relation("JobCompletionData", fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("job_completion_data")
 }
 
 // Work logs - track time and earnings per job

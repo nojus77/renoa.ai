@@ -51,6 +51,22 @@ export async function GET(
       include: {
         customer: true,
         photos: true,
+        completionData: true,
+        provider: {
+          select: {
+            id: true,
+            businessName: true,
+            phone: true,
+            email: true,
+          },
+        },
+        invoices: {
+          select: {
+            id: true,
+            invoiceNumber: true,
+            status: true,
+          },
+        },
       },
     });
 
@@ -78,10 +94,24 @@ export async function GET(
       });
     }
 
-    // Return job with assigned users
+    // Fetch completed by user details if exists
+    let completedByUser = null;
+    if (job.completedByUserId) {
+      completedByUser = await prisma.providerUser.findUnique({
+        where: { id: job.completedByUserId },
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      });
+    }
+
+    // Return job with assigned users and completion details
     return NextResponse.json({
       ...job,
       assignedUsers,
+      completedByUser,
+      invoice: job.invoices, // Map to singular for consistency
     });
   } catch (error) {
     console.error('Error fetching job:', error);
