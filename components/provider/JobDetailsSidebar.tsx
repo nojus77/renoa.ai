@@ -372,7 +372,7 @@ export default function JobDetailsSidebar({
 
       {/* Slide-in Panel from Right */}
       <div
-        className={`fixed right-0 top-0 bottom-0 w-full sm:w-[450px] bg-card border-l border-border z-50 transition-transform duration-300 ease-out shadow-2xl flex flex-col ${
+        className={`fixed right-0 top-0 bottom-0 w-full sm:w-[500px] bg-card border-l border-border z-50 transition-transform duration-300 ease-out shadow-2xl flex flex-col ${
           isOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -756,14 +756,28 @@ export default function JobDetailsSidebar({
             </div>
           )}
 
-          {/* Job mode - Close button when not editing (NO navigation) */}
+          {/* Job mode - Edit button + Close button when not editing */}
           {mode === 'job' && selectedJob && !isEditing && (
-            <button
-              onClick={onClose}
-              className="w-full py-3 bg-muted hover:bg-muted/80 text-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
-            >
-              Close
-            </button>
+            <div className="space-y-3">
+              {/* Large Edit Job Details button */}
+              <button
+                onClick={() => {
+                  router.push(`/provider/jobs/${selectedJob.id}`);
+                  onClose();
+                }}
+                className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-colors flex items-center justify-center gap-3 text-base"
+              >
+                <Pencil className="h-5 w-5" />
+                Edit Job Details
+              </button>
+              {/* Close button */}
+              <button
+                onClick={onClose}
+                className="w-full py-3 bg-muted hover:bg-muted/80 text-foreground font-medium rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                Close
+              </button>
+            </div>
           )}
 
           {/* Total Revenue for date mode */}

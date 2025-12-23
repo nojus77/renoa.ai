@@ -755,11 +755,15 @@ export default function ProviderHome() {
       }));
     } else {
       // For month view, show day numbers at regular intervals
-      // Show 1, 5, 10, 15, 20, 25, and last day
+      // Show 1, 5, 10, 15, 20, 25, and last day (but skip 30 if 31 is the last day)
+      const totalDays = processedData.length;
       return processedData.map((d, i) => {
         const dayNum = new Date(d.date + 'T12:00:00').getDate();
         const isLastDay = i === processedData.length - 1;
-        const showLabel = dayNum === 1 || dayNum % 5 === 0 || isLastDay;
+        // Skip showing 30 if the month has 31 days to avoid cramping
+        const isDayBeforeLast = i === processedData.length - 2;
+        const skipForLastDay = isDayBeforeLast && totalDays === 31;
+        const showLabel = (dayNum === 1 || dayNum % 5 === 0 || isLastDay) && !skipForLastDay;
         return {
           ...d,
           // Always set displayLabel to the day number for proper spacing
@@ -1029,7 +1033,7 @@ export default function ProviderHome() {
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart
                       data={chartData}
-                      margin={{ top: 20, right: 20, left: 10, bottom: 20 }}
+                      margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
                       onClick={(data) => {
                         const payload = (data as { activePayload?: Array<{ payload: RevenueDataPoint }> })?.activePayload?.[0]?.payload;
                         if (payload) handleGraphClick(payload);
