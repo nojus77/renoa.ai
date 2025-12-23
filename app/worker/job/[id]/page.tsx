@@ -2606,7 +2606,7 @@ export default function JobDetailPage() {
         </div>
       )}
 
-      {/* Job Completion Flow (Checklist, Photos, Signature) */}
+      {/* Job Completion Flow (Photos, Duration, Signature for card payments) */}
       {showCompletionFlow && job && (
         <JobCompletionFlow
           isOpen={showCompletionFlow}
@@ -2620,6 +2620,7 @@ export default function JobDetailPage() {
           estimatedDuration={job.estimatedDuration ?? undefined}
           existingPhotos={media.filter(m => m.type === 'after').map(m => m.url)}
           requireCompletionPhotos={requireCompletionPhotos}
+          paymentMethod={paymentMethod}
         />
       )}
 

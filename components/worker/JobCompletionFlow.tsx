@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { X, ChevronRight, ChevronLeft, Camera, Clock, Check, AlertCircle, Loader2 } from 'lucide-react';
-import CompletionChecklist, { ChecklistItem } from './CompletionChecklist';
+import { useState, useRef } from 'react';
+import { X, ChevronRight, ChevronLeft, Camera, Check, AlertCircle, Loader2 } from 'lucide-react';
 import SignaturePad from './SignatureCanvas';
 import { toast } from 'sonner';
 
@@ -18,6 +17,7 @@ interface JobCompletionFlowProps {
   estimatedDuration?: number; // hours
   existingPhotos?: string[];
   requireCompletionPhotos?: boolean;
+  paymentMethod?: string; // 'card' | 'cash' | 'check' - signature only for card
 }
 
 interface CompletionResult {
@@ -40,58 +40,20 @@ const DURATION_OPTIONS = [
   { minutes: 180, label: '3h' },
 ];
 
-// Default checklists by service type
-const DEFAULT_CHECKLISTS: Record<string, ChecklistItem[]> = {
-  'Lawn Mowing': [
-    { id: '1', label: 'Lawn mowed to correct height', required: true },
-    { id: '2', label: 'Edges trimmed', required: true },
-    { id: '3', label: 'Clippings cleaned up', required: true },
-    { id: '4', label: 'Walkways blown clean', required: true },
-    { id: '5', label: 'After photos taken', required: true },
-  ],
-  'Tree Removal': [
-    { id: '1', label: 'Tree safely removed', required: true },
-    { id: '2', label: 'Stump addressed per agreement', required: true },
-    { id: '3', label: 'Debris cleared', required: true },
-    { id: '4', label: 'Area raked clean', required: true },
-    { id: '5', label: 'Before/after photos taken', required: true },
-    { id: '6', label: 'Customer walkthrough completed', required: false },
-  ],
-  'Gutter Cleaning': [
-    { id: '1', label: 'All gutters cleaned', required: true },
-    { id: '2', label: 'Downspouts cleared', required: true },
-    { id: '3', label: 'Debris bagged/removed', required: true },
-    { id: '4', label: 'Water flow tested', required: false },
-    { id: '5', label: 'After photos taken', required: true },
-  ],
-};
-
-// Generic fallback checklist
-const GENERIC_CHECKLIST: ChecklistItem[] = [
-  { id: '1', label: 'Work completed as specified', required: true },
-  { id: '2', label: 'Area cleaned up', required: true },
-  { id: '3', label: 'After photos taken', required: true },
-  { id: '4', label: 'Customer walkthrough done', required: false },
-];
-
-type Step = 'checklist' | 'photos' | 'duration' | 'signature' | 'review';
+type Step = 'photos' | 'duration' | 'signature' | 'review';
 
 export default function JobCompletionFlow({
   isOpen,
   onClose,
   onComplete,
   jobId,
-  serviceType,
-  providerId,
-  customerId,
   customerName: initialCustomerName,
   estimatedDuration,
   existingPhotos = [],
   requireCompletionPhotos = false,
+  paymentMethod = '',
 }: JobCompletionFlowProps) {
-  const [step, setStep] = useState<Step>('checklist');
-  const [checklistItems, setChecklistItems] = useState<ChecklistItem[]>([]);
-  const [checklistCompleted, setChecklistCompleted] = useState<Record<string, boolean>>({});
+  const [step, setStep] = useState<Step>('photos');
   const [photos, setPhotos] = useState<string[]>(existingPhotos);
   const [uploading, setUploading] = useState(false);
   const [actualDurationMinutes, setActualDurationMinutes] = useState<number | null>(null);
@@ -104,48 +66,19 @@ export default function JobCompletionFlow({
   const [submitting, setSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load checklist for service type
-  useEffect(() => {
-    const loadChecklist = async () => {
-      try {
-        // Try to load custom checklist from API
-        const res = await fetch(
-          `/api/provider/services/checklist?providerId=${providerId}&serviceType=${encodeURIComponent(serviceType)}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          if (data.items && data.items.length > 0) {
-            setChecklistItems(data.items);
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load checklist:', error);
-      }
-
-      // Fall back to default or generic checklist
-      const defaultChecklist = DEFAULT_CHECKLISTS[serviceType] || GENERIC_CHECKLIST;
-      setChecklistItems(defaultChecklist);
-    };
-
-    if (isOpen && providerId && serviceType) {
-      loadChecklist();
-    }
-  }, [isOpen, providerId, serviceType]);
-
   if (!isOpen) return null;
 
-  const steps: Step[] = ['checklist', 'photos', 'duration', 'signature', 'review'];
-  const currentStepIndex = steps.indexOf(step);
+  // Only show signature step for card payments
+  const showSignatureStep = paymentMethod === 'card';
 
-  const requiredChecklistComplete = checklistItems
-    .filter(item => item.required)
-    .every(item => checklistCompleted[item.id]);
+  // Build steps array dynamically
+  const steps: Step[] = showSignatureStep
+    ? ['photos', 'duration', 'signature', 'review']
+    : ['photos', 'duration', 'review'];
+  const currentStepIndex = steps.indexOf(step);
 
   const canProceed = () => {
     switch (step) {
-      case 'checklist':
-        return requiredChecklistComplete;
       case 'photos':
         // If photos are required, need at least 1. Otherwise always allow proceeding.
         return requireCompletionPhotos ? photos.length >= 1 : true;
@@ -228,7 +161,7 @@ export default function JobCompletionFlow({
     setSubmitting(true);
     try {
       const result: CompletionResult = {
-        checklistCompleted,
+        checklistCompleted: {}, // Checklist removed - always empty
         completionPhotos: photos,
         actualDurationMinutes,
         signatureDataUrl,
@@ -282,29 +215,6 @@ export default function JobCompletionFlow({
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4">
-          {step === 'checklist' && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-base font-semibold text-zinc-100 mb-1">
-                  Completion Checklist
-                </h3>
-                <p className="text-sm text-zinc-400">
-                  Verify all work is complete
-                </p>
-              </div>
-              <CompletionChecklist
-                items={checklistItems}
-                completed={checklistCompleted}
-                onChange={(itemId, checked) => {
-                  setChecklistCompleted(prev => ({
-                    ...prev,
-                    [itemId]: checked,
-                  }));
-                }}
-              />
-            </div>
-          )}
-
           {step === 'photos' && (
             <div className="space-y-4">
               <div>
@@ -536,25 +446,20 @@ export default function JobCompletionFlow({
               </div>
 
               <div className="space-y-3">
-                {/* Checklist summary */}
-                <div className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg">
-                  <span className="text-sm text-zinc-300">Checklist</span>
-                  <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" />
-                    <span className="text-sm text-emerald-400">
-                      {Object.values(checklistCompleted).filter(Boolean).length}/{checklistItems.length} complete
-                    </span>
-                  </div>
-                </div>
-
                 {/* Photos summary */}
                 <div className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg">
                   <span className="text-sm text-zinc-300">Photos</span>
                   <div className="flex items-center gap-2">
-                    <Check className="w-4 h-4 text-emerald-500" />
-                    <span className="text-sm text-emerald-400">
-                      {photos.length} attached
-                    </span>
+                    {photos.length > 0 ? (
+                      <>
+                        <Check className="w-4 h-4 text-emerald-500" />
+                        <span className="text-sm text-emerald-400">
+                          {photos.length} attached
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-sm text-zinc-500">None</span>
+                    )}
                   </div>
                 </div>
 
@@ -568,22 +473,24 @@ export default function JobCompletionFlow({
                   </span>
                 </div>
 
-                {/* Signature summary */}
-                <div className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg">
-                  <span className="text-sm text-zinc-300">Signature</span>
-                  {skipSignature ? (
-                    <span className="text-sm text-amber-400">Skipped</span>
-                  ) : signatureDataUrl ? (
-                    <div className="flex items-center gap-2">
-                      <Check className="w-4 h-4 text-emerald-500" />
-                      <span className="text-sm text-emerald-400">
-                        {signedByName}
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="text-sm text-zinc-500">Not captured</span>
-                  )}
-                </div>
+                {/* Signature summary - only show if signature step was shown */}
+                {showSignatureStep && (
+                  <div className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-lg">
+                    <span className="text-sm text-zinc-300">Signature</span>
+                    {skipSignature ? (
+                      <span className="text-sm text-amber-400">Skipped</span>
+                    ) : signatureDataUrl ? (
+                      <div className="flex items-center gap-2">
+                        <Check className="w-4 h-4 text-emerald-500" />
+                        <span className="text-sm text-emerald-400">
+                          {signedByName}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-sm text-zinc-500">Not captured</span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Completion notes */}
