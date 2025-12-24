@@ -9,8 +9,6 @@ import WhyTrust from './WhyTrust';
 import Testimonials from './Testimonials';
 import Stats from './Stats';
 import CTASection from './CTASection';
-import Chatbot from './Chatbot';
-import ExitPopup from './ExitPopup';
 import Footer from './Footer';
 
 export default function LandingPage() {
@@ -24,8 +22,6 @@ export default function LandingPage() {
       <Testimonials />
       <Stats />
       <CTASection />
-      <Chatbot />
-      <ExitPopup />
       <Footer />
     </>
   );

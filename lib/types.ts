@@ -4,18 +4,14 @@
 
 // Re-export Prisma types for convenience
 export type {
-  User,
-  Lead,
-  Campaign,
-  Message,
-  EngagementMetric,
-  ServiceProvider,
-  Match,
-  MessageTemplate,
-  AIOptimization,
+  Provider,
+  ProviderUser,
+  Customer,
+  Job,
+  Invoice,
 } from "@prisma/client";
 
-// Campaign filters
+// Campaign filters (kept for backwards compatibility but deprecated)
 export interface CampaignFilters {
   serviceType?: string;
   location?: {

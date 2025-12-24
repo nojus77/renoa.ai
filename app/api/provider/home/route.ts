@@ -207,33 +207,6 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get new leads count
-    const newLeads = await prisma.lead.count({
-      where: {
-        assignedProviderId: providerId,
-        status: {
-          in: ['matched', 'new'],
-        },
-      },
-    });
-
-    // DEBUG: Log leads info for this provider
-    const allProviderLeads = await prisma.lead.findMany({
-      where: { assignedProviderId: providerId },
-      select: { id: true, status: true, firstName: true, lastName: true },
-    });
-    console.log('🎯 DEBUG - Leads for provider:', {
-      providerId,
-      totalLeads: allProviderLeads.length,
-      newLeadsCount: newLeads,
-      leadStatuses: allProviderLeads.map(l => l.status),
-      leads: allProviderLeads.slice(0, 5).map(l => ({
-        id: l.id.slice(-6),
-        status: l.status,
-        name: `${l.firstName} ${l.lastName}`,
-      })),
-    });
-
     // Get jobs needing crew assignment (scheduled but no workers assigned) with latest date
     const unassignedJobsData = await prisma.job.findMany({
       where: {
@@ -422,7 +395,6 @@ export async function GET(request: NextRequest) {
     console.log('🔔 DEBUG - Alerts for provider:', {
       providerId,
       pendingInvoices,
-      newLeads,
       unassignedJobs,
       overdueJobs,
       unconfirmedSoonJobs,
@@ -671,7 +643,6 @@ export async function GET(request: NextRequest) {
           pendingInvoicesAmount: pendingInvoicesAmount._sum.total
             ? Number(pendingInvoicesAmount._sum.total)
             : 0,
-          newLeadsCount: newLeads,
           completedThisWeek: weeklyJobs.length,
           completedThisMonth: monthlyJobs.length,
         },
