@@ -16,7 +16,8 @@ import {
   AlertCircle,
   Clock,
   TrendingUp,
-  MoreVertical
+  MoreVertical,
+  Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -26,13 +27,21 @@ interface Invoice {
   customerId: string;
   customer: {
     id: string;
-    firstName: string;
-    lastName: string;
+    name: string;
     email: string;
     phone: string;
-  };
+    address: string;
+  } | null;
   jobId?: string;
-  jobReference?: string;
+  jobs?: {
+    id: string;
+    serviceType: string;
+    address: string;
+    customer?: {
+      id: string;
+      name: string;
+    };
+  } | null;
   total: number;
   amountPaid: number;
   status: 'draft' | 'sent' | 'viewed' | 'paid' | 'partial' | 'overdue' | 'cancelled';
@@ -68,6 +77,9 @@ export default function ProviderInvoices() {
   const [stats, setStats] = useState<Stats>({ outstanding: 0, paidThisMonth: 0, overdue: 0 });
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'paid' | 'unpaid' | 'overdue' | 'draft'>('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'thisMonth' | 'lastMonth' | 'custom'>('all');
+  const [customDateFrom, setCustomDateFrom] = useState('');
+  const [customDateTo, setCustomDateTo] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
 
   useEffect(() => {
@@ -86,10 +98,29 @@ export default function ProviderInvoices() {
 
   const fetchInvoices = async (id: string) => {
     try {
+      // Calculate date range based on filter
+      let dateFrom = '';
+      let dateTo = '';
+
+      if (dateFilter === 'thisMonth') {
+        const now = new Date();
+        dateFrom = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        dateTo = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      } else if (dateFilter === 'lastMonth') {
+        const now = new Date();
+        dateFrom = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString().split('T')[0];
+        dateTo = new Date(now.getFullYear(), now.getMonth(), 0).toISOString().split('T')[0];
+      } else if (dateFilter === 'custom') {
+        dateFrom = customDateFrom;
+        dateTo = customDateTo;
+      }
+
       const params = new URLSearchParams({
         providerId: id,
         ...(statusFilter !== 'all' && { status: statusFilter }),
         ...(searchQuery && { search: searchQuery }),
+        ...(dateFrom && { dateFrom }),
+        ...(dateTo && { dateTo }),
       });
 
       const res = await fetch(`/api/provider/invoices?${params}`);
@@ -112,7 +143,7 @@ export default function ProviderInvoices() {
     if (providerId) {
       fetchInvoices(providerId);
     }
-  }, [searchQuery, statusFilter]);
+  }, [searchQuery, statusFilter, dateFilter, customDateFrom, customDateTo]);
 
   const handleSendInvoice = async (invoiceId: string) => {
     try {
@@ -290,34 +321,81 @@ export default function ProviderInvoices() {
         {/* Main Content */}
         <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-4 md:py-8">
           {/* Search and Filters */}
-          <div className="flex flex-col md:flex-row gap-2 md:gap-3 mb-4 md:mb-6">
-            {/* Search Bar */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 md:h-4 md:w-4 text-zinc-500" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search invoices..."
-                className="w-full pl-9 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs md:text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
-              />
+          <div className="flex flex-col gap-3 mb-4 md:mb-6">
+            {/* Row 1: Search + Status Filters */}
+            <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+              {/* Search Bar */}
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 md:h-4 md:w-4 text-zinc-500" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search invoices..."
+                  className="w-full pl-9 md:pl-10 pr-3 md:pr-4 py-2 md:py-2.5 bg-zinc-900 border border-zinc-800 rounded-lg text-xs md:text-sm text-zinc-200 placeholder-zinc-600 focus:outline-none focus:border-emerald-500 transition-colors"
+                />
+              </div>
+
+              {/* Status Filter - Horizontal scroll on mobile */}
+              <div className="flex gap-1.5 md:gap-2 overflow-x-auto pb-2 md:pb-0 -mx-3 px-3 md:mx-0 md:px-0">
+                {(['all', 'paid', 'unpaid', 'overdue', 'draft'] as const).map((status) => (
+                  <button
+                    key={status}
+                    onClick={() => setStatusFilter(status)}
+                    className={`px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-medium rounded-lg transition-colors capitalize flex-shrink-0 min-h-[44px] md:min-h-0 ${
+                      statusFilter === status
+                        ? 'bg-emerald-600 text-white'
+                        : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
+                    }`}
+                  >
+                    {status}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {/* Status Filter - Horizontal scroll on mobile */}
-            <div className="flex gap-1.5 md:gap-2 overflow-x-auto pb-2 md:pb-0 -mx-3 px-3 md:mx-0 md:px-0">
-              {(['all', 'paid', 'unpaid', 'overdue', 'draft'] as const).map((status) => (
-                <button
-                  key={status}
-                  onClick={() => setStatusFilter(status)}
-                  className={`px-3 md:px-4 py-2 md:py-2.5 text-xs md:text-sm font-medium rounded-lg transition-colors capitalize flex-shrink-0 min-h-[44px] md:min-h-0 ${
-                    statusFilter === status
-                      ? 'bg-emerald-600 text-white'
-                      : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
-                  }`}
-                >
-                  {status}
-                </button>
-              ))}
+            {/* Row 2: Date Filters */}
+            <div className="flex flex-wrap items-center gap-2">
+              <Calendar className="h-4 w-4 text-zinc-500 hidden md:block" />
+              <div className="flex gap-1.5 md:gap-2 overflow-x-auto -mx-3 px-3 md:mx-0 md:px-0">
+                {([
+                  { value: 'all', label: 'All Time' },
+                  { value: 'thisMonth', label: 'This Month' },
+                  { value: 'lastMonth', label: 'Last Month' },
+                  { value: 'custom', label: 'Custom' },
+                ] as const).map((option) => (
+                  <button
+                    key={option.value}
+                    onClick={() => setDateFilter(option.value)}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors flex-shrink-0 ${
+                      dateFilter === option.value
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-zinc-900 text-zinc-400 hover:bg-zinc-800 border border-zinc-800'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom Date Range Inputs */}
+              {dateFilter === 'custom' && (
+                <div className="flex items-center gap-2 ml-2">
+                  <input
+                    type="date"
+                    value={customDateFrom}
+                    onChange={(e) => setCustomDateFrom(e.target.value)}
+                    className="px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
+                  />
+                  <span className="text-zinc-500 text-xs">to</span>
+                  <input
+                    type="date"
+                    value={customDateTo}
+                    onChange={(e) => setCustomDateTo(e.target.value)}
+                    className="px-2 py-1.5 bg-zinc-900 border border-zinc-700 rounded-lg text-xs text-zinc-200 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
@@ -437,7 +515,14 @@ function InvoiceRow({
   getStatusColor: (status: string) => string;
 }) {
   const [showActions, setShowActions] = useState(false);
-  const customerName = `${invoice.customer.firstName} ${invoice.customer.lastName}`;
+
+  // Get customer name from either direct customer or job's customer
+  const customerName = invoice.customer?.name
+    || invoice.jobs?.customer?.name
+    || 'Walk-in Customer';
+
+  // Get service type from job if available
+  const serviceType = invoice.jobs?.serviceType || null;
 
   const formatShortDate = (date: string) => {
     return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -455,7 +540,10 @@ function InvoiceRow({
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-zinc-100 truncate">{customerName}</p>
-          <p className="text-xs text-zinc-500 truncate">{invoice.invoiceNumber}</p>
+          <p className="text-xs text-zinc-500 truncate">
+            {invoice.invoiceNumber}
+            {serviceType && <span className="text-zinc-600"> · {serviceType}</span>}
+          </p>
         </div>
       </div>
 

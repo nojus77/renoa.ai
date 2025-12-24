@@ -49,7 +49,24 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Get invoices
+    // Date range filters
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+
+    if (dateFrom || dateTo) {
+      where.invoiceDate = {};
+      if (dateFrom) {
+        where.invoiceDate.gte = new Date(dateFrom);
+      }
+      if (dateTo) {
+        // Add 1 day to include the end date fully
+        const endDate = new Date(dateTo);
+        endDate.setDate(endDate.getDate() + 1);
+        where.invoiceDate.lt = endDate;
+      }
+    }
+
+    // Get invoices with job and customer details
     const invoices = await prisma.invoice.findMany({
       where,
       include: {
@@ -60,6 +77,19 @@ export async function GET(request: NextRequest) {
             email: true,
             phone: true,
             address: true,
+          },
+        },
+        jobs: {
+          select: {
+            id: true,
+            serviceType: true,
+            address: true,
+            customer: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
           },
         },
         lineItems: {
