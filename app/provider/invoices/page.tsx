@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
   Search,
   Plus,
@@ -14,15 +13,12 @@ import {
   Send,
   CheckCircle,
   Trash2,
-  Filter,
-  Download,
   AlertCircle,
   Clock,
   TrendingUp,
-  Calendar
+  MoreVertical
 } from 'lucide-react';
 import { toast } from 'sonner';
-import Link from 'next/link';
 
 interface Invoice {
   id: string;
@@ -191,14 +187,6 @@ export default function ProviderInvoices() {
     }).format(amount);
   };
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
   const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       paid: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
@@ -362,119 +350,32 @@ export default function ProviderInvoices() {
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-3">
-              {filteredInvoices.map((invoice) => (
-                <Card
-                  key={invoice.id}
-                  className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors"
-                >
-                  <CardContent className="p-5">
-                    <div className="flex items-center justify-between">
-                      {/* Left Section */}
-                      <div className="flex items-center gap-6 flex-1">
-                        <div className="min-w-[120px]">
-                          <p className="text-sm text-zinc-500 mb-1">Invoice</p>
-                          <p className="font-semibold text-zinc-100">{invoice.invoiceNumber}</p>
-                        </div>
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
+              {/* Table Header - hidden on mobile */}
+              <div className="hidden md:grid md:grid-cols-[1fr_100px_100px_100px_100px_40px] gap-2 p-3 bg-zinc-800/50 text-xs text-zinc-400 font-medium border-b border-zinc-800">
+                <div>Customer / Invoice</div>
+                <div className="text-right">Amount</div>
+                <div>Status</div>
+                <div>Paid</div>
+                <div>Issued</div>
+                <div></div>
+              </div>
 
-                        <div className="flex-1">
-                          <p className="text-sm text-zinc-500 mb-1">Customer</p>
-                          <p className="font-medium text-zinc-100">{invoice.customer.firstName} {invoice.customer.lastName}</p>
-                          {invoice.jobReference && (
-                            <Link
-                              href={`/provider/calendar`}
-                              className="text-xs text-blue-400 hover:text-blue-300"
-                            >
-                              {invoice.jobReference}
-                            </Link>
-                          )}
-                        </div>
-
-                        <div className="min-w-[140px]">
-                          <p className="text-sm text-zinc-500 mb-1">Amount</p>
-                          <p className="text-lg font-bold text-emerald-400">
-                            {formatCurrency(invoice.total)}
-                          </p>
-                          {invoice.amountPaid > 0 && invoice.status !== 'paid' && (
-                            <p className="text-xs text-zinc-500">
-                              Paid: {formatCurrency(invoice.amountPaid)}
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="min-w-[100px]">
-                          <p className="text-sm text-zinc-500 mb-1">Status</p>
-                          <Badge className={`${getStatusColor(invoice.status)} border capitalize`}>
-                            {invoice.status}
-                          </Badge>
-                        </div>
-
-                        <div className="min-w-[120px]">
-                          <p className="text-sm text-zinc-500 mb-1">
-                            {invoice.status === 'paid' ? 'Paid' : 'Due'}
-                          </p>
-                          <div className="flex items-center gap-1 text-sm text-zinc-300">
-                            <Calendar className="h-3 w-3" />
-                            <span>{formatDate(invoice.status === 'paid' && invoice.paidDate ? invoice.paidDate : invoice.dueDate)}</span>
-                          </div>
-                        </div>
-
-                        <div className="min-w-[100px]">
-                          <p className="text-sm text-zinc-500 mb-1">Issued</p>
-                          <div className="flex items-center gap-1 text-sm text-zinc-300">
-                            <Calendar className="h-3 w-3" />
-                            <span>{formatDate(invoice.invoiceDate)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-zinc-700 hover:bg-zinc-800"
-                          onClick={() => router.push(`/provider/invoices/${invoice.id}`)}
-                        >
-                          <Eye className="h-4 w-4 mr-1" />
-                          View
-                        </Button>
-
-                        {invoice.status !== 'paid' && (
-                          <>
-                            <Button
-                              size="sm"
-                              className="bg-blue-600 hover:bg-blue-500"
-                              onClick={() => handleSendInvoice(invoice.id)}
-                            >
-                              <Send className="h-4 w-4 mr-1" />
-                              Send
-                            </Button>
-
-                            <Button
-                              size="sm"
-                              className="bg-emerald-600 hover:bg-emerald-500"
-                              onClick={() => handleMarkPaid(invoice.id)}
-                            >
-                              <CheckCircle className="h-4 w-4 mr-1" />
-                              Mark Paid
-                            </Button>
-                          </>
-                        )}
-
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-red-700 text-red-400 hover:bg-red-900/20"
-                          onClick={() => handleDeleteInvoice(invoice.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+              {/* Table Body */}
+              <div className="divide-y divide-zinc-800">
+                {filteredInvoices.map((invoice) => (
+                  <InvoiceRow
+                    key={invoice.id}
+                    invoice={invoice}
+                    onView={() => router.push(`/provider/invoices/${invoice.id}`)}
+                    onSend={() => handleSendInvoice(invoice.id)}
+                    onMarkPaid={() => handleMarkPaid(invoice.id)}
+                    onDelete={() => handleDeleteInvoice(invoice.id)}
+                    formatCurrency={formatCurrency}
+                    getStatusColor={getStatusColor}
+                  />
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -514,5 +415,161 @@ export default function ProviderInvoices() {
         </div>
       )}
     </ProviderLayout>
+  );
+}
+
+// Compact Invoice Row Component
+function InvoiceRow({
+  invoice,
+  onView,
+  onSend,
+  onMarkPaid,
+  onDelete,
+  formatCurrency,
+  getStatusColor,
+}: {
+  invoice: Invoice;
+  onView: () => void;
+  onSend: () => void;
+  onMarkPaid: () => void;
+  onDelete: () => void;
+  formatCurrency: (amount: number) => string;
+  getStatusColor: (status: string) => string;
+}) {
+  const [showActions, setShowActions] = useState(false);
+  const customerName = `${invoice.customer.firstName} ${invoice.customer.lastName}`;
+
+  const formatShortDate = (date: string) => {
+    return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div
+      onClick={onView}
+      className="p-3 hover:bg-zinc-800/50 cursor-pointer transition-colors md:grid md:grid-cols-[1fr_100px_100px_100px_100px_40px] gap-2 items-center"
+    >
+      {/* Customer & Invoice - combined */}
+      <div className="flex items-center gap-3 min-w-0">
+        <div className="h-9 w-9 rounded-full bg-gradient-to-br from-blue-600 to-blue-400 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
+          {customerName.charAt(0).toUpperCase()}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-zinc-100 truncate">{customerName}</p>
+          <p className="text-xs text-zinc-500 truncate">{invoice.invoiceNumber}</p>
+        </div>
+      </div>
+
+      {/* Amount */}
+      <div className="hidden md:block text-right">
+        <span className="text-sm font-semibold text-emerald-400">
+          {formatCurrency(invoice.total)}
+        </span>
+        {invoice.amountPaid > 0 && invoice.status !== 'paid' && (
+          <p className="text-xs text-zinc-500">Paid: {formatCurrency(invoice.amountPaid)}</p>
+        )}
+      </div>
+
+      {/* Status */}
+      <div className="hidden md:block">
+        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border ${getStatusColor(invoice.status)}`}>
+          <span className="font-medium capitalize">{invoice.status}</span>
+        </div>
+      </div>
+
+      {/* Paid/Due Date */}
+      <div className="hidden md:block">
+        <p className="text-sm text-zinc-200">
+          {invoice.status === 'paid' && invoice.paidDate
+            ? formatShortDate(invoice.paidDate)
+            : formatShortDate(invoice.dueDate)}
+        </p>
+        <p className="text-xs text-zinc-500">
+          {invoice.status === 'paid' ? 'Paid' : 'Due'}
+        </p>
+      </div>
+
+      {/* Issued Date */}
+      <div className="hidden md:block">
+        <p className="text-sm text-zinc-200">{formatShortDate(invoice.invoiceDate)}</p>
+      </div>
+
+      {/* Mobile: Show status & amount inline */}
+      <div className="flex items-center justify-between mt-2 md:hidden">
+        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border ${getStatusColor(invoice.status)}`}>
+          <span className="font-medium capitalize">{invoice.status}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-zinc-400">{formatShortDate(invoice.invoiceDate)}</span>
+          <span className="text-sm font-semibold text-emerald-400">
+            {formatCurrency(invoice.total)}
+          </span>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="relative hidden md:block" onClick={(e) => e.stopPropagation()}>
+        <button
+          onClick={() => setShowActions(!showActions)}
+          className="p-1.5 hover:bg-zinc-700 rounded-lg transition-colors"
+        >
+          <MoreVertical className="h-4 w-4 text-zinc-400" />
+        </button>
+
+        {showActions && (
+          <>
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setShowActions(false)}
+            />
+            <div className="absolute right-0 top-full mt-1 w-40 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl py-1 z-20">
+              <button
+                onClick={() => {
+                  setShowActions(false);
+                  onView();
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 w-full text-left"
+              >
+                <Eye className="h-3.5 w-3.5" />
+                View Details
+              </button>
+              {invoice.status !== 'paid' && (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowActions(false);
+                      onSend();
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-blue-400 hover:bg-zinc-800 w-full text-left"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    Send Invoice
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowActions(false);
+                      onMarkPaid();
+                    }}
+                    className="flex items-center gap-2 px-3 py-2 text-sm text-emerald-400 hover:bg-zinc-800 w-full text-left"
+                  >
+                    <CheckCircle className="h-3.5 w-3.5" />
+                    Mark Paid
+                  </button>
+                </>
+              )}
+              <button
+                onClick={() => {
+                  setShowActions(false);
+                  onDelete();
+                }}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-red-400 hover:bg-zinc-800 w-full text-left"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                Delete
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
