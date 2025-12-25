@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Search, Plus, Phone, Mail, MapPin, Star, MessageCircle, Users, TrendingUp, Award, Briefcase, Calendar, Trash2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import AddCustomerModal from '@/components/provider/AddCustomerModal';
+import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
 
 interface Customer {
   id: string;
@@ -156,9 +157,7 @@ export default function ProviderCustomers() {
   if (loading) {
     return (
       <ProviderLayout providerName={providerName}>
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-        </div>
+        <PageLoadingSkeleton statsCount={4} tableRows={8} />
       </ProviderLayout>
     );
   }

@@ -18,6 +18,7 @@ import DailyTeamCalendar from '@/components/provider/calendar/DailyTeamCalendar'
 import WeeklyTeamCalendar from '@/components/provider/calendar/WeeklyTeamCalendar';
 import GanttDailyCalendar from '@/components/provider/calendar/GanttDailyCalendar';
 import WorkerProfileModal from '@/components/provider/WorkerProfileModal';
+import CalendarSkeleton from '@/components/provider/calendar/CalendarSkeleton';
 import { DndContext, DragEndEvent, DragStartEvent, pointerWithin, useDraggable } from '@dnd-kit/core';
 
 type ViewMode = 'day' | 'week' | 'month';
@@ -424,9 +425,7 @@ export default function ProviderCalendar() {
   if (loading) {
     return (
       <ProviderLayout providerName={providerName}>
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-        </div>
+        <CalendarSkeleton type={viewMode === 'week' ? 'weekly' : 'daily'} />
       </ProviderLayout>
     );
   }

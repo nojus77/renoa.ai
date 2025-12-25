@@ -9,6 +9,10 @@ export async function GET(request: NextRequest) {
     const searchParams = request.nextUrl.searchParams;
     const providerId = searchParams.get('providerId');
 
+    // Pagination params
+    const cursor = searchParams.get('cursor');
+    const limit = parseInt(searchParams.get('limit') || '50');
+
     if (!providerId) {
       return NextResponse.json(
         { error: 'Provider ID required' },
@@ -16,7 +20,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Fetch all team members for this provider
+    // Fetch team members for this provider with pagination
     const users = await prisma.providerUser.findMany({
       where: {
         providerId,
@@ -57,13 +61,20 @@ export async function GET(request: NextRequest) {
         { role: 'asc' }, // Owners first
         { createdAt: 'asc' },
       ],
+      take: limit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     });
+
+    // Check if there are more results
+    const hasMore = users.length > limit;
+    const usersToProcess = hasMore ? users.slice(0, -1) : users;
+    const nextCursor = hasMore ? usersToProcess[usersToProcess.length - 1]?.id : null;
 
     // Add stats for each member
     const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 }); // Monday
     const today = new Date();
 
-    const usersWithStats = await Promise.all(users.map(async (user) => {
+    const usersWithStats = await Promise.all(usersToProcess.map(async (user) => {
       // Only calculate stats for field workers
       if (user.role !== 'field') {
         return {
@@ -133,7 +144,11 @@ export async function GET(request: NextRequest) {
       };
     }));
 
-    return NextResponse.json({ users: usersWithStats });
+    return NextResponse.json({
+      users: usersWithStats,
+      nextCursor,
+      hasMore,
+    });
   } catch (error) {
     console.error('Error fetching team members:', error);
     return NextResponse.json(

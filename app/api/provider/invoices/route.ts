@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { createInvoiceSchema } from '@/lib/validations/invoice';
 
 const prisma = new PrismaClient();
 
@@ -10,6 +11,10 @@ export async function GET(request: NextRequest) {
     const providerId = searchParams.get('providerId');
     const status = searchParams.get('status');
     const search = searchParams.get('search');
+
+    // Pagination params
+    const cursor = searchParams.get('cursor');
+    const limit = parseInt(searchParams.get('limit') || '50');
 
     if (!providerId) {
       return NextResponse.json(
@@ -66,7 +71,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Get invoices with job and customer details
+    // Get invoices with job and customer details (with pagination)
     const invoices = await prisma.invoice.findMany({
       where,
       include: {
@@ -100,7 +105,14 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: { createdAt: 'desc' },
+      take: limit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     });
+
+    // Check if there are more results
+    const hasMore = invoices.length > limit;
+    const invoicesToReturn = hasMore ? invoices.slice(0, -1) : invoices;
+    const nextCursor = hasMore ? invoicesToReturn[invoicesToReturn.length - 1]?.id : null;
 
     // Calculate stats
     const now = new Date();
@@ -146,7 +158,7 @@ export async function GET(request: NextRequest) {
     };
 
     return NextResponse.json({
-      invoices: invoices.map((inv) => ({
+      invoices: invoicesToReturn.map((inv) => ({
         ...inv,
         subtotal: Number(inv.subtotal),
         taxRate: inv.taxRate ? Number(inv.taxRate) : null,
@@ -167,6 +179,8 @@ export async function GET(request: NextRequest) {
         })),
       })),
       stats: statsData,
+      nextCursor,
+      hasMore,
     });
   } catch (error) {
     console.error('Error fetching invoices:', error);
@@ -181,6 +195,17 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+
+    // Validate request body with Zod
+    const validationResult = createInvoiceSchema.safeParse(body);
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      return NextResponse.json(
+        { error: firstError.message, field: firstError.path.join('.') },
+        { status: 400 }
+      );
+    }
+
     const {
       providerId,
       customerId,
@@ -195,14 +220,7 @@ export async function POST(request: NextRequest) {
       terms,
       paymentInstructions,
       status,
-    } = body;
-
-    if (!providerId || !customerId || !lineItems || lineItems.length === 0) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
-      );
-    }
+    } = validationResult.data;
 
     // Calculate subtotal
     const subtotal = lineItems.reduce(

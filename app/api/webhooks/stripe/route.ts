@@ -86,6 +86,16 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     console.log('Payment Intent Amount:', paymentIntent.amount);
     console.log('Payment Intent Metadata:', JSON.stringify(paymentIntent.metadata));
 
+    // Idempotency check - prevent duplicate payment records from webhook retries
+    const existingPayment = await prisma.payment.findFirst({
+      where: { transactionId: paymentIntent.id },
+    });
+
+    if (existingPayment) {
+      console.log('⏭️ Duplicate webhook - payment already processed:', paymentIntent.id);
+      return;
+    }
+
     const invoiceId = paymentIntent.metadata.invoiceId;
 
     if (!invoiceId) {

@@ -167,6 +167,9 @@ model ProviderUser {
   @@index([providerId])
   @@index([email])
   @@index([role])
+  // Compound indexes for performance
+  @@index([providerId, role])
+  @@index([providerId, status])
   @@map("provider_users")
 }
 
@@ -240,6 +243,9 @@ model Customer {
   @@index([providerId])
   @@index([phone])
   @@index([zone])
+  // Compound indexes for performance
+  @@index([providerId, createdAt])
+  @@index([providerId, name])
   @@map("customers")
 }
 
@@ -332,6 +338,11 @@ model Job {
   @@index([assignedUserIds])
   @@index([zone])
   @@index([jobCategory])
+  // Compound indexes for performance
+  @@index([providerId, status])
+  @@index([providerId, startTime])
+  @@index([status, startTime])
+  @@index([providerId, status, startTime])
   @@map("jobs")
 }
 
@@ -428,6 +439,10 @@ model Invoice {
   @@index([invoiceDate])
   @@index([dueDate])
   @@index([jobId])
+  // Compound indexes for performance
+  @@index([providerId, status])
+  @@index([providerId, invoiceDate])
+  @@index([providerId, status, invoiceDate])
   @@map("invoices")
 }
 

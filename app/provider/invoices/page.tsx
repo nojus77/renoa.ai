@@ -20,6 +20,7 @@ import {
   Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
 
 interface Invoice {
   id: string;
@@ -234,9 +235,7 @@ export default function ProviderInvoices() {
   if (loading) {
     return (
       <ProviderLayout providerName={providerName}>
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-        </div>
+        <PageLoadingSkeleton statsCount={3} tableRows={8} />
       </ProviderLayout>
     );
   }

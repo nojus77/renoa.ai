@@ -243,6 +243,10 @@ export async function GET(request: NextRequest) {
     const statuses = searchParams.get('statuses'); // Filter by multiple statuses (comma-separated)
     const unassigned = searchParams.get('unassigned'); // Filter for unassigned jobs only
 
+    // Pagination params
+    const cursor = searchParams.get('cursor');
+    const limit = parseInt(searchParams.get('limit') || '50');
+
     if (!providerId) {
       return NextResponse.json({ error: 'Provider ID required' }, { status: 400 });
     }
@@ -280,7 +284,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch all jobs for this provider using the Job model
+    // Fetch jobs with cursor-based pagination
     const jobs = await prisma.job.findMany({
       where: whereClause,
       include: {
@@ -290,6 +294,8 @@ export async function GET(request: NextRequest) {
       orderBy: {
         startTime: 'asc',
       },
+      take: limit + 1, // Fetch one extra to check if there are more
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     });
 
     // Collect all unique user IDs from all jobs
@@ -328,8 +334,13 @@ export async function GET(request: NextRequest) {
     // Create a map for O(1) lookups
     const userMap = new Map(users.map(u => [u.id, u]));
 
+    // Check if there are more results
+    const hasMore = jobs.length > limit;
+    const jobsToReturn = hasMore ? jobs.slice(0, -1) : jobs;
+    const nextCursor = hasMore ? jobsToReturn[jobsToReturn.length - 1]?.id : null;
+
     // Transform jobs with user data
-    const transformedJobs = jobs.map(job => {
+    const transformedJobs = jobsToReturn.map(job => {
       const assignedUsers = job.assignedUserIds
         ? job.assignedUserIds.map(id => userMap.get(id)).filter(Boolean)
         : [];
@@ -363,7 +374,11 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ jobs: transformedJobs });
+    return NextResponse.json({
+      jobs: transformedJobs,
+      nextCursor,
+      hasMore,
+    });
   } catch (error) {
     console.error('Error fetching provider jobs:', error);
     return NextResponse.json(

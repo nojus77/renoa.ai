@@ -28,6 +28,7 @@ import {
   Crown
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
 
 type MessageTab = 'team' | 'customers';
@@ -745,9 +746,7 @@ export default function ProviderMessages() {
   if (loading) {
     return (
       <ProviderLayout providerName={providerName}>
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-        </div>
+        <PageLoadingSkeleton showStats={false} tableRows={10} />
 
         {previewImage && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
