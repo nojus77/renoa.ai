@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { X, ChevronRight, ChevronLeft, Camera, Check, AlertCircle, Loader2 } from 'lucide-react';
 import SignaturePad from './SignatureCanvas';
 import { toast } from 'sonner';
+import { validateAndCompressImage } from '@/lib/image-upload';
 
 interface JobCompletionFlowProps {
   isOpen: boolean;
@@ -114,8 +115,15 @@ export default function JobCompletionFlow({
     setUploading(true);
     try {
       for (const file of Array.from(files)) {
+        // Validate and compress image before upload
+        const { file: compressedFile, error } = await validateAndCompressImage(file);
+        if (error || !compressedFile) {
+          toast.error(error || 'Failed to process image');
+          continue;
+        }
+
         const formData = new FormData();
-        formData.append('file', file);
+        formData.append('file', compressedFile);
         formData.append('type', 'after'); // Use 'after' type for completion photos
 
         // Use the existing job photos upload endpoint

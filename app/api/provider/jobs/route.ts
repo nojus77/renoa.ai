@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
+import { getTimezoneFromAddress } from '@/lib/google-timezone';
 
 export async function POST(request: NextRequest) {
   try {
@@ -122,6 +123,18 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Fetch provider for fallback timezone
+    const provider = await prisma.provider.findUnique({
+      where: { id: providerId },
+      select: { timeZone: true },
+    });
+
+    // Get timezone from job address location
+    const jobAddress = customerAddress || '';
+    const jobTimezone = jobAddress ? await getTimezoneFromAddress(jobAddress) : null;
+    // Fallback to provider timezone if lookup fails
+    const finalTimezone = jobTimezone || provider?.timeZone || 'America/Chicago';
+
     console.log('📋 ServiceTypeConfig for', serviceType, ':', serviceConfig ? {
       requiredSkills: serviceConfig.requiredSkills,
       preferredSkills: serviceConfig.preferredSkills,
@@ -137,6 +150,7 @@ export async function POST(request: NextRequest) {
         customerId: finalCustomerId,
         serviceType,
         address: customerAddress || '',
+        timezone: finalTimezone, // IANA timezone from job location
         startTime: startDate,
         endTime: endDate,
         status,

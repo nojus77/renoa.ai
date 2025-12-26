@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import crypto from 'crypto';
 import { SESClient, SendEmailCommand } from '@aws-sdk/client-ses';
+import { authRateLimiter, withRateLimit } from '@/lib/rate-limit';
 
 const sesClient = new SESClient({
   region: process.env.AWS_REGION || 'us-east-1',
@@ -12,6 +13,12 @@ const sesClient = new SESClient({
 });
 
 export async function POST(request: NextRequest) {
+  // Rate limit: 5 requests per minute for auth routes
+  const { allowed, response, headers } = await withRateLimit(request, authRateLimiter);
+  if (!allowed) {
+    return response;
+  }
+
   try {
     const body = await request.json();
     const { email } = body;

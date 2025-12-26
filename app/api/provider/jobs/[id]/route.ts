@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
+import { getTimezoneFromAddress } from '@/lib/google-timezone';
 
 const prisma = new PrismaClient();
 
@@ -58,6 +59,7 @@ export async function GET(
             businessName: true,
             phone: true,
             email: true,
+            timeZone: true, // Include provider timezone for fallback display
           },
         },
         invoices: {
@@ -146,6 +148,8 @@ export async function PATCH(
       startTime,
       endTime,
       assignedUserIds,
+      // Address update support (for timezone recalculation)
+      address,
     } = body;
 
     if (!providerId) {
@@ -217,6 +221,23 @@ export async function PATCH(
     // Calendar drag-and-drop: update assigned users
     if (assignedUserIds !== undefined) {
       updateData.assignedUserIds = assignedUserIds;
+    }
+
+    // Address update: recalculate timezone if address changes
+    if (address !== undefined && address !== existingJob.address) {
+      updateData.address = address;
+      // Lookup new timezone for the address
+      const newTimezone = address ? await getTimezoneFromAddress(address) : null;
+      if (newTimezone) {
+        updateData.timezone = newTimezone;
+      } else {
+        // Fallback to provider timezone
+        const provider = await prisma.provider.findUnique({
+          where: { id: providerId },
+          select: { timeZone: true },
+        });
+        updateData.timezone = provider?.timeZone || existingJob.timezone;
+      }
     }
 
     // Update the job

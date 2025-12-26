@@ -2,12 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { authRateLimiter, withRateLimit } from '@/lib/rate-limit';
 
 const prisma = new PrismaClient();
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
 
 export async function POST(request: NextRequest) {
+  // Rate limit: 5 requests per minute for login attempts
+  const { allowed, response } = await withRateLimit(request, authRateLimiter);
+  if (!allowed) {
+    return response;
+  }
+
   try {
     const body = await request.json();
     const { email, password } = body;

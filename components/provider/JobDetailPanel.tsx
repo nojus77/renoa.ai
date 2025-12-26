@@ -6,6 +6,8 @@ import { X, Phone, MapPin, MessageCircle, Edit2, Save, Trash2, CheckCircle, Send
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import EditJobModal from './EditJobModal';
+import { validateAndCompressImage } from '@/lib/image-upload';
+import { formatJobTime, formatJobTimeWithZone, getEffectiveTimezone } from '@/lib/utils/timezone';
 
 interface JobPhoto {
   id: string;
@@ -25,6 +27,8 @@ interface Job {
   phone: string;
   email: string;
   address: string;
+  timezone?: string | null; // IANA timezone from job location
+  providerTimezone?: string; // Provider's default timezone for fallback
   estimatedValue?: number;
   actualValue?: number;
   durationMinutes?: number; // hours
@@ -87,24 +91,18 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
     }
   };
 
-  const handlePhotoUpload = async (file: File, type: string) => {
-    console.log('📸 handlePhotoUpload called with:', { file: file?.name, type });
+  const handlePhotoUpload = async (rawFile: File, type: string) => {
+    console.log('📸 handlePhotoUpload called with:', { file: rawFile?.name, type });
 
-    if (!file || !job) {
-      console.log('❌ No file or job', { file: !!file, job: !!job });
+    if (!rawFile || !job) {
+      console.log('❌ No file or job', { file: !!rawFile, job: !!job });
       return;
     }
 
-    // Check file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB');
-      return;
-    }
-
-    // Check file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Please upload a JPG, PNG, or WebP image');
+    // Validate and compress the image
+    const { file, error } = await validateAndCompressImage(rawFile);
+    if (error || !file) {
+      toast.error(error || 'Failed to process image');
       return;
     }
 
@@ -243,22 +241,19 @@ export default function JobDetailPanel({ job, isOpen, onClose, onJobUpdated }: J
     }
   };
 
+  // Get effective timezone for this job
+  const jobTz = getEffectiveTimezone(job.timezone, job.providerTimezone || 'America/Chicago');
+
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return formatJobTime(dateString, job.timezone, job.providerTimezone || 'America/Chicago', 'EEEE, MMMM d, yyyy');
   };
 
   const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+    return formatJobTime(dateString, job.timezone, job.providerTimezone || 'America/Chicago', 'h:mm a');
+  };
+
+  const formatTimeWithZone = (dateString: string) => {
+    return formatJobTimeWithZone(dateString, job.timezone, job.providerTimezone || 'America/Chicago');
   };
 
   const getDuration = () => {

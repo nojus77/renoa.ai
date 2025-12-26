@@ -35,6 +35,7 @@ import {
 import { toast } from 'sonner';
 import { formatCurrency, formatDate, formatTime } from '@/lib/api-helpers';
 import CompleteJobModal from '@/components/provider/CompleteJobModal';
+import { validateAndCompressImage } from '@/lib/image-upload';
 
 interface Job {
   id: string;
@@ -296,21 +297,15 @@ export default function JobDetailPage() {
     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
   };
 
-  const handlePhotoUpload = async (file: File, type: 'before' | 'during' | 'after') => {
-    console.log('📸 Photo upload triggered:', { file: file.name, type });
+  const handlePhotoUpload = async (rawFile: File, type: 'before' | 'during' | 'after') => {
+    console.log('📸 Photo upload triggered:', { file: rawFile.name, type });
 
-    if (!file) return;
+    if (!rawFile) return;
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB');
-      return;
-    }
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Please upload a JPG, PNG, or WebP image');
+    // Validate and compress the image
+    const { file, error } = await validateAndCompressImage(rawFile);
+    if (error || !file) {
+      toast.error(error || 'Failed to process image');
       return;
     }
 

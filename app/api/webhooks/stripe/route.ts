@@ -5,8 +5,15 @@ import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
 import { sendNotification } from '@/lib/notifications/notification-service';
 import { createNotification } from '@/lib/notifications';
+import { webhookRateLimiter, withRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
+  // Rate limit: 100 requests per minute for webhooks
+  const { allowed, response } = await withRateLimit(request, webhookRateLimiter);
+  if (!allowed) {
+    return response;
+  }
+
   try {
     const body = await request.text();
     const headersList = await headers();

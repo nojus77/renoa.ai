@@ -293,6 +293,7 @@ model Job {
   latitude              Float? // For distance calculations
   longitude             Float? // For distance calculations
   zone                  String? // ZIP code or service area
+  timezone              String?                // IANA timezone from job address location (e.g., "America/Chicago")
   durationMinutes       Int?                   @map("duration_minutes") // Estimated duration in minutes
   actualDurationMinutes Int?                   @map("actual_duration_minutes") // Actual time spent (minutes)
   // Dispatch/Route fields

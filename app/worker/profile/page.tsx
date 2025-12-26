@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import WorkerLayout from '@/components/worker/WorkerLayout';
 import {
   User,
@@ -36,6 +37,7 @@ import {
   Navigation,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateAndCompressImage } from '@/lib/image-upload';
 import {
   Dialog,
   DialogContent,
@@ -182,6 +184,8 @@ const AVAILABLE_EQUIPMENT = [
 
 export default function WorkerProfile() {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [jobsThisWeek, setJobsThisWeek] = useState(0);
@@ -224,9 +228,6 @@ export default function WorkerProfile() {
   const [hasProfileChanges, setHasProfileChanges] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
-
-  // Theme state
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   // Home address state
   const [homeAddress, setHomeAddress] = useState('');
@@ -274,6 +275,11 @@ export default function WorkerProfile() {
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  // Handle theme mounting to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
   }, []);
 
   useEffect(() => {
@@ -369,17 +375,13 @@ export default function WorkerProfile() {
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !profile) return;
+    const rawFile = e.target.files?.[0];
+    if (!rawFile || !profile) return;
 
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      toast.error('Please upload a JPG, PNG, or WebP image');
-      return;
-    }
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('Photo too large. Max 5MB.');
+    // Validate and compress the image
+    const { file, error } = await validateAndCompressImage(rawFile);
+    if (error || !file) {
+      toast.error(error || 'Failed to process image');
       return;
     }
 
@@ -979,26 +981,26 @@ export default function WorkerProfile() {
                   <div className="flex items-center justify-between p-4">
                     <div className="flex items-center gap-3">
                       <div className="w-9 h-9 bg-zinc-800 rounded-lg flex items-center justify-center">
-                        {theme === 'dark' ? (
-                          <Moon className="w-4 h-4 text-zinc-400" />
+                        {mounted && theme === 'dark' ? (
+                          <Moon className="w-4 h-4 text-purple-400" />
                         ) : (
                           <Sun className="w-4 h-4 text-yellow-400" />
                         )}
                       </div>
                       <div>
-                        <span className="text-white font-medium">Appearance</span>
-                        <p className="text-xs text-zinc-500">{theme === 'dark' ? 'Dark Mode' : 'Light Mode'}</p>
+                        <span className="text-white font-medium">Dark Mode 🌙</span>
+                        <p className="text-xs text-zinc-500">{mounted && theme === 'dark' ? 'On' : 'Off'}</p>
                       </div>
                     </div>
                     <button
                       onClick={toggleTheme}
                       className={`relative w-12 h-7 rounded-full transition-colors ${
-                        theme === 'light' ? 'bg-[#C4F542]' : 'bg-zinc-700'
+                        mounted && theme === 'dark' ? 'bg-purple-500' : 'bg-zinc-700'
                       }`}
                     >
                       <span
                         className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-transform ${
-                          theme === 'light' ? 'left-6' : 'left-1'
+                          mounted && theme === 'dark' ? 'left-6' : 'left-1'
                         }`}
                       />
                     </button>

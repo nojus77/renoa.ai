@@ -38,6 +38,8 @@ import {
 import { toast } from 'sonner';
 import { PropertyPhoto } from '@/components/PropertyPhoto';
 import JobCompletionFlow from '@/components/worker/JobCompletionFlow';
+import { compressImage, ALLOWED_TYPES as IMAGE_ALLOWED_TYPES, MAX_FILE_SIZE } from '@/lib/image-upload';
+import { formatJobTime, getEffectiveTimezone } from '@/lib/utils/timezone';
 
 // Renoa Design System - Lime green brand color
 const LIME_GREEN = '#C4F542';
@@ -111,6 +113,8 @@ interface Job {
   jobInstructions: string | null;
   estimatedValue: number | null;
   durationMinutes: number | null;
+  timezone?: string | null; // IANA timezone from job location
+  providerTimezone?: string; // Provider's default timezone for fallback
   customer: {
     id: string;
     name: string;
@@ -199,6 +203,10 @@ export default function JobDetailPage() {
   const [providerCategory, setProviderCategory] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Use job's timezone with provider fallback - available early for all formatters
+  const providerTz = job?.providerTimezone || 'America/Chicago';
+  const jobTz = job?.timezone || null;
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Live date/time
@@ -349,16 +357,10 @@ export default function JobDetailPage() {
     }
   }, [job, jobId, selectedServices.length]);
 
-  // Format current time for display
+  // Format current time for display (in job's timezone)
   const formatCurrentTime = () => {
-    return currentTime.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    }) + ', ' + currentTime.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    // Show current time in job's timezone
+    return formatJobTime(currentTime.toISOString(), jobTz, providerTz, 'MMM d, h:mm a');
   };
 
   // Format timer display
@@ -508,19 +510,11 @@ export default function JobDetailPage() {
   };
 
   const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    return formatJobTime(dateStr, jobTz, providerTz, 'h:mm a');
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-    });
+    return formatJobTime(dateStr, jobTz, providerTz, 'EEEE, MMMM d');
   };
 
   const formatShortDate = (dateStr: string) => {
@@ -528,11 +522,7 @@ export default function JobDetailPage() {
     if (!dateStr || dateStr === 'Unknown') return '';
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return formatJobTime(dateStr, jobTz, providerTz, 'MMM d, yyyy');
   };
 
   const getDuration = (start: string, end: string) => {
@@ -1036,8 +1026,7 @@ export default function JobDetailPage() {
   };
 
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime'];
+    const ALLOWED_TYPES = [...IMAGE_ALLOWED_TYPES, 'image/gif', 'video/mp4', 'video/quicktime'];
 
     const files = e.target.files;
     if (!files || files.length === 0 || !job) {
@@ -1045,22 +1034,28 @@ export default function JobDetailPage() {
       return;
     }
 
-    // Validate files before upload
+    // Validate and compress files before upload
     const validFiles: File[] = [];
     for (const file of Array.from(files)) {
       // Check file size
       if (file.size > MAX_FILE_SIZE) {
-        toast.error(`Photo too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is 5MB.`);
+        toast.error(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is 5MB.`);
         continue;
       }
 
       // Check file type
       if (!ALLOWED_TYPES.includes(file.type) && !file.type.startsWith('image/')) {
-        toast.error(`Unsupported file type. Use JPG, PNG, GIF, or MP4.`);
+        toast.error(`Unsupported file type. Use JPG, PNG, WebP, GIF, or MP4.`);
         continue;
       }
 
-      validFiles.push(file);
+      // Compress images (not videos or GIFs)
+      if (IMAGE_ALLOWED_TYPES.includes(file.type)) {
+        const compressedFile = await compressImage(file);
+        validFiles.push(compressedFile);
+      } else {
+        validFiles.push(file);
+      }
     }
 
     if (validFiles.length === 0) {
@@ -1120,8 +1115,6 @@ export default function JobDetailPage() {
   };
 
   const handleCheckPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-
     const file = e.target.files?.[0];
     if (!file || !job) {
       return;
@@ -1136,9 +1129,9 @@ export default function JobDetailPage() {
       return;
     }
 
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+    // Check file type - only allow images
+    if (!IMAGE_ALLOWED_TYPES.includes(file.type)) {
+      toast.error('Only JPG, PNG, and WebP images are allowed');
       if (checkPhotoInputRef.current) {
         checkPhotoInputRef.current.value = '';
       }
@@ -1147,8 +1140,11 @@ export default function JobDetailPage() {
 
     toast.info('Uploading check photo...');
 
+    // Compress the image before uploading
+    const compressedFile = await compressImage(file);
+
     const formData = new FormData();
-    formData.append('files', file);
+    formData.append('files', compressedFile);
     formData.append('jobId', job.id);
     formData.append('userId', userId);
     formData.append('photoType', 'check');

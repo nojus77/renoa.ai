@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { validateAndCompressImage } from '@/lib/image-upload';
+import { formatJobTime, formatJobTimeWithZone, getEffectiveTimezone } from '@/lib/utils/timezone';
 
 interface JobPhoto {
   id: string;
@@ -52,6 +54,8 @@ interface Job {
   arrivedAt?: string | null;
   completedAt?: string | null;
   completedByUserId?: string;
+  timezone?: string | null; // IANA timezone from job location
+  providerTimezone?: string; // Provider's default timezone for fallback
 }
 
 interface JobDetailViewProps {
@@ -126,24 +130,15 @@ export default function JobDetailView({ job, isOpen, onClose, onJobUpdated }: Jo
     return `$${(cents / 100).toFixed(2)}`;
   };
 
+  // Use job's timezone with provider fallback
+  const providerTz = job.providerTimezone || 'America/Chicago';
+
   const formatDateTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+    return formatJobTime(dateStr, job.timezone, providerTz, 'EEEE, MMMM d, yyyy h:mm a');
   };
 
   const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+    return formatJobTime(dateStr, job.timezone, providerTz, 'h:mm a');
   };
 
   const duration = (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60);
@@ -407,29 +402,25 @@ function OverviewTab({ job }: { job: Job }) {
   const [editedEndTime, setEditedEndTime] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Use job's timezone with provider fallback
+  const providerTz = job.providerTimezone || 'America/Chicago';
+
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return formatJobTime(dateStr, job.timezone, providerTz, 'EEEE, MMMM d, yyyy');
   };
 
-  const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+  const formatTimeShort = (dateStr: string) => {
+    return formatJobTime(dateStr, job.timezone, providerTz, 'h:mm a');
   };
 
   const formatDateForInput = (dateStr: string) => {
-    return new Date(dateStr).toISOString().split('T')[0];
+    // For input fields, format in job's timezone
+    return formatJobTime(dateStr, job.timezone, providerTz, 'yyyy-MM-dd');
   };
 
   const formatTimeForInput = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toTimeString().slice(0, 5);
+    // For input fields, format in job's timezone
+    return formatJobTime(dateStr, job.timezone, providerTz, 'HH:mm');
   };
 
   const duration = (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60);
@@ -562,7 +553,7 @@ function OverviewTab({ job }: { job: Job }) {
                   }}
                 >
                   <p className="text-sm text-zinc-200">
-                    {formatTime(job.startTime)} – {formatTime(job.endTime)}
+                    {formatTimeShort(job.startTime)} – {formatTimeShort(job.endTime)}
                   </p>
                   <Pencil className="h-3 w-3 text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
@@ -842,11 +833,13 @@ function PhotosTab({ beforePhotos, afterPhotos, onPhotoUploaded, jobId, jobStatu
   const totalPhotos = beforePhotos.length + afterPhotos.length;
   const needsPhotos = jobStatus === 'completed' && totalPhotos === 0;
 
-  const handlePhotoUpload = async (file: File, type: 'before' | 'after') => {
-    if (!file) return;
+  const handlePhotoUpload = async (rawFile: File, type: 'before' | 'after') => {
+    if (!rawFile) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB');
+    // Validate and compress the image
+    const { file, error } = await validateAndCompressImage(rawFile);
+    if (error || !file) {
+      toast.error(error || 'Failed to process image');
       return;
     }
 

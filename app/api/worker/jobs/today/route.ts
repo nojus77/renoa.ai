@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getWidestTodayWindow } from '@/lib/utils/timezone';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,18 +14,17 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User ID is required' }, { status: 400 });
     }
 
-    // Get start and end of today
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Get widest possible "today" window across all US timezones
+    // This ensures we fetch all jobs that could be "today" in any timezone
+    // The client-side display will use isJobToday() for accurate per-job filtering
+    const { start, end } = getWidestTodayWindow();
 
     const jobs = await prisma.job.findMany({
       where: {
         assignedUserIds: { has: userId },
         startTime: {
-          gte: today,
-          lt: tomorrow,
+          gte: start,
+          lt: end,
         },
       },
       include: {
@@ -34,6 +34,11 @@ export async function GET(request: NextRequest) {
             name: true,
             phone: true,
             email: true,
+          },
+        },
+        provider: {
+          select: {
+            timeZone: true,
           },
         },
         workLogs: {
@@ -50,7 +55,13 @@ export async function GET(request: NextRequest) {
       orderBy: { startTime: 'asc' },
     });
 
-    return NextResponse.json({ jobs });
+    // Add provider timezone to each job for client-side isJobToday() filtering
+    const jobsWithTimezone = jobs.map((job) => ({
+      ...job,
+      providerTimezone: job.provider?.timeZone || 'America/Chicago',
+    }));
+
+    return NextResponse.json({ jobs: jobsWithTimezone });
   } catch (error) {
     console.error('Error fetching today jobs:', error);
     return NextResponse.json(
