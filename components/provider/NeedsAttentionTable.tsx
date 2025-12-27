@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import {
@@ -14,6 +14,7 @@ import {
   Clock,
   UserPlus,
   UserMinus,
+  X,
 } from 'lucide-react';
 
 interface WorkerAlert {
@@ -42,6 +43,7 @@ export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soo
 interface NeedsAttentionTableProps {
   alerts: Alerts;
   onAlertClick?: (alertType: AlertType, alertDetails: { count: number; href: string }) => void;
+  onDismissAlert?: (alertType: AlertType) => void;
 }
 
 type Priority = 'urgent' | 'medium' | 'low';
@@ -87,8 +89,10 @@ function formatRelativeDate(date: Date | null): string {
   return format(date, 'MMM d');
 }
 
-export default function NeedsAttentionTable({ alerts, onAlertClick }: NeedsAttentionTableProps) {
+export default function NeedsAttentionTable({ alerts, onAlertClick, onDismissAlert }: NeedsAttentionTableProps) {
   const router = useRouter();
+  const [dismissedAlerts, setDismissedAlerts] = useState<Set<AlertType>>(new Set());
+  const [dismissingAlert, setDismissingAlert] = useState<AlertType | null>(null);
 
   // Build and sort alert rows by latest date (most recent first), then by priority
   const alertRows = useMemo(() => {
@@ -194,17 +198,52 @@ export default function NeedsAttentionTable({ alerts, onAlertClick }: NeedsAtten
     // Sort by:
     // 1. Priority (urgent > medium > low)
     // 2. Latest date (most recent first)
-    return rows.sort((a, b) => {
-      // First sort by priority
-      const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-      if (priorityDiff !== 0) return priorityDiff;
+    return rows
+      .filter(row => !dismissedAlerts.has(row.id))
+      .sort((a, b) => {
+        // First sort by priority
+        const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+        if (priorityDiff !== 0) return priorityDiff;
 
-      // Then by latest date (most recent first)
-      const aTime = a.latestDate?.getTime() || 0;
-      const bTime = b.latestDate?.getTime() || 0;
-      return bTime - aTime;
-    });
-  }, [alerts]);
+        // Then by latest date (most recent first)
+        const aTime = a.latestDate?.getTime() || 0;
+        const bTime = b.latestDate?.getTime() || 0;
+        return bTime - aTime;
+      });
+  }, [alerts, dismissedAlerts]);
+
+  const handleDismissAlert = async (e: React.MouseEvent, alertType: AlertType) => {
+    e.stopPropagation(); // Prevent triggering row click
+    setDismissingAlert(alertType);
+
+    try {
+      // Optimistic UI update
+      setDismissedAlerts(prev => new Set(Array.from(prev).concat(alertType)));
+
+      // Call parent callback if provided
+      if (onDismissAlert) {
+        onDismissAlert(alertType);
+      }
+
+      // API call to persist dismissal
+      const providerId = localStorage.getItem('providerId');
+      await fetch('/api/provider/alerts/dismiss', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ providerId, alertType }),
+      });
+    } catch (error) {
+      // Revert on error
+      setDismissedAlerts(prev => {
+        const next = new Set(prev);
+        next.delete(alertType);
+        return next;
+      });
+      console.error('Failed to dismiss alert:', error);
+    } finally {
+      setDismissingAlert(null);
+    }
+  };
 
   const handleAlertClick = (alert: AlertRow) => {
     if (onAlertClick) {
@@ -256,7 +295,7 @@ export default function NeedsAttentionTable({ alerts, onAlertClick }: NeedsAtten
                 <tr
                   key={alert.id}
                   onClick={() => handleAlertClick(alert)}
-                  className={`cursor-pointer hover:bg-muted/40 transition-colors ${
+                  className={`cursor-pointer hover:bg-muted/40 transition-colors group ${
                     index % 2 === 0 ? 'bg-background' : 'bg-muted/20'
                   }`}
                 >
@@ -287,7 +326,17 @@ export default function NeedsAttentionTable({ alerts, onAlertClick }: NeedsAtten
                     </span>
                   </td>
                   <td className="px-5 py-3 text-right">
-                    <ChevronRight className={`h-4 w-4 inline-block ${colors.text}`} />
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={(e) => handleDismissAlert(e, alert.id)}
+                        disabled={dismissingAlert === alert.id}
+                        className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                        title="Dismiss alert"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                      <ChevronRight className={`h-4 w-4 ${colors.text}`} />
+                    </div>
                   </td>
                 </tr>
               );
