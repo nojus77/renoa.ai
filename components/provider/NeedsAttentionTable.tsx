@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import {
   ChevronRight,
@@ -91,6 +91,22 @@ const problemConfig: Record<ProblemType, { label: string; color: string; icon: R
 export default function NeedsAttentionTable({ alerts, onJobClick, onDismissJob }: NeedsAttentionTableProps) {
   const [dismissedJobIds, setDismissedJobIds] = useState<Set<string>>(new Set());
   const [dismissingJobId, setDismissingJobId] = useState<string | null>(null);
+  const [confirmingDismissId, setConfirmingDismissId] = useState<string | null>(null);
+  const confirmPopupRef = useRef<HTMLDivElement>(null);
+
+  // Close confirmation popup when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (confirmPopupRef.current && !confirmPopupRef.current.contains(event.target as Node)) {
+        setConfirmingDismissId(null);
+      }
+    };
+
+    if (confirmingDismissId) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [confirmingDismissId]);
 
   // Combine all job alerts into a flat list
   const allAlertJobs = useMemo(() => {
@@ -127,8 +143,15 @@ export default function NeedsAttentionTable({ alerts, onJobClick, onDismissJob }
       });
   }, [alerts, dismissedJobIds]);
 
-  const handleDismissJob = async (e: React.MouseEvent, jobId: string) => {
+  const handleDismissClick = (e: React.MouseEvent, jobId: string) => {
     e.stopPropagation();
+    // Show confirmation popup
+    setConfirmingDismissId(confirmingDismissId === jobId ? null : jobId);
+  };
+
+  const handleConfirmDismiss = async (e: React.MouseEvent, jobId: string) => {
+    e.stopPropagation();
+    setConfirmingDismissId(null);
     setDismissingJobId(jobId);
 
     try {
@@ -160,7 +183,16 @@ export default function NeedsAttentionTable({ alerts, onJobClick, onDismissJob }
     }
   };
 
+  const handleCancelDismiss = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setConfirmingDismissId(null);
+  };
+
   const handleJobClick = (job: AlertJob) => {
+    if (confirmingDismissId) {
+      setConfirmingDismissId(null);
+      return;
+    }
     if (onJobClick) {
       onJobClick(job);
     }
@@ -202,11 +234,12 @@ export default function NeedsAttentionTable({ alerts, onJobClick, onDismissJob }
         <div className="divide-y divide-border">
           {allAlertJobs.map((job) => {
             const config = problemConfig[job.problem];
+            const isConfirming = confirmingDismissId === job.id;
             return (
               <div
                 key={`${job.id}-${job.problem}`}
                 onClick={() => handleJobClick(job)}
-                className="px-4 py-3 hover:bg-muted/40 transition-colors cursor-pointer group flex items-center gap-3"
+                className="px-4 py-3 hover:bg-muted/40 transition-colors cursor-pointer group flex items-center gap-3 relative"
               >
                 {/* Job Info */}
                 <div className="flex-1 min-w-0">
@@ -231,15 +264,43 @@ export default function NeedsAttentionTable({ alerts, onJobClick, onDismissJob }
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0 relative">
                   <button
-                    onClick={(e) => handleDismissJob(e, job.id)}
+                    onClick={(e) => handleDismissClick(e, job.id)}
                     disabled={dismissingJobId === job.id}
-                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                    className={`p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors ${
+                      isConfirming ? 'opacity-100 text-red-500 bg-red-500/10' : 'opacity-0 group-hover:opacity-100'
+                    }`}
                     title="Dismiss"
                   >
                     <X className="h-4 w-4" />
                   </button>
+
+                  {/* Confirmation Popup */}
+                  {isConfirming && (
+                    <div
+                      ref={confirmPopupRef}
+                      className="absolute right-0 top-full mt-1 z-50 bg-[#1a1a1a] border border-border rounded-xl shadow-xl p-3 w-48"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <p className="text-sm text-foreground mb-3">Remove this alert?</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCancelDismiss}
+                          className="flex-1 px-3 py-1.5 bg-muted hover:bg-muted/80 text-foreground text-xs font-medium rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={(e) => handleConfirmDismiss(e, job.id)}
+                          className="flex-1 px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-medium rounded-lg transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
                   <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                 </div>
               </div>

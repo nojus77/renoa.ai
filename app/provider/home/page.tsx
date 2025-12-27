@@ -435,7 +435,8 @@ export default function ProviderHome() {
       address: job.address,
       startTime: job.startTime,
       endTime: job.endTime || undefined,
-      status: job.problem === 'overdue' ? 'overdue' : 'scheduled',
+      // Use 'scheduled' as default - sidebar will fetch actual status to prevent badge flashing
+      status: 'scheduled',
     };
 
     setSidebarMode('job');
