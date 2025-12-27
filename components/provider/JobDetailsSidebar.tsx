@@ -168,6 +168,10 @@ export default function JobDetailsSidebar({
   const [loading, setLoading] = useState(false);
   const [totalRevenue, setTotalRevenue] = useState(0);
 
+  // Loading state specifically for job detail mode - prevents flashing
+  const [jobDetailLoading, setJobDetailLoading] = useState(false);
+  const [jobDetailLoaded, setJobDetailLoaded] = useState(false);
+
   // Edit mode state for single job view
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<JobDetail | null>(null);
@@ -190,11 +194,15 @@ export default function JobDetailsSidebar({
       setSaveSuccess(false);
       setShowWorkerDropdown(false);
       setWorkerSearchQuery('');
+      setJobDetailLoading(false);
+      setJobDetailLoaded(false);
     }
   }, [isOpen, mode]);
 
   // Fetch full job details when opening in job mode
   const fetchJobDetails = async (jobId: string) => {
+    setJobDetailLoading(true);
+    setJobDetailLoaded(false);
     try {
       const providerId = localStorage.getItem('providerId');
       const res = await fetch(`/api/provider/jobs/${jobId}?providerId=${providerId}`);
@@ -220,24 +228,23 @@ export default function JobDetailsSidebar({
         };
         setEditForm(fullJobDetail);
         setSelectedWorkerIds(fullJobDetail.assignedUserIds || []);
+        setJobDetailLoaded(true);
       }
     } catch (error) {
       console.error('Error fetching job details:', error);
+    } finally {
+      setJobDetailLoading(false);
     }
   };
 
-  // Initialize edit form when selected job changes
+  // Initialize edit form when selected job changes - fetch full details first
   useEffect(() => {
-    if (selectedJob && mode === 'job') {
-      // Set initial form from passed data
-      setEditForm({ ...selectedJob });
-      const workerIds = selectedJob.assignedUserIds ||
-        (selectedJob.workers?.map(w => w.id) || []);
-      setSelectedWorkerIds(workerIds);
-      // Fetch full job details to get notes
+    if (selectedJob && mode === 'job' && isOpen) {
+      // Don't set from selectedJob - wait for full fetch to prevent flashing
+      // Fetch full job details immediately
       fetchJobDetails(selectedJob.id);
     }
-  }, [selectedJob, mode]);
+  }, [selectedJob?.id, mode, isOpen]);
 
   // Fetch available workers when entering edit mode
   useEffect(() => {
@@ -479,7 +486,8 @@ export default function JobDetailsSidebar({
   // Determine title and subtitle based on mode
   const getTitle = () => {
     if (mode === 'job' && selectedJob) {
-      return selectedJob.customerName;
+      // Use editForm (from API) if loaded, otherwise use selectedJob as fallback
+      return editForm?.customerName || selectedJob.customerName;
     }
     if (mode === 'date' && selectedDate) {
       return format(new Date(selectedDate + 'T12:00:00'), 'EEEE, MMMM d');
@@ -489,7 +497,8 @@ export default function JobDetailsSidebar({
 
   const getSubtitle = () => {
     if (mode === 'job' && selectedJob) {
-      return selectedJob.serviceType;
+      // Use editForm (from API) if loaded, otherwise use selectedJob as fallback
+      return editForm?.serviceType || selectedJob.serviceType;
     }
     if (mode === 'date') {
       return `${jobs.length} job${jobs.length !== 1 ? 's' : ''} • ${formatCurrency(totalRevenue)} total`;
@@ -553,8 +562,8 @@ export default function JobDetailsSidebar({
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {/* Edit button for job mode */}
-              {mode === 'job' && selectedJob && !isEditing && (
+              {/* Edit button for job mode - only show when data is loaded */}
+              {mode === 'job' && selectedJob && !isEditing && jobDetailLoaded && (
                 <button
                   onClick={handleStartEdit}
                   className="p-2 hover:bg-primary/10 text-primary rounded-lg transition-colors"
@@ -575,8 +584,13 @@ export default function JobDetailsSidebar({
 
         {/* Content */}
         <div className="flex-1 p-4 space-y-3 overflow-y-auto">
-          {/* Job Detail Mode */}
-          {mode === 'job' && selectedJob && editForm ? (
+          {/* Job Detail Mode - Show loading while fetching full data */}
+          {mode === 'job' && selectedJob && jobDetailLoading && !jobDetailLoaded ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary mb-3" />
+              <p className="text-sm text-muted-foreground">Loading job details...</p>
+            </div>
+          ) : mode === 'job' && selectedJob && editForm && jobDetailLoaded ? (
             <div className="space-y-4">
               {/* Success message */}
               {saveSuccess && (
@@ -1038,8 +1052,8 @@ export default function JobDetailsSidebar({
 
         {/* Footer with total and action */}
         <div className="flex-shrink-0 bg-card border-t border-border p-4 space-y-3">
-          {/* Job mode - Edit actions (only show when editing) */}
-          {mode === 'job' && selectedJob && isEditing && (
+          {/* Job mode - Edit actions (only show when editing and data is loaded) */}
+          {mode === 'job' && selectedJob && isEditing && jobDetailLoaded && (
             <div className="flex gap-3">
               <button
                 onClick={handleCancelEdit}
@@ -1064,8 +1078,8 @@ export default function JobDetailsSidebar({
             </div>
           )}
 
-          {/* Job mode - Edit button + Close button when not editing */}
-          {mode === 'job' && selectedJob && !isEditing && (
+          {/* Job mode - Edit button + Close button when not editing and data is loaded */}
+          {mode === 'job' && selectedJob && !isEditing && jobDetailLoaded && (
             <div className="space-y-3">
               {/* Large Edit Job Details button - triggers inline edit mode */}
               <button
