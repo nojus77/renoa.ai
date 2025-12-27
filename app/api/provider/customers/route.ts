@@ -12,6 +12,10 @@ export async function GET(request: NextRequest) {
     const filter = searchParams.get('filter'); // all, premium, hoa, new
     const sort = searchParams.get('sort'); // name, spent, recent, since
 
+    // Pagination params
+    const cursor = searchParams.get('cursor');
+    const limit = parseInt(searchParams.get('limit') || '50');
+
     if (!providerId) {
       return NextResponse.json({ error: 'Provider ID required' }, { status: 400 });
     }
@@ -43,7 +47,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch customers with job counts
+    // Fetch customers with job counts and pagination
     const customers = await prisma.customer.findMany({
       where,
       include: {
@@ -61,10 +65,17 @@ export async function GET(request: NextRequest) {
           },
         },
       },
+      take: limit + 1,
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     });
 
+    // Check if there are more results
+    const hasMore = customers.length > limit;
+    const customersToReturn = hasMore ? customers.slice(0, -1) : customers;
+    const nextCursor = hasMore ? customersToReturn[customersToReturn.length - 1]?.id : null;
+
     // Transform data to include calculated fields
-    const transformedCustomers = customers.map(customer => {
+    const transformedCustomers = customersToReturn.map(customer => {
       const jobCount = customer.jobs.length;
       const totalSpent = customer.jobs.reduce((sum, job) => {
         return sum + (job.actualValue || job.estimatedValue || 0);
@@ -118,7 +129,11 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    return NextResponse.json({ customers: transformedCustomers });
+    return NextResponse.json({
+      customers: transformedCustomers,
+      nextCursor,
+      hasMore,
+    });
   } catch (error) {
     console.error('Error fetching customers:', error);
     return NextResponse.json(

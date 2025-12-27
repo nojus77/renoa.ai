@@ -24,6 +24,7 @@ import {
   Camera,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { validateAndCompressImage } from '@/lib/image-upload';
 
 // Renoa Design System Colors
 const LIME_GREEN = '#C4F542';
@@ -571,16 +572,26 @@ export default function WorkerMessages() {
     setMessageText(template);
   };
 
-  const handleTeamAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTeamAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setTeamAttachment(e.target.files[0]);
+      const { file, error } = await validateAndCompressImage(e.target.files[0]);
+      if (error || !file) {
+        toast.error(error || 'Failed to process image');
+      } else {
+        setTeamAttachment(file);
+      }
     }
     e.target.value = '';
   };
 
-  const handleCustomerAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCustomerAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setCustomerAttachment(e.target.files[0]);
+      const { file, error } = await validateAndCompressImage(e.target.files[0]);
+      if (error || !file) {
+        toast.error(error || 'Failed to process image');
+      } else {
+        setCustomerAttachment(file);
+      }
     }
     e.target.value = '';
   };

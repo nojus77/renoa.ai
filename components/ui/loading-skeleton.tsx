@@ -56,3 +56,49 @@ export function StatCardSkeleton() {
     </div>
   );
 }
+
+export function PageLoadingSkeleton({
+  title = "Loading...",
+  showStats = true,
+  showTable = true,
+  statsCount = 3,
+  tableRows = 5
+}: {
+  title?: string;
+  showStats?: boolean;
+  showTable?: boolean;
+  statsCount?: number;
+  tableRows?: number;
+}) {
+  return (
+    <div className="min-h-screen bg-zinc-950 p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="space-y-2">
+          <Skeleton className="h-8 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </div>
+        <Skeleton className="h-10 w-32" />
+      </div>
+
+      {/* Stats */}
+      {showStats && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {Array.from({ length: statsCount }).map((_, i) => (
+            <StatCardSkeleton key={i} />
+          ))}
+        </div>
+      )}
+
+      {/* Filters */}
+      <div className="flex gap-3">
+        <Skeleton className="h-10 w-64" />
+        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-10 w-32" />
+      </div>
+
+      {/* Table */}
+      {showTable && <TableSkeleton rows={tableRows} />}
+    </div>
+  );
+}

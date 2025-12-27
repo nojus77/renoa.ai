@@ -36,29 +36,6 @@ export async function POST(request: NextRequest) {
     const passwordHash = await bcrypt.hash(newPassword, 10);
     const emailLower = email.toLowerCase().trim();
 
-    // Try to find and update in User table
-    const user = await prisma.user.findUnique({
-      where: { email: emailLower },
-    });
-
-    if (user) {
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { passwordHash, updatedAt: new Date() },
-      });
-
-      return NextResponse.json({
-        success: true,
-        message: `Password successfully reset for User: ${user.firstName} ${user.lastName}`,
-        accountType: 'User',
-        details: {
-          name: `${user.firstName} ${user.lastName}`,
-          email: user.email,
-          role: user.role,
-        },
-      });
-    }
-
     // Try to find and update in ProviderUser table
     const providerUser = await prisma.providerUser.findUnique({
       where: { email: emailLower },
@@ -121,28 +98,6 @@ export async function GET(request: NextRequest) {
 
     const emailLower = email.toLowerCase().trim();
     const results = [];
-
-    // Search in User table
-    const user = await prisma.user.findUnique({
-      where: { email: emailLower },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        role: true,
-      },
-    });
-
-    if (user) {
-      results.push({
-        type: 'User',
-        id: user.id,
-        email: user.email,
-        name: `${user.firstName} ${user.lastName}`,
-        role: user.role,
-      });
-    }
 
     // Search in ProviderUser table
     const providerUser = await prisma.providerUser.findUnique({

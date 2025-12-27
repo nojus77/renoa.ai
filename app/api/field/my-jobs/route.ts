@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
       endTime: job.endTime,
       status: job.status,
       customerNotes: job.customerNotes,
-      internalNotes: job.internalNotes,
+      jobInstructions: job.jobInstructions,
       customer: job.customer,
       // Exclude: estimatedValue, actualValue, invoices
     }));

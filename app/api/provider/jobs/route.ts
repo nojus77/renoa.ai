@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
+import { getTimezoneFromAddress } from '@/lib/google-timezone';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,9 +31,9 @@ export async function POST(request: NextRequest) {
       // serviceTypeConfigId - logged above but not stored (no field in schema)
       startTime,
       duration = 2, // Duration in hours, default 2
-      estimatedDuration, // NEW: Duration in minutes from modal
+      durationMinutes, // Duration in minutes
       estimatedValue,
-      internalNotes,
+      jobInstructions, // Office → worker instructions
       customerNotes,
       status = 'scheduled',
       appointmentType = 'anytime', // 'fixed', 'anytime', 'window'
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Duration validation
-    const durationHours = estimatedDuration ? estimatedDuration / 60 : duration;
+    const durationHours = durationMinutes ? durationMinutes / 60 : duration;
     if (!durationHours || durationHours <= 0) {
       return NextResponse.json({ error: 'Duration is required and must be positive' }, { status: 400 });
     }
@@ -122,11 +123,23 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Fetch provider for fallback timezone
+    const provider = await prisma.provider.findUnique({
+      where: { id: providerId },
+      select: { timeZone: true },
+    });
+
+    // Get timezone from job address location
+    const jobAddress = customerAddress || '';
+    const jobTimezone = jobAddress ? await getTimezoneFromAddress(jobAddress) : null;
+    // Fallback to provider timezone if lookup fails
+    const finalTimezone = jobTimezone || provider?.timeZone || 'America/Chicago';
+
     console.log('📋 ServiceTypeConfig for', serviceType, ':', serviceConfig ? {
       requiredSkills: serviceConfig.requiredSkills,
       preferredSkills: serviceConfig.preferredSkills,
       crewSizeMin: serviceConfig.crewSizeMin,
-      estimatedDuration: serviceConfig.estimatedDuration,
+      estimatedDuration: serviceConfig.estimatedDuration, // ServiceTypeConfig stores in hours
     } : 'Not configured');
 
     // Create the job with skill requirements
@@ -137,13 +150,14 @@ export async function POST(request: NextRequest) {
         customerId: finalCustomerId,
         serviceType,
         address: customerAddress || '',
+        timezone: finalTimezone, // IANA timezone from job location
         startTime: startDate,
         endTime: endDate,
         status,
         source: 'own', // Provider manually created this job
         appointmentType, // 'fixed', 'anytime', 'window'
         estimatedValue: estimatedValue ? parseFloat(estimatedValue) : null,
-        internalNotes: internalNotes || null,
+        jobInstructions: jobInstructions || null,
         customerNotes: customerNotes || null,
         isRecurring,
         recurringFrequency: isRecurring ? recurringFrequency : null,
@@ -154,7 +168,7 @@ export async function POST(request: NextRequest) {
         preferredSkillIds: preferredSkillIds ?? serviceConfig?.preferredSkills ?? [],
         requiredWorkerCount: requiredWorkerCount ?? serviceConfig?.crewSizeMin ?? 1,
         bufferMinutes: bufferMinutes ?? 15,
-        estimatedDuration: estimatedDuration ? estimatedDuration / 60 : (serviceConfig?.estimatedDuration || durationHours),
+        durationMinutes: durationMinutes ?? (serviceConfig?.estimatedDuration ? Math.round(serviceConfig.estimatedDuration * 60) : Math.round(durationHours * 60)),
         // Override fields
         allowUnqualified: allowUnqualified || false,
         unqualifiedOverrideReason: allowUnqualified ? (unqualifiedOverrideReason || null) : null,
@@ -243,6 +257,10 @@ export async function GET(request: NextRequest) {
     const statuses = searchParams.get('statuses'); // Filter by multiple statuses (comma-separated)
     const unassigned = searchParams.get('unassigned'); // Filter for unassigned jobs only
 
+    // Pagination params
+    const cursor = searchParams.get('cursor');
+    const limit = parseInt(searchParams.get('limit') || '50');
+
     if (!providerId) {
       return NextResponse.json({ error: 'Provider ID required' }, { status: 400 });
     }
@@ -280,7 +298,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Fetch all jobs for this provider using the Job model
+    // Fetch jobs with cursor-based pagination
     const jobs = await prisma.job.findMany({
       where: whereClause,
       include: {
@@ -290,6 +308,8 @@ export async function GET(request: NextRequest) {
       orderBy: {
         startTime: 'asc',
       },
+      take: limit + 1, // Fetch one extra to check if there are more
+      ...(cursor && { cursor: { id: cursor }, skip: 1 }),
     });
 
     // Collect all unique user IDs from all jobs
@@ -328,8 +348,13 @@ export async function GET(request: NextRequest) {
     // Create a map for O(1) lookups
     const userMap = new Map(users.map(u => [u.id, u]));
 
+    // Check if there are more results
+    const hasMore = jobs.length > limit;
+    const jobsToReturn = hasMore ? jobs.slice(0, -1) : jobs;
+    const nextCursor = hasMore ? jobsToReturn[jobsToReturn.length - 1]?.id : null;
+
     // Transform jobs with user data
-    const transformedJobs = jobs.map(job => {
+    const transformedJobs = jobsToReturn.map(job => {
       const assignedUsers = job.assignedUserIds
         ? job.assignedUserIds.map(id => userMap.get(id)).filter(Boolean)
         : [];
@@ -348,7 +373,7 @@ export async function GET(request: NextRequest) {
         isRenoaLead: job.source === 'renoa',
         estimatedValue: job.estimatedValue,
         actualValue: job.actualValue,
-        internalNotes: job.internalNotes,
+        jobInstructions: job.jobInstructions,
         customerNotes: job.customerNotes,
         createdAt: job.createdAt,
         updatedAt: job.updatedAt,
@@ -363,7 +388,11 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ jobs: transformedJobs });
+    return NextResponse.json({
+      jobs: transformedJobs,
+      nextCursor,
+      hasMore,
+    });
   } catch (error) {
     console.error('Error fetching provider jobs:', error);
     return NextResponse.json(

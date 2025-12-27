@@ -27,7 +27,19 @@
       "Bash(npm run build:*)",
       "Bash(npx next lint:*)",
       "Bash(cat:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(DATABASE_URL=\"postgresql://postgres.ysouziryzfstlwiclolc:qovhyp-datsib-7jyzkY@aws-1-us-east-2.pooler.supabase.com:5432/postgres\" npx tsx:*)",
+      "Bash(DATABASE_URL=postgresql://postgres.ysouziryzfstlwiclolc:qovhyp-datsib-7jyzkY@aws-1-us-east-2.pooler.supabase.com:5432/postgres npx prisma db pull:*)",
+      "Bash(npx depcheck:*)",
+      "Bash(# Count files before deletion echo \"\"=== FILES TO DELETE ===\"\" echo \"\"\"\" echo \"\"Lead Generation:\"\" find app/api/leads app/api/bulk components/leads -type f)",
+      "Bash(npx prisma db push:*)",
+      "Bash(rm:*)",
+      "Bash(ls:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nchore: major codebase cleanup - remove dead systems\n\n- Remove Lead Generation system \\(models, APIs, components\\)\n- Remove Email Campaign system \\(models, APIs, services\\)\n- Remove Landing Page components \\(moved to Lovable\\)\n- Remove Loyalty/Promotions system \\(not needed for V1\\)\n- Remove 15 database models, 17 enums\n- Remove 10 unused npm packages\n- Fix all broken imports\n- Schema reduced by 30%\n\nSystems removed:\n- Lead, Match, Campaign, CampaignLead, CampaignSequence\n- EmailLog, EmailTemplate, EmailEvent, Message, MessageTemplate\n- EngagementMetric, AIOptimization, InboundMessage, ServiceProvider, User\n\n🧹 Cleanup from 3 pivots of technical debt\n\n🤖 Generated with [Claude Code]\\(https://claude.com/claude-code\\)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(npm install:*)",
+      "Bash(npx ts-node scripts/backfill-job-timezones.ts)",
+      "Bash(vercel --prod:*)",
+      "Bash(npx vercel --prod)"
     ]
   }
 }

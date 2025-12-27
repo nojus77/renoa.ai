@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from 'next-themes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
@@ -40,10 +41,13 @@ import {
   Send,
   LogOut,
   Users,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Cropper from 'react-easy-crop';
 import type { Area } from 'react-easy-crop';
+import { validateImage, MAX_FILE_SIZE, ALLOWED_TYPES } from '@/lib/image-upload';
 
 type TabType = 'profile' | 'availability' | 'services' | 'team' | 'notifications' | 'payments' | 'integrations' | 'security';
 
@@ -195,6 +199,8 @@ const PAYMENT_TERMS_OPTIONS = [
 
 export default function ProviderSettings() {
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const [providerName, setProviderName] = useState('');
   const [providerId, setProviderId] = useState('');
   const [loading, setLoading] = useState(true);
@@ -331,6 +337,12 @@ export default function ProviderSettings() {
   const [workersCanEditSkills, setWorkersCanEditSkills] = useState(false);
   const [workersCanEditAvailability, setWorkersCanEditAvailability] = useState(true);
   const [workersCanViewTeamSchedule, setWorkersCanViewTeamSchedule] = useState(false);
+  const [requireCompletionPhotos, setRequireCompletionPhotos] = useState(false);
+
+  // Handle theme mounting to avoid hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     const id = localStorage.getItem('providerId');
@@ -449,6 +461,7 @@ export default function ProviderSettings() {
         setWorkersCanEditSkills(p.workersCanEditSkills ?? false);
         setWorkersCanEditAvailability(p.workersCanEditAvailability ?? true);
         setWorkersCanViewTeamSchedule(p.workersCanViewTeamSchedule ?? false);
+        setRequireCompletionPhotos(p.requireCompletionPhotos ?? false);
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -558,14 +571,10 @@ export default function ProviderSettings() {
   const handlePhotoUpload = async (file: File) => {
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB');
-      return;
-    }
-
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Please upload a JPG, PNG, or WebP image');
+    // Use shared validation
+    const validation = validateImage(file);
+    if (!validation.valid) {
+      toast.error(validation.error);
       return;
     }
 
@@ -808,6 +817,7 @@ export default function ProviderSettings() {
           workersCanEditSkills,
           workersCanEditAvailability,
           workersCanViewTeamSchedule,
+          requireCompletionPhotos,
         }),
       });
 
@@ -1499,6 +1509,35 @@ export default function ProviderSettings() {
                         </select>
                       </div>
 
+                      {/* Dark Mode Toggle */}
+                      <div>
+                        <label className="block text-sm font-medium text-zinc-300 mb-2">
+                          Dark Mode 🌙
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                          className="w-full flex items-center justify-between px-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 hover:border-zinc-700 transition-colors"
+                        >
+                          <span className="flex items-center gap-2">
+                            {mounted && theme === 'dark' ? (
+                              <>
+                                <Moon className="h-4 w-4 text-purple-400" />
+                                <span>Dark Mode</span>
+                              </>
+                            ) : (
+                              <>
+                                <Sun className="h-4 w-4 text-yellow-400" />
+                                <span>Light Mode</span>
+                              </>
+                            )}
+                          </span>
+                          <div className={`w-10 h-5 rounded-full relative transition-colors ${mounted && theme === 'dark' ? 'bg-purple-500' : 'bg-zinc-600'}`}>
+                            <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-all ${mounted && theme === 'dark' ? 'left-5' : 'left-0.5'}`} />
+                          </div>
+                        </button>
+                      </div>
+
                       <Button
                         onClick={saveBusinessLocation}
                         disabled={saving}
@@ -2132,6 +2171,28 @@ export default function ProviderSettings() {
                           <div
                             className={`w-5 h-5 rounded-full bg-white transition-transform ${
                               workersCanViewTeamSchedule ? 'translate-x-6' : 'translate-x-1'
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Require Completion Photos */}
+                      <div className="flex items-center justify-between p-4 bg-zinc-900 border border-zinc-800 rounded-lg">
+                        <div className="flex-1">
+                          <p className="text-sm font-medium text-zinc-200">Require photos when completing jobs</p>
+                          <p className="text-xs text-zinc-500 mt-1">
+                            Workers must upload at least one photo before they can finish a job. If disabled, photos are optional but workers will see a reminder.
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setRequireCompletionPhotos(!requireCompletionPhotos)}
+                          className={`w-12 h-6 rounded-full transition-colors flex-shrink-0 ${
+                            requireCompletionPhotos ? 'bg-emerald-600' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white transition-transform ${
+                              requireCompletionPhotos ? 'translate-x-6' : 'translate-x-1'
                             }`}
                           />
                         </button>

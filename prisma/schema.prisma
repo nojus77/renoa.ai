@@ -9,364 +9,6 @@ datasource db {
   directUrl = env("DIRECT_URL")
 }
 
-model User {
-  id               String            @id @default(uuid())
-  email            String            @unique
-  passwordHash     String            @map("password_hash")
-  role             UserRole
-  firstName        String            @map("first_name")
-  lastName         String            @map("last_name")
-  phone            String?
-  createdAt        DateTime          @default(now()) @map("created_at")
-  updatedAt        DateTime          @updatedAt @map("updated_at")
-  campaigns        Campaign[]
-  messageTemplates MessageTemplate[]
-  serviceProvider  ServiceProvider?
-
-  @@map("users")
-}
-
-model Lead {
-  id                    String             @id @default(uuid())
-  firstName             String             @map("first_name")
-  lastName              String             @map("last_name")
-  email                 String
-  phone                 String
-  address               String
-  city                  String
-  state                 String
-  zip                   String
-  propertyType          PropertyType       @map("property_type")
-  propertyValue         Decimal?           @map("property_value")
-  contractValue         Decimal?           @map("contract_value")
-  squareFootage         Int?               @map("square_footage")
-  moveInDate            DateTime?          @map("move_in_date")
-  serviceInterest       ServiceCategory    @map("service_interest")
-  leadSource            String             @map("lead_source")
-  leadScore             Int                @default(0) @map("lead_score")
-  tier                  Int
-  campaign              String?
-  contactCount          Int                @default(0) @map("contact_count")
-  urgencyScore          Int?
-  propertyScore         Int?
-  financialScore        Int?
-  demographicScore      Int?
-  marketScore           Int?
-  urgencyReasons        String?            @map("urgency_reasons")
-  status                LeadStatus         @default(new)
-  notes                 String?
-  aiTool1Metadata       Json?              @map("ai_tool_1_metadata")
-  customerPreferredDate DateTime?          @map("customer_preferred_date")
-  providerProposedDate  DateTime?          @map("provider_proposed_date")
-  schedulingStatus      String?            @map("scheduling_status")
-  schedulingNotes       String?            @map("scheduling_notes")
-  createdAt             DateTime           @default(now()) @map("created_at")
-  updatedAt             DateTime           @updatedAt @map("updated_at")
-  assignedProviderId    String?            @map("assigned_provider_id")
-  recommendation_source String?
-  campaignLeads         CampaignLead[]     @relation("CampaignLeadRelation")
-  inboundMessages       InboundMessage[]   @relation("LeadInboundMessages")
-  messages              Message[]          @relation("LeadMessages")
-  emailLogs             EmailLog[]         @relation("LeadEmailLogs")
-  engagementMetrics     EngagementMetric[] @relation("LeadEngagementMetrics")
-  providerNotes         LeadNote[]         @relation("LeadNotes")
-  assignedProvider      Provider?          @relation("AssignedProviderLeads", fields: [assignedProviderId], references: [id])
-  matches               Match[]            @relation("LeadMatches")
-
-  @@index([email])
-  @@index([zip])
-  @@index([status])
-  @@index([serviceInterest])
-  @@index([leadScore])
-  @@index([tier])
-  @@index([createdAt])
-  @@index([updatedAt])
-  @@index([assignedProviderId])
-  @@map("leads")
-}
-
-model LeadNote {
-  id         String   @id @default(uuid())
-  leadId     String   @map("lead_id")
-  providerId String   @map("provider_id")
-  note       String
-  createdAt  DateTime @default(now()) @map("created_at")
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  lead       Lead     @relation("LeadNotes", fields: [leadId], references: [id], onDelete: Cascade)
-  provider   Provider @relation("ProviderNotes", fields: [providerId], references: [id], onDelete: Cascade)
-
-  @@index([leadId])
-  @@index([providerId])
-  @@index([createdAt])
-  @@map("lead_notes")
-}
-
-model EmailLog {
-  id           String    @id @default(uuid())
-  messageId    String    @unique @map("message_id")
-  leadId       String    @map("lead_id")
-  campaignId   String?   @map("campaign_id")
-  fromEmail    String    @map("from_email")
-  toEmail      String    @map("to_email")
-  subject      String
-  body         String
-  sentAt       DateTime  @map("sent_at")
-  openedAt     DateTime? @map("opened_at")
-  clickedAt    DateTime? @map("clicked_at")
-  repliedAt    DateTime? @map("replied_at")
-  bouncedAt    DateTime? @map("bounced_at")
-  complainedAt DateTime? @map("complained_at")
-  lead         Lead      @relation("LeadEmailLogs", fields: [leadId], references: [id])
-
-  @@map("email_logs")
-}
-
-model InboundMessage {
-  id            String   @id @default(cuid())
-  originalMsgId String
-  leadId        String
-  messageId     String   @unique
-  inReplyTo     String?
-  references    String?
-  fromEmail     String
-  subject       String
-  body          String
-  htmlBody      String?
-  receivedAt    DateTime @default(now())
-  lead          Lead     @relation("LeadInboundMessages", fields: [leadId], references: [id], onDelete: Cascade)
-  originalMsg   Message  @relation("MessageInboundReplies", fields: [originalMsgId], references: [id], onDelete: Cascade)
-
-  @@index([leadId])
-  @@index([originalMsgId])
-}
-
-model Campaign {
-  id                String             @id @default(uuid())
-  name              String
-  serviceType       ServiceCategory    @map("service_type")
-  targetAudience    Json               @map("target_audience")
-  sequenceType      SequenceType       @map("sequence_type")
-  status            CampaignStatus     @default(draft)
-  totalLeads        Int                @default(0) @map("total_leads")
-  messagesSent      Int                @default(0) @map("messages_sent")
-  deliveredCount    Int                @default(0) @map("delivered_count")
-  openedCount       Int                @default(0) @map("opened_count")
-  repliedCount      Int                @default(0) @map("replied_count")
-  convertedCount    Int                @default(0) @map("converted_count")
-  scheduledStart    DateTime?          @map("scheduled_start")
-  startedAt         DateTime?          @map("started_at")
-  completedAt       DateTime?          @map("completed_at")
-  createdBy         String?            @map("created_by")
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-  type              CampaignType       @default(EMAIL)
-  campaignLeads     CampaignLead[]     @relation("CampaignLeadsRelation")
-  sequences         CampaignSequence[] @relation("CampaignSequences")
-  messages          Message[]          @relation("CampaignMessages")
-  creator           User?              @relation(fields: [createdBy], references: [id])
-  engagementMetrics EngagementMetric[] @relation("CampaignEngagementMetrics")
-  matches           Match[]            @relation("CampaignMatches")
-
-  @@index([status])
-  @@index([serviceType])
-  @@map("campaigns")
-}
-
-model Message {
-  id                String             @id @default(cuid())
-  leadId            String
-  campaignId        String?
-  sequenceStepId    String?
-  messageId         String             @unique
-  trackingToken     String             @unique
-  inReplyTo         String?
-  subject           String
-  body              String
-  fromEmail         String
-  toEmail           String
-  status            EmailStatus        @default(QUEUED)
-  sentAt            DateTime?
-  scheduledFor      DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  events            EmailEvent[]       @relation("MessageEvents")
-  replies           InboundMessage[]   @relation("MessageInboundReplies")
-  campaign          Campaign?          @relation("CampaignMessages", fields: [campaignId], references: [id])
-  lead              Lead               @relation("LeadMessages", fields: [leadId], references: [id], onDelete: Cascade)
-  engagementMetrics EngagementMetric[] @relation("MessageEngagementMetrics")
-
-  @@index([leadId])
-  @@index([campaignId])
-  @@index([status])
-  @@index([scheduledFor])
-}
-
-model EngagementMetric {
-  id             String          @id @default(uuid())
-  messageId      String          @map("message_id")
-  leadId         String          @map("lead_id")
-  campaignId     String          @map("campaign_id")
-  delivered      Boolean         @default(false)
-  opened         Boolean         @default(false)
-  clicked        Boolean         @default(false)
-  replied        Boolean         @default(false)
-  replyText      String?         @map("reply_text")
-  replySentiment ReplySentiment? @map("reply_sentiment")
-  openedAt       DateTime?       @map("opened_at")
-  clickedAt      DateTime?       @map("clicked_at")
-  repliedAt      DateTime?       @map("replied_at")
-  createdAt      DateTime        @default(now()) @map("created_at")
-  updatedAt      DateTime        @updatedAt @map("updated_at")
-  campaign       Campaign        @relation("CampaignEngagementMetrics", fields: [campaignId], references: [id])
-  lead           Lead            @relation("LeadEngagementMetrics", fields: [leadId], references: [id])
-  message        Message         @relation("MessageEngagementMetrics", fields: [messageId], references: [id])
-
-  @@index([messageId])
-  @@index([leadId])
-  @@index([campaignId])
-  @@map("engagement_metrics")
-}
-
-model EmailEvent {
-  id         String    @id @default(cuid())
-  messageId  String
-  eventType  EventType
-  timestamp  DateTime  @default(now())
-  ipAddress  String?
-  userAgent  String?
-  clickUrl   String?
-  bounceType String?
-  metadata   Json?
-  message    Message   @relation("MessageEvents", fields: [messageId], references: [id], onDelete: Cascade)
-
-  @@index([messageId])
-  @@index([eventType])
-  @@index([timestamp])
-}
-
-model ServiceProvider {
-  id                  String            @id @default(uuid())
-  userId              String            @unique @map("user_id")
-  businessName        String            @map("business_name")
-  serviceCategories   ServiceCategory[] @map("service_categories")
-  coverageAreas       Json              @map("coverage_areas")
-  rating              Decimal           @default(0) @db.Decimal(3, 2)
-  totalReviews        Int               @default(0) @map("total_reviews")
-  subscriptionTier    SubscriptionTier  @default(free) @map("subscription_tier")
-  priceRange          PriceRange        @map("price_range")
-  specializations     String[]
-  capacityStatus      CapacityStatus    @default(accepting) @map("capacity_status")
-  leadsReceivedCount  Int               @default(0) @map("leads_received_count")
-  leadsConvertedCount Int               @default(0) @map("leads_converted_count")
-  conversionRate      Decimal           @default(0) @map("conversion_rate") @db.Decimal(5, 2)
-  isVerified          Boolean           @default(false) @map("is_verified")
-  isActive            Boolean           @default(true) @map("is_active")
-  createdAt           DateTime          @default(now()) @map("created_at")
-  updatedAt           DateTime          @updatedAt @map("updated_at")
-  matches             Match[]           @relation("ServiceProviderMatches")
-  user                User              @relation(fields: [userId], references: [id])
-
-  @@map("service_providers")
-}
-
-model Match {
-  id                 String          @id @default(uuid())
-  leadId             String          @map("lead_id")
-  providerId         String          @map("provider_id")
-  campaignId         String          @map("campaign_id")
-  status             MatchStatus     @default(pending)
-  matchScore         Decimal         @map("match_score") @db.Decimal(5, 2)
-  estimatedValue     Decimal?        @map("estimated_value")
-  providerNotifiedAt DateTime?       @map("provider_notified_at")
-  providerResponseAt DateTime?       @map("provider_response_at")
-  dealClosedAt       DateTime?       @map("deal_closed_at")
-  createdAt          DateTime        @default(now()) @map("created_at")
-  updatedAt          DateTime        @updatedAt @map("updated_at")
-  campaign           Campaign        @relation("CampaignMatches", fields: [campaignId], references: [id])
-  lead               Lead            @relation("LeadMatches", fields: [leadId], references: [id])
-  provider           ServiceProvider @relation("ServiceProviderMatches", fields: [providerId], references: [id])
-
-  @@index([leadId])
-  @@index([providerId])
-  @@index([status])
-  @@map("matches")
-}
-
-model MessageTemplate {
-  id               String           @id @default(uuid())
-  name             String
-  type             MessageType
-  serviceCategory  ServiceCategory? @map("service_category")
-  subject          String?
-  body             String
-  isActive         Boolean          @default(true) @map("is_active")
-  performanceScore Decimal          @default(0) @map("performance_score") @db.Decimal(5, 2)
-  timesUsed        Int              @default(0) @map("times_used")
-  avgReplyRate     Decimal          @default(0) @map("avg_reply_rate") @db.Decimal(5, 2)
-  createdBy        String           @map("created_by")
-  createdAt        DateTime         @default(now()) @map("created_at")
-  updatedAt        DateTime         @updatedAt @map("updated_at")
-  creator          User             @relation(fields: [createdBy], references: [id])
-
-  @@index([type])
-  @@index([isActive])
-  @@map("message_templates")
-}
-
-model CampaignSequence {
-  id         String        @id @default(cuid())
-  campaignId String
-  stepNumber Int
-  delayDays  Int           @default(0)
-  templateId String
-  createdAt  DateTime      @default(now())
-  status     String        @default("active")
-  campaign   Campaign      @relation("CampaignSequences", fields: [campaignId], references: [id], onDelete: Cascade)
-  template   EmailTemplate @relation("TemplateSequences", fields: [templateId], references: [id])
-
-  @@unique([campaignId, stepNumber])
-  @@index([campaignId])
-}
-
-model EmailTemplate {
-  id        String             @id @default(cuid())
-  name      String
-  subject   String
-  body      String
-  variables Json?
-  createdAt DateTime           @default(now())
-  updatedAt DateTime           @updatedAt
-  sequences CampaignSequence[] @relation("TemplateSequences")
-}
-
-model AIOptimization {
-  id                    String           @id @default(uuid())
-  optimizationType      OptimizationType @map("optimization_type")
-  beforeMetric          Json             @map("before_metric")
-  afterMetric           Json             @map("after_metric")
-  improvementPercentage Decimal          @map("improvement_percentage") @db.Decimal(5, 2)
-  appliedAt             DateTime         @map("applied_at")
-  details               Json
-  createdAt             DateTime         @default(now()) @map("created_at")
-
-  @@index([optimizationType])
-  @@map("ai_optimizations")
-}
-
-model CampaignLead {
-  id         String   @id @default(cuid())
-  campaignId String
-  leadId     String
-  status     String   @default("pending")
-  createdAt  DateTime @default(now())
-  campaign   Campaign @relation("CampaignLeadsRelation", fields: [campaignId], references: [id], onDelete: Cascade)
-  lead       Lead     @relation("CampaignLeadRelation", fields: [leadId], references: [id], onDelete: Cascade)
-
-  @@unique([campaignId, leadId])
-  @@index([campaignId])
-  @@index([leadId])
-}
-
 model Provider {
   id                         String                       @id @default(uuid())
   businessName               String
@@ -433,6 +75,7 @@ model Provider {
   workersCanEditSkills       Boolean                      @default(false) @map("workers_can_edit_skills")
   workersCanEditAvailability Boolean                      @default(true) @map("workers_can_edit_availability")
   workersCanViewTeamSchedule Boolean                      @default(false) @map("workers_can_view_team_schedule")
+  requireCompletionPhotos    Boolean                      @default(false) @map("require_completion_photos")
   ownerId                    String?                      @map("owner_id")
   activeSeats                Int                          @default(1) @map("active_seats")
   stripeCustomerId           String?                      @map("stripe_customer_id")
@@ -447,8 +90,6 @@ model Provider {
   customers                  Customer[]                   @relation("ProviderCustomers")
   invoices                   Invoice[]                    @relation("ProviderInvoices")
   jobs                       Job[]                        @relation("ProviderJobs")
-  leadNotes                  LeadNote[]                   @relation("ProviderNotes")
-  leads                      Lead[]                       @relation("AssignedProviderLeads")
   promotions                 promotions[]
   provider_customer_messages provider_customer_messages[]
   reviews                    reviews[]
@@ -459,6 +100,7 @@ model Provider {
   workLogs                   WorkLog[]                    @relation("ProviderWorkLogs")
   statusLogs                 UserStatusLog[]              @relation("ProviderStatusLogs")
   teamMessages               team_messages[]
+  serviceChecklists          ServiceChecklist[]           @relation("ProviderChecklists")
 }
 
 model Notification {
@@ -525,6 +167,9 @@ model ProviderUser {
   @@index([providerId])
   @@index([email])
   @@index([role])
+  // Compound indexes for performance
+  @@index([providerId, role])
+  @@index([providerId, status])
   @@map("provider_users")
 }
 
@@ -598,6 +243,9 @@ model Customer {
   @@index([providerId])
   @@index([phone])
   @@index([zone])
+  // Compound indexes for performance
+  @@index([providerId, createdAt])
+  @@index([providerId, name])
   @@map("customers")
 }
 
@@ -613,8 +261,9 @@ model Job {
   source                String                 @default("own")
   estimatedValue        Float?                 @map("estimated_value")
   actualValue           Float?                 @map("actual_value")
-  internalNotes         String?                @map("internal_notes")
-  customerNotes         String?                @map("customer_notes")
+  jobInstructions       String?                @map("job_instructions") // Office → worker instructions (renamed from internalNotes)
+  customerNotes         String?                @map("customer_notes")   // Customer leaves, both see
+  fieldNotes            String?                @map("field_notes")      // Worker writes, visible in history
   createdAt             DateTime               @default(now()) @map("created_at")
   updatedAt             DateTime               @updatedAt @map("updated_at")
   booking_source        String?
@@ -644,7 +293,8 @@ model Job {
   latitude              Float? // For distance calculations
   longitude             Float? // For distance calculations
   zone                  String? // ZIP code or service area
-  estimatedDuration     Float?                 @map("estimated_duration") // hours
+  timezone              String?                // IANA timezone from job address location (e.g., "America/Chicago")
+  durationMinutes       Int?                   @map("duration_minutes") // Estimated duration in minutes
   actualDurationMinutes Int?                   @map("actual_duration_minutes") // Actual time spent (minutes)
   // Dispatch/Route fields
   appointmentType       String                 @default("anytime") @map("appointment_type") // "fixed", "anytime", "window"
@@ -680,6 +330,7 @@ model Job {
   loyalty_transactions  loyalty_transactions[]
   reviews               reviews?
   workLogs              WorkLog[]              @relation("JobWorkLogs")
+  completionData        JobCompletionData?     @relation("JobCompletionData")
 
   @@index([providerId])
   @@index([assignedCrewId])
@@ -688,6 +339,11 @@ model Job {
   @@index([assignedUserIds])
   @@index([zone])
   @@index([jobCategory])
+  // Compound indexes for performance
+  @@index([providerId, status])
+  @@index([providerId, startTime])
+  @@index([status, startTime])
+  @@index([providerId, status, startTime])
   @@map("jobs")
 }
 
@@ -784,6 +440,10 @@ model Invoice {
   @@index([invoiceDate])
   @@index([dueDate])
   @@index([jobId])
+  // Compound indexes for performance
+  @@index([providerId, status])
+  @@index([providerId, invoiceDate])
+  @@index([providerId, status, invoiceDate])
   @@map("invoices")
 }
 
@@ -1181,138 +841,9 @@ model service_upsells {
   @@index([display_order])
 }
 
-enum UserRole {
-  homeowner
-  provider
-  admin
-}
-
-enum PropertyType {
-  single_family
-  condo
-  townhouse
-  multi_family
-}
-
-enum ServiceCategory {
-  landscaping
-  remodeling
-  roofing
-  fencing
-  hvac
-  plumbing
-  painting
-  flooring
-  lawn_care
-  tree_service
-  hardscaping
-}
-
-enum LeadStatus {
-  new
-  contacted
-  replied
-  matched
-  accepted
-  converted
-  unqualified
-}
-
-enum CampaignStatus {
-  draft
-  scheduled
-  active
-  paused
-  completed
-}
-
-enum SequenceType {
-  sms_sms_email
-  email_sms_email
-  sms_email
-  custom
-}
-
-enum MessageType {
-  sms
-  email
-}
-
-enum MessageStatus {
-  scheduled
-  sent
-  delivered
-  failed
-  bounced
-}
-
-enum ReplySentiment {
-  positive
-  neutral
-  negative
-  question
-}
-
-enum SubscriptionTier {
-  free
-  basic
-  pro
-  enterprise
-}
-
-enum PriceRange {
-  budget
-  mid_range
-  premium
-  luxury
-}
-
-enum CapacityStatus {
-  accepting
-  limited
-  full
-}
-
-enum MatchStatus {
-  pending
-  sent_to_provider
-  accepted
-  declined
-  contacted
-  closed_won
-  closed_lost
-}
-
-enum OptimizationType {
-  message_template
-  send_timing
-  lead_scoring
-  matching_criteria
-}
-
-enum EmailStatus {
-  QUEUED
-  SENDING
-  SENT
-  DELIVERED
-  BOUNCED
-  COMPLAINED
-  FAILED
-}
-
-enum EventType {
-  DELIVERED
-  BOUNCED
-  COMPLAINED
-  OPENED
-  CLICKED
-}
-
-enum CampaignType {
-  EMAIL
-  SMS
-  MULTI_CHANNEL
-}
+// ============================================
+// ENUMS - Only used enums kept
+// ============================================
 
 enum AdminRole {
   super_admin
@@ -1584,6 +1115,39 @@ model PasswordResetToken {
   createdAt DateTime @default(now()) @map("created_at")
 
   @@map("password_reset_tokens")
+}
+
+// Service completion checklists per service type
+model ServiceChecklist {
+  id          String   @id @default(cuid())
+  providerId  String   @map("provider_id")
+  serviceType String   @map("service_type")
+  items       Json     // Array of { id, label, required }
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  provider    Provider @relation("ProviderChecklists", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, serviceType])
+  @@index([providerId])
+  @@map("service_checklists")
+}
+
+// Job completion data - checklist, signature, photos
+model JobCompletionData {
+  id                 String    @id @default(cuid())
+  jobId              String    @unique @map("job_id")
+  checklistCompleted Json?     @map("checklist_completed") // { itemId: boolean }
+  signatureUrl       String?   @map("signature_url")
+  signedByName       String?   @map("signed_by_name")
+  signedAt           DateTime? @map("signed_at")
+  completionNotes    String?   @map("completion_notes")
+  completionPhotos   String[]  @default([]) @map("completion_photos")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+  job                Job       @relation("JobCompletionData", fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@index([jobId])
+  @@map("job_completion_data")
 }
 
 // Work logs - track time and earnings per job

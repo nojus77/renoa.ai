@@ -35,6 +35,7 @@ import {
 import { toast } from 'sonner';
 import { formatCurrency, formatDate, formatTime } from '@/lib/api-helpers';
 import CompleteJobModal from '@/components/provider/CompleteJobModal';
+import { validateAndCompressImage } from '@/lib/image-upload';
 
 interface Job {
   id: string;
@@ -50,7 +51,7 @@ interface Job {
   isRenoaLead: boolean;
   estimatedValue: number | null;
   actualValue: number | null;
-  internalNotes: string | null;
+  jobInstructions: string | null;
   customerNotes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -78,6 +79,21 @@ interface Job {
     invoiceNumber: string;
     status: string;
   } | null;
+  durationMinutes?: number | null;
+  actualDurationMinutes?: number | null;
+  completedAt?: string | null;
+  completedByUser?: {
+    firstName: string;
+    lastName: string;
+  } | null;
+  completionData?: {
+    checklistCompleted: Record<string, boolean> | null;
+    signatureUrl: string | null;
+    signedByName: string | null;
+    signedAt: string | null;
+    completionNotes: string | null;
+    completionPhotos: string[];
+  } | null;
 }
 
 // Service type icons
@@ -101,7 +117,7 @@ export default function JobDetailPage() {
   const [updating, setUpdating] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [notesTab, setNotesTab] = useState<'internal' | 'customer'>('internal');
-  const [internalNotes, setInternalNotes] = useState('');
+  const [jobInstructions, setInternalNotes] = useState('');
   const [customerNotes, setCustomerNotes] = useState('');
   const [actualValue, setActualValue] = useState('');
   const [elapsedTime, setElapsedTime] = useState(0); // For in-progress timer
@@ -140,7 +156,7 @@ export default function JobDetailPage() {
 
       // API returns job data at root level, not wrapped in 'job' property
       setJob(data);
-      setInternalNotes(data.internalNotes || '');
+      setInternalNotes(data.jobInstructions || '');
       setCustomerNotes(data.customerNotes || '');
       setActualValue(data.actualValue?.toString() || '');
     } catch (error: any) {
@@ -225,7 +241,7 @@ export default function JobDetailPage() {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          internalNotes,
+          jobInstructions,
           customerNotes,
           actualValue: actualValue ? parseFloat(actualValue) : null,
         }),
@@ -239,7 +255,7 @@ export default function JobDetailPage() {
 
       setJob({
         ...job,
-        internalNotes,
+        jobInstructions,
         customerNotes,
         actualValue: actualValue ? parseFloat(actualValue) : null,
       });
@@ -255,7 +271,8 @@ export default function JobDetailPage() {
   const handleDeleteJob = async () => {
     try {
       setUpdating(true);
-      const response = await fetch(`/api/provider/jobs/${jobId}`, {
+      const providerId = job?.provider?.id || localStorage.getItem('providerId');
+      const response = await fetch(`/api/provider/jobs/${jobId}?providerId=${providerId}`, {
         method: 'DELETE',
       });
 
@@ -280,21 +297,15 @@ export default function JobDetailPage() {
     window.open(`https://www.google.com/maps/search/?api=1&query=${address}`, '_blank');
   };
 
-  const handlePhotoUpload = async (file: File, type: 'before' | 'during' | 'after') => {
-    console.log('📸 Photo upload triggered:', { file: file.name, type });
+  const handlePhotoUpload = async (rawFile: File, type: 'before' | 'during' | 'after') => {
+    console.log('📸 Photo upload triggered:', { file: rawFile.name, type });
 
-    if (!file) return;
+    if (!rawFile) return;
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB');
-      return;
-    }
-
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      toast.error('Please upload a JPG, PNG, or WebP image');
+    // Validate and compress the image
+    const { file, error } = await validateAndCompressImage(rawFile);
+    if (error || !file) {
+      toast.error(error || 'Failed to process image');
       return;
     }
 
@@ -493,14 +504,143 @@ export default function JobDetailPage() {
             <div className="flex items-center justify-center gap-3">
               <CheckCircle className="h-5 w-5 text-emerald-400" />
               <span className="text-base font-bold text-emerald-400">
-                ✓ Job Completed on {formatDate(job.updatedAt)}
+                ✓ Job Completed on {formatDate(job.completedAt || job.updatedAt)}
               </span>
+              {job.completedByUser && (
+                <span className="text-sm text-emerald-400/70">
+                  by {job.completedByUser.firstName} {job.completedByUser.lastName}
+                </span>
+              )}
               {job.invoice ? (
                 <span className="text-sm text-emerald-400/70">• Invoice #{job.invoice.invoiceNumber} created</span>
               ) : (
                 <span className="text-sm text-emerald-400/70">• Next: Create Invoice</span>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* COMPLETION DATA - Show for completed jobs with completion data */}
+      {job.status === 'completed' && job.completionData && (
+        <div className="bg-zinc-900/50 border-b border-zinc-800">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+            <div className="grid lg:grid-cols-4 gap-6">
+              {/* Duration Comparison */}
+              <div className="bg-zinc-800/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Clock className="h-4 w-4 text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-400">Duration</span>
+                </div>
+                {job.actualDurationMinutes ? (
+                  <div>
+                    <p className="text-lg font-bold text-zinc-100">
+                      {job.actualDurationMinutes} min
+                    </p>
+                    {job.durationMinutes && (
+                      <p className="text-xs text-zinc-500 mt-1">
+                        Estimated: {Math.round(job.durationMinutes * 60)} min
+                        {job.actualDurationMinutes > job.durationMinutes * 60 ? (
+                          <span className="text-amber-400 ml-1">
+                            (+{job.actualDurationMinutes - Math.round(job.durationMinutes * 60)} min)
+                          </span>
+                        ) : job.actualDurationMinutes < job.durationMinutes * 60 ? (
+                          <span className="text-emerald-400 ml-1">
+                            (-{Math.round(job.durationMinutes * 60) - job.actualDurationMinutes} min)
+                          </span>
+                        ) : null}
+                      </p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500">Not recorded</p>
+                )}
+              </div>
+
+              {/* Checklist Status */}
+              <div className="bg-zinc-800/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Check className="h-4 w-4 text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-400">Checklist</span>
+                </div>
+                {job.completionData.checklistCompleted ? (
+                  <div>
+                    <p className="text-lg font-bold text-emerald-400">
+                      {Object.values(job.completionData.checklistCompleted).filter(Boolean).length} items
+                    </p>
+                    <p className="text-xs text-zinc-500 mt-1">Completed</p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500">No checklist</p>
+                )}
+              </div>
+
+              {/* Signature */}
+              <div className="bg-zinc-800/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <User className="h-4 w-4 text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-400">Signature</span>
+                </div>
+                {job.completionData.signatureUrl ? (
+                  <div>
+                    <div className="w-full h-12 bg-white rounded border border-zinc-600 overflow-hidden mb-1">
+                      <img
+                        src={job.completionData.signatureUrl}
+                        alt="Customer signature"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      {job.completionData.signedByName || 'Signed'}
+                      {job.completionData.signedAt && (
+                        <span className="text-zinc-500 ml-1">
+                          at {formatTime(job.completionData.signedAt)}
+                        </span>
+                      )}
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500">No signature</p>
+                )}
+              </div>
+
+              {/* Completion Photos */}
+              <div className="bg-zinc-800/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Camera className="h-4 w-4 text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-400">Completion Photos</span>
+                </div>
+                {job.completionData.completionPhotos && job.completionData.completionPhotos.length > 0 ? (
+                  <div className="flex gap-2">
+                    {job.completionData.completionPhotos.slice(0, 3).map((url, idx) => (
+                      <div key={idx} className="w-10 h-10 rounded overflow-hidden">
+                        <img src={url} alt={`Completion ${idx + 1}`} className="w-full h-full object-cover" />
+                      </div>
+                    ))}
+                    {job.completionData.completionPhotos.length > 3 && (
+                      <div className="w-10 h-10 rounded bg-zinc-700 flex items-center justify-center">
+                        <span className="text-xs text-zinc-400">
+                          +{job.completionData.completionPhotos.length - 3}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-zinc-500">No photos</p>
+                )}
+              </div>
+            </div>
+
+            {/* Completion Notes */}
+            {job.completionData.completionNotes && (
+              <div className="mt-4 bg-zinc-800/50 rounded-xl p-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <FileText className="h-4 w-4 text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-400">Completion Notes</span>
+                </div>
+                <p className="text-sm text-zinc-200">{job.completionData.completionNotes}</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -785,7 +925,7 @@ export default function JobDetailPage() {
               {/* Notes Content */}
               {notesTab === 'internal' ? (
                 <textarea
-                  value={internalNotes}
+                  value={jobInstructions}
                   onChange={(e) => setInternalNotes(e.target.value)}
                   className="w-full px-4 py-4 bg-zinc-900 border border-zinc-800 rounded-xl text-zinc-100 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent min-h-[180px] font-mono text-sm"
                   placeholder="E.g., Customer wants extra mulch around roses&#10;Remember to check irrigation system&#10;Needs fall cleanup quote"

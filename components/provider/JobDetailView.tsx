@@ -9,6 +9,8 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { validateAndCompressImage } from '@/lib/image-upload';
+import { formatJobTime, formatJobTimeWithZone, getEffectiveTimezone } from '@/lib/utils/timezone';
 
 interface JobPhoto {
   id: string;
@@ -40,7 +42,7 @@ interface Job {
   isRenoaLead?: boolean;
   estimatedValue?: number;
   actualValue?: number;
-  internalNotes?: string;
+  jobInstructions?: string;
   customerNotes?: string;
   assignedUserIds?: string[];
   assignedUsers?: AssignedUser[];
@@ -52,6 +54,8 @@ interface Job {
   arrivedAt?: string | null;
   completedAt?: string | null;
   completedByUserId?: string;
+  timezone?: string | null; // IANA timezone from job location
+  providerTimezone?: string; // Provider's default timezone for fallback
 }
 
 interface JobDetailViewProps {
@@ -126,24 +130,15 @@ export default function JobDetailView({ job, isOpen, onClose, onJobUpdated }: Jo
     return `$${(cents / 100).toFixed(2)}`;
   };
 
+  // Use job's timezone with provider fallback
+  const providerTz = job.providerTimezone || 'America/Chicago';
+
   const formatDateTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+    return formatJobTime(dateStr, job.timezone, providerTz, 'EEEE, MMMM d, yyyy h:mm a');
   };
 
   const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+    return formatJobTime(dateStr, job.timezone, providerTz, 'h:mm a');
   };
 
   const duration = (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60);
@@ -407,29 +402,25 @@ function OverviewTab({ job }: { job: Job }) {
   const [editedEndTime, setEditedEndTime] = useState('');
   const [saving, setSaving] = useState(false);
 
+  // Use job's timezone with provider fallback
+  const providerTz = job.providerTimezone || 'America/Chicago';
+
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return formatJobTime(dateStr, job.timezone, providerTz, 'EEEE, MMMM d, yyyy');
   };
 
-  const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
+  const formatTimeShort = (dateStr: string) => {
+    return formatJobTime(dateStr, job.timezone, providerTz, 'h:mm a');
   };
 
   const formatDateForInput = (dateStr: string) => {
-    return new Date(dateStr).toISOString().split('T')[0];
+    // For input fields, format in job's timezone
+    return formatJobTime(dateStr, job.timezone, providerTz, 'yyyy-MM-dd');
   };
 
   const formatTimeForInput = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toTimeString().slice(0, 5);
+    // For input fields, format in job's timezone
+    return formatJobTime(dateStr, job.timezone, providerTz, 'HH:mm');
   };
 
   const duration = (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60);
@@ -562,7 +553,7 @@ function OverviewTab({ job }: { job: Job }) {
                   }}
                 >
                   <p className="text-sm text-zinc-200">
-                    {formatTime(job.startTime)} – {formatTime(job.endTime)}
+                    {formatTimeShort(job.startTime)} – {formatTimeShort(job.endTime)}
                   </p>
                   <Pencil className="h-3 w-3 text-zinc-500 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
@@ -678,11 +669,11 @@ function OverviewTab({ job }: { job: Job }) {
           )}
 
           {/* Internal Notes */}
-          {job.internalNotes && (
+          {job.jobInstructions && (
             <div>
               <label className="text-xs text-zinc-500 mb-1 block">Internal Notes</label>
               <div className="p-3 bg-zinc-900/50 border border-zinc-700 rounded text-sm text-zinc-300 whitespace-pre-wrap">
-                {job.internalNotes}
+                {job.jobInstructions}
               </div>
             </div>
           )}
@@ -842,11 +833,13 @@ function PhotosTab({ beforePhotos, afterPhotos, onPhotoUploaded, jobId, jobStatu
   const totalPhotos = beforePhotos.length + afterPhotos.length;
   const needsPhotos = jobStatus === 'completed' && totalPhotos === 0;
 
-  const handlePhotoUpload = async (file: File, type: 'before' | 'after') => {
-    if (!file) return;
+  const handlePhotoUpload = async (rawFile: File, type: 'before' | 'after') => {
+    if (!rawFile) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File size must be less than 5MB');
+    // Validate and compress the image
+    const { file, error } = await validateAndCompressImage(rawFile);
+    if (error || !file) {
+      toast.error(error || 'Failed to process image');
       return;
     }
 
@@ -1101,7 +1094,7 @@ function HistoryTab({ job }: { job: Job }) {
 
 // NOTES TAB - Internal and Customer notes with history
 function NotesTab({ job, onJobUpdated }: { job: Job; onJobUpdated: () => void }) {
-  const [internalNote, setInternalNote] = useState(job.internalNotes || '');
+  const [internalNote, setInternalNote] = useState(job.jobInstructions || '');
   const [customerNote, setCustomerNote] = useState(job.customerNotes || '');
   const [saving, setSaving] = useState(false);
   const [customerHistory, setCustomerHistory] = useState<Array<{ notes: string; date: string; serviceType: string }>>([]);
@@ -1136,7 +1129,7 @@ function NotesTab({ job, onJobUpdated }: { job: Job; onJobUpdated: () => void })
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          internalNotes: internalNote,
+          jobInstructions: internalNote,
           customerNotes: customerNote,
         }),
       });

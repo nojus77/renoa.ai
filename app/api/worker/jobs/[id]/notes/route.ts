@@ -24,7 +24,7 @@ export async function GET(
       },
       select: {
         id: true,
-        internalNotes: true,
+        jobInstructions: true,
         customerNotes: true,
       },
     });
@@ -50,9 +50,9 @@ export async function GET(
     // Also extract dispatcher instructions (non-timestamped content)
     let dispatcherInstructions = '';
 
-    if (job.internalNotes) {
+    if (job.jobInstructions) {
       // Split by double newlines to get individual notes
-      const noteBlocks = job.internalNotes.split('\n\n').filter(Boolean);
+      const noteBlocks = job.jobInstructions.split('\n\n').filter(Boolean);
       let index = 0;
 
       for (const block of noteBlocks) {
@@ -68,13 +68,23 @@ export async function GET(
             authorRole: match[2].toLowerCase().includes('dispatcher') ? 'dispatcher' : 'worker',
           });
         } else {
+          // Skip metadata blocks like "[Created by Name]" - these are not instructions
+          const trimmedBlock = block.trim();
+          if (trimmedBlock.match(/^\[Created by [^\]]+\]$/)) {
+            continue;
+          }
+
           // This is dispatcher instructions (plain text without timestamp format)
           // Accumulate all non-timestamped text as dispatcher instructions
-          if (block.trim()) {
-            if (dispatcherInstructions) {
-              dispatcherInstructions += '\n\n' + block.trim();
-            } else {
-              dispatcherInstructions = block.trim();
+          if (trimmedBlock) {
+            // Also strip out any "[Created by Name]" prefix from actual instructions
+            const cleanedBlock = trimmedBlock.replace(/^\[Created by [^\]]+\]\s*/, '');
+            if (cleanedBlock) {
+              if (dispatcherInstructions) {
+                dispatcherInstructions += '\n\n' + cleanedBlock;
+              } else {
+                dispatcherInstructions = cleanedBlock;
+              }
             }
           }
         }
@@ -119,7 +129,7 @@ export async function POST(
       },
       select: {
         id: true,
-        internalNotes: true,
+        jobInstructions: true,
       },
     });
 
@@ -143,13 +153,13 @@ export async function POST(
     // Append note to internal notes
     const timestamp = new Date().toLocaleString();
     const newNote = `[${timestamp}] ${workerName}: ${content}`;
-    const updatedNotes = job.internalNotes
-      ? `${job.internalNotes}\n\n${newNote}`
+    const updatedNotes = job.jobInstructions
+      ? `${job.jobInstructions}\n\n${newNote}`
       : newNote;
 
     await prisma.job.update({
       where: { id },
-      data: { internalNotes: updatedNotes },
+      data: { jobInstructions: updatedNotes },
     });
 
     return NextResponse.json({

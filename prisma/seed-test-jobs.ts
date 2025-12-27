@@ -189,7 +189,7 @@ async function seedTestJobs() {
         actualValue,
         assignedUserIds: [testWorker.id],
         source: 'test-seed',
-        internalNotes: `Test job #${i + 1} - ${serviceType}`,
+        jobInstructions: `Test job #${i + 1} - ${serviceType}`,
       },
     });
 

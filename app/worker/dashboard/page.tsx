@@ -40,7 +40,7 @@ interface Job {
   arrivedAt: string | null;
   completedAt: string | null;
   customerNotes: string | null;
-  internalNotes: string | null;
+  jobInstructions: string | null;
   customer: {
     id: string;
     name: string;

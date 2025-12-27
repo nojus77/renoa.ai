@@ -25,13 +25,9 @@ import { toast } from 'sonner';
 import SubscriptionWidget from '@/components/customer/SubscriptionWidget';
 import SubscriptionSetupModal from '@/components/customer/SubscriptionSetupModal';
 import BookAgainModal from '@/components/customer/BookAgainModal';
-import RecommendationsWidget from '@/components/customer/RecommendationsWidget';
 import ReferralWidget from '@/components/customer/ReferralWidget';
-import ServiceBundlesWidget from '@/components/customer/ServiceBundlesWidget';
 import PromoBanner from '@/components/customer/PromoBanner';
 import WinbackModal from '@/components/customer/WinbackModal';
-import SeasonalBanner from '@/components/customer/SeasonalBanner';
-import LoyaltyWidget from '@/components/customer/LoyaltyWidget';
 import ServiceDueAlert from '@/components/customer/ServiceDueAlert';
 
 interface Job {
@@ -185,9 +181,6 @@ export default function CustomerDashboard() {
 
       {/* Service Due Alert */}
       <ServiceDueAlert />
-
-      {/* Seasonal Banner */}
-      <SeasonalBanner />
 
       {/* Promo Banner */}
       <PromoBanner />
@@ -400,15 +393,6 @@ export default function CustomerDashboard() {
               </Link>
             </div>
           </div>
-
-          {/* Service Bundles Widget */}
-          <ServiceBundlesWidget />
-
-          {/* Loyalty Widget */}
-          <LoyaltyWidget />
-
-          {/* Service Recommendations Widget */}
-          <RecommendationsWidget />
 
           {/* Referral Widget */}
           <ReferralWidget />

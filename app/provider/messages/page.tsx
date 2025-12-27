@@ -28,7 +28,9 @@ import {
   Crown
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
 import { format, isToday, isYesterday, isSameDay } from 'date-fns';
+import { validateAndCompressImage } from '@/lib/image-upload';
 
 type MessageTab = 'team' | 'customers';
 
@@ -542,16 +544,26 @@ export default function ProviderMessages() {
     setShowTemplates(false);
   };
 
-  const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setPhotoFile(e.target.files[0]);
+      const { file, error } = await validateAndCompressImage(e.target.files[0]);
+      if (error || !file) {
+        toast.error(error || 'Failed to process image');
+      } else {
+        setPhotoFile(file);
+      }
     }
     e.target.value = '';
   };
 
-  const handleTeamAttachmentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTeamAttachmentChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setTeamAttachment(e.target.files[0]);
+      const { file, error } = await validateAndCompressImage(e.target.files[0]);
+      if (error || !file) {
+        toast.error(error || 'Failed to process image');
+      } else {
+        setTeamAttachment(file);
+      }
     }
     e.target.value = '';
   };
@@ -745,9 +757,7 @@ export default function ProviderMessages() {
   if (loading) {
     return (
       <ProviderLayout providerName={providerName}>
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-        </div>
+        <PageLoadingSkeleton showStats={false} tableRows={10} />
 
         {previewImage && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">

@@ -37,6 +37,9 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PropertyPhoto } from '@/components/PropertyPhoto';
+import JobCompletionFlow from '@/components/worker/JobCompletionFlow';
+import { compressImage, ALLOWED_TYPES as IMAGE_ALLOWED_TYPES, MAX_FILE_SIZE } from '@/lib/image-upload';
+import { formatJobTime, getEffectiveTimezone } from '@/lib/utils/timezone';
 
 // Renoa Design System - Lime green brand color
 const LIME_GREEN = '#C4F542';
@@ -107,8 +110,11 @@ interface Job {
   arrivedAt: string | null;
   completedAt: string | null;
   customerNotes: string | null;
-  internalNotes: string | null;
+  jobInstructions: string | null;
   estimatedValue: number | null;
+  durationMinutes: number | null;
+  timezone?: string | null; // IANA timezone from job location
+  providerTimezone?: string; // Provider's default timezone for fallback
   customer: {
     id: string;
     name: string;
@@ -197,6 +203,10 @@ export default function JobDetailPage() {
   const [providerCategory, setProviderCategory] = useState<string | null>(null);
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Use job's timezone with provider fallback - available early for all formatters
+  const providerTz = job?.providerTimezone || 'America/Chicago';
+  const jobTz = job?.timezone || null;
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   // Live date/time
@@ -250,6 +260,12 @@ export default function JobDetailPage() {
 
   // Confirmation modal state
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // New completion flow state
+  const [showCompletionFlow, setShowCompletionFlow] = useState(false);
+
+  // Provider settings for completion flow
+  const [requireCompletionPhotos, setRequireCompletionPhotos] = useState(false);
 
   // Actual duration tracking
   const [actualDurationMinutes, setActualDurationMinutes] = useState<number | null>(null);
@@ -341,16 +357,10 @@ export default function JobDetailPage() {
     }
   }, [job, jobId, selectedServices.length]);
 
-  // Format current time for display
+  // Format current time for display (in job's timezone)
   const formatCurrentTime = () => {
-    return currentTime.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    }) + ', ' + currentTime.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    // Show current time in job's timezone
+    return formatJobTime(currentTime.toISOString(), jobTz, providerTz, 'MMM d, h:mm a');
   };
 
   // Format timer display
@@ -387,6 +397,10 @@ export default function JobDetailPage() {
       if (res.ok && data.job) {
         const foundJob = data.job;
         setJob(foundJob);
+        // Set provider settings for completion flow
+        if (data.providerSettings) {
+          setRequireCompletionPhotos(data.providerSettings.requireCompletionPhotos ?? false);
+        }
         // Initialize timer state based on job state
         if (foundJob.completedAt) {
           setTimerState('completed');
@@ -496,19 +510,11 @@ export default function JobDetailPage() {
   };
 
   const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    return formatJobTime(dateStr, jobTz, providerTz, 'h:mm a');
   };
 
   const formatDate = (dateStr: string) => {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-    });
+    return formatJobTime(dateStr, jobTz, providerTz, 'EEEE, MMMM d');
   };
 
   const formatShortDate = (dateStr: string) => {
@@ -516,11 +522,7 @@ export default function JobDetailPage() {
     if (!dateStr || dateStr === 'Unknown') return '';
     const date = new Date(dateStr);
     if (isNaN(date.getTime())) return '';
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
+    return formatJobTime(dateStr, jobTz, providerTz, 'MMM d, yyyy');
   };
 
   const getDuration = (start: string, end: string) => {
@@ -657,8 +659,107 @@ export default function JobDetailPage() {
       setCustomActualDuration(suggestedMinutes.toString());
     }
 
-    // Show confirmation modal
-    setShowConfirmModal(true);
+    // Show completion flow (includes checklist, photos, signature)
+    setShowCompletionFlow(true);
+  };
+
+  // Handler for completion flow result
+  const handleCompletionFlowComplete = async (data: {
+    checklistCompleted: Record<string, boolean>;
+    completionPhotos: string[];
+    actualDurationMinutes: number | null;
+    signatureDataUrl: string | null;
+    signedByName: string | null;
+    skipSignature: boolean;
+    completionNotes: string;
+  }) => {
+    if (!job) return;
+
+    setShowCompletionFlow(false);
+    setActionLoading('complete');
+
+    try {
+      // Save final job value before completing
+      await updateJobValue(totalPrice);
+
+      // Stop on-site timer
+      const finalOnSiteTime = onSiteStartTime ? Math.floor((Date.now() - onSiteStartTime) / 1000) : onSiteTime;
+
+      // Call the new complete API endpoint
+      const completeRes = await fetch(`/api/provider/jobs/${job.id}/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...data,
+          completedByUserId: userId,
+          createInvoice: true,
+        }),
+      });
+
+      if (!completeRes.ok) {
+        throw new Error('Failed to save completion data');
+      }
+
+      // Also call clock-out to handle earnings and work logs
+      const res = await fetch('/api/worker/clock-out', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId: job.id,
+          userId,
+          travelDuration: travelTime,
+          onSiteDuration: finalOnSiteTime,
+          paymentMethod,
+          tipAmount: parseFloat(tipAmount) || 0,
+          actualDurationMinutes: data.actualDurationMinutes || undefined,
+        }),
+      });
+
+      const clockOutData = await res.json();
+
+      if (clockOutData.success) {
+        setOnSiteTime(finalOnSiteTime);
+        setOnSiteStartTime(null);
+        setTimerState('completed');
+
+        // Handle card payment - send payment link
+        if (paymentMethod === 'card') {
+          try {
+            const paymentRes = await fetch(`/api/worker/jobs/${job.id}/send-payment-link`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                amount: totalPrice,
+                tipAmount: parseFloat(tipAmount) || 0,
+              }),
+            });
+            const paymentData = await paymentRes.json();
+            if (paymentData.success) {
+              toast.success('Job completed! Payment link sent to customer.');
+            } else {
+              toast.success(`Job completed! Earned $${clockOutData.earnings?.toFixed(2) || '0.00'}. Note: Payment link could not be sent.`);
+            }
+          } catch (paymentError) {
+            console.error('Error sending payment link:', paymentError);
+            toast.success(`Job completed! Earned $${clockOutData.earnings?.toFixed(2) || '0.00'}. Note: Payment link could not be sent.`);
+          }
+        } else {
+          toast.success(`Job completed! Earned $${clockOutData.earnings?.toFixed(2) || '0.00'}`);
+        }
+
+        fetchJob(userId, jobId);
+
+        // Clear draft since job is done
+        localStorage.removeItem(`jobDraft_${jobId}`);
+      } else {
+        toast.error(clockOutData.error || 'Action failed');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error('Something went wrong');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleCompleteJob = async () => {
@@ -925,8 +1026,7 @@ export default function JobDetailPage() {
   };
 
   const handleMediaUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-    const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'video/mp4', 'video/quicktime'];
+    const ALLOWED_TYPES = [...IMAGE_ALLOWED_TYPES, 'image/gif', 'video/mp4', 'video/quicktime'];
 
     const files = e.target.files;
     if (!files || files.length === 0 || !job) {
@@ -934,22 +1034,28 @@ export default function JobDetailPage() {
       return;
     }
 
-    // Validate files before upload
+    // Validate and compress files before upload
     const validFiles: File[] = [];
     for (const file of Array.from(files)) {
       // Check file size
       if (file.size > MAX_FILE_SIZE) {
-        toast.error(`Photo too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is 5MB.`);
+        toast.error(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is 5MB.`);
         continue;
       }
 
       // Check file type
       if (!ALLOWED_TYPES.includes(file.type) && !file.type.startsWith('image/')) {
-        toast.error(`Unsupported file type. Use JPG, PNG, GIF, or MP4.`);
+        toast.error(`Unsupported file type. Use JPG, PNG, WebP, GIF, or MP4.`);
         continue;
       }
 
-      validFiles.push(file);
+      // Compress images (not videos or GIFs)
+      if (IMAGE_ALLOWED_TYPES.includes(file.type)) {
+        const compressedFile = await compressImage(file);
+        validFiles.push(compressedFile);
+      } else {
+        validFiles.push(file);
+      }
     }
 
     if (validFiles.length === 0) {
@@ -1009,8 +1115,6 @@ export default function JobDetailPage() {
   };
 
   const handleCheckPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
-
     const file = e.target.files?.[0];
     if (!file || !job) {
       return;
@@ -1025,9 +1129,9 @@ export default function JobDetailPage() {
       return;
     }
 
-    // Check file type
-    if (!file.type.startsWith('image/')) {
-      toast.error('Please upload an image file');
+    // Check file type - only allow images
+    if (!IMAGE_ALLOWED_TYPES.includes(file.type)) {
+      toast.error('Only JPG, PNG, and WebP images are allowed');
       if (checkPhotoInputRef.current) {
         checkPhotoInputRef.current.value = '';
       }
@@ -1036,8 +1140,11 @@ export default function JobDetailPage() {
 
     toast.info('Uploading check photo...');
 
+    // Compress the image before uploading
+    const compressedFile = await compressImage(file);
+
     const formData = new FormData();
-    formData.append('files', file);
+    formData.append('files', compressedFile);
     formData.append('jobId', job.id);
     formData.append('userId', userId);
     formData.append('photoType', 'check');
@@ -2493,6 +2600,24 @@ export default function JobDetailPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Job Completion Flow (Photos, Duration, Signature for card payments) */}
+      {showCompletionFlow && job && (
+        <JobCompletionFlow
+          isOpen={showCompletionFlow}
+          onClose={() => setShowCompletionFlow(false)}
+          onComplete={handleCompletionFlowComplete}
+          jobId={job.id}
+          serviceType={job.serviceType}
+          providerId={providerId}
+          customerId={job.customer.id}
+          customerName={job.customer.name}
+          durationMinutes={job.durationMinutes ?? undefined}
+          existingPhotos={media.filter(m => m.type === 'after').map(m => m.url)}
+          requireCompletionPhotos={requireCompletionPhotos}
+          paymentMethod={paymentMethod}
+        />
       )}
 
       {/* Job Completion Confirmation Modal */}

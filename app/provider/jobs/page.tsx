@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Search, Plus, Calendar, MapPin, DollarSign, Users, Briefcase, CheckCircle2, Clock, XCircle, MoreVertical, Trash2, Edit, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import AddJobModal from '@/components/provider/AddJobModal';
+import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
 
 interface Job {
   id: string;
@@ -149,9 +150,7 @@ export default function ProviderJobs() {
   if (loading) {
     return (
       <ProviderLayout providerName={providerName}>
-        <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
-        </div>
+        <PageLoadingSkeleton statsCount={4} tableRows={8} />
       </ProviderLayout>
     );
   }

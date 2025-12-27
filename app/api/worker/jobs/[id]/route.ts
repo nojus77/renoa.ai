@@ -113,12 +113,23 @@ export async function GET(
       },
     });
 
+    // Get provider settings for completion flow
+    const providerSettings = await prisma.provider.findUnique({
+      where: { id: job.providerId },
+      select: {
+        requireCompletionPhotos: true,
+      },
+    });
+
     return NextResponse.json({
       job: {
         ...job,
         coworkers,
         numWorkers: job.assignedUserIds.length,
         userPayInfo,
+      },
+      providerSettings: {
+        requireCompletionPhotos: providerSettings?.requireCompletionPhotos ?? false,
       },
     });
   } catch (error) {

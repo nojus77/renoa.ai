@@ -5,8 +5,15 @@ import { prisma } from '@/lib/prisma';
 import Stripe from 'stripe';
 import { sendNotification } from '@/lib/notifications/notification-service';
 import { createNotification } from '@/lib/notifications';
+import { webhookRateLimiter, withRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
+  // Rate limit: 100 requests per minute for webhooks
+  const { allowed, response } = await withRateLimit(request, webhookRateLimiter);
+  if (!allowed) {
+    return response;
+  }
+
   try {
     const body = await request.text();
     const headersList = await headers();
@@ -85,6 +92,16 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     console.log('Payment Intent ID:', paymentIntent.id);
     console.log('Payment Intent Amount:', paymentIntent.amount);
     console.log('Payment Intent Metadata:', JSON.stringify(paymentIntent.metadata));
+
+    // Idempotency check - prevent duplicate payment records from webhook retries
+    const existingPayment = await prisma.payment.findFirst({
+      where: { transactionId: paymentIntent.id },
+    });
+
+    if (existingPayment) {
+      console.log('⏭️ Duplicate webhook - payment already processed:', paymentIntent.id);
+      return;
+    }
 
     const invoiceId = paymentIntent.metadata.invoiceId;
 

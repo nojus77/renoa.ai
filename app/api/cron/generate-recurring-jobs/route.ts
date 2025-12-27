@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
           source: parentJob.source,
           appointmentType: parentJob.appointmentType || 'anytime', // Copy from parent
           estimatedValue: parentJob.estimatedValue,
-          internalNotes: parentJob.internalNotes,
+          jobInstructions: parentJob.jobInstructions,
           customerNotes: parentJob.customerNotes,
           isRecurring: false, // Child jobs are not themselves recurring
           parentRecurringJobId: parentJob.id, // Link to parent
