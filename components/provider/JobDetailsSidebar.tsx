@@ -193,14 +193,49 @@ export default function JobDetailsSidebar({
     }
   }, [isOpen, mode]);
 
+  // Fetch full job details when opening in job mode
+  const fetchJobDetails = async (jobId: string) => {
+    try {
+      const providerId = localStorage.getItem('providerId');
+      const res = await fetch(`/api/provider/jobs/${jobId}?providerId=${providerId}`);
+      if (res.ok) {
+        const job = await res.json();
+        // Update editForm with full job details including notes
+        const fullJobDetail: JobDetail = {
+          id: job.id,
+          customerName: job.customer?.name || 'Unknown',
+          customerPhone: job.customer?.phone,
+          serviceType: job.serviceType,
+          address: job.address,
+          startTime: job.startTime,
+          endTime: job.endTime,
+          status: job.status,
+          amount: job.actualValue || job.estimatedValue,
+          estimatedValue: job.estimatedValue,
+          workerName: job.assignedUsers?.map((u: { firstName: string; lastName: string }) => `${u.firstName} ${u.lastName}`).join(', ') || null,
+          workers: job.assignedUsers,
+          assignedUserIds: job.assignedUserIds || [],
+          notes: job.jobInstructions || '',
+          durationMinutes: job.durationMinutes,
+        };
+        setEditForm(fullJobDetail);
+        setSelectedWorkerIds(fullJobDetail.assignedUserIds || []);
+      }
+    } catch (error) {
+      console.error('Error fetching job details:', error);
+    }
+  };
+
   // Initialize edit form when selected job changes
   useEffect(() => {
     if (selectedJob && mode === 'job') {
+      // Set initial form from passed data
       setEditForm({ ...selectedJob });
-      // Initialize selected workers from job data
       const workerIds = selectedJob.assignedUserIds ||
         (selectedJob.workers?.map(w => w.id) || []);
       setSelectedWorkerIds(workerIds);
+      // Fetch full job details to get notes
+      fetchJobDetails(selectedJob.id);
     }
   }, [selectedJob, mode]);
 
@@ -211,16 +246,27 @@ export default function JobDetailsSidebar({
     }
   }, [isEditing]);
 
-  // Close worker dropdown when clicking outside
+  // Close worker dropdown when clicking outside or pressing Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (workerDropdownRef.current && !workerDropdownRef.current.contains(event.target as Node)) {
         setShowWorkerDropdown(false);
       }
     };
+
+    const handleEscapeKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showWorkerDropdown) {
+        setShowWorkerDropdown(false);
+      }
+    };
+
     document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEscapeKey);
+    };
+  }, [showWorkerDropdown]);
 
   const fetchAvailableWorkers = async () => {
     setLoadingWorkers(true);
@@ -364,7 +410,7 @@ export default function JobDetailsSidebar({
           endTime: editForm.endTime,
           assignedUserIds: selectedWorkerIds,
           actualValue: editForm.amount,
-          internalNotes: editForm.notes,
+          jobInstructions: editForm.notes,
         }),
       });
 

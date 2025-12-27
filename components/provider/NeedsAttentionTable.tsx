@@ -1,21 +1,28 @@
 "use client";
 
 import { useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
+import { format } from 'date-fns';
 import {
   ChevronRight,
-  AlertCircle,
-  CalendarX,
-  ClockAlert,
-  UserX,
-  FileWarning,
   CheckCircle2,
   Clock,
-  UserPlus,
-  UserMinus,
   X,
+  UserX,
+  AlertTriangle,
+  CalendarX,
+  ClockAlert,
 } from 'lucide-react';
+
+// Job with a problem that needs attention
+interface AlertJob {
+  id: string;
+  startTime: string;
+  endTime?: string | null;
+  serviceType: string;
+  customerName: string;
+  address: string;
+  problem: 'overdue' | 'no-worker' | 'conflict' | 'starting-soon';
+}
 
 interface WorkerAlert {
   id: string;
@@ -26,16 +33,20 @@ interface WorkerAlert {
 interface Alerts {
   scheduleConflicts: number;
   scheduleConflictsLatest?: string | null;
+  scheduleConflictsJobs?: AlertJob[];
   overloadedWorkers: WorkerAlert[];
   underutilizedWorkers: WorkerAlert[];
   unassignedJobs: number;
   unassignedJobsLatest?: string | null;
+  unassignedJobsList?: AlertJob[];
   unconfirmedSoonJobs: number;
   unconfirmedSoonLatest?: string | null;
+  unconfirmedSoonJobsList?: AlertJob[];
   overdueInvoices: number;
   overdueInvoicesLatest?: string | null;
   overdueJobs: number;
   overdueJobsLatest?: string | null;
+  overdueJobsList?: AlertJob[];
 }
 
 export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices' | 'overloaded-workers' | 'underutilized-workers' | 'today-jobs';
@@ -43,218 +54,128 @@ export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soo
 interface NeedsAttentionTableProps {
   alerts: Alerts;
   onAlertClick?: (alertType: AlertType, alertDetails: { count: number; href: string }) => void;
+  onJobClick?: (job: AlertJob) => void;
   onDismissAlert?: (alertType: AlertType) => void;
+  onDismissJob?: (jobId: string) => void;
 }
 
-type Priority = 'urgent' | 'medium' | 'low';
+type ProblemType = 'overdue' | 'no-worker' | 'conflict' | 'starting-soon';
 
-interface AlertRow {
-  id: AlertType;
-  type: string;
-  icon: React.ReactNode;
-  details: string;
-  priority: Priority;
-  href: string;
-  count: number;
-  latestDate: Date | null;
-}
-
-const priorityColors: Record<Priority, { bg: string; text: string; badge: string }> = {
-  urgent: { bg: 'bg-red-500/10', text: 'text-red-600', badge: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300' },
-  medium: { bg: 'bg-orange-500/10', text: 'text-orange-600', badge: 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300' },
-  low: { bg: 'bg-amber-500/10', text: 'text-amber-600', badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300' },
+const problemConfig: Record<ProblemType, { label: string; color: string; icon: React.ReactNode; priority: number }> = {
+  'overdue': {
+    label: 'Overdue',
+    color: 'bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300',
+    icon: <CalendarX className="h-3 w-3" />,
+    priority: 0,
+  },
+  'conflict': {
+    label: 'Conflict',
+    color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/50 dark:text-orange-300',
+    icon: <AlertTriangle className="h-3 w-3" />,
+    priority: 1,
+  },
+  'starting-soon': {
+    label: 'Starting Soon',
+    color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300',
+    icon: <ClockAlert className="h-3 w-3" />,
+    priority: 2,
+  },
+  'no-worker': {
+    label: 'No Worker',
+    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/50 dark:text-yellow-300',
+    icon: <UserX className="h-3 w-3" />,
+    priority: 3,
+  },
 };
 
-const priorityOrder: Record<Priority, number> = {
-  urgent: 0,
-  medium: 1,
-  low: 2,
-};
+export default function NeedsAttentionTable({ alerts, onJobClick, onDismissJob }: NeedsAttentionTableProps) {
+  const [dismissedJobIds, setDismissedJobIds] = useState<Set<string>>(new Set());
+  const [dismissingJobId, setDismissingJobId] = useState<string | null>(null);
 
-function formatRelativeDate(date: Date | null): string {
-  if (!date) return '';
+  // Combine all job alerts into a flat list
+  const allAlertJobs = useMemo(() => {
+    const jobs: AlertJob[] = [];
 
-  if (isToday(date)) {
-    return formatDistanceToNow(date, { addSuffix: true });
-  }
-  if (isYesterday(date)) {
-    return 'Yesterday';
-  }
-  // If within last 7 days, show relative
-  const daysDiff = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
-  if (daysDiff < 7) {
-    return formatDistanceToNow(date, { addSuffix: true });
-  }
-  // Otherwise show date
-  return format(date, 'MMM d');
-}
-
-export default function NeedsAttentionTable({ alerts, onAlertClick, onDismissAlert }: NeedsAttentionTableProps) {
-  const router = useRouter();
-  const [dismissedAlerts, setDismissedAlerts] = useState<Set<AlertType>>(new Set());
-  const [dismissingAlert, setDismissingAlert] = useState<AlertType | null>(null);
-
-  // Build and sort alert rows by latest date (most recent first), then by priority
-  const alertRows = useMemo(() => {
-    const rows: AlertRow[] = [];
-
-    if (alerts.scheduleConflicts > 0) {
-      rows.push({
-        id: 'schedule-conflicts',
-        type: 'Schedule Conflicts',
-        icon: <AlertCircle className="h-4 w-4" />,
-        details: `${alerts.scheduleConflicts} overlapping ${alerts.scheduleConflicts === 1 ? 'job' : 'jobs'}`,
-        priority: 'urgent',
-        href: '/provider/calendar',
-        count: alerts.scheduleConflicts,
-        latestDate: alerts.scheduleConflictsLatest ? new Date(alerts.scheduleConflictsLatest) : null,
-      });
+    // Add overdue jobs
+    if (alerts.overdueJobsList) {
+      jobs.push(...alerts.overdueJobsList);
     }
 
-    if (alerts.overdueJobs > 0) {
-      rows.push({
-        id: 'overdue-jobs',
-        type: 'Overdue Jobs',
-        icon: <CalendarX className="h-4 w-4" />,
-        details: `${alerts.overdueJobs} past scheduled time`,
-        priority: 'urgent',
-        href: '/provider/jobs?status=overdue',
-        count: alerts.overdueJobs,
-        latestDate: alerts.overdueJobsLatest ? new Date(alerts.overdueJobsLatest) : null,
-      });
+    // Add schedule conflicts
+    if (alerts.scheduleConflictsJobs) {
+      jobs.push(...alerts.scheduleConflictsJobs);
     }
 
-    if (alerts.unconfirmedSoonJobs > 0) {
-      rows.push({
-        id: 'unconfirmed-soon',
-        type: 'Starting Soon',
-        icon: <ClockAlert className="h-4 w-4" />,
-        details: `${alerts.unconfirmedSoonJobs} within 2 hours`,
-        priority: 'urgent', // Upgraded to urgent since they're imminent
-        href: '/provider/jobs?status=pending',
-        count: alerts.unconfirmedSoonJobs,
-        latestDate: alerts.unconfirmedSoonLatest ? new Date(alerts.unconfirmedSoonLatest) : null,
-      });
+    // Add starting soon jobs
+    if (alerts.unconfirmedSoonJobsList) {
+      jobs.push(...alerts.unconfirmedSoonJobsList);
     }
 
-    if (alerts.unassignedJobs > 0) {
-      rows.push({
-        id: 'unassigned-jobs',
-        type: 'Unassigned Jobs',
-        icon: <UserX className="h-4 w-4" />,
-        details: `${alerts.unassignedJobs} ${alerts.unassignedJobs === 1 ? 'job needs' : 'jobs need'} worker`,
-        priority: 'medium',
-        href: '/provider/calendar',
-        count: alerts.unassignedJobs,
-        latestDate: alerts.unassignedJobsLatest ? new Date(alerts.unassignedJobsLatest) : null,
-      });
+    // Add unassigned jobs
+    if (alerts.unassignedJobsList) {
+      jobs.push(...alerts.unassignedJobsList);
     }
 
-    if (alerts.overdueInvoices > 0) {
-      rows.push({
-        id: 'overdue-invoices',
-        type: 'Overdue Invoices',
-        icon: <FileWarning className="h-4 w-4" />,
-        details: `${alerts.overdueInvoices} unpaid 30+ days`,
-        priority: 'low',
-        href: '/provider/invoices?status=overdue',
-        count: alerts.overdueInvoices,
-        latestDate: alerts.overdueInvoicesLatest ? new Date(alerts.overdueInvoicesLatest) : null,
-      });
-    }
-
-    // Overloaded workers (>8 jobs in next 7 days)
-    if (alerts.overloadedWorkers && alerts.overloadedWorkers.length > 0) {
-      const workerNames = alerts.overloadedWorkers.slice(0, 2).map(w => w.name.split(' ')[0]).join(', ');
-      const moreCount = alerts.overloadedWorkers.length > 2 ? ` +${alerts.overloadedWorkers.length - 2}` : '';
-      rows.push({
-        id: 'overloaded-workers',
-        type: 'Overloaded Workers',
-        icon: <UserPlus className="h-4 w-4" />,
-        details: `${workerNames}${moreCount} have 8+ jobs`,
-        priority: 'medium',
-        href: '/provider/team',
-        count: alerts.overloadedWorkers.length,
-        latestDate: null, // No specific date for this alert
-      });
-    }
-
-    // Underutilized workers (<2 jobs in next 7 days)
-    if (alerts.underutilizedWorkers && alerts.underutilizedWorkers.length > 0) {
-      const workerNames = alerts.underutilizedWorkers.slice(0, 2).map(w => w.name.split(' ')[0]).join(', ');
-      const moreCount = alerts.underutilizedWorkers.length > 2 ? ` +${alerts.underutilizedWorkers.length - 2}` : '';
-      rows.push({
-        id: 'underutilized-workers',
-        type: 'Underutilized Workers',
-        icon: <UserMinus className="h-4 w-4" />,
-        details: `${workerNames}${moreCount} have <2 jobs`,
-        priority: 'low',
-        href: '/provider/team',
-        count: alerts.underutilizedWorkers.length,
-        latestDate: null, // No specific date for this alert
-      });
-    }
-
-    // Sort by:
-    // 1. Priority (urgent > medium > low)
-    // 2. Latest date (most recent first)
-    return rows
-      .filter(row => !dismissedAlerts.has(row.id))
+    // Filter out dismissed jobs and sort by priority
+    return jobs
+      .filter(job => !dismissedJobIds.has(job.id))
       .sort((a, b) => {
-        // First sort by priority
-        const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
+        const priorityDiff = problemConfig[a.problem].priority - problemConfig[b.problem].priority;
         if (priorityDiff !== 0) return priorityDiff;
-
-        // Then by latest date (most recent first)
-        const aTime = a.latestDate?.getTime() || 0;
-        const bTime = b.latestDate?.getTime() || 0;
-        return bTime - aTime;
+        // Secondary sort by start time (soonest first)
+        return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
       });
-  }, [alerts, dismissedAlerts]);
+  }, [alerts, dismissedJobIds]);
 
-  const handleDismissAlert = async (e: React.MouseEvent, alertType: AlertType) => {
-    e.stopPropagation(); // Prevent triggering row click
-    setDismissingAlert(alertType);
+  const handleDismissJob = async (e: React.MouseEvent, jobId: string) => {
+    e.stopPropagation();
+    setDismissingJobId(jobId);
 
     try {
       // Optimistic UI update
-      setDismissedAlerts(prev => new Set(Array.from(prev).concat(alertType)));
+      setDismissedJobIds(prev => new Set(Array.from(prev).concat(jobId)));
 
       // Call parent callback if provided
-      if (onDismissAlert) {
-        onDismissAlert(alertType);
+      if (onDismissJob) {
+        onDismissJob(jobId);
       }
 
-      // API call to persist dismissal
+      // API call to persist dismissal (optional - can be job-specific)
       const providerId = localStorage.getItem('providerId');
       await fetch('/api/provider/alerts/dismiss', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ providerId, alertType }),
+        body: JSON.stringify({ providerId, alertType: `job-${jobId}` }),
       });
     } catch (error) {
       // Revert on error
-      setDismissedAlerts(prev => {
+      setDismissedJobIds(prev => {
         const next = new Set(prev);
-        next.delete(alertType);
+        next.delete(jobId);
         return next;
       });
-      console.error('Failed to dismiss alert:', error);
+      console.error('Failed to dismiss job alert:', error);
     } finally {
-      setDismissingAlert(null);
+      setDismissingJobId(null);
     }
   };
 
-  const handleAlertClick = (alert: AlertRow) => {
-    if (onAlertClick) {
-      onAlertClick(alert.id, { count: alert.count, href: alert.href });
-    } else {
-      router.push(alert.href);
+  const handleJobClick = (job: AlertJob) => {
+    if (onJobClick) {
+      onJobClick(job);
     }
+  };
+
+  const formatTime = (dateStr: string) => {
+    return format(new Date(dateStr), 'h:mm a');
+  };
+
+  const formatDate = (dateStr: string) => {
+    return format(new Date(dateStr), 'MMM d');
   };
 
   // Empty state
-  if (alertRows.length === 0) {
+  if (allAlertJobs.length === 0) {
     return (
       <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-border">
@@ -274,75 +195,57 @@ export default function NeedsAttentionTable({ alerts, onAlertClick, onDismissAle
       <div className="px-5 py-4 border-b border-border flex items-center justify-between">
         <h3 className="text-base font-semibold text-foreground">Needs Attention</h3>
         <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
-          {alertRows.length} {alertRows.length === 1 ? 'issue' : 'issues'}
+          {allAlertJobs.length} {allAlertJobs.length === 1 ? 'job' : 'jobs'}
         </span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-muted/30">
-            <tr>
-              <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Alert Type</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Details</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Latest</th>
-              <th className="text-left text-xs font-medium text-muted-foreground px-5 py-3">Priority</th>
-              <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {alertRows.map((alert, index) => {
-              const colors = priorityColors[alert.priority];
-              return (
-                <tr
-                  key={alert.id}
-                  onClick={() => handleAlertClick(alert)}
-                  className={`cursor-pointer hover:bg-muted/40 transition-colors group ${
-                    index % 2 === 0 ? 'bg-background' : 'bg-muted/20'
-                  }`}
-                >
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${colors.bg}`}>
-                        <span className={colors.text}>{alert.icon}</span>
-                      </div>
-                      <span className="text-sm font-medium text-foreground">{alert.type}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-sm text-muted-foreground">
-                    {alert.details}
-                  </td>
-                  <td className="px-5 py-3">
-                    {alert.latestDate ? (
-                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <Clock className="h-3 w-3" />
-                        <span>{formatRelativeDate(alert.latestDate)}</span>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">-</span>
-                    )}
-                  </td>
-                  <td className="px-5 py-3">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${colors.badge}`}>
-                      {alert.priority === 'urgent' ? 'Urgent' : alert.priority === 'medium' ? 'Medium' : 'Low'}
+      <div className="max-h-[400px] overflow-y-auto">
+        <div className="divide-y divide-border">
+          {allAlertJobs.map((job) => {
+            const config = problemConfig[job.problem];
+            return (
+              <div
+                key={`${job.id}-${job.problem}`}
+                onClick={() => handleJobClick(job)}
+                className="px-4 py-3 hover:bg-muted/40 transition-colors cursor-pointer group flex items-center gap-3"
+              >
+                {/* Job Info */}
+                <div className="flex-1 min-w-0">
+                  {/* Row 1: Customer + Service + Problem Badge */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-semibold text-foreground truncate">
+                      {job.customerName}
                     </span>
-                  </td>
-                  <td className="px-5 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={(e) => handleDismissAlert(e, alert.id)}
-                        disabled={dismissingAlert === alert.id}
-                        className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
-                        title="Dismiss alert"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                      <ChevronRight className={`h-4 w-4 ${colors.text}`} />
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    <span className="text-xs text-primary">
+                      {job.serviceType}
+                    </span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${config.color}`}>
+                      {config.icon}
+                      {config.label}
+                    </span>
+                  </div>
+                  {/* Row 2: Date/Time */}
+                  <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                    <Clock className="h-3 w-3" />
+                    <span>{formatDate(job.startTime)} at {formatTime(job.startTime)}</span>
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={(e) => handleDismissJob(e, job.id)}
+                    disabled={dismissingJobId === job.id}
+                    className="p-1.5 rounded-lg text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100"
+                    title="Dismiss"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
     </div>
   );

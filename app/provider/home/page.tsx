@@ -426,6 +426,25 @@ export default function ProviderHome() {
     setSidebarOpen(true);
   };
 
+  // Handler for clicking on an individual alert job in the NeedsAttention table
+  const handleAlertJobClick = (job: { id: string; customerName: string; serviceType: string; address: string; startTime: string; endTime?: string | null; problem: string }) => {
+    const jobDetail: JobDetail = {
+      id: job.id,
+      customerName: job.customerName,
+      serviceType: job.serviceType,
+      address: job.address,
+      startTime: job.startTime,
+      endTime: job.endTime || undefined,
+      status: job.problem === 'overdue' ? 'overdue' : 'scheduled',
+    };
+
+    setSidebarMode('job');
+    setSelectedSidebarJob(jobDetail);
+    setSelectedSidebarDate(null);
+    setSelectedAlertType(null);
+    setSidebarOpen(true);
+  };
+
   const closeSidebar = () => {
     setSidebarOpen(false);
     setTimeout(() => {
@@ -1209,7 +1228,7 @@ export default function ProviderHome() {
 
           {/* Needs Attention Table - Full Width in Above Fold */}
           <div className="mt-6 flex-1">
-            <NeedsAttentionTable alerts={alerts} onAlertClick={handleAlertClick} />
+            <NeedsAttentionTable alerts={alerts} onAlertClick={handleAlertClick} onJobClick={handleAlertJobClick} />
           </div>
         </div>
 

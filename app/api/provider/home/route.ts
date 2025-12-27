@@ -207,7 +207,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Get jobs needing crew assignment (scheduled but no workers assigned) with latest date
+    // Get jobs needing crew assignment (scheduled but no workers assigned) with full details
     const unassignedJobsData = await prisma.job.findMany({
       where: {
         providerId,
@@ -225,6 +225,15 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         startTime: true,
+        endTime: true,
+        serviceType: true,
+        address: true,
+        status: true,
+        customer: {
+          select: {
+            name: true,
+          },
+        },
       },
       orderBy: {
         startTime: 'asc',
@@ -233,7 +242,7 @@ export async function GET(request: NextRequest) {
     const unassignedJobs = unassignedJobsData.length;
     const unassignedJobsLatest = unassignedJobsData[0]?.startTime?.toISOString() || null;
 
-    // Get overdue jobs (past end time but not completed) with latest date
+    // Get overdue jobs (past end time but not completed) with full details
     const overdueJobsData = await prisma.job.findMany({
       where: {
         providerId,
@@ -246,7 +255,16 @@ export async function GET(request: NextRequest) {
       },
       select: {
         id: true,
+        startTime: true,
         endTime: true,
+        serviceType: true,
+        address: true,
+        status: true,
+        customer: {
+          select: {
+            name: true,
+          },
+        },
       },
       orderBy: {
         endTime: 'desc',
@@ -255,7 +273,7 @@ export async function GET(request: NextRequest) {
     const overdueJobs = overdueJobsData.length;
     const overdueJobsLatest = overdueJobsData[0]?.endTime?.toISOString() || null;
 
-    // Jobs starting in <2 hours without confirmation (status still pending) with latest date
+    // Jobs starting in <2 hours without confirmation (status still pending) with full details
     const twoHoursFromNow = new Date(now.getTime() + 2 * 60 * 60 * 1000);
     const unconfirmedSoonJobsData = await prisma.job.findMany({
       where: {
@@ -269,6 +287,15 @@ export async function GET(request: NextRequest) {
       select: {
         id: true,
         startTime: true,
+        endTime: true,
+        serviceType: true,
+        address: true,
+        status: true,
+        customer: {
+          select: {
+            name: true,
+          },
+        },
       },
       orderBy: {
         startTime: 'asc',
@@ -651,16 +678,60 @@ export async function GET(request: NextRequest) {
           scheduleConflictsLatest: conflictingJobs.length > 0
             ? upcomingJobsForAnalysis.find(j => j.id === conflictingJobs[0]?.jobId1)?.startTime?.toISOString() || null
             : null,
+          // Include conflicting job details
+          scheduleConflictsJobs: conflictingJobs.slice(0, 10).map(conflict => {
+            const job = upcomingJobsForAnalysis.find(j => j.id === conflict.jobId1);
+            const worker = providerWorkers.find(w => w.id === conflict.workerId);
+            return job ? {
+              id: job.id,
+              startTime: job.startTime.toISOString(),
+              endTime: job.endTime?.toISOString() || null,
+              serviceType: 'Conflict',
+              customerName: worker ? `${worker.firstName} ${worker.lastName}` : 'Unknown',
+              address: job.address || '',
+              problem: 'conflict',
+            } : null;
+          }).filter(Boolean),
           overloadedWorkers,
           underutilizedWorkers,
           unassignedJobs,
           unassignedJobsLatest,
+          // Include unassigned job details
+          unassignedJobsList: unassignedJobsData.slice(0, 10).map(job => ({
+            id: job.id,
+            startTime: job.startTime.toISOString(),
+            endTime: job.endTime?.toISOString() || null,
+            serviceType: job.serviceType,
+            customerName: job.customer?.name || 'Unknown Customer',
+            address: job.address || '',
+            problem: 'no-worker',
+          })),
           unconfirmedSoonJobs,
           unconfirmedSoonLatest,
+          // Include unconfirmed soon job details
+          unconfirmedSoonJobsList: unconfirmedSoonJobsData.slice(0, 10).map(job => ({
+            id: job.id,
+            startTime: job.startTime.toISOString(),
+            endTime: job.endTime?.toISOString() || null,
+            serviceType: job.serviceType,
+            customerName: job.customer?.name || 'Unknown Customer',
+            address: job.address || '',
+            problem: 'starting-soon',
+          })),
           overdueInvoices,
           overdueInvoicesLatest,
           overdueJobs,
           overdueJobsLatest,
+          // Include overdue job details
+          overdueJobsList: overdueJobsData.slice(0, 10).map(job => ({
+            id: job.id,
+            startTime: job.startTime.toISOString(),
+            endTime: job.endTime?.toISOString() || null,
+            serviceType: job.serviceType,
+            customerName: job.customer?.name || 'Unknown Customer',
+            address: job.address || '',
+            problem: 'overdue',
+          })),
         },
         recentActivity: activity,
         revenueHistory: revenueHistoryWithUtilization,
