@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { format, formatDistanceToNow } from 'date-fns';
 import {
@@ -27,10 +27,23 @@ import {
   XCircle,
   FileText,
   Users,
+  Plus,
+  Search,
+  Check,
 } from 'lucide-react';
 
 export type SidebarMode = 'date' | 'alert' | 'job';
 export type AlertType = 'schedule-conflicts' | 'overdue-jobs' | 'unconfirmed-soon' | 'unassigned-jobs' | 'overdue-invoices' | 'overloaded-workers' | 'underutilized-workers' | 'today-jobs';
+
+// Worker type for selection
+interface Worker {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  profilePhotoUrl?: string | null;
+  status?: string;
+}
 
 // Single job detail for the job mode
 export interface JobDetail {
@@ -46,6 +59,7 @@ export interface JobDetail {
   estimatedValue?: number | null;
   workerName?: string | null;
   workers?: { id: string; firstName: string; lastName: string }[];
+  assignedUserIds?: string[];
   notes?: string;
   estimatedDuration?: number;
 }
@@ -158,12 +172,24 @@ export default function JobDetailsSidebar({
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<JobDetail | null>(null);
   const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  // Worker selection state
+  const [availableWorkers, setAvailableWorkers] = useState<Worker[]>([]);
+  const [loadingWorkers, setLoadingWorkers] = useState(false);
+  const [workerSearchQuery, setWorkerSearchQuery] = useState('');
+  const [showWorkerDropdown, setShowWorkerDropdown] = useState(false);
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([]);
+  const workerDropdownRef = useRef<HTMLDivElement>(null);
 
   // Reset edit state when sidebar closes or job changes
   useEffect(() => {
     if (!isOpen || mode !== 'job') {
       setIsEditing(false);
       setEditForm(null);
+      setSaveSuccess(false);
+      setShowWorkerDropdown(false);
+      setWorkerSearchQuery('');
     }
   }, [isOpen, mode]);
 
@@ -171,8 +197,50 @@ export default function JobDetailsSidebar({
   useEffect(() => {
     if (selectedJob && mode === 'job') {
       setEditForm({ ...selectedJob });
+      // Initialize selected workers from job data
+      const workerIds = selectedJob.assignedUserIds ||
+        (selectedJob.workers?.map(w => w.id) || []);
+      setSelectedWorkerIds(workerIds);
     }
   }, [selectedJob, mode]);
+
+  // Fetch available workers when entering edit mode
+  useEffect(() => {
+    if (isEditing && availableWorkers.length === 0) {
+      fetchAvailableWorkers();
+    }
+  }, [isEditing]);
+
+  // Close worker dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (workerDropdownRef.current && !workerDropdownRef.current.contains(event.target as Node)) {
+        setShowWorkerDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const fetchAvailableWorkers = async () => {
+    setLoadingWorkers(true);
+    try {
+      const providerId = localStorage.getItem('providerId');
+      const res = await fetch(`/api/provider/team?providerId=${providerId}`);
+      if (res.ok) {
+        const data = await res.json();
+        // Filter to only include field workers who are active
+        const workers = (data.users || []).filter((u: Worker) =>
+          u.role === 'field' && u.status !== 'inactive'
+        );
+        setAvailableWorkers(workers);
+      }
+    } catch (error) {
+      console.error('Error fetching workers:', error);
+    } finally {
+      setLoadingWorkers(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -273,6 +341,12 @@ export default function JobDetailsSidebar({
 
   const config = alertType ? alertConfig[alertType] : null;
 
+  // Handle entering edit mode
+  const handleStartEdit = () => {
+    setIsEditing(true);
+    setSaveSuccess(false);
+  };
+
   // Handle save for job edit
   const handleSaveJob = async () => {
     if (!editForm || !selectedJob) return;
@@ -285,15 +359,31 @@ export default function JobDetailsSidebar({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           providerId,
-          ...editForm,
+          status: editForm.status,
+          startTime: editForm.startTime,
+          endTime: editForm.endTime,
+          assignedUserIds: selectedWorkerIds,
+          actualValue: editForm.amount,
+          internalNotes: editForm.notes,
         }),
       });
 
       if (res.ok) {
-        const data = await res.json();
+        // Update the edit form with selected workers
+        const updatedWorkers = availableWorkers.filter(w => selectedWorkerIds.includes(w.id));
+        const updatedJob: JobDetail = {
+          ...editForm,
+          workers: updatedWorkers.map(w => ({ id: w.id, firstName: w.firstName, lastName: w.lastName })),
+          assignedUserIds: selectedWorkerIds,
+          workerName: updatedWorkers.map(w => `${w.firstName} ${w.lastName}`).join(', ') || null,
+        };
+        setEditForm(updatedJob);
         setIsEditing(false);
+        setSaveSuccess(true);
+        // Clear success after 3 seconds
+        setTimeout(() => setSaveSuccess(false), 3000);
         if (onJobUpdate) {
-          onJobUpdate(editForm);
+          onJobUpdate(updatedJob);
         }
       } else {
         console.error('Failed to save job');
@@ -309,7 +399,35 @@ export default function JobDetailsSidebar({
     setIsEditing(false);
     if (selectedJob) {
       setEditForm({ ...selectedJob });
+      // Reset selected workers
+      const workerIds = selectedJob.assignedUserIds ||
+        (selectedJob.workers?.map(w => w.id) || []);
+      setSelectedWorkerIds(workerIds);
     }
+    setShowWorkerDropdown(false);
+    setWorkerSearchQuery('');
+  };
+
+  // Worker selection helpers
+  const toggleWorker = (workerId: string) => {
+    setSelectedWorkerIds(prev =>
+      prev.includes(workerId)
+        ? prev.filter(id => id !== workerId)
+        : [...prev, workerId]
+    );
+  };
+
+  const removeWorker = (workerId: string) => {
+    setSelectedWorkerIds(prev => prev.filter(id => id !== workerId));
+  };
+
+  const filteredWorkers = availableWorkers.filter(worker => {
+    const fullName = `${worker.firstName} ${worker.lastName}`.toLowerCase();
+    return fullName.includes(workerSearchQuery.toLowerCase());
+  });
+
+  const getWorkerInitials = (worker: Worker) => {
+    return `${worker.firstName[0]}${worker.lastName[0]}`.toUpperCase();
   };
 
   // Determine title and subtitle based on mode
@@ -392,7 +510,7 @@ export default function JobDetailsSidebar({
               {/* Edit button for job mode */}
               {mode === 'job' && selectedJob && !isEditing && (
                 <button
-                  onClick={() => setIsEditing(true)}
+                  onClick={handleStartEdit}
                   className="p-2 hover:bg-primary/10 text-primary rounded-lg transition-colors"
                   title="Edit job"
                 >
@@ -414,26 +532,41 @@ export default function JobDetailsSidebar({
           {/* Job Detail Mode */}
           {mode === 'job' && selectedJob && editForm ? (
             <div className="space-y-4">
-              {/* Status Badge */}
-              <div className="flex items-center justify-between">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium capitalize ${getStatusColor(selectedJob.status)}`}>
-                  {getStatusIcon(selectedJob.status)}
-                  {selectedJob.status.replace('_', ' ')}
-                </span>
-                {isEditing && (
+              {/* Success message */}
+              {saveSuccess && (
+                <div className="flex items-center gap-2 px-4 py-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-emerald-500">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="text-sm font-medium">Changes saved successfully!</span>
+                </div>
+              )}
+
+              {/* Status - Badge in view mode, Dropdown in edit mode */}
+              {isEditing ? (
+                <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-border">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="text-xs font-medium uppercase tracking-wide">Status</span>
+                  </div>
                   <select
                     value={editForm.status}
                     onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                    className="text-xs bg-muted border border-border rounded-lg px-2 py-1 text-foreground"
+                    className="w-full bg-[#1a1a1a] border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                   >
-                    <option value="pending">Pending</option>
                     <option value="scheduled">Scheduled</option>
+                    <option value="pending">Pending</option>
                     <option value="in_progress">In Progress</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                   </select>
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium capitalize ${getStatusColor(editForm.status)}`}>
+                    {getStatusIcon(editForm.status)}
+                    {editForm.status.replace('_', ' ')}
+                  </span>
+                </div>
+              )}
 
               {/* Customer Info */}
               <div className="bg-muted/30 rounded-xl p-4 space-y-3 border border-border">
@@ -447,25 +580,25 @@ export default function JobDetailsSidebar({
                       type="text"
                       value={editForm.customerName}
                       onChange={(e) => setEditForm({ ...editForm, customerName: e.target.value })}
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                      className="w-full bg-[#1a1a1a] border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                       placeholder="Customer name"
                     />
                     <input
                       type="tel"
                       value={editForm.customerPhone || ''}
                       onChange={(e) => setEditForm({ ...editForm, customerPhone: e.target.value })}
-                      className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                      className="w-full bg-[#1a1a1a] border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                       placeholder="Phone number"
                     />
                   </div>
                 ) : (
                   <>
-                    <p className="text-base font-semibold text-foreground">{selectedJob.customerName}</p>
-                    {selectedJob.customerPhone && (
+                    <p className="text-base font-semibold text-foreground">{editForm.customerName}</p>
+                    {editForm.customerPhone && (
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Phone className="h-3.5 w-3.5" />
-                        <a href={`tel:${selectedJob.customerPhone}`} className="text-sm hover:text-primary transition-colors">
-                          {selectedJob.customerPhone}
+                        <a href={`tel:${editForm.customerPhone}`} className="text-sm hover:text-primary transition-colors">
+                          {editForm.customerPhone}
                         </a>
                       </div>
                     )}
@@ -484,11 +617,11 @@ export default function JobDetailsSidebar({
                     type="text"
                     value={editForm.serviceType}
                     onChange={(e) => setEditForm({ ...editForm, serviceType: e.target.value })}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    className="w-full bg-[#1a1a1a] border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                     placeholder="Service type"
                   />
                 ) : (
-                  <p className="text-sm font-medium text-primary">{selectedJob.serviceType}</p>
+                  <p className="text-sm font-medium text-primary">{editForm.serviceType}</p>
                 )}
               </div>
 
@@ -501,39 +634,39 @@ export default function JobDetailsSidebar({
                 {isEditing ? (
                   <div className="space-y-2">
                     <div>
-                      <label className="text-xs text-muted-foreground">Start Time</label>
+                      <label className="text-xs text-muted-foreground block mb-1">Start Time</label>
                       <input
                         type="datetime-local"
                         value={editForm.startTime ? format(new Date(editForm.startTime), "yyyy-MM-dd'T'HH:mm") : ''}
                         onChange={(e) => setEditForm({ ...editForm, startTime: new Date(e.target.value).toISOString() })}
-                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                        className="w-full bg-[#1a1a1a] border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                       />
                     </div>
                     <div>
-                      <label className="text-xs text-muted-foreground">End Time</label>
+                      <label className="text-xs text-muted-foreground block mb-1">End Time</label>
                       <input
                         type="datetime-local"
                         value={editForm.endTime ? format(new Date(editForm.endTime), "yyyy-MM-dd'T'HH:mm") : ''}
                         onChange={(e) => setEditForm({ ...editForm, endTime: new Date(e.target.value).toISOString() })}
-                        className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                        className="w-full bg-[#1a1a1a] border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                       />
                     </div>
                   </div>
                 ) : (
                   <>
                     <p className="text-sm text-foreground">
-                      {format(new Date(selectedJob.startTime), 'EEEE, MMMM d, yyyy')}
+                      {format(new Date(editForm.startTime), 'EEEE, MMMM d, yyyy')}
                     </p>
                     <div className="flex items-center gap-2 text-muted-foreground">
                       <Clock className="h-3.5 w-3.5" />
                       <span className="text-sm">
-                        {formatDateTime(selectedJob.startTime)}
-                        {selectedJob.endTime && ` - ${formatDateTime(selectedJob.endTime)}`}
+                        {formatDateTime(editForm.startTime)}
+                        {editForm.endTime && ` - ${formatDateTime(editForm.endTime)}`}
                       </span>
                     </div>
-                    {selectedJob.estimatedDuration && (
+                    {editForm.estimatedDuration && (
                       <p className="text-xs text-muted-foreground">
-                        Est. duration: {selectedJob.estimatedDuration} min
+                        Est. duration: {editForm.estimatedDuration} min
                       </p>
                     )}
                   </>
@@ -551,11 +684,11 @@ export default function JobDetailsSidebar({
                     type="text"
                     value={editForm.address}
                     onChange={(e) => setEditForm({ ...editForm, address: e.target.value })}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
+                    className="w-full bg-[#1a1a1a] border border-border rounded-lg px-3 py-2.5 text-sm text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                     placeholder="Address"
                   />
                 ) : (
-                  <p className="text-sm text-foreground">{selectedJob.address}</p>
+                  <p className="text-sm text-foreground">{editForm.address}</p>
                 )}
               </div>
 
@@ -565,19 +698,145 @@ export default function JobDetailsSidebar({
                   <Users className="h-4 w-4" />
                   <span className="text-xs font-medium uppercase tracking-wide">Assigned Workers</span>
                 </div>
-                {selectedJob.workers && selectedJob.workers.length > 0 ? (
+                {isEditing ? (
+                  <div className="space-y-3" ref={workerDropdownRef}>
+                    {/* Selected workers as chips */}
+                    {selectedWorkerIds.length > 0 && (
+                      <div className="flex flex-wrap gap-2">
+                        {selectedWorkerIds.map((workerId) => {
+                          const worker = availableWorkers.find(w => w.id === workerId);
+                          // Also check original job workers if not in available workers yet
+                          const originalWorker = editForm.workers?.find(w => w.id === workerId);
+                          const workerName = worker
+                            ? `${worker.firstName} ${worker.lastName}`
+                            : originalWorker
+                              ? `${originalWorker.firstName} ${originalWorker.lastName}`
+                              : 'Unknown Worker';
+                          const initials = worker
+                            ? getWorkerInitials(worker)
+                            : originalWorker
+                              ? `${originalWorker.firstName[0]}${originalWorker.lastName[0]}`.toUpperCase()
+                              : '??';
+                          return (
+                            <span
+                              key={workerId}
+                              className="inline-flex items-center gap-2 px-2.5 py-1.5 bg-muted text-primary rounded-lg text-xs font-medium group"
+                            >
+                              <span className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center text-[10px] font-semibold text-primary">
+                                {initials}
+                              </span>
+                              {workerName}
+                              <button
+                                onClick={() => removeWorker(workerId)}
+                                className="p-0.5 hover:bg-red-500/20 rounded-full transition-colors"
+                              >
+                                <X className="h-3 w-3 text-muted-foreground hover:text-red-500" />
+                              </button>
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Add Worker button / dropdown */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowWorkerDropdown(!showWorkerDropdown)}
+                        className="inline-flex items-center gap-2 px-3 py-2 bg-[#1a1a1a] hover:bg-muted border border-border rounded-lg text-sm text-primary font-medium transition-colors"
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Worker
+                      </button>
+
+                      {showWorkerDropdown && (
+                        <div className="absolute left-0 top-full mt-2 w-full bg-[#1a1a1a] border border-border rounded-xl shadow-xl z-50 overflow-hidden">
+                          {/* Search input */}
+                          <div className="p-3 border-b border-border">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <input
+                                type="text"
+                                value={workerSearchQuery}
+                                onChange={(e) => setWorkerSearchQuery(e.target.value)}
+                                placeholder="Search workers..."
+                                className="w-full bg-background border border-border rounded-lg pl-9 pr-3 py-2 text-sm text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                                autoFocus
+                              />
+                            </div>
+                          </div>
+
+                          {/* Worker list */}
+                          <div className="max-h-48 overflow-y-auto">
+                            {loadingWorkers ? (
+                              <div className="flex items-center justify-center py-6">
+                                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                              </div>
+                            ) : filteredWorkers.length === 0 ? (
+                              <div className="px-3 py-4 text-center text-sm text-muted-foreground">
+                                {workerSearchQuery ? 'No workers found' : 'No available workers'}
+                              </div>
+                            ) : (
+                              filteredWorkers.map((worker) => {
+                                const isSelected = selectedWorkerIds.includes(worker.id);
+                                return (
+                                  <button
+                                    key={worker.id}
+                                    type="button"
+                                    onClick={() => toggleWorker(worker.id)}
+                                    className={`w-full flex items-center gap-3 px-3 py-2.5 text-left hover:bg-muted/50 transition-colors ${
+                                      isSelected ? 'bg-primary/10' : ''
+                                    }`}
+                                  >
+                                    <span className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-semibold text-foreground">
+                                      {getWorkerInitials(worker)}
+                                    </span>
+                                    <span className="flex-1 text-sm font-medium text-foreground">
+                                      {worker.firstName} {worker.lastName}
+                                    </span>
+                                    {isSelected && (
+                                      <Check className="h-4 w-4 text-primary" />
+                                    )}
+                                  </button>
+                                );
+                              })
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : selectedWorkerIds.length > 0 ? (
                   <div className="flex flex-wrap gap-2">
-                    {selectedJob.workers.map((worker) => (
+                    {selectedWorkerIds.map((workerId) => {
+                      const worker = availableWorkers.find(w => w.id === workerId);
+                      const originalWorker = editForm.workers?.find(w => w.id === workerId);
+                      const workerName = worker
+                        ? `${worker.firstName} ${worker.lastName}`
+                        : originalWorker
+                          ? `${originalWorker.firstName} ${originalWorker.lastName}`
+                          : editForm.workerName || 'Unknown Worker';
+                      return (
+                        <span key={workerId} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+                          <User className="h-3 w-3" />
+                          {workerName}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : editForm.workers && editForm.workers.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {editForm.workers.map((worker) => (
                       <span key={worker.id} className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
                         <User className="h-3 w-3" />
                         {worker.firstName} {worker.lastName}
                       </span>
                     ))}
                   </div>
-                ) : selectedJob.workerName ? (
+                ) : editForm.workerName ? (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
                     <User className="h-3 w-3" />
-                    {selectedJob.workerName}
+                    {editForm.workerName}
                   </span>
                 ) : (
                   <p className="text-sm text-orange-500 flex items-center gap-1.5">
@@ -594,16 +853,19 @@ export default function JobDetailsSidebar({
                   <span className="text-xs font-medium uppercase tracking-wide">Amount</span>
                 </div>
                 {isEditing ? (
-                  <input
-                    type="number"
-                    value={editForm.amount || editForm.estimatedValue || ''}
-                    onChange={(e) => setEditForm({ ...editForm, amount: parseFloat(e.target.value) || null })}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground"
-                    placeholder="Amount"
-                  />
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">$</span>
+                    <input
+                      type="number"
+                      value={editForm.amount || editForm.estimatedValue || ''}
+                      onChange={(e) => setEditForm({ ...editForm, amount: parseFloat(e.target.value) || null })}
+                      className="w-full bg-[#1a1a1a] border border-border rounded-lg pl-7 pr-3 py-2.5 text-sm text-foreground focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
+                      placeholder="0.00"
+                    />
+                  </div>
                 ) : (
                   <p className="text-lg font-bold text-emerald-500">
-                    {formatCurrency(selectedJob.amount || selectedJob.estimatedValue || 0)}
+                    {formatCurrency(editForm.amount || editForm.estimatedValue || 0)}
                   </p>
                 )}
               </div>
@@ -618,11 +880,11 @@ export default function JobDetailsSidebar({
                   <textarea
                     value={editForm.notes || ''}
                     onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
-                    className="w-full bg-background border border-border rounded-lg px-3 py-2 text-sm text-foreground min-h-[80px] resize-none"
+                    className="w-full bg-[#1a1a1a] border border-border rounded-lg px-3 py-2.5 text-sm text-foreground min-h-[80px] resize-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors"
                     placeholder="Add notes..."
                   />
-                ) : selectedJob.notes ? (
-                  <p className="text-sm text-foreground whitespace-pre-wrap">{selectedJob.notes}</p>
+                ) : editForm.notes ? (
+                  <p className="text-sm text-foreground whitespace-pre-wrap">{editForm.notes}</p>
                 ) : (
                   <p className="text-sm text-muted-foreground italic">No notes</p>
                 )}
@@ -759,12 +1021,9 @@ export default function JobDetailsSidebar({
           {/* Job mode - Edit button + Close button when not editing */}
           {mode === 'job' && selectedJob && !isEditing && (
             <div className="space-y-3">
-              {/* Large Edit Job Details button */}
+              {/* Large Edit Job Details button - triggers inline edit mode */}
               <button
-                onClick={() => {
-                  router.push(`/provider/jobs/${selectedJob.id}`);
-                  onClose();
-                }}
+                onClick={handleStartEdit}
                 className="w-full h-14 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl transition-colors flex items-center justify-center gap-3 text-base"
               >
                 <Pencil className="h-5 w-5" />
