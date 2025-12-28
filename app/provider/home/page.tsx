@@ -23,6 +23,7 @@ import RecentJobsTable from '@/components/provider/RecentJobsTable';
 import NeedsAttentionTable, { type AlertType } from '@/components/provider/NeedsAttentionTable';
 import JobPreviewModal from '@/components/provider/JobPreviewModal';
 import JobDetailsSidebar, { type SidebarMode, type JobDetail } from '@/components/provider/JobDetailsSidebar';
+import CustomizableDashboard, { type DashboardWidget } from '@/components/provider/CustomizableDashboard';
 import {
   AreaChart,
   Area,
@@ -861,6 +862,266 @@ export default function ProviderHome() {
     return groups.sort((a, b) => a.date.localeCompare(b.date)).slice(0, 7);
   }, [homeData?.upcomingJobs]);
 
+  // Extract data safely for use in memos (before early returns)
+  const todaysJobs = homeData?.todaysJobs || [];
+  const stats = homeData?.stats;
+  const alerts = homeData?.alerts;
+
+  // Calculate metrics
+  const numberOfJobs = viewMode === 'week' ? (stats?.completedThisWeek || 0) : (stats?.completedThisMonth || 0);
+  const averageJobSize = avgPerJob;
+  const totalJobValue = totalRevenue;
+
+  // Check if there are any alerts
+  const hasAlerts = (alerts?.scheduleConflicts || 0) > 0 ||
+    (alerts?.unassignedJobs || 0) > 0 ||
+    (alerts?.unconfirmedSoonJobs || 0) > 0 ||
+    (alerts?.overdueInvoices || 0) > 0 ||
+    (alerts?.overdueJobs || 0) > 0;
+
+  // Dashboard widgets configuration - must be before early returns
+  const dashboardWidgets: DashboardWidget[] = useMemo(() => [
+    {
+      id: 'metrics',
+      title: 'Metrics',
+      minW: 2,
+      minH: 2,
+      component: (
+        <div className="h-full flex flex-col gap-4">
+          {/* Number of Jobs */}
+          <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-4xl font-bold text-white">{numberOfJobs}</div>
+              <Hash className="h-6 w-6 text-[#52525b]" />
+            </div>
+            <div className="text-sm text-[#71717a]">Jobs Completed</div>
+          </div>
+          {/* Average Job Size */}
+          <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-4xl font-bold text-white">{formatCurrency(averageJobSize)}</div>
+              <TrendingUp className="h-6 w-6 text-[#52525b]" />
+            </div>
+            <div className="text-sm text-[#71717a]">Average Job Size</div>
+          </div>
+          {/* Total Job Value */}
+          <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-4xl font-bold text-white">{formatCurrency(totalJobValue)}</div>
+              <DollarSign className="h-6 w-6 text-[#52525b]" />
+            </div>
+            <div className="text-sm text-[#71717a]">Total Revenue</div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'chart',
+      title: 'Revenue Chart',
+      minW: 4,
+      minH: 3,
+      component: (
+        <div className="bg-card rounded-2xl border border-border shadow-sm p-5 overflow-hidden h-full flex flex-col">
+          {/* Chart Header */}
+          <div className="flex flex-col gap-3 mb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <h2 className="text-lg font-semibold text-foreground">{METRIC_CONFIG[chartMetric].label}</h2>
+                <span className="text-lg font-bold" style={{ color: METRIC_CONFIG[chartMetric].color }}>
+                  {METRIC_CONFIG[chartMetric].formatter(currentMetricTotal)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={handlePrev} className="w-7 h-7 flex items-center justify-center rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+                  <ChevronLeft className="h-4 w-4 text-muted-foreground" />
+                </button>
+                <span className="text-sm text-muted-foreground min-w-[120px] text-center">{dateLabel}</span>
+                <button onClick={handleNext} disabled={!canGoNext} className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${canGoNext ? 'bg-muted/50 hover:bg-muted' : 'opacity-30 cursor-not-allowed'}`}>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="flex gap-2">
+                {(Object.keys(METRIC_CONFIG) as ChartMetric[]).map((metric) => (
+                  <button key={metric} onClick={() => setChartMetric(metric)} className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all border ${chartMetric === metric ? METRIC_CONFIG[metric].buttonActive : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground bg-transparent'}`}>
+                    {METRIC_CONFIG[metric].label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex bg-muted rounded-lg p-1">
+                <button onClick={() => { setViewMode('week'); setCurrentDate(new Date()); }} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${viewMode === 'week' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Week</button>
+                <button onClick={() => { setViewMode('month'); setCurrentDate(new Date()); }} className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${viewMode === 'month' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}>Month</button>
+              </div>
+            </div>
+          </div>
+          <div className="flex-1 min-h-[200px]">
+            {chartData.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }} onClick={(data) => { const payload = (data as { activePayload?: Array<{ payload: RevenueDataPoint }> })?.activePayload?.[0]?.payload; if (payload) handleGraphClick(payload); }} style={{ cursor: 'pointer' }}>
+                  <defs>
+                    <linearGradient id="colorMetricWidget" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={METRIC_CONFIG[chartMetric].color} stopOpacity={0.3} />
+                      <stop offset="95%" stopColor={METRIC_CONFIG[chartMetric].color} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
+                  <XAxis dataKey="displayLabel" stroke="#6b7280" strokeOpacity={0.3} tickLine={false} axisLine={false} interval={0} tick={(props: { x: number; y: number; payload: { value: string; index: number } }) => { if (viewMode === 'month') { const dataPoint = chartData[props.payload.index]; if (dataPoint && !dataPoint.showTick) return <g />; } return <text x={props.x} y={props.y + 12} textAnchor="middle" fill="#6b7280" fontSize={11}>{props.payload.value}</text>; }} />
+                  <YAxis domain={[0, 'auto']} stroke="#6b7280" strokeOpacity={0.3} tick={{ fill: '#6b7280', fontSize: 11 }} tickLine={false} axisLine={false} tickFormatter={(value) => { if (chartMetric === 'revenue' || chartMetric === 'avgValue') return `$${value}`; if (chartMetric === 'utilization') return `${value}%`; return String(value); }} width={45} />
+                  <Tooltip content={<CustomTooltip metric={chartMetric} metricColor={METRIC_CONFIG[chartMetric].color} />} />
+                  <Area type="monotoneX" dataKey={METRIC_CONFIG[chartMetric].dataKey} stroke={METRIC_CONFIG[chartMetric].color} strokeWidth={2.5} fill="url(#colorMetricWidget)" fillOpacity={0.2} isAnimationActive={false} connectNulls={true} dot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint; index?: number }) => { const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint; const val = props.payload?.[dataKey]; if (val === null || val === undefined || val === 0) return <g key={props.index} />; return <circle key={props.index} cx={props.cx} cy={props.cy} r={4} fill={METRIC_CONFIG[chartMetric].color} stroke="#fff" strokeWidth={2} />; }} activeDot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint }) => { const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint; const val = props.payload?.[dataKey]; if (val === null || val === undefined || val === 0) return <g />; return <circle cx={props.cx} cy={props.cy} r={7} fill={METRIC_CONFIG[chartMetric].color} stroke="#fff" strokeWidth={2} />; }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                <Activity className="h-10 w-10 mb-2 opacity-30" />
+                <p className="text-sm">No data for this period</p>
+              </div>
+            )}
+          </div>
+        </div>
+      ),
+    },
+    {
+      id: 'alerts',
+      title: 'Needs Attention',
+      minW: 6,
+      minH: 2,
+      component: alerts ? (
+        <NeedsAttentionTable alerts={alerts} onAlertClick={handleAlertClick} onJobClick={handleAlertJobClick} />
+      ) : (
+        <div className="bg-card rounded-2xl border border-border p-8 flex flex-col items-center justify-center text-muted-foreground h-full">
+          <p className="text-sm">Loading alerts...</p>
+        </div>
+      ),
+    },
+    {
+      id: 'recent',
+      title: 'Recent Jobs',
+      minW: 6,
+      minH: 2,
+      component: homeData?.recentJobs && homeData.recentJobs.length > 0 ? (
+        <RecentJobsTable jobs={homeData.recentJobs} onJobClick={(job) => openSidebarForRecentJob(job)} />
+      ) : (
+        <div className="bg-card rounded-2xl border border-border p-8 flex flex-col items-center justify-center text-muted-foreground h-full">
+          <Briefcase className="h-10 w-10 mb-2 opacity-30" />
+          <p className="text-sm">No recent jobs</p>
+        </div>
+      ),
+    },
+    {
+      id: 'upcoming',
+      title: 'Coming Up',
+      minW: 3,
+      minH: 3,
+      component: (
+        <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col h-full">
+          <div className="flex items-center justify-between mb-5">
+            <h3 className="text-base font-semibold text-foreground">Coming Up</h3>
+            {groupedUpcomingJobs.length > 3 && (
+              <button onClick={() => setShowAllComingUp(!showAllComingUp)} className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5">
+                {showAllComingUp ? 'Show less' : `View all (${homeData?.upcomingJobs?.length || 0})`}
+                <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAllComingUp ? 'rotate-90' : ''}`} />
+              </button>
+            )}
+          </div>
+          {groupedUpcomingJobs.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+              <Calendar className="h-10 w-10 mb-2 opacity-30" />
+              <p className="text-sm">No upcoming jobs</p>
+            </div>
+          ) : (
+            <div className={`flex-1 space-y-4 overflow-y-auto ${showAllComingUp ? 'max-h-none' : 'max-h-[350px]'}`}>
+              {(showAllComingUp ? groupedUpcomingJobs : groupedUpcomingJobs.slice(0, 3)).map((group) => (
+                <div key={group.date}>
+                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{group.label}</p>
+                  <div className="space-y-2">
+                    {group.jobs.map((job) => (
+                      <button key={job.id} onClick={() => openSidebarForJob(job)} className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-3 text-left transition-all group">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-foreground truncate">{job.customerName || 'Unknown Customer'}</p>
+                              <span className="text-xs text-primary">• {job.serviceType}</span>
+                            </div>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{format(new Date(job.startTime), 'MMM d')} {formatTime(job.startTime)}</span>
+                              {job.workerName ? <span className="flex items-center gap-1"><User className="h-3 w-3" />{job.workerName.split(' ')[0]}</span> : <span className="flex items-center gap-1 text-orange-500"><UserX className="h-3 w-3" />Unassigned</span>}
+                            </div>
+                          </div>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ),
+    },
+    {
+      id: 'today',
+      title: 'Today\'s Jobs',
+      minW: 3,
+      minH: 3,
+      component: (
+        <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col h-full">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
+              <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">{todaysJobs.length}</span>
+            </div>
+            {todaysJobs.length > 3 && (
+              <button onClick={() => setShowAllToday(!showAllToday)} className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5">
+                {showAllToday ? 'Show less' : `View all (${todaysJobs.length})`}
+                <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAllToday ? 'rotate-90' : ''}`} />
+              </button>
+            )}
+          </div>
+          {todaysJobs.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
+              <Calendar className="h-10 w-10 mb-2 opacity-30" />
+              <p className="text-sm">No jobs scheduled today</p>
+            </div>
+          ) : (
+            <div className={`flex-1 space-y-2 overflow-y-auto ${showAllToday ? 'max-h-none' : 'max-h-[350px]'}`}>
+              {(showAllToday ? todaysJobs : todaysJobs.slice(0, 5)).map((job) => (
+                <button key={job.id} onClick={() => openSidebarForJob(job)} className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-3 text-left transition-all group">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground truncate">{job.customerName}</p>
+                        <span className="text-xs text-primary">• {job.serviceType}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatTime(job.startTime)}{job.endTime && ` - ${formatTime(job.endTime)}`}</span>
+                        {job.workers && job.workers.length > 0 ? <span className="flex items-center gap-1"><User className="h-3 w-3" />{job.workers[0].firstName}</span> : <span className="flex items-center gap-1 text-orange-500"><UserX className="h-3 w-3" />Unassigned</span>}
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ),
+    },
+  ], [numberOfJobs, averageJobSize, totalJobValue, formatCurrency, chartMetric, currentMetricTotal, dateLabel, canGoNext, chartData, viewMode, alerts, handleAlertClick, handleAlertJobClick, homeData, groupedUpcomingJobs, showAllComingUp, showAllToday, todaysJobs, openSidebarForJob, openSidebarForRecentJob, formatTime, handlePrev, handleNext, setViewMode, setCurrentDate, setChartMetric, handleGraphClick, setShowAllComingUp, setShowAllToday]);
+
+  // Default layout for the dashboard grid
+  const defaultDashboardLayout = useMemo(() => [
+    { i: 'metrics', x: 0, y: 0, w: 3, h: 4, minW: 2, minH: 3 },
+    { i: 'chart', x: 3, y: 0, w: 9, h: 4, minW: 4, minH: 3 },
+    { i: 'alerts', x: 0, y: 4, w: 12, h: 3, minW: 6, minH: 2 },
+    { i: 'recent', x: 0, y: 7, w: 12, h: 3, minW: 6, minH: 2 },
+    { i: 'upcoming', x: 0, y: 10, w: 6, h: 4, minW: 3, minH: 3 },
+    { i: 'today', x: 6, y: 10, w: 6, h: 4, minW: 3, minH: 3 },
+  ], []);
+
+  // Early returns after all hooks
   if (loading) {
     return (
       <ProviderLayout providerName={providerName}>
@@ -880,20 +1141,6 @@ export default function ProviderHome() {
       </ProviderLayout>
     );
   }
-
-  const { todaysJobs, stats, alerts } = homeData;
-
-  // Calculate metrics
-  const numberOfJobs = viewMode === 'week' ? stats.completedThisWeek : stats.completedThisMonth;
-  const averageJobSize = avgPerJob;
-  const totalJobValue = totalRevenue;
-
-  // Check if there are any alerts
-  const hasAlerts = alerts.scheduleConflicts > 0 ||
-    alerts.unassignedJobs > 0 ||
-    alerts.unconfirmedSoonJobs > 0 ||
-    alerts.overdueInvoices > 0 ||
-    alerts.overdueJobs > 0;
 
   return (
     <ProviderLayout providerName={providerName}>
@@ -922,512 +1169,13 @@ export default function ProviderHome() {
         }}
       />
 
-      <div className="w-full bg-background">
-        {/* ABOVE FOLD SECTION - Metrics + Chart + Alerts */}
-        <div className="min-h-[calc(100vh-64px)] px-6 py-5 flex flex-col">
-
-          {/* TOP ROW: Metrics + Chart */}
-          <div className="flex flex-col lg:flex-row gap-6">
-
-            {/* Left: 3 Metric Cards - Original Size */}
-            <div className="flex flex-col sm:flex-row lg:flex-col gap-4 lg:w-[280px] flex-shrink-0">
-              {/* Number of Jobs */}
-              <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-4xl font-bold text-white">{numberOfJobs}</div>
-                  <Hash className="h-6 w-6 text-[#52525b]" />
-                </div>
-                <div className="text-sm text-[#71717a]">Jobs Completed</div>
-              </div>
-
-              {/* Average Job Size */}
-              <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-4xl font-bold text-white">{formatCurrency(averageJobSize)}</div>
-                  <TrendingUp className="h-6 w-6 text-[#52525b]" />
-                </div>
-                <div className="text-sm text-[#71717a]">Average Job Size</div>
-              </div>
-
-              {/* Total Job Value */}
-              <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="text-4xl font-bold text-white">{formatCurrency(totalJobValue)}</div>
-                  <DollarSign className="h-6 w-6 text-[#52525b]" />
-                </div>
-                <div className="text-sm text-[#71717a]">Total Revenue</div>
-              </div>
-            </div>
-
-            {/* Right: Revenue Chart */}
-            <div className="flex-1 bg-card rounded-2xl border border-border shadow-sm p-5 overflow-hidden">
-              {/* Chart Header */}
-              <div className="flex flex-col gap-3 mb-3">
-                {/* Top row: Title + Total + Date Navigation */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <h2 className="text-lg font-semibold text-foreground">{METRIC_CONFIG[chartMetric].label}</h2>
-                    <span
-                      className="text-lg font-bold"
-                      style={{ color: METRIC_CONFIG[chartMetric].color }}
-                    >
-                      {METRIC_CONFIG[chartMetric].formatter(currentMetricTotal)}
-                    </span>
-                  </div>
-
-                  {/* Date Navigation */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={handlePrev}
-                      className="w-7 h-7 flex items-center justify-center rounded-lg bg-muted/50 hover:bg-muted transition-colors"
-                    >
-                      <ChevronLeft className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                    <span className="text-sm text-muted-foreground min-w-[120px] text-center">{dateLabel}</span>
-                    <button
-                      onClick={handleNext}
-                      disabled={!canGoNext}
-                      className={`w-7 h-7 flex items-center justify-center rounded-lg transition-colors ${
-                        canGoNext ? 'bg-muted/50 hover:bg-muted' : 'opacity-30 cursor-not-allowed'
-                      }`}
-                    >
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Bottom row: Metric toggles + Time period */}
-                <div className="flex items-center justify-between">
-                  {/* Metric Toggles - Color matches chart */}
-                  <div className="flex gap-2">
-                    {(Object.keys(METRIC_CONFIG) as ChartMetric[]).map((metric) => (
-                      <button
-                        key={metric}
-                        onClick={() => setChartMetric(metric)}
-                        className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all border ${
-                          chartMetric === metric
-                            ? METRIC_CONFIG[metric].buttonActive
-                            : 'border-border text-muted-foreground hover:text-foreground hover:border-muted-foreground bg-transparent'
-                        }`}
-                      >
-                        {METRIC_CONFIG[metric].label}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Time Period Toggle */}
-                  <div className="flex bg-muted rounded-lg p-1">
-                    <button
-                      onClick={() => {
-                        setViewMode('week');
-                        setCurrentDate(new Date());
-                      }}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                        viewMode === 'week'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      Week
-                    </button>
-                    <button
-                      onClick={() => {
-                        setViewMode('month');
-                        setCurrentDate(new Date());
-                      }}
-                      className={`px-3 py-1 text-xs font-medium rounded-md transition-all ${
-                        viewMode === 'month'
-                          ? 'bg-background text-foreground shadow-sm'
-                          : 'text-muted-foreground hover:text-foreground'
-                      }`}
-                    >
-                      Month
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Chart */}
-              <div className="h-[280px] w-full">
-                {chartData.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart
-                      data={chartData}
-                      margin={{ top: 20, right: 30, left: 10, bottom: 20 }}
-                      onClick={(data) => {
-                        const payload = (data as { activePayload?: Array<{ payload: RevenueDataPoint }> })?.activePayload?.[0]?.payload;
-                        if (payload) handleGraphClick(payload);
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <defs>
-                        <linearGradient id="colorMetric" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor={METRIC_CONFIG[chartMetric].color} stopOpacity={0.3} />
-                          <stop offset="95%" stopColor={METRIC_CONFIG[chartMetric].color} stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.06} vertical={false} />
-                      <XAxis
-                        dataKey="displayLabel"
-                        stroke="#6b7280"
-                        strokeOpacity={0.3}
-                        tickLine={false}
-                        axisLine={false}
-                        interval={0}
-                        tick={(props: { x: number; y: number; payload: { value: string; index: number } }) => {
-                          // For month view, only show certain tick labels
-                          if (viewMode === 'month') {
-                            const dataPoint = chartData[props.payload.index];
-                            if (dataPoint && !dataPoint.showTick) {
-                              return <g />;
-                            }
-                          }
-                          return (
-                            <text
-                              x={props.x}
-                              y={props.y + 12}
-                              textAnchor="middle"
-                              fill="#6b7280"
-                              fontSize={11}
-                            >
-                              {props.payload.value}
-                            </text>
-                          );
-                        }}
-                      />
-                      <YAxis
-                        domain={[0, 'auto']}
-                        stroke="#6b7280"
-                        strokeOpacity={0.3}
-                        tick={{ fill: '#6b7280', fontSize: 11 }}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(value) => {
-                          if (chartMetric === 'revenue' || chartMetric === 'avgValue') return `$${value}`;
-                          if (chartMetric === 'utilization') return `${value}%`;
-                          return String(value);
-                        }}
-                        width={45}
-                      />
-                      <Tooltip
-                        content={
-                          <CustomTooltip
-                            metric={chartMetric}
-                            metricColor={METRIC_CONFIG[chartMetric].color}
-                          />
-                        }
-                      />
-                      <Area
-                        type="monotoneX"
-                        dataKey={METRIC_CONFIG[chartMetric].dataKey}
-                        stroke={METRIC_CONFIG[chartMetric].color}
-                        strokeWidth={2.5}
-                        fill="url(#colorMetric)"
-                        fillOpacity={0.2}
-                        isAnimationActive={false}
-                        dot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint; index?: number }) => {
-                          const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint;
-                          const val = props.payload?.[dataKey];
-                          // Only show dots for data points that have values
-                          if (val === null || val === undefined || val === 0) {
-                            return <g key={props.index} />;
-                          }
-                          return (
-                            <circle
-                              key={props.index}
-                              cx={props.cx}
-                              cy={props.cy}
-                              r={4}
-                              fill={METRIC_CONFIG[chartMetric].color}
-                              stroke="#fff"
-                              strokeWidth={2}
-                            />
-                          );
-                        }}
-                        connectNulls={true}
-                        activeDot={(props: { cx?: number; cy?: number; payload?: RevenueDataPoint }) => {
-                          const dataKey = METRIC_CONFIG[chartMetric].dataKey as keyof RevenueDataPoint;
-                          const val = props.payload?.[dataKey];
-                          if (val === null || val === undefined || val === 0) {
-                            return <g />;
-                          }
-                          return (
-                            <circle
-                              cx={props.cx}
-                              cy={props.cy}
-                              r={7}
-                              fill={METRIC_CONFIG[chartMetric].color}
-                              stroke="#fff"
-                              strokeWidth={2}
-                            />
-                          );
-                        }}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                    <Activity className="h-10 w-10 mb-2 opacity-30" />
-                    <p className="text-sm">No data for this period</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Date Breakdown */}
-              {selectedDate && (
-                <div ref={breakdownRef} className="mt-4 bg-muted/30 rounded-xl border border-border overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/50">
-                    <div className="flex items-center gap-3">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="font-medium text-foreground">
-                        {format(new Date(selectedDate + 'T12:00:00'), 'EEEE, MMMM d, yyyy')}
-                      </span>
-                    </div>
-                    <button
-                      onClick={() => { setSelectedDate(null); setDateBreakdown(null); }}
-                      className="w-6 h-6 flex items-center justify-center rounded-md hover:bg-muted transition-colors"
-                    >
-                      <X className="h-4 w-4 text-muted-foreground" />
-                    </button>
-                  </div>
-                  <div className="p-4">
-                    {loadingBreakdown ? (
-                      <div className="flex items-center justify-center py-6">
-                        <div className="animate-pulse text-muted-foreground">Loading...</div>
-                      </div>
-                    ) : dateBreakdown?.jobs.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
-                        <Briefcase className="h-8 w-8 mb-2 opacity-50" />
-                        <p className="text-sm">No jobs scheduled</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2 max-h-[200px] overflow-y-auto">
-                        {dateBreakdown?.jobs.map((job) => (
-                          <button
-                            key={job.id}
-                            onClick={() => openSidebarForBreakdownJob(job)}
-                            className="w-full p-3 bg-background hover:bg-muted/40 rounded-lg text-left transition-colors"
-                          >
-                            <div className="flex items-center justify-between">
-                              <div>
-                                <p className="font-medium text-foreground text-sm">{job.serviceType}</p>
-                                <p className="text-xs text-muted-foreground">{job.customerName}</p>
-                              </div>
-                              {job.amount !== null && (
-                                <p className="text-sm font-semibold text-emerald-600">{formatCurrency(job.amount)}</p>
-                              )}
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Needs Attention Table - Full Width in Above Fold */}
-          <div className="mt-6 flex-1">
-            <NeedsAttentionTable alerts={alerts} onAlertClick={handleAlertClick} onJobClick={handleAlertJobClick} />
-          </div>
-        </div>
-
-        {/* BELOW FOLD SECTION - History & Schedules */}
-        <div className="px-6 py-8 border-t border-border bg-muted/5">
-
-          {/* Recent Jobs Table - Full Width */}
-          {homeData.recentJobs && homeData.recentJobs.length > 0 && (
-            <div className="mb-10">
-              <RecentJobsTable
-                jobs={homeData.recentJobs}
-                onJobClick={(job) => openSidebarForRecentJob(job)}
-              />
-            </div>
-          )}
-
-          {/* Coming Up + Jobs Scheduled Today - 2 Columns with equal height */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-
-            {/* Column 1: Coming Up - Enhanced Cards */}
-            <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col min-h-[400px]">
-              <div className="flex items-center justify-between mb-5">
-                <h3 className="text-base font-semibold text-foreground">Coming Up</h3>
-                {groupedUpcomingJobs.length > 3 && (
-                  <button
-                    onClick={() => setShowAllComingUp(!showAllComingUp)}
-                    className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5"
-                  >
-                    {showAllComingUp ? 'Show less' : `View all (${homeData?.upcomingJobs?.length || 0})`}
-                    <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAllComingUp ? 'rotate-90' : ''}`} />
-                  </button>
-                )}
-              </div>
-
-              {groupedUpcomingJobs.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
-                  <Calendar className="h-10 w-10 mb-2 opacity-30" />
-                  <p className="text-sm">No upcoming jobs</p>
-                </div>
-              ) : (
-                <div className={`flex-1 space-y-4 overflow-y-auto ${showAllComingUp ? 'max-h-none' : 'max-h-[350px]'}`}>
-                  {(showAllComingUp ? groupedUpcomingJobs : groupedUpcomingJobs.slice(0, 3)).map((group) => (
-                    <div key={group.date}>
-                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{group.label}</p>
-                      <div className="space-y-2">
-                        {group.jobs.map((job) => (
-                          <button
-                            key={job.id}
-                            onClick={() => openSidebarForJob(job)}
-                            className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-3 text-left transition-all group"
-                          >
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex-1 min-w-0 space-y-1">
-                                {/* Row 1: Customer Name + Service + Status */}
-                                <div className="flex items-center gap-2">
-                                  <p className="text-sm font-semibold text-foreground truncate">
-                                    {job.customerName || 'Unknown Customer'}
-                                  </p>
-                                  <span className="text-xs text-primary">• {job.serviceType}</span>
-                                  {job.status && (
-                                    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium capitalize ${
-                                      job.status === 'scheduled' ? 'bg-blue-500/20 text-blue-400' :
-                                      job.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                                      job.status === 'in_progress' ? 'bg-orange-500/20 text-orange-400' :
-                                      job.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
-                                      'bg-muted text-muted-foreground'
-                                    }`}>
-                                      {job.status.replace('_', ' ')}
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Row 2: Time + Worker + Amount */}
-                                <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="h-3 w-3" />
-                                    {format(new Date(job.startTime), 'MMM d')} {formatTime(job.startTime)}
-                                  </span>
-                                  {job.workerName ? (
-                                    <span className="flex items-center gap-1">
-                                      <User className="h-3 w-3" />
-                                      {job.workerName.split(' ')[0]}
-                                    </span>
-                                  ) : (
-                                    <span className="flex items-center gap-1 text-orange-500">
-                                      <UserX className="h-3 w-3" />
-                                      Unassigned
-                                    </span>
-                                  )}
-                                  {(job.estimatedValue || job.actualValue) && (
-                                    <span className="font-semibold text-emerald-500 ml-auto">
-                                      {formatCurrency(job.actualValue || job.estimatedValue || 0)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {/* Arrow on right */}
-                              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Column 2: Jobs Scheduled Today - Enhanced Cards */}
-            <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col min-h-[400px]">
-              <div className="flex items-center justify-between mb-5">
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-semibold text-foreground">Jobs Scheduled Today</h3>
-                  <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">
-                    {todaysJobs.length}
-                  </span>
-                </div>
-                {todaysJobs.length > 3 && (
-                  <button
-                    onClick={() => setShowAllToday(!showAllToday)}
-                    className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5"
-                  >
-                    {showAllToday ? 'Show less' : `View all (${todaysJobs.length})`}
-                    <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAllToday ? 'rotate-90' : ''}`} />
-                  </button>
-                )}
-              </div>
-
-              {todaysJobs.length === 0 ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
-                  <Calendar className="h-10 w-10 mb-2 opacity-30" />
-                  <p className="text-sm">No jobs scheduled today</p>
-                </div>
-              ) : (
-                <div className={`flex-1 space-y-2 overflow-y-auto ${showAllToday ? 'max-h-none' : 'max-h-[350px]'}`}>
-                  {(showAllToday ? todaysJobs : todaysJobs.slice(0, 5)).map((job) => (
-                    <button
-                      key={job.id}
-                      onClick={() => openSidebarForJob(job)}
-                      className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-3 text-left transition-all group"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex-1 min-w-0 space-y-1">
-                          {/* Row 1: Customer Name + Service + Status */}
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-foreground truncate">{job.customerName}</p>
-                            <span className="text-xs text-primary">• {job.serviceType}</span>
-                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium capitalize ${
-                              job.status === 'scheduled' ? 'bg-blue-500/20 text-blue-400' :
-                              job.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' :
-                              job.status === 'in_progress' ? 'bg-orange-500/20 text-orange-400' :
-                              job.status === 'completed' ? 'bg-emerald-500/20 text-emerald-400' :
-                              'bg-muted text-muted-foreground'
-                            }`}>
-                              {job.status === 'in_progress' && (
-                                <span className="w-1.5 h-1.5 bg-orange-500 rounded-full mr-1 animate-pulse" />
-                              )}
-                              {job.status.replace('_', ' ')}
-                            </span>
-                          </div>
-
-                          {/* Row 2: Time + Worker + Amount */}
-                          <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {formatTime(job.startTime)}{job.endTime && ` - ${formatTime(job.endTime)}`}
-                            </span>
-                            {job.workers && job.workers.length > 0 ? (
-                              <span className="flex items-center gap-1">
-                                <User className="h-3 w-3" />
-                                {job.workers[0].firstName}
-                                {job.workers.length > 1 && ` +${job.workers.length - 1}`}
-                              </span>
-                            ) : (
-                              <span className="flex items-center gap-1 text-orange-500">
-                                <UserX className="h-3 w-3" />
-                                Unassigned
-                              </span>
-                            )}
-                            {job.totalAmount && (
-                              <span className="font-semibold text-emerald-500 ml-auto">
-                                {formatCurrency(job.totalAmount)}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Arrow on right */}
-                        <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+      <div className="w-full bg-background px-6 py-5">
+        {/* Customizable Dashboard Grid */}
+        <CustomizableDashboard
+          widgets={dashboardWidgets}
+          defaultLayout={defaultDashboardLayout}
+          storageKey={`dashboard-layout-${providerId}`}
+        />
       </div>
     </ProviderLayout>
   );
