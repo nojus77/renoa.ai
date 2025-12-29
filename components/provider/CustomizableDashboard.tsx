@@ -1,9 +1,12 @@
 "use client";
 
 import { useState, useEffect, useCallback, ReactNode, useRef } from 'react';
-import GridLayout, { LayoutItem, verticalCompactor } from 'react-grid-layout';
+import GridLayout, { LayoutItem, getCompactor } from 'react-grid-layout';
 import { Pencil, Check, GripVertical, RotateCcw } from 'lucide-react';
 import 'react-grid-layout/css/styles.css';
+
+// Create a vertical compactor that prevents collision (no overlapping)
+const verticalNoOverlapCompactor = getCompactor('vertical', false, false);
 
 export interface DashboardWidget {
   id: string;
@@ -51,21 +54,40 @@ export default function CustomizableDashboard({
   const [isEditMode, setIsEditMode] = useState(false);
   const [layout, setLayout] = useState<LayoutItem[]>(defaultLayout);
   const [mounted, setMounted] = useState(false);
-  const [containerWidth, setContainerWidth] = useState(1200);
+  const [containerWidth, setContainerWidth] = useState(0); // Start at 0 to force recalculate
+  const [widthReady, setWidthReady] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Measure container width
+  // Measure container width - runs after mount
   useEffect(() => {
     const updateWidth = () => {
       if (containerRef.current) {
-        setContainerWidth(containerRef.current.offsetWidth);
+        const newWidth = containerRef.current.offsetWidth;
+        if (newWidth > 0) {
+          setContainerWidth(newWidth);
+          setWidthReady(true);
+        }
       }
     };
 
-    updateWidth();
+    // Initial calculation with small delay to ensure DOM is ready
+    const initialTimer = setTimeout(() => {
+      updateWidth();
+    }, 50);
+
+    // Second calculation to catch any layout shifts
+    const secondTimer = setTimeout(() => {
+      updateWidth();
+    }, 150);
+
     window.addEventListener('resize', updateWidth);
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearTimeout(secondTimer);
+      window.removeEventListener('resize', updateWidth);
+    };
+  }, [mounted]); // Re-run when mounted changes
 
   // Load saved layout from localStorage
   useEffect(() => {
@@ -136,9 +158,10 @@ export default function CustomizableDashboard({
   // Get widget from layout
   const getWidgetLayout = (id: string) => layout.find(l => l.i === id);
 
-  if (!mounted) {
+  // Show loading skeleton until both mounted and width is calculated
+  if (!mounted || !widthReady) {
     return (
-      <div className={`relative ${className}`}>
+      <div className={`relative ${className}`} ref={containerRef}>
         <div className="animate-pulse space-y-4">
           {widgets.slice(0, 3).map((widget) => (
             <div key={widget.id} className="bg-card rounded-2xl h-64 border border-border" />
@@ -210,9 +233,9 @@ export default function CustomizableDashboard({
         }}
         resizeConfig={{
           enabled: isEditMode,
-          handles: ['se'],
+          handles: ['s', 'w', 'e', 'n', 'sw', 'nw', 'se', 'ne'],
         }}
-        compactor={verticalCompactor}
+        compactor={verticalNoOverlapCompactor}
         onLayoutChange={handleLayoutChange}
       >
         {widgets.map((widget) => {
@@ -291,33 +314,171 @@ export default function CustomizableDashboard({
           box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.4);
         }
 
+        /* Base resize handle styles */
         .react-grid-item > .react-resizable-handle {
           position: absolute;
-          width: 20px;
-          height: 20px;
-          bottom: 8px;
-          right: 8px;
-          cursor: se-resize;
           opacity: 0;
           transition: opacity 200ms ease;
+          z-index: 20;
         }
 
-        .widget-container:hover > .react-resizable-handle,
+        .react-grid-item:hover > .react-resizable-handle,
         .react-grid-item.resizing > .react-resizable-handle {
           opacity: 1;
         }
 
-        .react-grid-item > .react-resizable-handle::after {
+        /* Corner handles */
+        .react-grid-item > .react-resizable-handle-se {
+          width: 20px;
+          height: 20px;
+          bottom: 4px;
+          right: 4px;
+          cursor: se-resize;
+        }
+        .react-grid-item > .react-resizable-handle-se::after {
           content: '';
           position: absolute;
           right: 3px;
           bottom: 3px;
-          width: 12px;
-          height: 12px;
+          width: 10px;
+          height: 10px;
           border-right: 3px solid hsl(var(--primary));
           border-bottom: 3px solid hsl(var(--primary));
-          border-radius: 0 0 4px 0;
-          opacity: 0.8;
+          border-radius: 0 0 3px 0;
+        }
+
+        .react-grid-item > .react-resizable-handle-sw {
+          width: 20px;
+          height: 20px;
+          bottom: 4px;
+          left: 4px;
+          cursor: sw-resize;
+        }
+        .react-grid-item > .react-resizable-handle-sw::after {
+          content: '';
+          position: absolute;
+          left: 3px;
+          bottom: 3px;
+          width: 10px;
+          height: 10px;
+          border-left: 3px solid hsl(var(--primary));
+          border-bottom: 3px solid hsl(var(--primary));
+          border-radius: 0 0 0 3px;
+        }
+
+        .react-grid-item > .react-resizable-handle-nw {
+          width: 20px;
+          height: 20px;
+          top: 4px;
+          left: 4px;
+          cursor: nw-resize;
+        }
+        .react-grid-item > .react-resizable-handle-nw::after {
+          content: '';
+          position: absolute;
+          left: 3px;
+          top: 3px;
+          width: 10px;
+          height: 10px;
+          border-left: 3px solid hsl(var(--primary));
+          border-top: 3px solid hsl(var(--primary));
+          border-radius: 3px 0 0 0;
+        }
+
+        .react-grid-item > .react-resizable-handle-ne {
+          width: 20px;
+          height: 20px;
+          top: 4px;
+          right: 4px;
+          cursor: ne-resize;
+        }
+        .react-grid-item > .react-resizable-handle-ne::after {
+          content: '';
+          position: absolute;
+          right: 3px;
+          top: 3px;
+          width: 10px;
+          height: 10px;
+          border-right: 3px solid hsl(var(--primary));
+          border-top: 3px solid hsl(var(--primary));
+          border-radius: 0 3px 0 0;
+        }
+
+        /* Edge handles */
+        .react-grid-item > .react-resizable-handle-e {
+          width: 10px;
+          height: calc(100% - 40px);
+          right: 0;
+          top: 20px;
+          cursor: e-resize;
+        }
+        .react-grid-item > .react-resizable-handle-e::after {
+          content: '';
+          position: absolute;
+          right: 2px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 30px;
+          background: hsl(var(--primary));
+          border-radius: 2px;
+        }
+
+        .react-grid-item > .react-resizable-handle-w {
+          width: 10px;
+          height: calc(100% - 40px);
+          left: 0;
+          top: 20px;
+          cursor: w-resize;
+        }
+        .react-grid-item > .react-resizable-handle-w::after {
+          content: '';
+          position: absolute;
+          left: 2px;
+          top: 50%;
+          transform: translateY(-50%);
+          width: 4px;
+          height: 30px;
+          background: hsl(var(--primary));
+          border-radius: 2px;
+        }
+
+        .react-grid-item > .react-resizable-handle-n {
+          width: calc(100% - 40px);
+          height: 10px;
+          top: 0;
+          left: 20px;
+          cursor: n-resize;
+        }
+        .react-grid-item > .react-resizable-handle-n::after {
+          content: '';
+          position: absolute;
+          top: 2px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 30px;
+          height: 4px;
+          background: hsl(var(--primary));
+          border-radius: 2px;
+        }
+
+        .react-grid-item > .react-resizable-handle-s {
+          width: calc(100% - 40px);
+          height: 10px;
+          bottom: 0;
+          left: 20px;
+          cursor: s-resize;
+        }
+        .react-grid-item > .react-resizable-handle-s::after {
+          content: '';
+          position: absolute;
+          bottom: 2px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 30px;
+          height: 4px;
+          background: hsl(var(--primary));
+          border-radius: 2px;
         }
 
         .react-grid-placeholder {
