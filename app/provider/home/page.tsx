@@ -887,28 +887,28 @@ export default function ProviderHome() {
       minW: 2,
       minH: 2,
       component: (
-        <div className="h-full flex flex-col gap-4">
+        <div className="h-full flex flex-col gap-3 p-1">
           {/* Number of Jobs */}
-          <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-4xl font-bold text-white">{numberOfJobs}</div>
-              <Hash className="h-6 w-6 text-[#52525b]" />
+          <div className="flex-1 min-h-[90px] bg-[#18181b] rounded-2xl px-5 py-4 border border-[#27272a] flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-3xl font-bold text-white">{numberOfJobs}</div>
+              <Hash className="h-5 w-5 text-[#52525b]" />
             </div>
             <div className="text-sm text-[#71717a]">Jobs Completed</div>
           </div>
           {/* Average Job Size */}
-          <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-4xl font-bold text-white">{formatCurrency(averageJobSize)}</div>
-              <TrendingUp className="h-6 w-6 text-[#52525b]" />
+          <div className="flex-1 min-h-[90px] bg-[#18181b] rounded-2xl px-5 py-4 border border-[#27272a] flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-3xl font-bold text-white">{formatCurrency(averageJobSize)}</div>
+              <TrendingUp className="h-5 w-5 text-[#52525b]" />
             </div>
             <div className="text-sm text-[#71717a]">Average Job Size</div>
           </div>
           {/* Total Job Value */}
-          <div className="flex-1 bg-[#18181b] rounded-2xl p-6 border border-[#27272a]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-4xl font-bold text-white">{formatCurrency(totalJobValue)}</div>
-              <DollarSign className="h-6 w-6 text-[#52525b]" />
+          <div className="flex-1 min-h-[90px] bg-[#18181b] rounded-2xl px-5 py-4 border border-[#27272a] flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-3xl font-bold text-white">{formatCurrency(totalJobValue)}</div>
+              <DollarSign className="h-5 w-5 text-[#52525b]" />
             </div>
             <div className="text-sm text-[#71717a]">Total Revenue</div>
           </div>
