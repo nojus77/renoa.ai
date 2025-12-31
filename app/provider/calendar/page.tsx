@@ -415,6 +415,51 @@ export default function ProviderCalendar() {
     };
   };
 
+  // Get monthly stats for the month view
+  const getMonthlyStats = () => {
+    const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
+
+    // Filter jobs for the month
+    const monthJobs = jobs.filter(job => {
+      const jobDate = new Date(job.startTime);
+      return jobDate >= monthStart && jobDate <= monthEnd;
+    });
+
+    // Calculate total revenue (actualValue for completed jobs)
+    const totalRevenue = monthJobs
+      .filter(j => j.status === 'completed')
+      .reduce((sum, j) => sum + (j.actualValue || j.estimatedValue || 0), 0);
+
+    // Count completed jobs
+    const completedJobs = monthJobs.filter(j => j.status === 'completed').length;
+
+    // Count all scheduled jobs (not cancelled)
+    const scheduledJobs = monthJobs.filter(j => j.status !== 'cancelled').length;
+
+    // Calculate utilization (hours worked / available hours)
+    const totalHoursWorked = monthJobs
+      .filter(j => j.status === 'completed')
+      .reduce((sum, j) => {
+        const start = new Date(j.startTime);
+        const end = new Date(j.endTime);
+        return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+      }, 0);
+
+    // Calculate available hours (8 hours per worker per working day)
+    // Assume 5 working days per week, ~22 working days per month
+    const workingDaysInMonth = 22;
+    const availableHours = teamMembers.length * 8 * workingDaysInMonth;
+    const utilizationPercent = availableHours > 0 ? Math.round((totalHoursWorked / availableHours) * 100) : 0;
+
+    return {
+      totalRevenue,
+      completedJobs,
+      scheduledJobs,
+      utilizationPercent,
+    };
+  };
+
   const getWeekStart = (date: Date) => {
     const d = new Date(date);
     const day = d.getDay();
@@ -524,7 +569,19 @@ export default function ProviderCalendar() {
               <div className="flex items-center gap-2">
                 <Button
                   onClick={() => {
-                    setSelectedSlot(null);
+                    // Pre-fill date based on view mode
+                    if (viewMode === 'week') {
+                      // Use Monday of the current week
+                      const weekStart = getWeekStart(currentDate);
+                      setSelectedSlot({ date: weekStart, hour: 9 });
+                    } else if (viewMode === 'month') {
+                      // Use first day of current month
+                      const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+                      setSelectedSlot({ date: monthStart, hour: 9 });
+                    } else {
+                      // Day view - use current date
+                      setSelectedSlot({ date: currentDate, hour: 9 });
+                    }
                     setShowAddJobModal(true);
                   }}
                   size="sm"
@@ -717,7 +774,7 @@ export default function ProviderCalendar() {
                 }}
               />
             )}
-            {viewMode === 'month' && <MonthView jobs={jobs} currentDate={currentDate} />}
+            {viewMode === 'month' && <MonthView jobs={jobs} currentDate={currentDate} stats={getMonthlyStats()} />}
           </div>
 
         </DndContext>
@@ -1167,8 +1224,15 @@ function DayView({ jobs, blockedTimes, currentDate, onSlotClick, onJobClick, onS
   );
 }
 
-// FIXED: Month View - Proper implementation with job indicators
-function MonthView({ jobs, currentDate }: { jobs: Job[]; currentDate: Date }) {
+// Month View with stats summary
+interface MonthStats {
+  totalRevenue: number;
+  completedJobs: number;
+  scheduledJobs: number;
+  utilizationPercent: number;
+}
+
+function MonthView({ jobs, currentDate, stats }: { jobs: Job[]; currentDate: Date; stats: MonthStats }) {
   const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
   const startDay = monthStart.getDay();
@@ -1231,63 +1295,133 @@ function MonthView({ jobs, currentDate }: { jobs: Job[]; currentDate: Date }) {
   };
 
   return (
-    <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 overflow-hidden">
-      {/* Day of week headers */}
-      <div className="grid grid-cols-7 border-b border-zinc-800/50 bg-zinc-900">
-        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-          <div key={day} className="p-3 text-center border-r border-zinc-800/30 last:border-r-0">
-            <span className="text-xs font-medium text-zinc-400">{day}</span>
+    <div className="space-y-4">
+      {/* Monthly Stats Summary */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
+        <div className="flex items-start justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-zinc-100">
+              {format(currentDate, 'MMMM yyyy')}
+            </h2>
+            <p className="text-zinc-400 mt-1">
+              Monthly overview
+            </p>
           </div>
-        ))}
+          <div className="text-center">
+            <div className={`text-4xl font-bold ${stats.utilizationPercent > 70 ? 'text-emerald-400' : stats.utilizationPercent > 40 ? 'text-yellow-400' : 'text-zinc-400'}`}>
+              {stats.utilizationPercent}%
+            </div>
+            <div className="text-sm text-zinc-500">Utilization</div>
+          </div>
+        </div>
+
+        {/* Stat Cards Row - 4 cards for monthly view */}
+        <div className="grid grid-cols-4 gap-4">
+          {/* Total Revenue */}
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <DollarSign className="h-4 w-4 text-emerald-400 opacity-70" />
+              <span className="text-xs font-medium text-emerald-400 opacity-70">Revenue</span>
+            </div>
+            <div className="text-2xl font-bold text-emerald-400">
+              ${stats.totalRevenue.toLocaleString()}
+            </div>
+            <div className="text-xs text-emerald-400 opacity-60 mt-0.5">this month</div>
+          </div>
+
+          {/* Completed Jobs */}
+          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <CheckCircle className="h-4 w-4 text-zinc-300 opacity-70" />
+              <span className="text-xs font-medium text-zinc-300 opacity-70">Completed</span>
+            </div>
+            <div className="text-2xl font-bold text-zinc-300">{stats.completedJobs}</div>
+            <div className="text-xs text-zinc-300 opacity-60 mt-0.5">jobs done</div>
+          </div>
+
+          {/* Scheduled Jobs */}
+          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <Clock className="h-4 w-4 text-zinc-300 opacity-70" />
+              <span className="text-xs font-medium text-zinc-300 opacity-70">Scheduled</span>
+            </div>
+            <div className="text-2xl font-bold text-zinc-300">{stats.scheduledJobs}</div>
+            <div className="text-xs text-zinc-300 opacity-60 mt-0.5">total jobs</div>
+          </div>
+
+          {/* Completion Rate */}
+          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingUp className="h-4 w-4 text-zinc-300 opacity-70" />
+              <span className="text-xs font-medium text-zinc-300 opacity-70">Completion</span>
+            </div>
+            <div className="text-2xl font-bold text-zinc-300">
+              {stats.scheduledJobs > 0 ? Math.round((stats.completedJobs / stats.scheduledJobs) * 100) : 0}%
+            </div>
+            <div className="text-xs text-zinc-300 opacity-60 mt-0.5">rate</div>
+          </div>
+        </div>
       </div>
 
-      {/* Calendar grid */}
-      <div>
-        {weeks.map((week, weekIdx) => (
-          <div key={weekIdx} className="grid grid-cols-7 border-b border-zinc-800/30 last:border-b-0">
-            {week.map((date, dayIdx) => {
-              const dayJobs = getJobsForDate(date);
-              const jobCount = dayJobs.length;
+      {/* Calendar Grid */}
+      <div className="bg-zinc-900/50 rounded-xl border border-zinc-800/50 overflow-hidden">
+        {/* Day of week headers */}
+        <div className="grid grid-cols-7 border-b border-zinc-800/50 bg-zinc-900">
+          {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+            <div key={day} className="p-3 text-center border-r border-zinc-800/30 last:border-r-0">
+              <span className="text-xs font-medium text-zinc-400">{day}</span>
+            </div>
+          ))}
+        </div>
 
-              return (
-                <div
-                  key={dayIdx}
-                  className={`min-h-[100px] p-2 border-r border-zinc-800/30 last:border-r-0 ${
-                    isCurrentMonth(date) ? '' : 'bg-zinc-950/50'
-                  } ${isToday(date) ? 'bg-emerald-500/5' : ''}`}
-                >
-                  <div className={`text-sm font-medium mb-2 ${
-                    isToday(date) ? 'text-emerald-400' : isCurrentMonth(date) ? 'text-zinc-300' : 'text-zinc-600'
-                  }`}>
-                    {date.getDate()}
-                  </div>
+        {/* Calendar grid */}
+        <div>
+          {weeks.map((week, weekIdx) => (
+            <div key={weekIdx} className="grid grid-cols-7 border-b border-zinc-800/30 last:border-b-0">
+              {week.map((date, dayIdx) => {
+                const dayJobs = getJobsForDate(date);
+                const jobCount = dayJobs.length;
 
-                  {/* Job indicators */}
-                  <div className="space-y-1">
-                    {dayJobs.slice(0, 3).map(job => (
-                      <div
-                        key={job.id}
-                        className={`text-[10px] px-2 py-1 rounded truncate ${
-                          job.status === 'scheduled' ? 'bg-blue-500/20 text-blue-400' :
-                          job.status === 'in_progress' ? 'bg-yellow-500/20 text-yellow-400' :
-                          job.status === 'completed' ? 'bg-green-500/20 text-green-400' :
-                          'bg-zinc-500/20 text-zinc-400'
-                        }`}
-                      >
-                        {job.customerName}
-                      </div>
-                    ))}
-                    {jobCount > 3 && (
-                      <div className="text-[10px] text-zinc-500 pl-2">
-                        +{jobCount - 3} more
-                      </div>
-                    )}
+                return (
+                  <div
+                    key={dayIdx}
+                    className={`min-h-[100px] p-2 border-r border-zinc-800/30 last:border-r-0 ${
+                      isCurrentMonth(date) ? '' : 'bg-zinc-950/50'
+                    } ${isToday(date) ? 'bg-emerald-500/5' : ''}`}
+                  >
+                    <div className={`text-sm font-medium mb-2 ${
+                      isToday(date) ? 'text-emerald-400' : isCurrentMonth(date) ? 'text-zinc-300' : 'text-zinc-600'
+                    }`}>
+                      {date.getDate()}
+                    </div>
+
+                    {/* Job indicators */}
+                    <div className="space-y-1">
+                      {dayJobs.slice(0, 3).map(job => (
+                        <div
+                          key={job.id}
+                          className={`text-[10px] px-2 py-1 rounded truncate ${
+                            job.status === 'scheduled' ? 'bg-blue-500/20 text-blue-400' :
+                            job.status === 'in_progress' ? 'bg-yellow-500/20 text-yellow-400' :
+                            job.status === 'completed' ? 'bg-green-500/20 text-green-400' :
+                            'bg-zinc-500/20 text-zinc-400'
+                          }`}
+                        >
+                          {job.customerName}
+                        </div>
+                      ))}
+                      {jobCount > 3 && (
+                        <div className="text-[10px] text-zinc-500 pl-2">
+                          +{jobCount - 3} more
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        ))}
+                );
+              })}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

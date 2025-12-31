@@ -33,7 +33,6 @@ import WeekInsightsPanel from './WeekInsightsPanel';
 import UnassignedJobsPanel, { UnassignedJob } from './UnassignedJobsPanel';
 import CalendarSkeleton from './CalendarSkeleton';
 import { useKeyboardShortcuts, KeyboardShortcutsDialog } from './KeyboardShortcuts';
-import { ScheduleProposalModal } from './ScheduleProposalModal';
 
 // Types
 export interface WeeklyJob {
@@ -147,9 +146,6 @@ export default function WeeklyTeamCalendar({
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [activeDragJob, setActiveDragJob] = useState<WeeklyJob | null>(null);
   const [unassignedJobs, setUnassignedJobs] = useState<UnassignedJob[]>([]);
-  const [isAutoAssigning, setIsAutoAssigning] = useState(false);
-  const [showProposalModal, setShowProposalModal] = useState(false);
-  const [currentProposal, setCurrentProposal] = useState<any>(null);
 
   // Configure drag sensors
   const mouseSensor = useSensor(MouseSensor, {
@@ -477,67 +473,6 @@ export default function WeeklyTeamCalendar({
     }
   };
 
-  // Handle auto-assign unassigned jobs
-  const handleAutoAssignUnassigned = async () => {
-    if (unassignedJobs.length === 0) return;
-
-    setIsAutoAssigning(true);
-    try {
-      const currentUserId = localStorage.getItem('userId');
-
-      // Get the earliest job date from unassigned jobs
-      // (API requires date but will use jobIds to fetch the actual jobs)
-      const earliestJobDate = unassignedJobs.reduce((earliest, job) => {
-        const jobDate = new Date(job.startTime);
-        return jobDate < earliest ? jobDate : earliest;
-      }, new Date(unassignedJobs[0].startTime));
-
-      // Use the smart scheduler API to generate a proposal
-      const response = await fetch('/api/provider/schedule/auto', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          providerId,
-          date: earliestJobDate.toISOString(),
-          jobIds: unassignedJobs.map(j => j.id),
-          createdBy: currentUserId || 'system',
-        }),
-      });
-
-      const result = await response.json();
-
-      if (result.success && result.proposalId) {
-        // Check if any jobs were actually assigned
-        if (result.stats.assignedJobs === 0) {
-          toast.warning(`No jobs could be assigned. ${result.stats.unassignedJobs} jobs have no suitable workers.`);
-          console.log('Scheduling result:', result);
-          return;
-        }
-
-        // Get full proposal details including job/worker info
-        const proposalResponse = await fetch(`/api/provider/schedule/proposals/${result.proposalId}`);
-        const proposalData = await proposalResponse.json();
-
-        // Show proposal modal for review
-        setCurrentProposal({
-          proposalId: result.proposalId,
-          assignments: proposalData.assignments,
-          unassignedJobs: result.unassignedJobs || [],
-          stats: result.stats,
-        });
-        setShowProposalModal(true);
-      } else {
-        toast.error('Failed to generate schedule');
-        console.error('Smart scheduler failed:', result);
-      }
-    } catch (error) {
-      console.error('Error auto-assigning jobs:', error);
-      toast.error('Error auto-assigning jobs');
-    } finally {
-      setIsAutoAssigning(false);
-    }
-  };
-
   // Handle job click from grid
   const handleJobClick = (jobId: string) => {
     onJobClick?.(jobId);
@@ -674,8 +609,6 @@ export default function WeeklyTeamCalendar({
                 <UnassignedJobsPanel
                   jobs={unassignedJobs}
                   onJobClick={handleJobClick}
-                  onAutoAssign={handleAutoAssignUnassigned}
-                  isAutoAssigning={isAutoAssigning}
                   isLoading={loading}
                 />
               </div>
@@ -721,30 +654,6 @@ export default function WeeklyTeamCalendar({
         isOpen={showShortcuts}
         onClose={() => setShowShortcuts(false)}
       />
-
-      {/* Schedule Proposal Modal */}
-      {currentProposal && (
-        <ScheduleProposalModal
-          open={showProposalModal}
-          onClose={() => {
-            setShowProposalModal(false);
-            setCurrentProposal(null);
-          }}
-          proposal={currentProposal}
-          jobs={unassignedJobs}
-          workers={workers.map(w => ({
-            id: w.id,
-            firstName: w.firstName,
-            lastName: w.lastName,
-            color: w.color,
-          }))}
-          onSuccess={() => {
-            setShowProposalModal(false);
-            setCurrentProposal(null);
-            fetchWeeklyData();
-          }}
-        />
-      )}
     </div>
   );
 }

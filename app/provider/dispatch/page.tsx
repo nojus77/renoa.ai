@@ -223,6 +223,7 @@ export default function DispatchPage() {
     missingSkillNames: string[];
   } | null>(null);
   const [overrideReason, setOverrideReason] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string[]>(['all']);
 
   // Check theme
   useEffect(() => {
@@ -246,6 +247,8 @@ export default function DispatchPage() {
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '',
+    language: 'en',
+    region: 'US',
   });
 
   // Load provider ID
@@ -298,6 +301,40 @@ export default function DispatchPage() {
   useEffect(() => {
     fetchDispatchData();
   }, [fetchDispatchData]);
+
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!optimizing && !loading) {
+        fetchDispatchData();
+      }
+    }, 30000);
+
+    return () => clearInterval(interval);
+  }, [fetchDispatchData, optimizing, loading]);
+
+  // Filter toggle helper
+  const toggleStatusFilter = (status: string) => {
+    if (status === 'all') {
+      setStatusFilter(['all']);
+    } else {
+      setStatusFilter(prev => {
+        const withoutAll = prev.filter(s => s !== 'all');
+        if (withoutAll.includes(status)) {
+          const newFilter = withoutAll.filter(s => s !== status);
+          return newFilter.length === 0 ? ['all'] : newFilter;
+        } else {
+          return [...withoutAll, status];
+        }
+      });
+    }
+  };
+
+  // Filter jobs based on status filter
+  const filterJobsByStatus = (jobList: Job[]) => {
+    if (statusFilter.includes('all')) return jobList;
+    return jobList.filter(job => statusFilter.includes(job.status));
+  };
 
   // Group jobs by worker and calculate routes
   useEffect(() => {
@@ -578,6 +615,63 @@ export default function DispatchPage() {
             </div>
           </div>
 
+          {/* Status Filter Chips */}
+          <div className="flex items-center gap-2 mb-3">
+            <Filter className="w-4 h-4 text-muted-foreground" />
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => toggleStatusFilter('all')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  statusFilter.includes('all')
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-muted text-muted-foreground hover:bg-accent'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => toggleStatusFilter('scheduled')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  statusFilter.includes('scheduled')
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                }`}
+              >
+                Scheduled
+              </button>
+              <button
+                onClick={() => toggleStatusFilter('on_the_way')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  statusFilter.includes('on_the_way')
+                    ? 'bg-blue-500 text-white'
+                    : 'bg-blue-500/10 text-blue-600 hover:bg-blue-500/20'
+                }`}
+              >
+                On the Way
+              </button>
+              <button
+                onClick={() => toggleStatusFilter('in_progress')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  statusFilter.includes('in_progress')
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-amber-500/10 text-amber-600 hover:bg-amber-500/20'
+                }`}
+              >
+                In Progress
+              </button>
+              <button
+                onClick={() => toggleStatusFilter('completed')}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                  statusFilter.includes('completed')
+                    ? 'bg-zinc-500 text-white'
+                    : 'bg-zinc-500/10 text-zinc-600 hover:bg-zinc-500/20'
+                }`}
+              >
+                Completed
+              </button>
+            </div>
+          </div>
+
           {/* Worker Legend */}
           <div className="flex flex-wrap gap-3">
             {workerRoutes.map(route => (
@@ -780,7 +874,8 @@ export default function DispatchPage() {
                 {workerRoutes.flatMap(route => {
                   if (selectedWorker && selectedWorker !== route.workerId) return [];
 
-                  return route.jobs.map((job, index) => (
+                  const filteredJobs = filterJobsByStatus(route.jobs);
+                  return filteredJobs.map((job, index) => (
                     <Marker
                       key={job.id}
                       position={{ lat: job.latitude!, lng: job.longitude! }}
@@ -804,7 +899,7 @@ export default function DispatchPage() {
                 })}
 
                 {/* Unassigned job markers */}
-                {unassignedJobs
+                {filterJobsByStatus(unassignedJobs)
                   .filter(job => job.latitude && job.longitude)
                   .map(job => (
                     <Marker

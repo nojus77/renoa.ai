@@ -13,6 +13,9 @@ import {
   Clock,
   Plus,
   AlertCircle,
+  MessageSquare,
+  XCircle,
+  Briefcase,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -33,29 +36,22 @@ interface NotificationsDropdownProps {
   onUnreadCountChange?: (count: number) => void;
 }
 
-// Map notification types to icons
-const typeIconMap: Record<string, React.ElementType> = {
-  time_off_request: Calendar,
-  job_completed: CheckCircle,
-  new_customer: UserPlus,
-  payment_received: DollarSign,
-  worker_clocked_in: Clock,
-  job_created_by_worker: Plus,
-  new_team_member: UserPlus,
-  new_lead: Star,
+// Notification icon configuration with consistent styling
+const notificationConfig: Record<string, { icon: React.ElementType; iconColor: string; bgColor: string }> = {
+  job_completed: { icon: CheckCircle, iconColor: 'text-emerald-500', bgColor: 'bg-emerald-500/15' },
+  job_assigned: { icon: Briefcase, iconColor: 'text-blue-500', bgColor: 'bg-blue-500/15' },
+  job_cancelled: { icon: XCircle, iconColor: 'text-red-500', bgColor: 'bg-red-500/15' },
+  payment_received: { icon: DollarSign, iconColor: 'text-green-500', bgColor: 'bg-green-500/15' },
+  message_received: { icon: MessageSquare, iconColor: 'text-purple-500', bgColor: 'bg-purple-500/15' },
+  time_off_request: { icon: Calendar, iconColor: 'text-yellow-500', bgColor: 'bg-yellow-500/15' },
+  new_customer: { icon: UserPlus, iconColor: 'text-blue-500', bgColor: 'bg-blue-500/15' },
+  worker_clocked_in: { icon: Clock, iconColor: 'text-purple-500', bgColor: 'bg-purple-500/15' },
+  job_created_by_worker: { icon: Plus, iconColor: 'text-blue-500', bgColor: 'bg-blue-500/15' },
+  new_team_member: { icon: UserPlus, iconColor: 'text-indigo-500', bgColor: 'bg-indigo-500/15' },
+  new_lead: { icon: Star, iconColor: 'text-yellow-500', bgColor: 'bg-yellow-500/15' },
 };
 
-// Map notification types to colors
-const typeColorMap: Record<string, string> = {
-  time_off_request: 'text-yellow-400 bg-yellow-400/10',
-  job_completed: 'text-emerald-400 bg-emerald-400/10',
-  new_customer: 'text-blue-400 bg-blue-400/10',
-  payment_received: 'text-green-400 bg-green-400/10',
-  worker_clocked_in: 'text-purple-400 bg-purple-400/10',
-  job_created_by_worker: 'text-blue-400 bg-blue-400/10',
-  new_team_member: 'text-purple-400 bg-purple-400/10',
-  new_lead: 'text-yellow-400 bg-yellow-400/10',
-};
+const defaultConfig = { icon: AlertCircle, iconColor: 'text-zinc-400', bgColor: 'bg-zinc-500/15' };
 
 export default function NotificationsDropdown({
   isOpen,
@@ -200,11 +196,10 @@ export default function NotificationsDropdown({
               </p>
             </div>
           ) : (
-            <div className="divide-y divide-zinc-800">
+            <div className="divide-y divide-zinc-800/50">
               {notifications.map((notification) => {
-                const IconComponent = typeIconMap[notification.type] || AlertCircle;
-                const colorClass = typeColorMap[notification.type] || 'text-zinc-400 bg-zinc-400/10';
-                const [textColor, bgColor] = colorClass.split(' ');
+                const config = notificationConfig[notification.type] || defaultConfig;
+                const IconComponent = config.icon;
 
                 return (
                   <button
@@ -214,26 +209,25 @@ export default function NotificationsDropdown({
                       notification.link ? 'cursor-pointer' : 'cursor-default'
                     } ${!notification.read ? 'bg-zinc-800/30' : ''}`}
                   >
-                    <div className="flex items-start gap-3">
-                      {/* Unread indicator */}
-                      {!notification.read && (
-                        <div className="absolute left-2 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                      )}
-
-                      {/* Icon */}
-                      <div className={`relative flex-shrink-0 p-2 rounded-lg ${bgColor}`}>
-                        <IconComponent className={`h-4 w-4 ${textColor}`} />
+                    <div className="flex items-center gap-3 min-h-[48px]">
+                      {/* Circular Icon */}
+                      <div className={`relative flex-shrink-0 w-10 h-10 rounded-full ${config.bgColor} flex items-center justify-center`}>
+                        <IconComponent className={`w-5 h-5 ${config.iconColor}`} />
+                        {/* Unread indicator */}
+                        {!notification.read && (
+                          <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-zinc-900" />
+                        )}
                       </div>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium mb-0.5 ${!notification.read ? 'text-zinc-100' : 'text-zinc-300'}`}>
+                        <p className={`text-sm font-medium leading-tight ${!notification.read ? 'text-zinc-100' : 'text-zinc-300'}`}>
                           {notification.title}
                         </p>
-                        <p className="text-sm text-zinc-400 mb-1 line-clamp-2">
+                        <p className="text-sm text-zinc-400 leading-tight mt-0.5 line-clamp-1">
                           {notification.message}
                         </p>
-                        <p className="text-xs text-zinc-500">
+                        <p className="text-xs text-zinc-500 mt-1">
                           {formatTimeAgo(notification.createdAt)}
                         </p>
                       </div>

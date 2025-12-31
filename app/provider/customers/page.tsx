@@ -309,7 +309,7 @@ export default function ProviderCustomers() {
               )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-3">
               {filteredCustomers.map(customer => (
                 <CustomerCard
                   key={customer.id}
@@ -421,7 +421,7 @@ export default function ProviderCustomers() {
   );
 }
 
-// Customer Card Component
+// Customer Card Component - Compact version
 function CustomerCard({ customer, onViewDetails, onDelete, providerId }: {
   customer: Customer;
   onViewDetails: () => void;
@@ -431,93 +431,70 @@ function CustomerCard({ customer, onViewDetails, onDelete, providerId }: {
   return (
     <div
       onClick={onViewDetails}
-      className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 md:p-5 hover:bg-zinc-900/70 transition-all cursor-pointer hover:border-emerald-500/50 relative group"
+      className="bg-zinc-900/50 border border-zinc-800 rounded-lg p-3 hover:bg-zinc-900/70 transition-all cursor-pointer hover:border-emerald-500/50 relative group"
     >
       {/* Delete Button - Shows on hover */}
       <button
         onClick={(e) => onDelete(customer, e)}
-        className="absolute top-3 right-3 p-2 bg-red-600/80 hover:bg-red-500 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        className="absolute top-2 right-2 p-1.5 bg-red-600/80 hover:bg-red-500 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-10"
         title="Delete customer"
       >
-        <Trash2 className="h-4 w-4 text-white" />
+        <Trash2 className="h-3.5 w-3.5 text-white" />
       </button>
 
       {/* Header with avatar */}
-      <div className="flex items-start gap-2 md:gap-3 mb-3 md:mb-4">
-        <div className="h-10 w-10 md:h-12 md:w-12 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-400 flex items-center justify-center text-white text-lg md:text-xl font-bold flex-shrink-0">
+      <div className="flex items-center gap-2 mb-2">
+        <div className="h-8 w-8 rounded-full bg-gradient-to-br from-emerald-600 to-emerald-400 flex items-center justify-center text-white text-sm font-bold flex-shrink-0">
           {customer.name.charAt(0).toUpperCase()}
         </div>
         <div className="flex-1 min-w-0">
-          <h3 className="text-base md:text-lg font-semibold text-zinc-100 mb-1 truncate">{customer.name}</h3>
-          <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-            <span className={`px-1.5 md:px-2 py-0.5 text-xs font-medium rounded-full ${
-              customer.source === 'renoa'
-                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/30'
-                : 'bg-zinc-700/50 text-zinc-400 border border-zinc-600'
-            }`}>
-              {customer.source === 'renoa' ? 'Renoa Lead' : 'Own Client'}
-            </span>
-          </div>
+          <h3 className="text-sm font-semibold text-zinc-100 truncate">{customer.name}</h3>
         </div>
       </div>
 
-      {/* Contact Info */}
-      <div className="space-y-1.5 md:space-y-2 mb-3 md:mb-4">
-        <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-zinc-400">
-          <Phone className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
+      {/* Contact Info - Minimal */}
+      <div className="space-y-1 mb-2">
+        <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+          <Phone className="h-3 w-3 flex-shrink-0" />
           <span className="truncate">{customer.phone}</span>
         </div>
-        {customer.email && (
-          <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-zinc-400">
-            <Mail className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-            <span className="truncate">{customer.email}</span>
-          </div>
-        )}
-        <div className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm text-zinc-400">
-          <MapPin className="h-3.5 w-3.5 md:h-4 md:w-4 flex-shrink-0" />
-          <span className="truncate">{customer.address || 'No address'}</span>
-        </div>
       </div>
 
-      {/* Stats - Inline on mobile */}
-      <div className="flex items-center gap-3 md:gap-4 mb-3 md:mb-4 pb-3 md:pb-4 border-b border-zinc-800 text-xs md:text-sm">
-        <div>
-          <p className="text-lg md:text-xl font-bold text-zinc-100">{customer.jobCount}</p>
-          <p className="text-xs text-zinc-500">Jobs</p>
-        </div>
-        <div>
-          <p className="text-lg md:text-xl font-bold text-emerald-400">
-            ${Math.round(customer.totalSpent)}
-          </p>
-          <p className="text-xs text-zinc-500"><span className="hidden md:inline">Total </span>Spent</p>
-        </div>
-        {customer.lastJobDate && (
-          <div className="ml-auto text-right">
-            <p className="text-xs text-zinc-500">Last Job</p>
-            <p className="text-xs md:text-sm text-zinc-300">
-              {new Date(customer.lastJobDate).toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric'
-              })}
+      {/* Stats Row */}
+      <div className="flex items-center justify-between pt-2 border-t border-zinc-800/50">
+        <div className="flex items-center gap-3">
+          <div>
+            <p className="text-sm font-bold text-zinc-100">{customer.jobCount}</p>
+            <p className="text-[10px] text-zinc-500">Jobs</p>
+          </div>
+          <div>
+            <p className="text-sm font-bold text-emerald-400">
+              ${Math.round(customer.totalSpent)}
             </p>
+            <p className="text-[10px] text-zinc-500">Spent</p>
           </div>
+        </div>
+        {customer.source === 'renoa' && (
+          <span className="px-1.5 py-0.5 text-[10px] font-medium rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+            Renoa
+          </span>
         )}
       </div>
 
-      {/* Tags */}
+      {/* Tags - Show on hover only */}
       {customer.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 md:gap-2">
-          {customer.tags.slice(0, 3).map((tag, index) => (
+        <div className="flex flex-wrap gap-1 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+          {customer.tags.slice(0, 2).map((tag, index) => (
             <span
               key={index}
-              className="px-1.5 md:px-2 py-0.5 md:py-1 text-xs font-medium bg-zinc-800/50 text-zinc-300 rounded border border-zinc-700"
+              className="px-1.5 py-0.5 text-[10px] font-medium bg-zinc-800/50 text-zinc-400 rounded"
             >
               {tag}
             </span>
           ))}
-          {customer.tags.length > 3 && (
-            <span className="px-1.5 md:px-2 py-0.5 md:py-1 text-xs font-medium text-zinc-500">
-              +{customer.tags.length - 3} more
+          {customer.tags.length > 2 && (
+            <span className="px-1.5 py-0.5 text-[10px] text-zinc-500">
+              +{customer.tags.length - 2}
             </span>
           )}
         </div>

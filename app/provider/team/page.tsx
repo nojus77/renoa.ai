@@ -1846,7 +1846,6 @@ export default function TeamManagementPage() {
                             <th className="px-4 py-3">Status</th>
                             <th className="px-4 py-3">Skills</th>
                             <th className="px-4 py-3 text-right">This Week</th>
-                            <th className="px-4 py-3">Next Job</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-zinc-800">
@@ -1913,13 +1912,16 @@ export default function TeamManagementPage() {
                               </div>
                             </td>
 
-                            {/* Skills */}
+                            {/* Skills - Compact pills */}
                             <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center gap-1 flex-wrap max-w-[200px]">
+                              <div className="flex items-center gap-1 flex-wrap max-w-[220px]">
                                 {member.workerSkills && member.workerSkills.length > 0 ? (
                                   <>
-                                    {member.workerSkills.slice(0, 2).map(ws => (
-                                      <Badge key={ws.id} variant="secondary" className="text-xs px-1.5 py-0 bg-zinc-800 text-zinc-300 flex items-center gap-1">
+                                    {member.workerSkills.slice(0, 3).map(ws => (
+                                      <span
+                                        key={ws.id}
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-emerald-900/30 text-emerald-400 rounded-full"
+                                      >
                                         {ws.skill.name}
                                         {isOwner && (
                                           <X
@@ -1930,18 +1932,17 @@ export default function TeamManagementPage() {
                                             }}
                                           />
                                         )}
-                                      </Badge>
+                                      </span>
                                     ))}
 
                                     {/* +X with title showing all remaining skills */}
-                                    {member.workerSkills.length > 2 && (
-                                      <Badge
-                                        variant="outline"
-                                        className="text-xs px-1.5 py-0 border-zinc-700 text-zinc-400 cursor-default"
-                                        title={member.workerSkills.slice(2).map(ws => ws.skill.name).join(', ')}
+                                    {member.workerSkills.length > 3 && (
+                                      <span
+                                        className="px-2 py-0.5 text-xs bg-zinc-800 text-zinc-400 rounded-full cursor-default"
+                                        title={member.workerSkills.slice(3).map(ws => ws.skill.name).join(', ')}
                                       >
-                                        +{member.workerSkills.length - 2}
-                                      </Badge>
+                                        +{member.workerSkills.length - 3}
+                                      </span>
                                     )}
                                   </>
                                 ) : (
@@ -2028,22 +2029,6 @@ export default function TeamManagementPage() {
                               <span className="text-sm font-medium text-zinc-100 tabular-nums">
                                 {member.hoursThisWeek || 0}h
                               </span>
-                            </td>
-
-                            {/* Next Job */}
-                            <td className="px-4 py-3">
-                              {member.nextJob ? (
-                                <div>
-                                  <div className="text-sm font-medium text-zinc-200">
-                                    {format(new Date(member.nextJob.startTime), 'EEE, MMM d')}
-                                  </div>
-                                  <div className="text-xs text-zinc-500">
-                                    {format(new Date(member.nextJob.startTime), 'h:mm a')} · {member.nextJob.serviceType}
-                                  </div>
-                                </div>
-                              ) : (
-                                <span className="text-sm text-zinc-600">No upcoming jobs</span>
-                              )}
                             </td>
 
                           </tr>
