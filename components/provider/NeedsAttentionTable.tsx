@@ -223,14 +223,14 @@ export default function NeedsAttentionTable({ alerts, onJobClick, onDismissJob }
   }
 
   return (
-    <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+    <div className="bg-card rounded-2xl border border-border shadow-sm overflow-hidden h-full flex flex-col">
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between flex-shrink-0">
         <h3 className="text-base font-semibold text-foreground">Needs Attention</h3>
         <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded-full">
           {allAlertJobs.length} {allAlertJobs.length === 1 ? 'job' : 'jobs'}
         </span>
       </div>
-      <div className="max-h-[400px] overflow-y-auto">
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-teal">
         <div className="divide-y divide-border">
           {allAlertJobs.map((job) => {
             const config = problemConfig[job.problem];
@@ -308,6 +308,27 @@ export default function NeedsAttentionTable({ alerts, onJobClick, onDismissJob }
           })}
         </div>
       </div>
+
+      {/* Custom Teal Scrollbar Styles */}
+      <style jsx global>{`
+        .scrollbar-teal::-webkit-scrollbar {
+          width: 6px;
+        }
+        .scrollbar-teal::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .scrollbar-teal::-webkit-scrollbar-thumb {
+          background: #14b8a6;
+          border-radius: 3px;
+        }
+        .scrollbar-teal::-webkit-scrollbar-thumb:hover {
+          background: #0d9488;
+        }
+        .scrollbar-teal {
+          scrollbar-width: thin;
+          scrollbar-color: #14b8a6 transparent;
+        }
+      `}</style>
     </div>
   );
 }

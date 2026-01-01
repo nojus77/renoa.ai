@@ -1030,7 +1030,7 @@ export default function ProviderHome() {
                               <span className="text-xs text-primary">• {job.serviceType}</span>
                             </div>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{format(new Date(job.startTime), 'MMM d')} {formatTime(job.startTime)}</span>
+                              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatTime(job.startTime)}</span>
                               {job.workerName ? <span className="flex items-center gap-1"><User className="h-3 w-3" />{job.workerName.split(' ')[0]}</span> : <span className="flex items-center gap-1 text-orange-500"><UserX className="h-3 w-3" />Unassigned</span>}
                             </div>
                           </div>
