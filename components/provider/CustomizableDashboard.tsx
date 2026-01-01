@@ -341,7 +341,8 @@ export default function CustomizableDashboard({
           opacity: 1;
         }
 
-        /* Corner handles - clean teal L-shapes */
+        /* Corner handles - clean teal L-shapes pointing OUTWARD */
+        /* Bottom-right corner ↘ - L opens toward bottom-right */
         .react-grid-item > .react-resizable-handle-se {
           width: 16px;
           height: 16px;
@@ -360,6 +361,7 @@ export default function CustomizableDashboard({
           border-bottom: 2px solid #14b8a6;
         }
 
+        /* Bottom-left corner ↙ - L opens toward bottom-left */
         .react-grid-item > .react-resizable-handle-sw {
           width: 16px;
           height: 16px;
@@ -378,6 +380,7 @@ export default function CustomizableDashboard({
           border-bottom: 2px solid #14b8a6;
         }
 
+        /* Top-left corner ↖ - L opens toward top-left */
         .react-grid-item > .react-resizable-handle-nw {
           width: 16px;
           height: 16px;
@@ -396,6 +399,7 @@ export default function CustomizableDashboard({
           border-top: 2px solid #14b8a6;
         }
 
+        /* Top-right corner ↗ - L opens toward top-right */
         .react-grid-item > .react-resizable-handle-ne {
           width: 16px;
           height: 16px;

@@ -585,7 +585,11 @@ export default function ProviderHome() {
       };
 
       if (result.success && result.data) {
-        const hasRealData = result.data.revenueHistory?.some((d: RevenueDataPoint) => (d.amount ?? 0) > 0);
+        // Only use real revenue data from the database - no mock data
+        const realRevenueHistory = result.data.revenueHistory?.map((d: RevenueDataPoint) => ({
+          ...d,
+          label: format(new Date(d.date), 'MMM d'),
+        })) || [];
 
         setHomeData({
           todaysJobs: result.data.todaysJobs || [],
@@ -601,63 +605,43 @@ export default function ProviderHome() {
             completedThisMonth: 0,
           },
           alerts: result.data.alerts || defaultAlerts,
-          revenueHistory: hasRealData
-            ? result.data.revenueHistory.map((d: RevenueDataPoint) => ({
-                ...d,
-                label: format(new Date(d.date), 'MMM d'),
-              }))
-            : generateTestDataForRange(
-                startOfMonth(subMonths(new Date(), 1)),
-                new Date()
-              ),
+          revenueHistory: realRevenueHistory,
           recentJobs: result.data.recentJobs || [],
         });
       } else {
-        const testData = generateTestDataForRange(
-          startOfMonth(subMonths(new Date(), 1)),
-          new Date()
-        );
-        const weekTotal = testData.slice(-7).reduce((sum, d) => sum + (d.amount ?? 0), 0);
-        const monthTotal = testData.slice(-30).reduce((sum, d) => sum + (d.amount ?? 0), 0);
-
+        // No data available - use empty state, no mock data
         setHomeData({
           todaysJobs: [],
           upcomingJobs: [],
           stats: {
-            todaysJobsCount: 3,
-            weeklyRevenue: weekTotal,
-            monthlyRevenue: monthTotal,
-            pendingInvoicesCount: 2,
-            pendingInvoicesAmount: 450,
-            newLeadsCount: 5,
-            completedThisWeek: 18,
-            completedThisMonth: 67,
+            todaysJobsCount: 0,
+            weeklyRevenue: 0,
+            monthlyRevenue: 0,
+            pendingInvoicesCount: 0,
+            pendingInvoicesAmount: 0,
+            newLeadsCount: 0,
+            completedThisWeek: 0,
+            completedThisMonth: 0,
           },
           alerts: defaultAlerts,
-          revenueHistory: testData,
+          revenueHistory: [],
         });
       }
     } catch (error) {
       console.error('Error loading home data:', error);
-      const testData = generateTestDataForRange(
-        startOfMonth(subMonths(new Date(), 1)),
-        new Date()
-      );
-      const weekTotal = testData.slice(-7).reduce((sum, d) => sum + (d.amount ?? 0), 0);
-      const monthTotal = testData.slice(-30).reduce((sum, d) => sum + (d.amount ?? 0), 0);
-
+      // Error state - use empty data, no mock data
       setHomeData({
         todaysJobs: [],
         upcomingJobs: [],
         stats: {
-          todaysJobsCount: 3,
-          weeklyRevenue: weekTotal,
-          monthlyRevenue: monthTotal,
-          pendingInvoicesCount: 2,
-          pendingInvoicesAmount: 450,
-          newLeadsCount: 5,
-          completedThisWeek: 18,
-          completedThisMonth: 67,
+          todaysJobsCount: 0,
+          weeklyRevenue: 0,
+          monthlyRevenue: 0,
+          pendingInvoicesCount: 0,
+          pendingInvoicesAmount: 0,
+          newLeadsCount: 0,
+          completedThisWeek: 0,
+          completedThisMonth: 0,
         },
         alerts: {
           scheduleConflicts: 0,
@@ -668,7 +652,7 @@ export default function ProviderHome() {
           overdueInvoices: 0,
           overdueJobs: 0,
         },
-        revenueHistory: testData,
+        revenueHistory: [],
       });
     } finally {
       setLoading(false);
@@ -956,7 +940,7 @@ export default function ProviderHome() {
             </div>
           </div>
           <div className="flex-1 min-h-[200px]">
-            {chartData.length > 0 ? (
+            {hasChartData ? (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top: 20, right: 30, left: 10, bottom: 20 }} onClick={(data) => { const payload = (data as { activePayload?: Array<{ payload: RevenueDataPoint }> })?.activePayload?.[0]?.payload; if (payload) handleGraphClick(payload); }} style={{ cursor: 'pointer' }}>
                   <defs>
@@ -974,8 +958,9 @@ export default function ProviderHome() {
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-                <Activity className="h-10 w-10 mb-2 opacity-30" />
-                <p className="text-sm">No data for this period</p>
+                <Activity className="h-10 w-10 mb-3 opacity-30" />
+                <p className="text-sm font-medium">No revenue data yet</p>
+                <p className="text-xs mt-1 opacity-70">Complete jobs to see your revenue chart</p>
               </div>
             )}
           </div>
