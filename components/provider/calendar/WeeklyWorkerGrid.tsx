@@ -146,15 +146,16 @@ export default function WeeklyWorkerGrid({
 
         {/* SCROLLABLE DAYS GRID */}
         <div className="flex-1 overflow-x-auto">
-          <div style={{ minWidth: '700px' }}>
+          <div className="min-w-[700px]">
             {/* Day headers */}
             <div className="grid grid-cols-7 border-b border-zinc-700 h-16 bg-zinc-800/50">
               {weekDays.map((day, index) => (
                 <div
                   key={day.toISOString()}
                   className={cn(
-                    "px-2 flex flex-col items-center justify-center border-r border-zinc-700",
-                    isToday(day) && "bg-emerald-500/10 relative"
+                    "flex flex-col items-center justify-center border-r border-zinc-700",
+                    isToday(day) && "bg-emerald-500/10 relative",
+                    index === 6 && "border-r-0" // Remove border on last column
                   )}
                 >
                   {/* Today indicator line */}
@@ -201,12 +202,13 @@ export default function WeeklyWorkerGrid({
                   <div
                     key={stats.date.toISOString()}
                     className={cn(
-                      "px-2 border-r border-zinc-700 flex flex-col items-center justify-center",
-                      isToday(stats.date) && "bg-emerald-500/10"
+                      "border-r border-zinc-700 flex flex-col items-center justify-center text-center",
+                      isToday(stats.date) && "bg-emerald-500/10",
+                      index === 6 && "border-r-0" // Remove border on last column
                     )}
                   >
-                    <div className="text-sm font-medium text-white leading-tight">{stats.jobCount} jobs</div>
-                    <div className="text-xs text-zinc-400 leading-tight">{stats.totalHours}h</div>
+                    <div className="text-sm font-medium text-white">{stats.jobCount} jobs</div>
+                    <div className="text-xs text-zinc-400">{stats.totalHours}h</div>
                   </div>
                 ))}
               </div>
@@ -267,7 +269,8 @@ function WeeklyWorkerRow({
               key={day.toISOString()}
               className={cn(
                 "p-2 cursor-pointer transition-all group relative border-r border-zinc-800",
-                isToday(day) && "bg-emerald-500/5"
+                isToday(day) && "bg-emerald-500/5",
+                dayIndex === 6 && "border-r-0" // Remove border on last column
               )}
               onClick={handleCellClick}
             >
