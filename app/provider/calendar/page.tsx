@@ -759,7 +759,7 @@ export default function ProviderCalendar() {
                 }}
               />
             )}
-            {viewMode === 'month' && <MonthView jobs={jobs} currentDate={currentDate} stats={getMonthlyStats()} />}
+            {viewMode === 'month' && <MonthView jobs={jobs} currentDate={currentDate} stats={getMonthlyStats()} onDateChange={setCurrentDate} />}
           </div>
 
         </DndContext>
@@ -1217,7 +1217,7 @@ interface MonthStats {
   utilizationPercent: number;
 }
 
-function MonthView({ jobs, currentDate, stats }: { jobs: Job[]; currentDate: Date; stats: MonthStats }) {
+function MonthView({ jobs, currentDate, stats, onDateChange }: { jobs: Job[]; currentDate: Date; stats: MonthStats; onDateChange: (date: Date) => void }) {
   const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
   const startDay = monthStart.getDay();
@@ -1280,70 +1280,120 @@ function MonthView({ jobs, currentDate, stats }: { jobs: Job[]; currentDate: Dat
   };
 
   return (
-    <div className="space-y-4">
+    <div className="px-4 py-3 space-y-3">
       {/* Monthly Stats Summary */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-6">
-        <div className="flex items-start justify-between mb-6">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+        {/* Title Row with Navigation */}
+        <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-2xl font-bold text-zinc-100">
-              {format(currentDate, 'MMMM yyyy')}
-            </h2>
-            <p className="text-zinc-400 mt-1">
-              Monthly overview
-            </p>
-          </div>
-          <div className="text-center">
-            <div className={`text-4xl font-bold ${stats.utilizationPercent > 70 ? 'text-emerald-400' : stats.utilizationPercent > 40 ? 'text-yellow-400' : 'text-zinc-400'}`}>
-              {stats.utilizationPercent}%
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => {
+                  const prev = new Date(currentDate);
+                  prev.setMonth(prev.getMonth() - 1);
+                  onDateChange(prev);
+                }}
+                className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <h2 className="text-xl font-bold text-zinc-100">
+                {format(currentDate, 'MMMM yyyy')}
+              </h2>
+              <button
+                onClick={() => {
+                  const next = new Date(currentDate);
+                  next.setMonth(next.getMonth() + 1);
+                  onDateChange(next);
+                }}
+                className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+              {!(currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear()) && (
+                <button
+                  onClick={() => onDateChange(new Date())}
+                  className="ml-2 px-2 py-1 text-xs font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors"
+                >
+                  This Month
+                </button>
+              )}
             </div>
-            <div className="text-sm text-zinc-500">Utilization</div>
           </div>
         </div>
 
-        {/* Stat Cards Row - 4 cards for monthly view */}
-        <div className="grid grid-cols-4 gap-4">
+        {/* Stat Cards Row - Compact with info tooltips */}
+        <div className="grid grid-cols-4 gap-3">
           {/* Total Revenue */}
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <DollarSign className="h-4 w-4 text-emerald-400 opacity-70" />
-              <span className="text-xs font-medium text-emerald-400 opacity-70">Revenue</span>
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-2.5 relative group">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <DollarSign className="h-3.5 w-3.5 text-emerald-400" />
+                <span className="text-xs text-emerald-400">Revenue</span>
+              </div>
+              <div className="relative">
+                <Info className="h-3 w-3 text-emerald-600 cursor-help" />
+                <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Total revenue this month
+                </div>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-emerald-400">
+            <div className="text-lg font-bold text-emerald-400">
               ${stats.totalRevenue.toLocaleString()}
             </div>
-            <div className="text-xs text-emerald-400 opacity-60 mt-0.5">this month</div>
           </div>
 
           {/* Completed Jobs */}
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <CheckCircle className="h-4 w-4 text-zinc-300 opacity-70" />
-              <span className="text-xs font-medium text-zinc-300 opacity-70">Completed</span>
+          <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-2.5 relative group">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <CheckCircle className="h-3.5 w-3.5 text-zinc-400" />
+                <span className="text-xs text-zinc-400">Completed</span>
+              </div>
+              <div className="relative">
+                <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Jobs completed this month
+                </div>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-zinc-300">{stats.completedJobs}</div>
-            <div className="text-xs text-zinc-300 opacity-60 mt-0.5">jobs done</div>
+            <div className="text-lg font-bold text-zinc-200">{stats.completedJobs}</div>
           </div>
 
           {/* Scheduled Jobs */}
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <Clock className="h-4 w-4 text-zinc-300 opacity-70" />
-              <span className="text-xs font-medium text-zinc-300 opacity-70">Scheduled</span>
+          <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-2.5 relative group">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5 text-zinc-400" />
+                <span className="text-xs text-zinc-400">Scheduled</span>
+              </div>
+              <div className="relative">
+                <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Total jobs scheduled this month
+                </div>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-zinc-300">{stats.scheduledJobs}</div>
-            <div className="text-xs text-zinc-300 opacity-60 mt-0.5">total jobs</div>
+            <div className="text-lg font-bold text-zinc-200">{stats.scheduledJobs}</div>
           </div>
 
           {/* Completion Rate */}
-          <div className="bg-zinc-800 border border-zinc-700 rounded-lg p-3">
-            <div className="flex items-center gap-2 mb-1">
-              <TrendingUp className="h-4 w-4 text-zinc-300 opacity-70" />
-              <span className="text-xs font-medium text-zinc-300 opacity-70">Completion</span>
+          <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-2.5 relative group">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <TrendingUp className="h-3.5 w-3.5 text-zinc-400" />
+                <span className="text-xs text-zinc-400">Rate</span>
+              </div>
+              <div className="relative">
+                <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                  Completion rate for this month
+                </div>
+              </div>
             </div>
-            <div className="text-2xl font-bold text-zinc-300">
+            <div className="text-lg font-bold text-zinc-200">
               {stats.scheduledJobs > 0 ? Math.round((stats.completedJobs / stats.scheduledJobs) * 100) : 0}%
             </div>
-            <div className="text-xs text-zinc-300 opacity-60 mt-0.5">rate</div>
           </div>
         </div>
       </div>
