@@ -490,6 +490,13 @@ export default function WeeklyTeamCalendar({
 
   return (
     <div className="w-full space-y-3">
+      {/* Week Stats Header - Full width at TOP */}
+      {headerStats && (
+        <div className="px-4">
+          <WeekHeader stats={headerStats} problems={insights.problems} />
+        </div>
+      )}
+
       {/* Navigation Header */}
       <div className="border-b border-zinc-800 bg-zinc-900/50 px-4 py-2">
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -616,11 +623,6 @@ export default function WeeklyTeamCalendar({
 
             {/* Main Content - Fills remaining space to right edge */}
             <div className="flex-1 space-y-3 min-w-0 overflow-hidden px-4 py-4">
-              {/* Week Header with Stats */}
-              {headerStats && (
-                <WeekHeader stats={headerStats} problems={insights.problems} />
-              )}
-
               {/* Worker Grid */}
               <WeeklyWorkerGrid
                 workers={transformedWorkers}

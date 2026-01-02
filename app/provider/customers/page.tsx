@@ -458,6 +458,12 @@ function CustomerCard({ customer, onViewDetails, onDelete, providerId }: {
           <Phone className="h-3 w-3 flex-shrink-0" />
           <span className="truncate">{customer.phone}</span>
         </div>
+        {customer.address && (
+          <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+            <MapPin className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">{customer.address}</span>
+          </div>
+        )}
       </div>
 
       {/* Stats Row */}
