@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
-import { Clock, Lock, DollarSign, TrendingUp, CheckCircle, Users, AlertTriangle, XCircle, TrendingDown } from 'lucide-react';
+import { Clock, Lock, DollarSign, TrendingUp, CheckCircle, Users, AlertTriangle, XCircle, TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react';
 import { format, isSameDay, startOfDay } from 'date-fns';
 import { toast } from 'sonner';
 import AddJobModal from '@/components/provider/AddJobModal';
@@ -571,9 +571,39 @@ export default function ProviderCalendar() {
                 {/* Title Row */}
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h2 className="text-xl font-bold text-zinc-100">
-                      {format(currentDate, 'EEEE, MMMM d, yyyy')}
-                    </h2>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const prev = new Date(currentDate);
+                          prev.setDate(prev.getDate() - 1);
+                          setCurrentDate(prev);
+                        }}
+                        className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+                      >
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      <h2 className="text-xl font-bold text-zinc-100">
+                        {format(currentDate, 'EEEE, MMMM d, yyyy')}
+                      </h2>
+                      <button
+                        onClick={() => {
+                          const next = new Date(currentDate);
+                          next.setDate(next.getDate() + 1);
+                          setCurrentDate(next);
+                        }}
+                        className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+                      >
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                      {!isSameDay(currentDate, new Date()) && (
+                        <button
+                          onClick={() => setCurrentDate(new Date())}
+                          className="ml-2 px-2 py-1 text-xs font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors"
+                        >
+                          Today
+                        </button>
+                      )}
+                    </div>
                     <p className="text-sm text-zinc-400 mt-0.5">
                       {stats.totalJobs} jobs scheduled across {stats.activeWorkers} workers
                       {stats.totalJobs === 0 && stats.totalJobsInSystem > 0 && (
