@@ -16,6 +16,7 @@ import {
   MessageSquare,
   XCircle,
   Briefcase,
+  AlertTriangle,
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -49,6 +50,7 @@ const notificationConfig: Record<string, { icon: React.ElementType; iconColor: s
   job_created_by_worker: { icon: Plus, iconColor: 'text-blue-500', bgColor: 'bg-blue-500/15' },
   new_team_member: { icon: UserPlus, iconColor: 'text-indigo-500', bgColor: 'bg-indigo-500/15' },
   new_lead: { icon: Star, iconColor: 'text-yellow-500', bgColor: 'bg-yellow-500/15' },
+  invoice_overdue: { icon: AlertTriangle, iconColor: 'text-red-500', bgColor: 'bg-red-500/15' },
 };
 
 const defaultConfig = { icon: AlertCircle, iconColor: 'text-zinc-400', bgColor: 'bg-zinc-500/15' };

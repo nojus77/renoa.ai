@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
@@ -759,7 +759,7 @@ export default function ProviderCalendar() {
                 }}
               />
             )}
-            {viewMode === 'month' && <MonthView jobs={jobs} currentDate={currentDate} stats={getMonthlyStats()} onDateChange={setCurrentDate} />}
+            {viewMode === 'month' && <MonthView jobs={jobs} currentDate={currentDate} stats={getMonthlyStats()} onDateChange={setCurrentDate} teamMembers={teamMembers} />}
           </div>
 
         </DndContext>
@@ -1217,7 +1217,18 @@ interface MonthStats {
   utilizationPercent: number;
 }
 
-function MonthView({ jobs, currentDate, stats, onDateChange }: { jobs: Job[]; currentDate: Date; stats: MonthStats; onDateChange: (date: Date) => void }) {
+interface DayPreviewData {
+  date: Date;
+  jobs: Job[];
+  workerHours: { id: string; name: string; hours: number }[];
+  totalRevenue: number;
+  position: { x: number; y: number };
+}
+
+function MonthView({ jobs, currentDate, stats, onDateChange, teamMembers }: { jobs: Job[]; currentDate: Date; stats: MonthStats; onDateChange: (date: Date) => void; teamMembers: TeamMember[] }) {
+  const [hoveredPreview, setHoveredPreview] = useState<DayPreviewData | null>(null);
+  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
   const monthEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
   const startDay = monthStart.getDay();
@@ -1277,6 +1288,69 @@ function MonthView({ jobs, currentDate, stats, onDateChange }: { jobs: Job[]; cu
 
   const isCurrentMonth = (date: Date) => {
     return date.getMonth() === currentDate.getMonth();
+  };
+
+  // Calculate worker hours for a given day's jobs
+  const getWorkerHoursForDay = (dayJobs: Job[]) => {
+    const workerHoursMap = new Map<string, number>();
+
+    dayJobs.forEach(job => {
+      const startTime = new Date(job.startTime);
+      const endTime = new Date(job.endTime);
+      const hours = (endTime.getTime() - startTime.getTime()) / (1000 * 60 * 60);
+
+      job.assignedUserIds.forEach(userId => {
+        workerHoursMap.set(userId, (workerHoursMap.get(userId) || 0) + hours);
+      });
+    });
+
+    // Convert to array with names and sort by hours descending
+    return Array.from(workerHoursMap.entries())
+      .map(([id, hours]) => {
+        const member = teamMembers.find(m => m.id === id);
+        return {
+          id,
+          name: member ? `${member.firstName} ${member.lastName[0]}.` : 'Unknown',
+          hours: Math.round(hours * 10) / 10,
+        };
+      })
+      .sort((a, b) => b.hours - a.hours);
+  };
+
+  // Handle mouse enter on day cell with 2 second delay
+  const handleDayMouseEnter = (e: React.MouseEvent, date: Date, dayJobs: Job[]) => {
+    // Clear any existing timeout
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+
+    hoverTimeoutRef.current = setTimeout(() => {
+      const totalRevenue = dayJobs.reduce((sum, job) => {
+        return sum + (job.actualValue || job.estimatedValue || 0);
+      }, 0);
+
+      setHoveredPreview({
+        date,
+        jobs: dayJobs,
+        workerHours: getWorkerHoursForDay(dayJobs),
+        totalRevenue,
+        position: {
+          x: rect.left + rect.width / 2,
+          y: rect.top,
+        },
+      });
+    }, 2000); // 2 second delay
+  };
+
+  // Handle mouse leave
+  const handleDayMouseLeave = () => {
+    if (hoverTimeoutRef.current) {
+      clearTimeout(hoverTimeoutRef.current);
+      hoverTimeoutRef.current = null;
+    }
+    setHoveredPreview(null);
   };
 
   return (
@@ -1420,9 +1494,11 @@ function MonthView({ jobs, currentDate, stats, onDateChange }: { jobs: Job[]; cu
                 return (
                   <div
                     key={dayIdx}
-                    className={`min-h-[100px] p-2 border-r border-zinc-800/30 last:border-r-0 ${
+                    className={`min-h-[100px] p-2 border-r border-zinc-800/30 last:border-r-0 cursor-pointer transition-colors hover:bg-zinc-800/30 ${
                       isCurrentMonth(date) ? '' : 'bg-zinc-950/50'
                     } ${isToday(date) ? 'bg-emerald-500/5' : ''}`}
+                    onMouseEnter={(e) => handleDayMouseEnter(e, date, dayJobs)}
+                    onMouseLeave={handleDayMouseLeave}
                   >
                     <div className={`text-sm font-medium mb-2 ${
                       isToday(date) ? 'text-emerald-400' : isCurrentMonth(date) ? 'text-zinc-300' : 'text-zinc-600'
@@ -1458,6 +1534,75 @@ function MonthView({ jobs, currentDate, stats, onDateChange }: { jobs: Job[]; cu
           ))}
         </div>
       </div>
+
+      {/* Day Preview Popup - appears after 2 second hover */}
+      {hoveredPreview && hoveredPreview.jobs.length > 0 && (
+        <div
+          className="fixed z-50 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl p-3 w-64 pointer-events-none"
+          style={{
+            left: Math.min(hoveredPreview.position.x - 128, window.innerWidth - 280),
+            top: Math.max(hoveredPreview.position.y - 10, 10),
+            transform: 'translateY(-100%)',
+          }}
+        >
+          {/* Date header */}
+          <div className="text-sm font-semibold text-zinc-100 mb-2 pb-2 border-b border-zinc-700">
+            {format(hoveredPreview.date, 'EEEE, MMM d')}
+          </div>
+
+          {/* Jobs section */}
+          <div className="mb-3">
+            <div className="text-[10px] uppercase text-zinc-500 mb-1.5">
+              Jobs ({hoveredPreview.jobs.length})
+            </div>
+            <div className="space-y-1 max-h-24 overflow-y-auto">
+              {hoveredPreview.jobs.slice(0, 5).map(job => {
+                const startTime = new Date(job.startTime);
+                return (
+                  <div key={job.id} className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-300 truncate flex-1 mr-2">{job.customerName}</span>
+                    <span className="text-zinc-500 whitespace-nowrap">
+                      {startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                    </span>
+                  </div>
+                );
+              })}
+              {hoveredPreview.jobs.length > 5 && (
+                <div className="text-[10px] text-zinc-500">
+                  +{hoveredPreview.jobs.length - 5} more
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Workers section */}
+          {hoveredPreview.workerHours.length > 0 && (
+            <div className="mb-3">
+              <div className="text-[10px] uppercase text-zinc-500 mb-1.5">
+                Workers by Hours
+              </div>
+              <div className="space-y-1">
+                {hoveredPreview.workerHours.slice(0, 3).map(worker => (
+                  <div key={worker.id} className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-300">{worker.name}</span>
+                    <span className="text-emerald-400 font-medium">{worker.hours}h</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Revenue section */}
+          <div className="pt-2 border-t border-zinc-700">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase text-zinc-500">Revenue</span>
+              <span className="text-sm font-semibold text-emerald-400">
+                ${hoveredPreview.totalRevenue.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

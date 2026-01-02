@@ -369,6 +369,8 @@ model BlockedTime {
   endTime              String?   @map("end_time")
   reason               String
   notes                String?
+  scope                String    @default("company") // "company" or "workers"
+  blockedWorkerIds     String[]  @default([]) @map("blocked_worker_ids")
   isRecurring          Boolean   @default(false) @map("is_recurring")
   recurringType        String?   @map("recurring_type")
   recurringDaysOfWeek  Int[]     @default([]) @map("recurring_days_of_week")

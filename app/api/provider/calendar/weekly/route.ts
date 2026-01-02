@@ -134,6 +134,42 @@ export async function GET(request: NextRequest) {
       job => !job.assignedUserIds || job.assignedUserIds.length === 0
     );
 
+    // Get blocked times for the week
+    const blockedTimes = await prisma.blockedTime.findMany({
+      where: {
+        providerId,
+        fromDate: { lte: addDays(endDate, 1) },
+        toDate: { gte: startDate },
+        OR: [
+          { isRecurring: false },
+          {
+            AND: [
+              { isRecurring: true },
+              {
+                OR: [
+                  { recurringEndsType: 'never' },
+                  { recurringEndsOnDate: { gte: startDate } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        fromDate: true,
+        toDate: true,
+        startTime: true,
+        endTime: true,
+        reason: true,
+        scope: true,
+        blockedWorkerIds: true,
+        isRecurring: true,
+        recurringType: true,
+        recurringDaysOfWeek: true,
+      },
+    });
+
     // Build worker data
     const workers: WorkerWeekData[] = teamMembers.map((member, index) => {
       const memberJobs = weekJobs.filter(
@@ -295,6 +331,19 @@ export async function GET(request: NextRequest) {
         endTime: job.endTime.toISOString(),
         duration: (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60),
         estimatedValue: job.estimatedValue ? Number(job.estimatedValue) : null,
+      })),
+      blockedTimes: blockedTimes.map((block) => ({
+        id: block.id,
+        fromDate: block.fromDate.toISOString(),
+        toDate: block.toDate.toISOString(),
+        startTime: block.startTime,
+        endTime: block.endTime,
+        reason: block.reason,
+        scope: block.scope,
+        blockedWorkerIds: block.blockedWorkerIds,
+        isRecurring: block.isRecurring,
+        recurringType: block.recurringType,
+        recurringDaysOfWeek: block.recurringDaysOfWeek,
       })),
     });
   } catch (error) {

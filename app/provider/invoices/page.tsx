@@ -18,10 +18,42 @@ import {
   TrendingUp,
   MoreVertical,
   Calendar,
-  Info
+  Info,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
+import { cn } from '@/lib/utils';
+
+// Helper to calculate days overdue
+const calculateDaysOverdue = (invoice: Invoice): number => {
+  if (invoice.status === 'paid' || invoice.status === 'cancelled' || !invoice.dueDate) {
+    return 0;
+  }
+  const dueDate = new Date(invoice.dueDate);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  dueDate.setHours(0, 0, 0, 0);
+  const diffTime = today.getTime() - dueDate.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays > 0 ? diffDays : 0;
+};
+
+// Sort invoices with overdue at top
+const sortInvoicesWithOverdueFirst = (invoices: Invoice[]): Invoice[] => {
+  return [...invoices].sort((a, b) => {
+    const aDaysOverdue = calculateDaysOverdue(a);
+    const bDaysOverdue = calculateDaysOverdue(b);
+
+    // Overdue items first (highest days overdue at top)
+    if (aDaysOverdue > 0 && bDaysOverdue <= 0) return -1;
+    if (bDaysOverdue > 0 && aDaysOverdue <= 0) return 1;
+    if (aDaysOverdue > 0 && bDaysOverdue > 0) return bDaysOverdue - aDaysOverdue;
+
+    // Then by issue date (newest first)
+    return new Date(b.invoiceDate).getTime() - new Date(a.invoiceDate).getTime();
+  });
+};
 
 interface Invoice {
   id: string;
@@ -311,7 +343,13 @@ export default function ProviderInvoices() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-orange-500/10 border-orange-500/30 relative group">
+              <Card
+                className={cn(
+                  "bg-orange-500/10 border-orange-500/30 relative group cursor-pointer transition-all",
+                  statusFilter === 'overdue' && "ring-2 ring-orange-500"
+                )}
+                onClick={() => setStatusFilter(statusFilter === 'overdue' ? 'all' : 'overdue')}
+              >
                 <CardContent className="pt-3 md:pt-6 pb-3 md:pb-6">
                   <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3">
                     <div className="p-1.5 md:p-2 bg-orange-500/20 rounded-lg">
@@ -326,7 +364,7 @@ export default function ProviderInvoices() {
                     <div className="absolute top-3 right-3 hidden md:block">
                       <Info className="h-3 w-3 text-orange-600/50 cursor-help" />
                       <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
-                        Invoices past their due date
+                        Click to filter overdue invoices
                       </div>
                     </div>
                   </div>
@@ -459,18 +497,22 @@ export default function ProviderInvoices() {
 
               {/* Table Body */}
               <div className="divide-y divide-zinc-800">
-                {filteredInvoices.map((invoice) => (
-                  <InvoiceRow
-                    key={invoice.id}
-                    invoice={invoice}
-                    onView={() => router.push(`/provider/invoices/${invoice.id}`)}
-                    onSend={() => handleSendInvoice(invoice.id)}
-                    onMarkPaid={() => handleMarkPaid(invoice.id)}
-                    onDelete={() => handleDeleteInvoice(invoice.id)}
-                    formatCurrency={formatCurrency}
-                    getStatusColor={getStatusColor}
-                  />
-                ))}
+                {sortInvoicesWithOverdueFirst(filteredInvoices).map((invoice) => {
+                  const daysOverdue = calculateDaysOverdue(invoice);
+                  return (
+                    <InvoiceRow
+                      key={invoice.id}
+                      invoice={invoice}
+                      daysOverdue={daysOverdue}
+                      onView={() => router.push(`/provider/invoices/${invoice.id}`)}
+                      onSend={() => handleSendInvoice(invoice.id)}
+                      onMarkPaid={() => handleMarkPaid(invoice.id)}
+                      onDelete={() => handleDeleteInvoice(invoice.id)}
+                      formatCurrency={formatCurrency}
+                      getStatusColor={getStatusColor}
+                    />
+                  );
+                })}
               </div>
             </div>
           )}
@@ -517,6 +559,7 @@ export default function ProviderInvoices() {
 // Compact Invoice Row Component
 function InvoiceRow({
   invoice,
+  daysOverdue,
   onView,
   onSend,
   onMarkPaid,
@@ -525,6 +568,7 @@ function InvoiceRow({
   getStatusColor,
 }: {
   invoice: Invoice;
+  daysOverdue: number;
   onView: () => void;
   onSend: () => void;
   onMarkPaid: () => void;
@@ -546,10 +590,16 @@ function InvoiceRow({
     return new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
+  // Determine if this is a severely overdue invoice (14+ days)
+  const isSeverelyOverdue = daysOverdue >= 14;
+
   return (
     <div
       onClick={onView}
-      className="p-3 hover:bg-zinc-800/50 cursor-pointer transition-colors md:grid md:grid-cols-[1fr_100px_100px_100px_100px_40px] gap-2 items-center"
+      className={cn(
+        "p-3 hover:bg-zinc-800/50 cursor-pointer transition-colors md:grid md:grid-cols-[1fr_100px_100px_100px_100px_40px] gap-2 items-center",
+        isSeverelyOverdue && "bg-red-950/20 border-l-4 border-red-500"
+      )}
     >
       {/* Customer & Invoice - combined */}
       <div className="flex items-center gap-3 min-w-0">
@@ -577,8 +627,23 @@ function InvoiceRow({
 
       {/* Status */}
       <div className="hidden md:block">
-        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border ${getStatusColor(invoice.status)}`}>
-          <span className="font-medium capitalize">{invoice.status}</span>
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border",
+            daysOverdue > 0 && invoice.status !== 'paid'
+              ? 'bg-red-500/20 text-red-400 border-red-500/30'
+              : getStatusColor(invoice.status)
+          )}>
+            <span className="font-medium capitalize">
+              {daysOverdue > 0 && invoice.status !== 'paid' ? 'overdue' : invoice.status}
+            </span>
+          </div>
+          {daysOverdue > 0 && invoice.status !== 'paid' && (
+            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">
+              <AlertTriangle className="h-3 w-3" />
+              {daysOverdue}d
+            </div>
+          )}
         </div>
       </div>
 
@@ -601,8 +666,22 @@ function InvoiceRow({
 
       {/* Mobile: Show status & amount inline */}
       <div className="flex items-center justify-between mt-2 md:hidden">
-        <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border ${getStatusColor(invoice.status)}`}>
-          <span className="font-medium capitalize">{invoice.status}</span>
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs border",
+            daysOverdue > 0 && invoice.status !== 'paid'
+              ? 'bg-red-500/20 text-red-400 border-red-500/30'
+              : getStatusColor(invoice.status)
+          )}>
+            <span className="font-medium capitalize">
+              {daysOverdue > 0 && invoice.status !== 'paid' ? 'overdue' : invoice.status}
+            </span>
+          </div>
+          {daysOverdue > 0 && invoice.status !== 'paid' && (
+            <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-red-600 text-white text-[10px] font-bold">
+              {daysOverdue}d
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-3">
           <span className="text-xs text-zinc-400">{formatShortDate(invoice.invoiceDate)}</span>

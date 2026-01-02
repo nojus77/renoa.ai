@@ -16,6 +16,7 @@ import {
   MapPin,
   User,
   AlertTriangle,
+  Lock,
 } from 'lucide-react';
 import {
   DndContext,
@@ -60,6 +61,17 @@ interface GanttWorker {
   utilization: number;
 }
 
+interface BlockedTime {
+  id: string;
+  fromDate: string;
+  toDate: string;
+  startTime: string | null;
+  endTime: string | null;
+  reason: string;
+  scope: string;
+  blockedWorkerIds: string[];
+}
+
 interface GanttDailyCalendarProps {
   providerId: string;
   initialDate?: Date;
@@ -88,6 +100,7 @@ export default function GanttDailyCalendar({
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [workers, setWorkers] = useState<GanttWorker[]>([]);
   const [unassignedJobs, setUnassignedJobs] = useState<GanttJob[]>([]);
+  const [blockedTimes, setBlockedTimes] = useState<BlockedTime[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeDragJob, setActiveDragJob] = useState<GanttJob | null>(null);
   const [dragSourceType, setDragSourceType] = useState<'sidebar' | 'timeline' | null>(null);
@@ -128,6 +141,7 @@ export default function GanttDailyCalendar({
       const data = await res.json();
       setWorkers(data.workers || []);
       setUnassignedJobs(data.unassignedJobs || []);
+      setBlockedTimes(data.blockedTimes || []);
       setNextJobDate(data.nextJobDate || null);
       setPrevJobDate(data.prevJobDate || null);
     } catch (error) {
@@ -184,6 +198,48 @@ export default function GanttDailyCalendar({
   };
 
   const currentTimePosition = getCurrentTimePosition();
+
+  // Helper to get blocked times for a specific worker
+  const getBlockedTimesForWorker = (workerId: string) => {
+    return blockedTimes.filter((block) => {
+      // Company-wide blocks apply to all workers
+      if (block.scope === 'company') return true;
+      // Worker-specific blocks only apply to listed workers
+      if (block.scope === 'workers' && block.blockedWorkerIds.includes(workerId)) return true;
+      return false;
+    });
+  };
+
+  // Calculate blocked time bar position and width
+  const getBlockedTimeStyle = (block: BlockedTime) => {
+    // Determine start and end hours for this block
+    let blockStartHour = startHour;
+    let blockEndHour = endHour;
+
+    if (block.startTime) {
+      const [h, m] = block.startTime.split(':').map(Number);
+      blockStartHour = h + m / 60;
+    }
+
+    if (block.endTime) {
+      const [h, m] = block.endTime.split(':').map(Number);
+      blockEndHour = h + m / 60;
+    }
+
+    // Clamp to visible range
+    const visibleStart = Math.max(blockStartHour, startHour);
+    const visibleEnd = Math.min(blockEndHour, endHour);
+
+    if (visibleStart >= visibleEnd) return null;
+
+    const startOffset = visibleStart - startHour;
+    const duration = visibleEnd - visibleStart;
+
+    return {
+      left: `${startOffset * HOUR_WIDTH}px`,
+      width: `${duration * HOUR_WIDTH}px`,
+    };
+  };
 
   // Drag handlers
   const handleDragStart = (event: DragStartEvent) => {
@@ -491,6 +547,8 @@ export default function GanttDailyCalendar({
                     getJobStyle={getJobStyle}
                     onJobClick={onJobClick}
                     onWorkerClick={onWorkerClick}
+                    blockedTimes={getBlockedTimesForWorker(worker.id)}
+                    getBlockedTimeStyle={getBlockedTimeStyle}
                   />
                 ))}
 
@@ -535,6 +593,8 @@ interface WorkerRowProps {
   getJobStyle: (job: GanttJob) => { left: string; width: string };
   onJobClick?: (jobId: string) => void;
   onWorkerClick?: (workerId: string) => void;
+  blockedTimes: BlockedTime[];
+  getBlockedTimeStyle: (block: BlockedTime) => { left: string; width: string } | null;
 }
 
 function WorkerRow({
@@ -545,6 +605,8 @@ function WorkerRow({
   getJobStyle,
   onJobClick,
   onWorkerClick,
+  blockedTimes,
+  getBlockedTimeStyle,
 }: WorkerRowProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: `worker-row-${worker.id}`,
@@ -616,6 +678,27 @@ function WorkerRow({
             />
           ))}
         </div>
+
+        {/* Blocked time overlays */}
+        {blockedTimes.map((block) => {
+          const style = getBlockedTimeStyle(block);
+          if (!style) return null;
+          return (
+            <div
+              key={block.id}
+              className="absolute top-1 bottom-1 bg-zinc-700/60 border border-zinc-600/50 rounded flex items-center justify-center z-5 pointer-events-none"
+              style={style}
+              title={`Blocked: ${block.reason}`}
+            >
+              <div className="flex items-center gap-1.5 px-2">
+                <Lock className="h-3.5 w-3.5 text-zinc-400" />
+                <span className="text-xs font-medium text-zinc-400 truncate">
+                  {block.reason}
+                </span>
+              </div>
+            </div>
+          );
+        })}
 
         {/* Job bars */}
         {worker.jobs.map((job) => (

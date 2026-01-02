@@ -1,9 +1,17 @@
 "use client"
 
-import { useState } from 'react';
-import { X, Lock, AlertCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Lock, AlertCircle, Users, Building2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+
+interface TeamMember {
+  id: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  profilePhotoUrl?: string;
+}
 
 interface BlockTimeModalProps {
   isOpen: boolean;
@@ -22,6 +30,12 @@ export default function BlockTimeModal({
 }: BlockTimeModalProps) {
   const [submitting, setSubmitting] = useState(false);
   const [isRecurring, setIsRecurring] = useState(false);
+
+  // Scope state - company-wide or specific workers
+  const [scope, setScope] = useState<'company' | 'workers'>('company');
+  const [selectedWorkerIds, setSelectedWorkerIds] = useState<string[]>([]);
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [loadingTeam, setLoadingTeam] = useState(false);
 
   const [blockData, setBlockData] = useState({
     fromDate: selectedDate ? selectedDate.toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
@@ -66,6 +80,36 @@ export default function BlockTimeModal({
     }));
   };
 
+  // Fetch team members when modal opens and scope is 'workers'
+  useEffect(() => {
+    const fetchTeamMembers = async () => {
+      if (!providerId || !isOpen) return;
+
+      setLoadingTeam(true);
+      try {
+        const res = await fetch(`/api/provider/team?providerId=${providerId}`);
+        if (res.ok) {
+          const data = await res.json();
+          setTeamMembers(data.teamMembers || []);
+        }
+      } catch (error) {
+        console.error('Error fetching team members:', error);
+      } finally {
+        setLoadingTeam(false);
+      }
+    };
+
+    fetchTeamMembers();
+  }, [providerId, isOpen]);
+
+  const toggleWorker = (workerId: string) => {
+    setSelectedWorkerIds(prev =>
+      prev.includes(workerId)
+        ? prev.filter(id => id !== workerId)
+        : [...prev, workerId]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -100,6 +144,11 @@ export default function BlockTimeModal({
       return;
     }
 
+    if (scope === 'workers' && selectedWorkerIds.length === 0) {
+      toast.error('Please select at least one worker');
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -112,6 +161,8 @@ export default function BlockTimeModal({
         reason: blockData.reason,
         notes: blockData.notes || null,
         isRecurring,
+        scope,
+        blockedWorkerIds: scope === 'workers' ? selectedWorkerIds : [],
         ...(isRecurring && {
           recurring: {
             type: blockData.repeatType,
@@ -160,6 +211,8 @@ export default function BlockTimeModal({
       endsOnDate: '',
     });
     setIsRecurring(false);
+    setScope('company');
+    setSelectedWorkerIds([]);
   };
 
   if (!isOpen) return null;
@@ -246,6 +299,135 @@ export default function BlockTimeModal({
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Who to Block - Scope Selection */}
+            <div>
+              <h3 className="text-lg font-semibold text-zinc-100 mb-4">Who to Block</h3>
+
+              {/* Scope Options */}
+              <div className="space-y-3">
+                <label
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    scope === 'company'
+                      ? 'bg-orange-500/10 border-orange-500'
+                      : 'bg-zinc-800/30 border-zinc-700 hover:bg-zinc-800/50'
+                  }`}
+                  onClick={() => setScope('company')}
+                >
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="company"
+                    checked={scope === 'company'}
+                    onChange={() => setScope('company')}
+                    className="sr-only"
+                  />
+                  <div className={`p-2 rounded-lg ${scope === 'company' ? 'bg-orange-500/20' : 'bg-zinc-700/50'}`}>
+                    <Building2 className={`h-5 w-5 ${scope === 'company' ? 'text-orange-400' : 'text-zinc-400'}`} />
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${scope === 'company' ? 'text-orange-400' : 'text-zinc-300'}`}>
+                      Block entire company
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      All workers will be blocked during this time
+                    </p>
+                  </div>
+                  {scope === 'company' && (
+                    <Check className="h-5 w-5 text-orange-400" />
+                  )}
+                </label>
+
+                <label
+                  className={`flex items-center gap-3 p-3 rounded-lg border-2 cursor-pointer transition-all ${
+                    scope === 'workers'
+                      ? 'bg-orange-500/10 border-orange-500'
+                      : 'bg-zinc-800/30 border-zinc-700 hover:bg-zinc-800/50'
+                  }`}
+                  onClick={() => setScope('workers')}
+                >
+                  <input
+                    type="radio"
+                    name="scope"
+                    value="workers"
+                    checked={scope === 'workers'}
+                    onChange={() => setScope('workers')}
+                    className="sr-only"
+                  />
+                  <div className={`p-2 rounded-lg ${scope === 'workers' ? 'bg-orange-500/20' : 'bg-zinc-700/50'}`}>
+                    <Users className={`h-5 w-5 ${scope === 'workers' ? 'text-orange-400' : 'text-zinc-400'}`} />
+                  </div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-medium ${scope === 'workers' ? 'text-orange-400' : 'text-zinc-300'}`}>
+                      Block specific workers
+                    </p>
+                    <p className="text-xs text-zinc-500">
+                      Choose which workers to block
+                    </p>
+                  </div>
+                  {scope === 'workers' && (
+                    <Check className="h-5 w-5 text-orange-400" />
+                  )}
+                </label>
+              </div>
+
+              {/* Worker Selection - shown when scope is 'workers' */}
+              {scope === 'workers' && (
+                <div className="mt-4 p-4 bg-zinc-800/30 border border-zinc-700/50 rounded-lg">
+                  <p className="text-sm font-medium text-zinc-300 mb-3">
+                    Select workers to block <span className="text-red-400">*</span>
+                  </p>
+
+                  {loadingTeam ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-500"></div>
+                    </div>
+                  ) : teamMembers.length === 0 ? (
+                    <p className="text-sm text-zinc-500 text-center py-4">
+                      No team members found
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-48 overflow-y-auto">
+                      {teamMembers.map((member) => (
+                        <label
+                          key={member.id}
+                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-all ${
+                            selectedWorkerIds.includes(member.id)
+                              ? 'bg-orange-500/10 border border-orange-500/50'
+                              : 'bg-zinc-800/50 border border-zinc-700/50 hover:bg-zinc-800'
+                          }`}
+                          onClick={() => toggleWorker(member.id)}
+                        >
+                          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center ${
+                            selectedWorkerIds.includes(member.id)
+                              ? 'bg-orange-500 border-orange-500'
+                              : 'border-zinc-600'
+                          }`}>
+                            {selectedWorkerIds.includes(member.id) && (
+                              <Check className="h-3 w-3 text-white" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-zinc-200 truncate">
+                              {member.firstName} {member.lastName}
+                            </p>
+                            <p className="text-xs text-zinc-500 capitalize">
+                              {member.role}
+                            </p>
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {selectedWorkerIds.length > 0 && (
+                    <p className="text-xs text-zinc-400 mt-3">
+                      {selectedWorkerIds.length} worker{selectedWorkerIds.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Time Range */}

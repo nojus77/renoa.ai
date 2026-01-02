@@ -115,6 +115,100 @@ export async function POST(request: NextRequest) {
       console.log('ℹ️ No users assigned to this job');
     }
 
+    // Check for blocked time conflicts (if workers are assigned)
+    if (assignedUserIds && assignedUserIds.length > 0) {
+      // Get the job's date (for recurring block check)
+      const jobDayOfWeek = startDate.getDay();
+
+      // Find blocked times that overlap with this job's time
+      const blockedTimes = await prisma.blockedTime.findMany({
+        where: {
+          providerId,
+          fromDate: { lte: endDate },
+          toDate: { gte: startDate },
+          OR: [
+            { isRecurring: false },
+            {
+              AND: [
+                { isRecurring: true },
+                {
+                  OR: [
+                    { recurringEndsType: 'never' },
+                    { recurringEndsOnDate: { gte: startDate } },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      });
+
+      // Check if any blocked time affects the assigned workers
+      const blockedWorkers: string[] = [];
+      for (const block of blockedTimes) {
+        // For recurring blocks, check if the day of week matches
+        if (block.isRecurring && block.recurringType === 'weekly' && block.recurringDaysOfWeek) {
+          const blockDays = block.recurringDaysOfWeek as number[];
+          if (!blockDays.includes(jobDayOfWeek)) continue;
+        }
+
+        // Check time overlap (if time-specific block)
+        if (block.startTime && block.endTime) {
+          const [blockStartH, blockStartM] = block.startTime.split(':').map(Number);
+          const [blockEndH, blockEndM] = block.endTime.split(':').map(Number);
+          const jobStartHour = startDate.getHours() + startDate.getMinutes() / 60;
+          const jobEndHour = endDate.getHours() + endDate.getMinutes() / 60;
+          const blockStartHour = blockStartH + blockStartM / 60;
+          const blockEndHour = blockEndH + blockEndM / 60;
+
+          // Check if there's no overlap
+          if (jobEndHour <= blockStartHour || jobStartHour >= blockEndHour) {
+            continue; // No time overlap, skip this block
+          }
+        }
+
+        // Determine which workers are affected
+        if (block.scope === 'company') {
+          // Company-wide block affects all assigned workers
+          blockedWorkers.push(...assignedUserIds);
+        } else if (block.scope === 'workers' && block.blockedWorkerIds) {
+          // Check if any assigned workers are in the blocked list
+          const affected = assignedUserIds.filter((id: string) =>
+            block.blockedWorkerIds.includes(id)
+          );
+          blockedWorkers.push(...affected);
+        }
+      }
+
+      // Remove duplicates
+      const uniqueBlockedWorkers = Array.from(new Set(blockedWorkers));
+
+      if (uniqueBlockedWorkers.length > 0) {
+        // Get worker names for the error message
+        const blockedWorkerDetails = await prisma.providerUser.findMany({
+          where: { id: { in: uniqueBlockedWorkers } },
+          select: { id: true, firstName: true, lastName: true },
+        });
+
+        const workerNames = blockedWorkerDetails
+          .map(w => `${w.firstName} ${w.lastName}`)
+          .join(', ');
+
+        console.log('⚠️ Blocked time conflict detected:', {
+          blockedWorkers: uniqueBlockedWorkers,
+          workerNames,
+        });
+
+        return NextResponse.json(
+          {
+            error: `Cannot schedule job: ${workerNames} ${uniqueBlockedWorkers.length > 1 ? 'are' : 'is'} blocked during this time`,
+            blockedWorkerIds: uniqueBlockedWorkers,
+          },
+          { status: 400 }
+        );
+      }
+    }
+
     // Fetch ServiceTypeConfig for skill requirements
     const serviceConfig = await prisma.serviceTypeConfig.findFirst({
       where: {

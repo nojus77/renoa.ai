@@ -16,6 +16,8 @@ export async function POST(request: NextRequest) {
       notes,
       isRecurring,
       recurring,
+      scope,
+      blockedWorkerIds,
     } = body;
 
     if (!providerId || !fromDate || !toDate || !reason) {
@@ -38,6 +40,8 @@ export async function POST(request: NextRequest) {
         recurringEndsType: isRecurring && recurring ? recurring.endsType : null,
         recurringOccurrences: isRecurring && recurring && recurring.endsType === 'after' ? recurring.occurrences : null,
         recurringEndsOnDate: isRecurring && recurring && recurring.endsType === 'on' ? new Date(recurring.endsOnDate) : null,
+        scope: scope || 'company',
+        blockedWorkerIds: blockedWorkerIds || [],
       },
     });
 

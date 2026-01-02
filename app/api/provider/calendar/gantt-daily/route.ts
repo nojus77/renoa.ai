@@ -115,6 +115,55 @@ export async function GET(request: NextRequest) {
       orderBy: { startTime: 'desc' },
     }) : null;
 
+    // Get blocked times that overlap with the selected day
+    const blockedTimes = await prisma.blockedTime.findMany({
+      where: {
+        providerId,
+        // Block overlaps with the day if:
+        // - Block start date is before or on the day AND block end date is on or after the day
+        fromDate: { lte: endOfDay },
+        toDate: { gte: startOfDay },
+        // Active recurring blocks
+        OR: [
+          { isRecurring: false },
+          {
+            AND: [
+              { isRecurring: true },
+              {
+                OR: [
+                  { recurringEndsType: 'never' },
+                  { recurringEndsOnDate: { gte: startOfDay } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      select: {
+        id: true,
+        fromDate: true,
+        toDate: true,
+        startTime: true,
+        endTime: true,
+        reason: true,
+        scope: true,
+        blockedWorkerIds: true,
+        isRecurring: true,
+        recurringType: true,
+        recurringDaysOfWeek: true,
+      },
+    });
+
+    // Filter recurring blocks to only include those that match the current day of week
+    const dayOfWeek = targetDate.getDay(); // 0 = Sunday, 6 = Saturday
+    const filteredBlockedTimes = blockedTimes.filter((block) => {
+      if (!block.isRecurring) return true;
+      if (block.recurringType === 'weekly' && block.recurringDaysOfWeek) {
+        return (block.recurringDaysOfWeek as number[]).includes(dayOfWeek);
+      }
+      return true;
+    });
+
     // Get ALL unassigned jobs (not just for the selected day)
     // NOTE: Sidebar shows all unassigned jobs for drag-and-drop convenience,
     // but stats.unassignedJobs only counts jobs for the selected day
@@ -236,6 +285,16 @@ export async function GET(request: NextRequest) {
       date: targetDate.toISOString().split('T')[0],
       workers,
       unassignedJobs,
+      blockedTimes: filteredBlockedTimes.map((block) => ({
+        id: block.id,
+        fromDate: block.fromDate.toISOString(),
+        toDate: block.toDate.toISOString(),
+        startTime: block.startTime,
+        endTime: block.endTime,
+        reason: block.reason,
+        scope: block.scope,
+        blockedWorkerIds: block.blockedWorkerIds,
+      })),
       stats: {
         totalJobs,
         assignedJobs: assignedJobCount,
