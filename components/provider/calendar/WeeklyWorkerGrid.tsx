@@ -201,12 +201,12 @@ export default function WeeklyWorkerGrid({
                   <div
                     key={stats.date.toISOString()}
                     className={cn(
-                      "px-2 py-2 border-r border-zinc-700 text-center",
+                      "px-2 border-r border-zinc-700 flex flex-col items-center justify-center",
                       isToday(stats.date) && "bg-emerald-500/10"
                     )}
                   >
-                    <div className="text-sm font-medium text-white">{stats.jobCount} jobs</div>
-                    <div className="text-xs text-zinc-400">{stats.totalHours}h</div>
+                    <div className="text-sm font-medium text-white leading-tight">{stats.jobCount} jobs</div>
+                    <div className="text-xs text-zinc-400 leading-tight">{stats.totalHours}h</div>
                   </div>
                 ))}
               </div>

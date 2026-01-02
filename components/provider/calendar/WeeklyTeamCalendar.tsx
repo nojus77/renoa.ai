@@ -29,7 +29,6 @@ import { toast } from 'sonner';
 // Import new strategic components
 import WeekHeader from './WeekHeader';
 import WeeklyWorkerGrid from './WeeklyWorkerGrid';
-import WeekInsightsPanel from './WeekInsightsPanel';
 import UnassignedJobsPanel, { UnassignedJob } from './UnassignedJobsPanel';
 import CalendarSkeleton from './CalendarSkeleton';
 import { useKeyboardShortcuts, KeyboardShortcutsDialog } from './KeyboardShortcuts';
@@ -624,7 +623,7 @@ export default function WeeklyTeamCalendar({
             </div>
 
             {/* Main Content - Fills remaining space to right edge */}
-            <div className="flex-1 space-y-3 min-w-0 overflow-hidden px-4 py-4">
+            <div className="flex-1 min-w-0 overflow-hidden px-4 py-4">
               {/* Worker Grid */}
               <WeeklyWorkerGrid
                 workers={transformedWorkers}
@@ -632,12 +631,6 @@ export default function WeeklyTeamCalendar({
                 onJobClick={handleJobClick}
                 onDayClick={handleDayClick}
                 onAddJob={onAddJob}
-              />
-
-              {/* Insights Panel */}
-              <WeekInsightsPanel
-                insights={insights}
-                onOptimize={handleOptimizeWeek}
               />
             </div>
           </div>
