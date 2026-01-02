@@ -360,7 +360,6 @@ export default function ProviderCalendar() {
 
     // Total capacity (8 hours per active worker, or total team if no assignments yet)
     const totalCapacity = Math.max(activeWorkers, teamMembers.length) * 8;
-    const avgCapacity = totalCapacity > 0 ? Math.round((totalHours / totalCapacity) * 100) : 0;
 
     // Unassigned jobs - ONLY for the selected date
     const unassignedJobs = selectedDateJobs.filter(
@@ -413,7 +412,6 @@ export default function ProviderCalendar() {
       totalJobs: selectedDateJobs.length,
       totalHours,
       totalCapacity,
-      avgCapacity,
       activeWorkers,
       unassignedJobs,
       conflicts,
@@ -544,13 +542,6 @@ export default function ProviderCalendar() {
           const stats = getDailyStats();
           if (!stats) return null;
 
-          const capacityColor =
-            stats.avgCapacity > 90
-              ? 'text-red-400'
-              : stats.avgCapacity > 70
-                ? 'text-yellow-400'
-                : 'text-emerald-400';
-
           return (
             <div className="px-4 py-3">
               <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
@@ -590,14 +581,6 @@ export default function ProviderCalendar() {
                         </button>
                       )}
                     </div>
-                  </div>
-
-                  {/* Average capacity badge */}
-                  <div className="text-right">
-                    <div className={`text-3xl font-bold ${capacityColor}`}>
-                      {stats.avgCapacity}%
-                    </div>
-                    <div className="text-xs text-zinc-500">Avg Capacity</div>
                   </div>
                 </div>
 
