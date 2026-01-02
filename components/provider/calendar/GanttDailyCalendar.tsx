@@ -450,19 +450,6 @@ export default function GanttDailyCalendar({
               </Button>
             </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2">
-              {onAddJob && (
-                <Button
-                  onClick={() => onAddJob()}
-                  size="sm"
-                  className="bg-emerald-600 hover:bg-emerald-500"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Job
-                </Button>
-              )}
-            </div>
           </div>
         </div>
 
