@@ -11,15 +11,12 @@ import {
   ChevronRight,
   Plus,
   Calendar as CalendarIcon,
-  RefreshCw,
   GripVertical,
   Clock,
   MapPin,
   User,
   AlertTriangle,
 } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
 import {
   DndContext,
   DragOverlay,
@@ -69,6 +66,8 @@ interface GanttDailyCalendarProps {
   onJobClick?: (jobId: string) => void;
   onWorkerClick?: (workerId: string) => void;
   onAddJob?: (workerId?: string, hour?: number) => void;
+  onDateChange?: (date: Date) => void;
+  onRefresh?: () => void;
 }
 
 // Constants
@@ -83,12 +82,13 @@ export default function GanttDailyCalendar({
   onJobClick,
   onWorkerClick,
   onAddJob,
+  onDateChange,
+  onRefresh,
 }: GanttDailyCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(initialDate);
   const [workers, setWorkers] = useState<GanttWorker[]>([]);
   const [unassignedJobs, setUnassignedJobs] = useState<GanttJob[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showDatePicker, setShowDatePicker] = useState(false);
   const [activeDragJob, setActiveDragJob] = useState<GanttJob | null>(null);
   const [dragSourceType, setDragSourceType] = useState<'sidebar' | 'timeline' | null>(null);
   const [nextJobDate, setNextJobDate] = useState<string | null>(null);
@@ -153,21 +153,6 @@ export default function GanttDailyCalendar({
       }
     }
   }, [loading, selectedDate]);
-
-  // Navigation handlers
-  const goToPreviousDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() - 1);
-    setSelectedDate(newDate);
-  };
-
-  const goToNextDay = () => {
-    const newDate = new Date(selectedDate);
-    newDate.setDate(newDate.getDate() + 1);
-    setSelectedDate(newDate);
-  };
-
-  const goToToday = () => setSelectedDate(new Date());
 
   // Calculate job bar position and width
   const getJobStyle = (job: GanttJob) => {
@@ -379,80 +364,7 @@ export default function GanttDailyCalendar({
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="w-full space-y-3">
-        {/* Header */}
-        <div className="border-b border-zinc-800 bg-zinc-900/50 px-4 py-2">
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            {/* Date Navigation */}
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={goToPreviousDay}
-                className="border-zinc-700 hover:bg-zinc-800"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-
-              <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="min-w-[200px] justify-start text-left font-medium border-zinc-700 hover:bg-zinc-800"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-800" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={selectedDate}
-                    onSelect={(date) => {
-                      if (date) {
-                        setSelectedDate(date);
-                        setShowDatePicker(false);
-                      }
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={goToNextDay}
-                className="border-zinc-700 hover:bg-zinc-800"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-
-              {!isToday(selectedDate) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={goToToday}
-                  className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
-                >
-                  Today
-                </Button>
-              )}
-
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={fetchDailyData}
-                disabled={loading}
-                className="text-zinc-400 hover:text-zinc-200"
-              >
-                <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-              </Button>
-            </div>
-
-          </div>
-        </div>
-
+      <div className="w-full">
         {/* Main Content - Gantt timeline with horizontal scroll */}
         <div className="flex w-full border border-zinc-800 overflow-hidden">
           {/* Left Sidebar - Unassigned Jobs */}
