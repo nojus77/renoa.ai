@@ -866,27 +866,50 @@ export default function DispatchPage() {
                   if (selectedWorker && selectedWorker !== route.workerId) return [];
 
                   const filteredJobs = filterJobsByStatus(route.jobs);
-                  return filteredJobs.map((job, index) => (
-                    <Marker
-                      key={job.id}
-                      position={{ lat: job.latitude!, lng: job.longitude! }}
-                      icon={{
-                        path: google.maps.SymbolPath.CIRCLE,
-                        fillColor: route.workerColor,
-                        fillOpacity: 1,
-                        strokeWeight: job.appointmentType === 'fixed' ? 4 : 2,
-                        strokeColor: job.appointmentType === 'fixed' ? '#ef4444' : '#fff',
-                        scale: 14,
-                      }}
-                      label={{
-                        text: String(index + 1),
-                        color: '#fff',
-                        fontSize: '11px',
-                        fontWeight: 'bold',
-                      }}
-                      onClick={() => setSelectedJob(job)}
-                    />
-                  ));
+                  return filteredJobs.map((job, index) => {
+                    // Determine stroke color based on job status
+                    const isCompleted = job.status === 'completed';
+                    const isActive = job.status === 'in_progress' || job.status === 'on_the_way';
+
+                    let strokeColor = '#fff'; // Default: white for upcoming
+                    let strokeWeight = 2;
+
+                    if (isCompleted) {
+                      strokeColor = '#10b981'; // Green for completed
+                      strokeWeight = 3;
+                    } else if (isActive) {
+                      strokeColor = '#f59e0b'; // Orange for active
+                      strokeWeight = 4; // Thicker stroke for active jobs
+                    }
+
+                    // Fixed appointments still get red outline (takes priority)
+                    if (job.appointmentType === 'fixed') {
+                      strokeColor = '#ef4444';
+                      strokeWeight = 4;
+                    }
+
+                    return (
+                      <Marker
+                        key={job.id}
+                        position={{ lat: job.latitude!, lng: job.longitude! }}
+                        icon={{
+                          path: google.maps.SymbolPath.CIRCLE,
+                          fillColor: route.workerColor,
+                          fillOpacity: 1,
+                          strokeWeight,
+                          strokeColor,
+                          scale: isActive ? 16 : 14, // Slightly larger for active jobs
+                        }}
+                        label={{
+                          text: String(index + 1),
+                          color: '#fff',
+                          fontSize: '11px',
+                          fontWeight: 'bold',
+                        }}
+                        onClick={() => setSelectedJob(job)}
+                      />
+                    );
+                  });
                 })}
 
                 {/* Unassigned job markers */}
