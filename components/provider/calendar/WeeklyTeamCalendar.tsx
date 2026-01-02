@@ -491,102 +491,39 @@ export default function WeeklyTeamCalendar({
 
   return (
     <div className="w-full space-y-3">
-      {/* Date Navigation Header - ABOVE stats like daily view */}
-      <div className="px-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={goToPreviousWeek}
-            className="h-8 w-8 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-          >
-            <ChevronLeft className="h-4 w-4" />
-          </Button>
-
-          <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-            <PopoverTrigger asChild>
-              <Button
-                variant="ghost"
-                className="text-lg font-semibold text-zinc-100 hover:bg-zinc-800 px-2"
-              >
-                {format(selectedWeekStart, 'MMM d')} - {format(weekEnd, 'MMM d, yyyy')}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-800" align="start">
-              <Calendar
-                mode="single"
-                selected={selectedWeekStart}
-                onSelect={(date) => {
-                  if (date) {
-                    setSelectedWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
-                    setShowDatePicker(false);
-                  }
-                }}
-                initialFocus
-              />
-            </PopoverContent>
-          </Popover>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={goToNextWeek}
-            className="h-8 w-8 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
-          >
-            <ChevronRight className="h-4 w-4" />
-          </Button>
-
-          {!isCurrentWeek && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={goToCurrentWeek}
-              className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 h-8"
-            >
-              This Week
-            </Button>
-          )}
-
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={fetchWeeklyData}
-            disabled={loading}
-            className="h-8 w-8 text-zinc-400 hover:text-zinc-200"
-          >
-            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
-          </Button>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {onSwitchToDailyView && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onSwitchToDailyView}
-              className="border-zinc-700 hover:bg-zinc-800 h-8"
-            >
-              Switch to Daily View
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setShowShortcuts(true)}
-            className="h-8 w-8 text-zinc-400 hover:text-zinc-200"
-            title="Keyboard shortcuts (?)"
-          >
-            <Keyboard className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Week Stats Header - Below date navigation */}
+      {/* Week Stats Header with integrated date navigation - Same as Daily View */}
       {headerStats && (
         <div className="px-4">
-          <WeekHeader stats={headerStats} problems={insights.problems} />
+          <WeekHeader
+            stats={headerStats}
+            problems={insights.problems}
+            onPreviousWeek={goToPreviousWeek}
+            onNextWeek={goToNextWeek}
+            onCurrentWeek={goToCurrentWeek}
+            onDateClick={() => setShowDatePicker(true)}
+          />
         </div>
       )}
+
+      {/* Date Picker Popover - Positioned separately */}
+      <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+        <PopoverTrigger asChild>
+          <span className="hidden" />
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-800" align="start">
+          <Calendar
+            mode="single"
+            selected={selectedWeekStart}
+            onSelect={(date) => {
+              if (date) {
+                setSelectedWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
+                setShowDatePicker(false);
+              }
+            }}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
 
       {/* Main Content - No internal scrolling, flows with page */}
       <DndContext

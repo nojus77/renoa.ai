@@ -138,10 +138,6 @@ export default function WeeklyWorkerGrid({
             </div>
           ))}
 
-          {/* Summary bar label - matches height of totals row */}
-          <div className="h-12 bg-zinc-800 px-3 flex items-center">
-            <span className="text-sm font-medium text-zinc-400">Daily Totals</span>
-          </div>
         </div>
 
         {/* SCROLLABLE DAYS GRID */}
@@ -194,24 +190,33 @@ export default function WeeklyWorkerGrid({
                 No team members found. Add workers to see their weekly schedule.
               </div>
             )}
+          </div>
+        </div>
+      </div>
 
-            {/* SUMMARY BAR - matches label height */}
-            <div className="bg-zinc-800 h-12">
-              <div className="grid grid-cols-7 h-full">
-                {dailyStats.map((stats, index) => (
-                  <div
-                    key={stats.date.toISOString()}
-                    className={cn(
-                      "border-r border-zinc-700 flex flex-col items-center justify-center text-center",
-                      isToday(stats.date) && "bg-emerald-500/10",
-                      index === 6 && "border-r-0" // Remove border on last column
-                    )}
-                  >
-                    <div className="text-sm font-medium text-white">{stats.jobCount} jobs</div>
-                    <div className="text-xs text-zinc-400">{stats.totalHours}h</div>
-                  </div>
-                ))}
-              </div>
+      {/* DAILY TOTALS ROW - Outside flex container to span full width */}
+      <div className="flex bg-zinc-800 border-t border-zinc-700">
+        {/* Frozen label column */}
+        <div className="w-48 flex-shrink-0 h-12 flex items-center justify-center border-r border-zinc-700">
+          <span className="text-sm font-medium text-zinc-400">Daily Totals</span>
+        </div>
+        {/* Scrollable stats columns */}
+        <div className="flex-1 overflow-x-auto">
+          <div className="min-w-[700px] h-12">
+            <div className="grid grid-cols-7 h-full">
+              {dailyStats.map((stats, index) => (
+                <div
+                  key={stats.date.toISOString()}
+                  className={cn(
+                    "border-r border-zinc-700 flex flex-col items-center justify-center text-center",
+                    isToday(stats.date) && "bg-emerald-500/10",
+                    index === 6 && "border-r-0"
+                  )}
+                >
+                  <div className="text-sm font-medium text-white">{stats.jobCount} jobs</div>
+                  <div className="text-xs text-zinc-400">{stats.totalHours}h</div>
+                </div>
+              ))}
             </div>
           </div>
         </div>

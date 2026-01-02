@@ -1,6 +1,6 @@
 'use client';
 
-import { format } from 'date-fns';
+import { format, isThisWeek } from 'date-fns';
 import { Card, CardContent } from '@/components/ui/card';
 import {
   AlertTriangle,
@@ -10,6 +10,8 @@ import {
   XCircle,
   TrendingDown,
   Info,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -36,6 +38,10 @@ interface Problem {
 interface WeekHeaderProps {
   stats: WeekStats;
   problems?: Problem[];
+  onPreviousWeek?: () => void;
+  onNextWeek?: () => void;
+  onCurrentWeek?: () => void;
+  onDateClick?: () => void;
 }
 
 function StatCard({
@@ -77,10 +83,52 @@ function StatCard({
   );
 }
 
-export default function WeekHeader({ stats }: WeekHeaderProps) {
+export default function WeekHeader({
+  stats,
+  onPreviousWeek,
+  onNextWeek,
+  onCurrentWeek,
+  onDateClick,
+}: WeekHeaderProps) {
+  const isCurrentWeek = isThisWeek(stats.weekStart, { weekStartsOn: 1 });
+
   return (
     <Card className="bg-zinc-900 border-zinc-800">
       <CardContent className="p-4">
+        {/* Title Row with Date Navigation - Same as Daily View */}
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onPreviousWeek}
+                className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              <h2
+                onClick={onDateClick}
+                className="text-xl font-bold text-zinc-100 cursor-pointer hover:text-zinc-300 transition-colors"
+              >
+                {format(stats.weekStart, 'MMM d')} - {format(stats.weekEnd, 'MMM d, yyyy')}
+              </h2>
+              <button
+                onClick={onNextWeek}
+                className="p-1.5 rounded-md hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+              {!isCurrentWeek && (
+                <button
+                  onClick={onCurrentWeek}
+                  className="ml-2 px-2 py-1 text-xs font-medium text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors"
+                >
+                  This Week
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Quick stats bar - 5 cards */}
         <div className="grid grid-cols-5 gap-3">
           <StatCard
