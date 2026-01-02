@@ -230,7 +230,7 @@ export default function NeedsAttentionTable({ alerts, onJobClick, onDismissJob }
           {allAlertJobs.length} {allAlertJobs.length === 1 ? 'job' : 'jobs'}
         </span>
       </div>
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-teal">
+      <div className="flex-1 overflow-y-auto scrollbar-grey">
         <div className="divide-y divide-border">
           {allAlertJobs.map((job) => {
             const config = problemConfig[job.problem];
@@ -309,24 +309,24 @@ export default function NeedsAttentionTable({ alerts, onJobClick, onDismissJob }
         </div>
       </div>
 
-      {/* Custom Teal Scrollbar Styles */}
+      {/* Custom Grey Scrollbar Styles - Shared across dashboard */}
       <style jsx global>{`
-        .scrollbar-teal::-webkit-scrollbar {
+        .scrollbar-grey::-webkit-scrollbar {
           width: 6px;
         }
-        .scrollbar-teal::-webkit-scrollbar-track {
+        .scrollbar-grey::-webkit-scrollbar-track {
           background: transparent;
         }
-        .scrollbar-teal::-webkit-scrollbar-thumb {
-          background: #14b8a6;
+        .scrollbar-grey::-webkit-scrollbar-thumb {
+          background: #4a5568;
           border-radius: 3px;
         }
-        .scrollbar-teal::-webkit-scrollbar-thumb:hover {
-          background: #0d9488;
+        .scrollbar-grey::-webkit-scrollbar-thumb:hover {
+          background: #718096;
         }
-        .scrollbar-teal {
+        .scrollbar-grey {
           scrollbar-width: thin;
-          scrollbar-color: #14b8a6 transparent;
+          scrollbar-color: #4a5568 transparent;
         }
       `}</style>
     </div>

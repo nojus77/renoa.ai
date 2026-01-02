@@ -1003,43 +1003,36 @@ export default function ProviderHome() {
         <div className="bg-card rounded-2xl border border-border shadow-sm p-6 flex flex-col h-full">
           <div className="flex items-center justify-between mb-5">
             <h3 className="text-base font-semibold text-foreground">Coming Up</h3>
-            {groupedUpcomingJobs.length > 3 && (
+            {(homeData?.upcomingJobs?.length || 0) > 5 && (
               <button onClick={() => setShowAllComingUp(!showAllComingUp)} className="text-xs text-muted-foreground hover:text-primary transition-colors flex items-center gap-0.5">
                 {showAllComingUp ? 'Show less' : `View all (${homeData?.upcomingJobs?.length || 0})`}
                 <ChevronRight className={`h-3.5 w-3.5 transition-transform ${showAllComingUp ? 'rotate-90' : ''}`} />
               </button>
             )}
           </div>
-          {groupedUpcomingJobs.length === 0 ? (
+          {!homeData?.upcomingJobs || homeData.upcomingJobs.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground">
               <Calendar className="h-10 w-10 mb-2 opacity-30" />
               <p className="text-sm">No upcoming jobs</p>
             </div>
           ) : (
-            <div className={`flex-1 space-y-4 overflow-y-auto ${showAllComingUp ? 'max-h-none' : 'max-h-[350px]'}`}>
-              {(showAllComingUp ? groupedUpcomingJobs : groupedUpcomingJobs.slice(0, 3)).map((group) => (
-                <div key={group.date}>
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">{group.label}</p>
-                  <div className="space-y-2">
-                    {group.jobs.map((job) => (
-                      <button key={job.id} onClick={() => openSidebarForJob(job)} className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-3 text-left transition-all group">
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex-1 min-w-0 space-y-1">
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm font-semibold text-foreground truncate">{job.customerName || 'Unknown Customer'}</p>
-                              <span className="text-xs text-primary">• {job.serviceType}</span>
-                            </div>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                              <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{formatTime(job.startTime)}</span>
-                              {job.workerName ? <span className="flex items-center gap-1"><User className="h-3 w-3" />{job.workerName.split(' ')[0]}</span> : <span className="flex items-center gap-1 text-orange-500"><UserX className="h-3 w-3" />Unassigned</span>}
-                            </div>
-                          </div>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
-                        </div>
-                      </button>
-                    ))}
+            <div className={`flex-1 space-y-2 overflow-y-auto scrollbar-grey ${showAllComingUp ? 'max-h-none' : 'max-h-[350px]'}`}>
+              {(showAllComingUp ? homeData.upcomingJobs : homeData.upcomingJobs.slice(0, 5)).map((job) => (
+                <button key={job.id} onClick={() => openSidebarForJob(job)} className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-3 text-left transition-all group">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground truncate">{job.customerName || 'Unknown Customer'}</p>
+                        <span className="text-xs text-primary">• {job.serviceType}</span>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{format(new Date(job.startTime), 'MMM d')} at {formatTime(job.startTime)}</span>
+                        {job.workerName ? <span className="flex items-center gap-1"><User className="h-3 w-3" />{job.workerName.split(' ')[0]}</span> : <span className="flex items-center gap-1 text-orange-500"><UserX className="h-3 w-3" />Unassigned</span>}
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary flex-shrink-0 transition-colors" />
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
@@ -1071,7 +1064,7 @@ export default function ProviderHome() {
               <p className="text-sm">No jobs scheduled today</p>
             </div>
           ) : (
-            <div className={`flex-1 space-y-2 overflow-y-auto ${showAllToday ? 'max-h-none' : 'max-h-[350px]'}`}>
+            <div className={`flex-1 space-y-2 overflow-y-auto scrollbar-grey ${showAllToday ? 'max-h-none' : 'max-h-[350px]'}`}>
               {(showAllToday ? todaysJobs : todaysJobs.slice(0, 5)).map((job) => (
                 <button key={job.id} onClick={() => openSidebarForJob(job)} className="w-full bg-muted/30 hover:bg-muted/50 border border-border hover:border-primary/30 rounded-xl p-3 text-left transition-all group">
                   <div className="flex items-center justify-between gap-2">
