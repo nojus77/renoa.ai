@@ -791,6 +791,11 @@ export default function ProviderCalendar() {
                   setViewMode('day');
                   setCalendarViewMode('team-schedule');
                 }}
+                onAddJob={(workerId, date) => {
+                  // Open add job modal with pre-filled date
+                  setSelectedSlot({ date, hour: 9 });
+                  setShowAddJobModal(true);
+                }}
               />
             )}
             {viewMode === 'day' && calendarViewMode === 'my-schedule' && (

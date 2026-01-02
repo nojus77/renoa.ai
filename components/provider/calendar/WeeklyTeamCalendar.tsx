@@ -125,6 +125,7 @@ interface WeeklyTeamCalendarProps {
   providerId: string;
   onJobClick?: (jobId: string) => void;
   onDayClick?: (workerId: string, date: string) => void;
+  onAddJob?: (workerId: string, date: Date) => void;
   onSwitchToDailyView?: () => void;
 }
 
@@ -132,6 +133,7 @@ export default function WeeklyTeamCalendar({
   providerId,
   onJobClick,
   onDayClick,
+  onAddJob,
   onSwitchToDailyView,
 }: WeeklyTeamCalendarProps) {
   const [selectedWeekStart, setSelectedWeekStart] = useState<Date>(
@@ -629,6 +631,7 @@ export default function WeeklyTeamCalendar({
                 weekDays={weekDays}
                 onJobClick={handleJobClick}
                 onDayClick={handleDayClick}
+                onAddJob={onAddJob}
               />
 
               {/* Insights Panel */}

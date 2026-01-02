@@ -48,6 +48,7 @@ interface WeeklyWorkerGridProps {
   weekDays: Date[];
   onJobClick?: (jobId: string) => void;
   onDayClick?: (workerId: string, date: Date) => void;
+  onAddJob?: (workerId: string, date: Date) => void;
 }
 
 export default function WeeklyWorkerGrid({
@@ -55,6 +56,7 @@ export default function WeeklyWorkerGrid({
   weekDays,
   onJobClick,
   onDayClick,
+  onAddJob,
 }: WeeklyWorkerGridProps) {
   // Calculate daily stats for summary bar
   const dailyStats = useMemo(() => {
@@ -180,6 +182,7 @@ export default function WeeklyWorkerGrid({
                 days={weekDays}
                 onJobClick={onJobClick}
                 onDayClick={onDayClick}
+                onAddJob={onAddJob}
                 isZebraEven={workerIndex % 2 === 0}
               />
             ))}
@@ -220,6 +223,7 @@ interface WeeklyWorkerRowProps {
   days: Date[];
   onJobClick?: (jobId: string) => void;
   onDayClick?: (workerId: string, date: Date) => void;
+  onAddJob?: (workerId: string, date: Date) => void;
   isZebraEven?: boolean;
 }
 
@@ -228,6 +232,7 @@ function WeeklyWorkerRow({
   days,
   onJobClick,
   onDayClick,
+  onAddJob,
   isZebraEven,
 }: WeeklyWorkerRowProps) {
   const [expanded, setExpanded] = useState(false);
@@ -248,6 +253,15 @@ function WeeklyWorkerRow({
           const isOffDay = dayData?.isOffDay || (isWeekend && (!dayData || dayData.jobCount === 0));
           const hasJobs = dayData?.jobCount && dayData.jobCount > 0;
 
+          // Click handler logic: cells with jobs go to day view, empty cells open add job modal
+          const handleCellClick = () => {
+            if (hasJobs) {
+              onDayClick?.(worker.id, day);
+            } else if (!isOffDay) {
+              onAddJob?.(worker.id, day);
+            }
+          };
+
           return (
             <div
               key={day.toISOString()}
@@ -255,7 +269,7 @@ function WeeklyWorkerRow({
                 "p-2 cursor-pointer transition-all group relative border-r border-zinc-800",
                 isToday(day) && "bg-emerald-500/5"
               )}
-              onClick={() => onDayClick?.(worker.id, day)}
+              onClick={handleCellClick}
             >
               {/* Today indicator line */}
               {isToday(day) && (
