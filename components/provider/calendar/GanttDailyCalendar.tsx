@@ -95,6 +95,11 @@ export default function GanttDailyCalendar({
   const [prevJobDate, setPrevJobDate] = useState<string | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Sync selectedDate when parent's initialDate changes (e.g., from navigation buttons)
+  useEffect(() => {
+    setSelectedDate(initialDate);
+  }, [initialDate]);
+
   // Hours to display (6 AM to 8 PM = 15 hours)
   const hours = useMemo(() => Array.from({ length: 15 }, (_, i) => i + 6), []);
   const startHour = 6;
