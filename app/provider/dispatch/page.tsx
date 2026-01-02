@@ -1073,141 +1073,186 @@ export default function DispatchPage() {
                   <p>No assigned jobs for this date</p>
                 </div>
               ) : (
-                workerRoutes.map(route => (
-                  <div
-                    key={route.workerId}
-                    className={`border-b border-border ${
-                      selectedWorker && selectedWorker !== route.workerId ? 'opacity-50' : ''
-                    }`}
-                  >
-                    {/* Worker header */}
-                    <button
-                      onClick={() => setSelectedWorker(
-                        selectedWorker === route.workerId ? null : route.workerId
-                      )}
-                      className="w-full p-3 flex items-center justify-between hover:bg-accent/50 transition-colors"
+                workerRoutes.map(route => {
+                  // Sort jobs by route order, then by start time
+                  const sortedJobs = [...route.jobs].sort((a, b) => {
+                    if (a.routeOrder !== null && b.routeOrder !== null) {
+                      return (a.routeOrder || 0) - (b.routeOrder || 0);
+                    }
+                    return new Date(a.startTime).getTime() - new Date(b.startTime).getTime();
+                  });
+
+                  // Calculate progress
+                  const completedCount = sortedJobs.filter(j => j.status === 'completed').length;
+                  const activeJob = sortedJobs.find(j => j.status === 'in_progress' || j.status === 'on_the_way');
+                  const currentStop = activeJob
+                    ? sortedJobs.findIndex(j => j.id === activeJob.id) + 1
+                    : completedCount > 0 ? completedCount : 0;
+
+                  return (
+                    <div
+                      key={route.workerId}
+                      className={`border-b border-border ${
+                        selectedWorker && selectedWorker !== route.workerId ? 'opacity-50' : ''
+                      }`}
                     >
-                      <div className="flex items-center gap-3">
-                        <div
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
-                          style={{ backgroundColor: route.workerColor }}
-                        >
-                          {route.workerName.charAt(0)}
+                      {/* Worker header */}
+                      <button
+                        onClick={() => setSelectedWorker(
+                          selectedWorker === route.workerId ? null : route.workerId
+                        )}
+                        className="w-full p-3 flex items-center justify-between hover:bg-accent/50 transition-colors"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm"
+                            style={{ backgroundColor: route.workerColor }}
+                          >
+                            {route.workerName.charAt(0)}
+                          </div>
+                          <div className="text-left">
+                            <p className="font-medium text-foreground">{route.workerName}</p>
+                            <div className="flex items-center gap-2 text-xs">
+                              {activeJob ? (
+                                <span className="text-amber-400 font-medium">
+                                  Stop {currentStop} of {sortedJobs.length}
+                                </span>
+                              ) : completedCount === sortedJobs.length && sortedJobs.length > 0 ? (
+                                <span className="text-emerald-500 font-medium">
+                                  All {sortedJobs.length} complete ✓
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">
+                                  {completedCount}/{sortedJobs.length} done
+                                </span>
+                              )}
+                              <span className="text-muted-foreground">
+                                • {route.totalDistance} • {route.totalDuration}
+                              </span>
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-left">
-                          <p className="font-medium text-foreground">{route.workerName}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {route.jobs.length} jobs - {route.totalDistance} - {route.totalDuration}
-                          </p>
-                        </div>
-                      </div>
-                      <ChevronDown
-                        className={`w-4 h-4 text-muted-foreground transition-transform ${
-                          selectedWorker === route.workerId ? 'rotate-180' : ''
-                        }`}
-                      />
-                    </button>
+                        <ChevronDown
+                          className={`w-4 h-4 text-muted-foreground transition-transform ${
+                            selectedWorker === route.workerId ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </button>
 
-                    {/* Worker jobs */}
-                    {selectedWorker === route.workerId && (
-                      <div className="px-3 pb-3 space-y-2">
-                        {route.jobs.map((job, index) => {
-                          const isCompleted = job.status === 'completed';
-                          const isActive = job.status === 'in_progress' || job.status === 'on_the_way';
-                          const isScheduled = job.status === 'scheduled' || job.status === 'confirmed';
+                      {/* Worker jobs - sorted by route order */}
+                      {selectedWorker === route.workerId && (
+                        <div className="px-3 pb-3 space-y-1">
+                          {sortedJobs.map((job, index) => {
+                            const isCompleted = job.status === 'completed';
+                            const isActive = job.status === 'in_progress' || job.status === 'on_the_way';
+                            const stopNumber = index + 1;
 
-                          return (
-                            <div
-                              key={job.id}
-                              className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                                selectedJob?.id === job.id
-                                  ? 'bg-primary/10 ring-1 ring-primary'
-                                  : isActive
-                                  ? 'bg-amber-500/15 ring-1 ring-amber-500/50 animate-pulse'
-                                  : isCompleted
-                                  ? 'bg-emerald-500/5 opacity-70'
-                                  : 'hover:bg-accent/50'
-                              }`}
-                              onClick={() => {
-                                setSelectedJob(job);
-                                if (job.latitude && job.longitude) {
-                                  setCenter({ lat: job.latitude, lng: job.longitude });
-                                  mapRef?.panTo({ lat: job.latitude, lng: job.longitude });
-                                }
-                              }}
-                            >
-                              {/* Status indicator */}
-                              <div className="flex-shrink-0">
-                                {isCompleted ? (
-                                  <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                                    <CheckCircle className="w-4 h-4 text-emerald-500" />
-                                  </div>
-                                ) : isActive ? (
-                                  <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center animate-pulse">
-                                    <span className="text-xs font-bold text-white">{index + 1}</span>
-                                  </div>
-                                ) : (
-                                  <div
-                                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
-                                    style={{ backgroundColor: route.workerColor }}
-                                  >
-                                    {index + 1}
-                                  </div>
-                                )}
-                              </div>
+                            return (
+                              <div
+                                key={job.id}
+                                className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-all ${
+                                  selectedJob?.id === job.id
+                                    ? 'bg-primary/10 ring-1 ring-primary'
+                                    : isActive
+                                    ? 'bg-amber-500/10 ring-1 ring-amber-500/40'
+                                    : isCompleted
+                                    ? 'bg-emerald-500/5'
+                                    : 'hover:bg-accent/50'
+                                }`}
+                                onClick={() => {
+                                  setSelectedJob(job);
+                                  if (job.latitude && job.longitude) {
+                                    setCenter({ lat: job.latitude, lng: job.longitude });
+                                    mapRef?.panTo({ lat: job.latitude, lng: job.longitude });
+                                  }
+                                }}
+                              >
+                                {/* Stop number with status */}
+                                <div className="flex-shrink-0 w-7">
+                                  {isCompleted ? (
+                                    <div className="w-6 h-6 rounded-full bg-emerald-500 flex items-center justify-center">
+                                      <CheckCircle className="w-4 h-4 text-white" />
+                                    </div>
+                                  ) : isActive ? (
+                                    <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center relative">
+                                      <span className="text-xs font-bold text-white">{stopNumber}</span>
+                                      <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-amber-400 rounded-full animate-ping" />
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold border-2"
+                                      style={{
+                                        borderColor: route.workerColor,
+                                        color: route.workerColor,
+                                        backgroundColor: 'transparent'
+                                      }}
+                                    >
+                                      {stopNumber}
+                                    </div>
+                                  )}
+                                </div>
 
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2">
-                                  {getAppointmentTypeIcon(job.appointmentType)}
-                                  <p className={`text-sm font-medium truncate ${
+                                {/* Job info */}
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5">
+                                    <p className={`text-sm font-medium truncate ${
+                                      isCompleted
+                                        ? 'text-emerald-600 dark:text-emerald-400'
+                                        : isActive
+                                        ? 'text-amber-600 dark:text-amber-400 font-semibold'
+                                        : 'text-foreground'
+                                    }`}>
+                                      {job.serviceType}
+                                    </p>
+                                    {isActive && (
+                                      <span className="px-1.5 py-0.5 text-[10px] font-bold bg-amber-500 text-white rounded uppercase">
+                                        Now
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className={`text-xs truncate ${
                                     isCompleted
-                                      ? 'text-emerald-500 line-through'
+                                      ? 'text-emerald-600/70 dark:text-emerald-400/70'
                                       : isActive
-                                      ? 'text-amber-400'
-                                      : 'text-foreground'
+                                      ? 'text-amber-600/80 dark:text-amber-400/80'
+                                      : 'text-muted-foreground'
                                   }`}>
-                                    {job.serviceType}
+                                    {job.customer.name}
                                   </p>
                                 </div>
-                                <p className={`text-xs truncate ${
-                                  isCompleted
-                                    ? 'text-emerald-500/70'
-                                    : isActive
-                                    ? 'text-amber-400/80'
-                                    : 'text-muted-foreground'
-                                }`}>
-                                  {job.customer.name}
-                                </p>
-                              </div>
 
-                              <div className="text-right flex-shrink-0">
-                                <p className={`text-xs font-medium ${
-                                  isCompleted
-                                    ? 'text-emerald-500'
-                                    : isActive
-                                    ? 'text-amber-400'
-                                    : 'text-foreground'
-                                }`}>
-                                  {format(parseISO(job.startTime), 'h:mm a')}
-                                </p>
-                                {job.estimatedArrival && !isCompleted && (
-                                  <p className="text-xs text-emerald-500">
-                                    ETA {format(parseISO(job.estimatedArrival), 'h:mm')}
-                                  </p>
-                                )}
-                                {isActive && (
-                                  <p className="text-[10px] font-semibold text-amber-400 uppercase">
-                                    Active
-                                  </p>
-                                )}
+                                {/* Time info */}
+                                <div className="text-right flex-shrink-0">
+                                  {isCompleted ? (
+                                    <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                                      Done
+                                    </p>
+                                  ) : isActive ? (
+                                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                                      {format(parseISO(job.startTime), 'h:mm a')}
+                                    </p>
+                                  ) : (
+                                    <>
+                                      {job.estimatedArrival ? (
+                                        <p className="text-xs text-muted-foreground">
+                                          ETA {format(parseISO(job.estimatedArrival), 'h:mm a')}
+                                        </p>
+                                      ) : (
+                                        <p className="text-xs text-muted-foreground">
+                                          {format(parseISO(job.startTime), 'h:mm a')}
+                                        </p>
+                                      )}
+                                    </>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                ))
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>
