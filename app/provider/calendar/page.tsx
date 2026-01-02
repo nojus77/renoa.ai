@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
-import { Clock, Lock, DollarSign, TrendingUp, CheckCircle, Users, AlertTriangle, XCircle, TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Clock, Lock, DollarSign, TrendingUp, CheckCircle, Users, AlertTriangle, XCircle, TrendingDown, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { toast } from 'sonner';
 import AddJobModal from '@/components/provider/AddJobModal';
@@ -604,77 +604,112 @@ export default function ProviderCalendar() {
                 {/* Stat Cards Row - Compact */}
                 <div className="grid grid-cols-5 gap-3">
                   {/* Total Hours */}
-                  <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-2.5">
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <Clock className="h-3.5 w-3.5 text-zinc-400" />
-                      <span className="text-xs text-zinc-400">Hours</span>
+                  <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-2.5 relative group">
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-zinc-400" />
+                        <span className="text-xs text-zinc-400">Hours</span>
+                      </div>
+                      <div className="relative">
+                        <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                        <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          of {stats.totalCapacity}h capacity
+                        </div>
+                      </div>
                     </div>
                     <div className="text-lg font-bold text-zinc-200">{stats.totalHours}h</div>
-                    <div className="text-[10px] text-zinc-500">of {stats.totalCapacity}h</div>
                   </div>
 
                   {/* Unassigned */}
-                  <div className={`rounded-lg border p-2.5 ${
+                  <div className={`rounded-lg border p-2.5 relative group ${
                     stats.unassignedJobs > 0
                       ? 'bg-yellow-500/10 border-yellow-500/30'
                       : 'bg-emerald-500/10 border-emerald-500/30'
                   }`}>
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      {stats.unassignedJobs > 0 ? (
-                        <AlertTriangle className="h-3.5 w-3.5 text-yellow-400" />
-                      ) : (
-                        <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
-                      )}
-                      <span className={`text-xs ${stats.unassignedJobs > 0 ? 'text-yellow-400' : 'text-emerald-400'}`}>Unassigned</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        {stats.unassignedJobs > 0 ? (
+                          <AlertTriangle className="h-3.5 w-3.5 text-yellow-400" />
+                        ) : (
+                          <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                        )}
+                        <span className={`text-xs ${stats.unassignedJobs > 0 ? 'text-yellow-400' : 'text-emerald-400'}`}>Unassigned</span>
+                      </div>
+                      <div className="relative">
+                        <Info className={`h-3 w-3 cursor-help ${stats.unassignedJobs > 0 ? 'text-yellow-600' : 'text-emerald-600'}`} />
+                        <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          Jobs that need workers assigned
+                        </div>
+                      </div>
                     </div>
                     <div className={`text-lg font-bold ${stats.unassignedJobs > 0 ? 'text-yellow-400' : 'text-emerald-400'}`}>{stats.unassignedJobs}</div>
-                    <div className={`text-[10px] ${stats.unassignedJobs > 0 ? 'text-yellow-400/60' : 'text-emerald-400/60'}`}>need workers</div>
                   </div>
 
                   {/* Conflicts */}
-                  <div className={`rounded-lg border p-2.5 ${
+                  <div className={`rounded-lg border p-2.5 relative group ${
                     stats.conflicts > 0
                       ? 'bg-red-500/10 border-red-500/30'
                       : 'bg-emerald-500/10 border-emerald-500/30'
                   }`}>
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      {stats.conflicts > 0 ? (
-                        <XCircle className="h-3.5 w-3.5 text-red-400" />
-                      ) : (
-                        <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
-                      )}
-                      <span className={`text-xs ${stats.conflicts > 0 ? 'text-red-400' : 'text-emerald-400'}`}>Conflicts</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        {stats.conflicts > 0 ? (
+                          <XCircle className="h-3.5 w-3.5 text-red-400" />
+                        ) : (
+                          <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                        )}
+                        <span className={`text-xs ${stats.conflicts > 0 ? 'text-red-400' : 'text-emerald-400'}`}>Conflicts</span>
+                      </div>
+                      <div className="relative">
+                        <Info className={`h-3 w-3 cursor-help ${stats.conflicts > 0 ? 'text-red-600' : 'text-emerald-600'}`} />
+                        <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          Overlapping job schedules
+                        </div>
+                      </div>
                     </div>
                     <div className={`text-lg font-bold ${stats.conflicts > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{stats.conflicts}</div>
-                    <div className={`text-[10px] ${stats.conflicts > 0 ? 'text-red-400/60' : 'text-emerald-400/60'}`}>overlaps</div>
                   </div>
 
                   {/* Overbooked */}
-                  <div className={`rounded-lg border p-2.5 ${
+                  <div className={`rounded-lg border p-2.5 relative group ${
                     stats.overbookedWorkers > 0
                       ? 'bg-red-500/10 border-red-500/30'
                       : 'bg-zinc-800/50 border-zinc-700/50'
                   }`}>
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <Users className="h-3.5 w-3.5 text-zinc-400" />
-                      <span className={`text-xs ${stats.overbookedWorkers > 0 ? 'text-red-400' : 'text-zinc-400'}`}>Overbooked</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5 text-zinc-400" />
+                        <span className={`text-xs ${stats.overbookedWorkers > 0 ? 'text-red-400' : 'text-zinc-400'}`}>Overbooked</span>
+                      </div>
+                      <div className="relative">
+                        <Info className={`h-3 w-3 cursor-help ${stats.overbookedWorkers > 0 ? 'text-red-600' : 'text-zinc-600'}`} />
+                        <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          Workers with &gt;90% utilization
+                        </div>
+                      </div>
                     </div>
                     <div className={`text-lg font-bold ${stats.overbookedWorkers > 0 ? 'text-red-400' : 'text-zinc-200'}`}>{stats.overbookedWorkers}</div>
-                    <div className="text-[10px] text-zinc-500">&gt;90%</div>
                   </div>
 
                   {/* Underutilized */}
-                  <div className={`rounded-lg border p-2.5 ${
+                  <div className={`rounded-lg border p-2.5 relative group ${
                     stats.underutilizedWorkers > 0
                       ? 'bg-yellow-500/10 border-yellow-500/30'
                       : 'bg-zinc-800/50 border-zinc-700/50'
                   }`}>
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <TrendingDown className="h-3.5 w-3.5 text-zinc-400" />
-                      <span className={`text-xs ${stats.underutilizedWorkers > 0 ? 'text-yellow-400' : 'text-zinc-400'}`}>Underused</span>
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center gap-1.5">
+                        <TrendingDown className="h-3.5 w-3.5 text-zinc-400" />
+                        <span className={`text-xs ${stats.underutilizedWorkers > 0 ? 'text-yellow-400' : 'text-zinc-400'}`}>Underused</span>
+                      </div>
+                      <div className="relative">
+                        <Info className={`h-3 w-3 cursor-help ${stats.underutilizedWorkers > 0 ? 'text-yellow-600' : 'text-zinc-600'}`} />
+                        <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                          Workers with &lt;40% utilization
+                        </div>
+                      </div>
                     </div>
                     <div className={`text-lg font-bold ${stats.underutilizedWorkers > 0 ? 'text-yellow-400' : 'text-zinc-200'}`}>{stats.underutilizedWorkers}</div>
-                    <div className="text-[10px] text-zinc-500">&lt;40%</div>
                   </div>
                 </div>
               </div>
