@@ -4,8 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
-import { Clock, Lock, DollarSign, TrendingUp, CheckCircle } from 'lucide-react';
-import { format } from 'date-fns';
+import { Clock, Lock, DollarSign, TrendingUp, CheckCircle, Users, AlertTriangle, XCircle, TrendingDown } from 'lucide-react';
+import { format, isSameDay, startOfDay } from 'date-fns';
 import { toast } from 'sonner';
 import AddJobModal from '@/components/provider/AddJobModal';
 import BlockTimeModal from '@/components/provider/BlockTimeModal';
@@ -329,6 +329,113 @@ export default function ProviderCalendar() {
     }
   };
 
+  // Calculate comprehensive daily stats for selected date
+  const getDailyStats = () => {
+    if (viewMode !== 'day') return null;
+
+    // Filter jobs for selected date that are not cancelled
+    const selectedDateJobs = jobs.filter(job => {
+      const jobDate = new Date(job.startTime);
+      return (
+        isSameDay(jobDate, currentDate) &&
+        job.status !== 'cancelled'
+      );
+    });
+
+    // Find next/prev dates with jobs for navigation hints
+    const futureJobs = jobs
+      .filter(j => new Date(j.startTime) > currentDate && j.status !== 'cancelled')
+      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    const pastJobs = jobs
+      .filter(j => new Date(j.startTime) < startOfDay(currentDate) && j.status !== 'cancelled')
+      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
+
+    const nextJobDate = futureJobs[0]?.startTime ? new Date(futureJobs[0].startTime) : null;
+    const prevJobDate = pastJobs[0]?.startTime ? new Date(pastJobs[0].startTime) : null;
+
+    // Calculate total hours scheduled
+    const totalHours = Math.round(selectedDateJobs.reduce((sum, j) => {
+      const start = new Date(j.startTime);
+      const end = new Date(j.endTime);
+      const hours = (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+      return sum + hours;
+    }, 0));
+
+    // Count active workers (workers with jobs today)
+    const activeWorkerIds = new Set(
+      selectedDateJobs
+        .filter(j => j.assignedUserIds && j.assignedUserIds.length > 0)
+        .flatMap(j => j.assignedUserIds || [])
+    );
+    const activeWorkers = activeWorkerIds.size;
+
+    // Total capacity (8 hours per active worker, or total team if no assignments yet)
+    const totalCapacity = Math.max(activeWorkers, teamMembers.length) * 8;
+    const avgCapacity = totalCapacity > 0 ? Math.round((totalHours / totalCapacity) * 100) : 0;
+
+    // Unassigned jobs - ONLY for the selected date
+    const unassignedJobs = selectedDateJobs.filter(
+      j => (!j.assignedUserIds || j.assignedUserIds.length === 0)
+    ).length;
+
+    // Detect conflicts (overlapping jobs for same worker)
+    let conflicts = 0;
+    const workerJobsMap = new Map<string, Job[]>();
+
+    selectedDateJobs.forEach(job => {
+      if (job.assignedUserIds) {
+        job.assignedUserIds.forEach(workerId => {
+          if (!workerJobsMap.has(workerId)) {
+            workerJobsMap.set(workerId, []);
+          }
+          workerJobsMap.get(workerId)!.push(job);
+        });
+      }
+    });
+
+    workerJobsMap.forEach(workerJobs => {
+      const sorted = workerJobs.sort((a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
+      for (let i = 0; i < sorted.length - 1; i++) {
+        const current = sorted[i];
+        const next = sorted[i + 1];
+        if (new Date(current.endTime) > new Date(next.startTime)) {
+          conflicts++;
+        }
+      }
+    });
+
+    // Calculate worker utilization
+    const workerUtilization = new Map<string, number>();
+    workerJobsMap.forEach((workerJobs, workerId) => {
+      const hours = workerJobs.reduce((sum, j) => {
+        const start = new Date(j.startTime);
+        const end = new Date(j.endTime);
+        return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
+      }, 0);
+      workerUtilization.set(workerId, (hours / 8) * 100);
+    });
+
+    const overbookedWorkers = Array.from(workerUtilization.values()).filter(util => util > 90).length;
+    const underutilizedWorkers = Array.from(workerUtilization.values()).filter(util => util < 40).length;
+
+    return {
+      totalJobs: selectedDateJobs.length,
+      totalHours,
+      totalCapacity,
+      avgCapacity,
+      activeWorkers,
+      unassignedJobs,
+      conflicts,
+      overbookedWorkers,
+      underutilizedWorkers,
+      nextJobDate,
+      prevJobDate,
+      totalJobsInSystem: jobs.filter(j => j.status !== 'cancelled').length,
+    };
+  };
+
   // Get monthly stats for the month view
   const getMonthlyStats = () => {
     const monthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
@@ -445,6 +552,149 @@ export default function ProviderCalendar() {
 
           </div>
         </div>
+
+        {/* Daily Stats Section (Day view only) */}
+        {viewMode === 'day' && (() => {
+          const stats = getDailyStats();
+          if (!stats) return null;
+
+          const capacityColor =
+            stats.avgCapacity > 90
+              ? 'text-red-400'
+              : stats.avgCapacity > 70
+                ? 'text-yellow-400'
+                : 'text-emerald-400';
+
+          return (
+            <div className="px-4 py-3">
+              <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-4">
+                {/* Title Row */}
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-zinc-100">
+                      {format(currentDate, 'EEEE, MMMM d, yyyy')}
+                    </h2>
+                    <p className="text-sm text-zinc-400 mt-0.5">
+                      {stats.totalJobs} jobs scheduled across {stats.activeWorkers} workers
+                      {stats.totalJobs === 0 && stats.totalJobsInSystem > 0 && (
+                        <span className="text-zinc-500 ml-2">
+                          ({stats.totalJobsInSystem} total jobs in system)
+                        </span>
+                      )}
+                    </p>
+                    {/* Navigation hints when no jobs for selected date */}
+                    {stats.totalJobs === 0 && (stats.nextJobDate || stats.prevJobDate) && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="text-xs text-zinc-500">Jump to:</span>
+                        {stats.prevJobDate && (
+                          <button
+                            onClick={() => setCurrentDate(stats.prevJobDate!)}
+                            className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-700 transition-colors"
+                          >
+                            Previous: {format(stats.prevJobDate, 'MMM d')}
+                          </button>
+                        )}
+                        {stats.nextJobDate && (
+                          <button
+                            onClick={() => setCurrentDate(stats.nextJobDate!)}
+                            className="text-xs px-2 py-1 bg-emerald-600/20 text-emerald-400 rounded hover:bg-emerald-600/30 transition-colors"
+                          >
+                            Next: {format(stats.nextJobDate, 'MMM d')}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Average capacity badge */}
+                  <div className="text-right">
+                    <div className={`text-3xl font-bold ${capacityColor}`}>
+                      {stats.avgCapacity}%
+                    </div>
+                    <div className="text-xs text-zinc-500">Avg Capacity</div>
+                  </div>
+                </div>
+
+                {/* Stat Cards Row - Compact */}
+                <div className="grid grid-cols-5 gap-3">
+                  {/* Total Hours */}
+                  <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-lg p-2.5">
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <Clock className="h-3.5 w-3.5 text-zinc-400" />
+                      <span className="text-xs text-zinc-400">Hours</span>
+                    </div>
+                    <div className="text-lg font-bold text-zinc-200">{stats.totalHours}h</div>
+                    <div className="text-[10px] text-zinc-500">of {stats.totalCapacity}h</div>
+                  </div>
+
+                  {/* Unassigned */}
+                  <div className={`rounded-lg border p-2.5 ${
+                    stats.unassignedJobs > 0
+                      ? 'bg-yellow-500/10 border-yellow-500/30'
+                      : 'bg-emerald-500/10 border-emerald-500/30'
+                  }`}>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      {stats.unassignedJobs > 0 ? (
+                        <AlertTriangle className="h-3.5 w-3.5 text-yellow-400" />
+                      ) : (
+                        <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                      )}
+                      <span className={`text-xs ${stats.unassignedJobs > 0 ? 'text-yellow-400' : 'text-emerald-400'}`}>Unassigned</span>
+                    </div>
+                    <div className={`text-lg font-bold ${stats.unassignedJobs > 0 ? 'text-yellow-400' : 'text-emerald-400'}`}>{stats.unassignedJobs}</div>
+                    <div className={`text-[10px] ${stats.unassignedJobs > 0 ? 'text-yellow-400/60' : 'text-emerald-400/60'}`}>need workers</div>
+                  </div>
+
+                  {/* Conflicts */}
+                  <div className={`rounded-lg border p-2.5 ${
+                    stats.conflicts > 0
+                      ? 'bg-red-500/10 border-red-500/30'
+                      : 'bg-emerald-500/10 border-emerald-500/30'
+                  }`}>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      {stats.conflicts > 0 ? (
+                        <XCircle className="h-3.5 w-3.5 text-red-400" />
+                      ) : (
+                        <CheckCircle className="h-3.5 w-3.5 text-emerald-400" />
+                      )}
+                      <span className={`text-xs ${stats.conflicts > 0 ? 'text-red-400' : 'text-emerald-400'}`}>Conflicts</span>
+                    </div>
+                    <div className={`text-lg font-bold ${stats.conflicts > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{stats.conflicts}</div>
+                    <div className={`text-[10px] ${stats.conflicts > 0 ? 'text-red-400/60' : 'text-emerald-400/60'}`}>overlaps</div>
+                  </div>
+
+                  {/* Overbooked */}
+                  <div className={`rounded-lg border p-2.5 ${
+                    stats.overbookedWorkers > 0
+                      ? 'bg-red-500/10 border-red-500/30'
+                      : 'bg-zinc-800/50 border-zinc-700/50'
+                  }`}>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <Users className="h-3.5 w-3.5 text-zinc-400" />
+                      <span className={`text-xs ${stats.overbookedWorkers > 0 ? 'text-red-400' : 'text-zinc-400'}`}>Overbooked</span>
+                    </div>
+                    <div className={`text-lg font-bold ${stats.overbookedWorkers > 0 ? 'text-red-400' : 'text-zinc-200'}`}>{stats.overbookedWorkers}</div>
+                    <div className="text-[10px] text-zinc-500">&gt;90%</div>
+                  </div>
+
+                  {/* Underutilized */}
+                  <div className={`rounded-lg border p-2.5 ${
+                    stats.underutilizedWorkers > 0
+                      ? 'bg-yellow-500/10 border-yellow-500/30'
+                      : 'bg-zinc-800/50 border-zinc-700/50'
+                  }`}>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      <TrendingDown className="h-3.5 w-3.5 text-zinc-400" />
+                      <span className={`text-xs ${stats.underutilizedWorkers > 0 ? 'text-yellow-400' : 'text-zinc-400'}`}>Underused</span>
+                    </div>
+                    <div className={`text-lg font-bold ${stats.underutilizedWorkers > 0 ? 'text-yellow-400' : 'text-zinc-200'}`}>{stats.underutilizedWorkers}</div>
+                    <div className="text-[10px] text-zinc-500">&lt;40%</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Calendar Views - Wrapped in DndContext */}
         <DndContext
