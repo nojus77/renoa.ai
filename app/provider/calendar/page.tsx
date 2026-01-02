@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
 import { Clock, Lock, DollarSign, TrendingUp, CheckCircle, Users, AlertTriangle, XCircle, TrendingDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { format, isSameDay, startOfDay } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import { toast } from 'sonner';
 import AddJobModal from '@/components/provider/AddJobModal';
 import BlockTimeModal from '@/components/provider/BlockTimeModal';
@@ -342,17 +342,6 @@ export default function ProviderCalendar() {
       );
     });
 
-    // Find next/prev dates with jobs for navigation hints
-    const futureJobs = jobs
-      .filter(j => new Date(j.startTime) > currentDate && j.status !== 'cancelled')
-      .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-    const pastJobs = jobs
-      .filter(j => new Date(j.startTime) < startOfDay(currentDate) && j.status !== 'cancelled')
-      .sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime());
-
-    const nextJobDate = futureJobs[0]?.startTime ? new Date(futureJobs[0].startTime) : null;
-    const prevJobDate = pastJobs[0]?.startTime ? new Date(pastJobs[0].startTime) : null;
-
     // Calculate total hours scheduled
     const totalHours = Math.round(selectedDateJobs.reduce((sum, j) => {
       const start = new Date(j.startTime);
@@ -430,9 +419,6 @@ export default function ProviderCalendar() {
       conflicts,
       overbookedWorkers,
       underutilizedWorkers,
-      nextJobDate,
-      prevJobDate,
-      totalJobsInSystem: jobs.filter(j => j.status !== 'cancelled').length,
     };
   };
 
@@ -604,36 +590,6 @@ export default function ProviderCalendar() {
                         </button>
                       )}
                     </div>
-                    <p className="text-sm text-zinc-400 mt-0.5">
-                      {stats.totalJobs} jobs scheduled across {stats.activeWorkers} workers
-                      {stats.totalJobs === 0 && stats.totalJobsInSystem > 0 && (
-                        <span className="text-zinc-500 ml-2">
-                          ({stats.totalJobsInSystem} total jobs in system)
-                        </span>
-                      )}
-                    </p>
-                    {/* Navigation hints when no jobs for selected date */}
-                    {stats.totalJobs === 0 && (stats.nextJobDate || stats.prevJobDate) && (
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="text-xs text-zinc-500">Jump to:</span>
-                        {stats.prevJobDate && (
-                          <button
-                            onClick={() => setCurrentDate(stats.prevJobDate!)}
-                            className="text-xs px-2 py-1 bg-zinc-700/50 text-zinc-400 rounded hover:bg-zinc-700 transition-colors"
-                          >
-                            Previous: {format(stats.prevJobDate, 'MMM d')}
-                          </button>
-                        )}
-                        {stats.nextJobDate && (
-                          <button
-                            onClick={() => setCurrentDate(stats.nextJobDate!)}
-                            className="text-xs px-2 py-1 bg-emerald-600/20 text-emerald-400 rounded hover:bg-emerald-600/30 transition-colors"
-                          >
-                            Next: {format(stats.nextJobDate, 'MMM d')}
-                          </button>
-                        )}
-                      </div>
-                    )}
                   </div>
 
                   {/* Average capacity badge */}
