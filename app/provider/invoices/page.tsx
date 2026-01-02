@@ -17,7 +17,8 @@ import {
   Clock,
   TrendingUp,
   MoreVertical,
-  Calendar
+  Calendar,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
@@ -264,7 +265,7 @@ export default function ProviderInvoices() {
 
             {/* Stats Cards - Inline on mobile */}
             <div className="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-4">
-              <Card className="bg-red-500/10 border-red-500/30">
+              <Card className="bg-red-500/10 border-red-500/30 relative group">
                 <CardContent className="pt-3 md:pt-6 pb-3 md:pb-6">
                   <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3">
                     <div className="p-1.5 md:p-2 bg-red-500/20 rounded-lg">
@@ -277,11 +278,17 @@ export default function ProviderInvoices() {
                         {formatCurrency(stats.outstanding)}
                       </p>
                     </div>
+                    <div className="absolute top-3 right-3 hidden md:block">
+                      <Info className="h-3 w-3 text-red-600/50 cursor-help" />
+                      <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                        Total amount waiting to be paid
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-emerald-500/10 border-emerald-500/30">
+              <Card className="bg-emerald-500/10 border-emerald-500/30 relative group">
                 <CardContent className="pt-3 md:pt-6 pb-3 md:pb-6">
                   <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3">
                     <div className="p-1.5 md:p-2 bg-emerald-500/20 rounded-lg">
@@ -294,11 +301,17 @@ export default function ProviderInvoices() {
                         {formatCurrency(stats.paidThisMonth)}
                       </p>
                     </div>
+                    <div className="absolute top-3 right-3 hidden md:block">
+                      <Info className="h-3 w-3 text-emerald-600/50 cursor-help" />
+                      <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                        Payments received this month
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="bg-orange-500/10 border-orange-500/30">
+              <Card className="bg-orange-500/10 border-orange-500/30 relative group">
                 <CardContent className="pt-3 md:pt-6 pb-3 md:pb-6">
                   <div className="flex flex-col md:flex-row items-center gap-2 md:gap-3">
                     <div className="p-1.5 md:p-2 bg-orange-500/20 rounded-lg">
@@ -309,6 +322,12 @@ export default function ProviderInvoices() {
                       <p className="text-base md:text-2xl font-bold text-orange-400">
                         {formatCurrency(stats.overdue)}
                       </p>
+                    </div>
+                    <div className="absolute top-3 right-3 hidden md:block">
+                      <Info className="h-3 w-3 text-orange-600/50 cursor-help" />
+                      <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                        Invoices past their due date
+                      </div>
                     </div>
                   </div>
                 </CardContent>

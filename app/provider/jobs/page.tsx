@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
-import { Search, Plus, Calendar, MapPin, DollarSign, Users, Briefcase, CheckCircle2, Clock, XCircle, MoreVertical, Trash2, Edit, Eye } from 'lucide-react';
+import { Search, Plus, Calendar, MapPin, DollarSign, Users, Briefcase, CheckCircle2, Clock, XCircle, MoreVertical, Trash2, Edit, Eye, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import AddJobModal from '@/components/provider/AddJobModal';
 import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
@@ -179,62 +179,92 @@ export default function ProviderJobs() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-5 gap-2 md:gap-4 mb-3 md:mb-6">
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4 relative group">
                 <div className="flex items-center gap-2 md:gap-3">
                   <div className="p-1.5 md:p-2 bg-emerald-500/20 rounded-lg flex-shrink-0">
                     <Briefcase className="h-4 w-4 md:h-5 md:w-5 text-emerald-400" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-lg md:text-2xl font-bold text-zinc-100">{totalJobs}</p>
                     <p className="text-xs text-zinc-500">Total Jobs</p>
+                  </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      All jobs in the system
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4 relative group">
                 <div className="flex items-center gap-2 md:gap-3">
                   <div className="p-1.5 md:p-2 bg-blue-500/20 rounded-lg flex-shrink-0">
                     <Clock className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-lg md:text-2xl font-bold text-zinc-100">{scheduledJobs}</p>
                     <p className="text-xs text-zinc-500">Scheduled</p>
+                  </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Jobs waiting to be started
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4 relative group">
                 <div className="flex items-center gap-2 md:gap-3">
                   <div className="p-1.5 md:p-2 bg-yellow-500/20 rounded-lg flex-shrink-0">
                     <Clock className="h-4 w-4 md:h-5 md:w-5 text-yellow-400" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-lg md:text-2xl font-bold text-zinc-100">{inProgressJobs}</p>
                     <p className="text-xs text-zinc-500">In Progress</p>
+                  </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Jobs currently being worked on
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4 relative group">
                 <div className="flex items-center gap-2 md:gap-3">
                   <div className="p-1.5 md:p-2 bg-emerald-500/20 rounded-lg flex-shrink-0">
                     <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-emerald-400" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-lg md:text-2xl font-bold text-zinc-100">{completedJobs}</p>
                     <p className="text-xs text-zinc-500">Completed</p>
+                  </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Successfully finished jobs
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4 relative group">
                 <div className="flex items-center gap-2 md:gap-3">
                   <div className="p-1.5 md:p-2 bg-purple-500/20 rounded-lg flex-shrink-0">
                     <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-purple-400" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-lg md:text-2xl font-bold text-zinc-100">${Math.round(totalRevenue)}</p>
                     <p className="text-xs text-zinc-500">Revenue</p>
+                  </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Total from completed jobs
+                    </div>
                   </div>
                 </div>
               </div>
