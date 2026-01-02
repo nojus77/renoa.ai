@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
-import { Search, Plus, Phone, Mail, MapPin, Star, MessageCircle, Users, TrendingUp, Award, Briefcase, Calendar, Trash2, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Phone, Mail, MapPin, Star, MessageCircle, Users, TrendingUp, Award, Briefcase, Calendar, Trash2, AlertTriangle, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import AddCustomerModal from '@/components/provider/AddCustomerModal';
 import { PageLoadingSkeleton } from '@/components/ui/loading-skeleton';
@@ -186,46 +186,64 @@ export default function ProviderCustomers() {
 
             {/* Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4 mb-3 md:mb-6">
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4 relative group">
                 <div className="flex items-center gap-2 md:gap-3">
                   <div className="p-1.5 md:p-2 bg-emerald-500/20 rounded-lg flex-shrink-0">
                     <Users className="h-4 w-4 md:h-5 md:w-5 text-emerald-400" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-lg md:text-2xl font-bold text-zinc-100">{totalCustomers}</p>
                     <p className="text-xs text-zinc-500 hidden md:block">Total Customers</p>
                     <p className="text-xs text-zinc-500 md:hidden">Total</p>
                   </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      All customers in your database
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4 relative group">
                 <div className="flex items-center gap-2 md:gap-3">
                   <div className="p-1.5 md:p-2 bg-blue-500/20 rounded-lg flex-shrink-0">
                     <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-lg md:text-2xl font-bold text-zinc-100">{activeThisMonth}</p>
                     <p className="text-xs text-zinc-500 hidden md:block">Active This Month</p>
                     <p className="text-xs text-zinc-500 md:hidden">Active</p>
                   </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Customers with jobs this month
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4 relative group">
                 <div className="flex items-center gap-2 md:gap-3">
                   <div className="p-1.5 md:p-2 bg-purple-500/20 rounded-lg flex-shrink-0">
                     <Briefcase className="h-4 w-4 md:h-5 md:w-5 text-purple-400" />
                   </div>
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <p className="text-lg md:text-2xl font-bold text-zinc-100">${Math.round(averageJobValue)}</p>
                     <p className="text-xs text-zinc-500 hidden md:block">Avg Job Value</p>
                     <p className="text-xs text-zinc-500 md:hidden">Avg Value</p>
                   </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Average value per customer job
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4">
+              <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-2.5 md:p-4 relative group">
                 <div className="flex items-center gap-2 md:gap-3">
                   <div className="p-1.5 md:p-2 bg-orange-500/20 rounded-lg flex-shrink-0">
                     <Award className="h-4 w-4 md:h-5 md:w-5 text-orange-400" />
@@ -239,6 +257,12 @@ export default function ProviderCustomers() {
                       <span className="md:hidden">Top</span>
                       {topCustomer ? ` - $${Math.round(topCustomer.totalSpent)}` : ''}
                     </p>
+                  </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Highest spending customer
+                    </div>
                   </div>
                 </div>
               </div>

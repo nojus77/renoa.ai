@@ -54,6 +54,7 @@ import {
   CalendarX,
   Hash,
   Activity,
+  Info,
 } from 'lucide-react';
 
 interface Worker {
@@ -873,26 +874,50 @@ export default function ProviderHome() {
       component: (
         <div className="h-full flex flex-col gap-3 p-1">
           {/* Number of Jobs */}
-          <div className="flex-1 min-h-[90px] bg-[#18181b] rounded-2xl px-5 py-4 border border-[#27272a] flex flex-col justify-center">
+          <div className="flex-1 min-h-[90px] bg-[#18181b] rounded-2xl px-5 py-4 border border-[#27272a] flex flex-col justify-center relative group">
             <div className="flex items-center justify-between mb-2">
               <div className="text-3xl font-bold text-white">{numberOfJobs}</div>
-              <Hash className="h-5 w-5 text-[#52525b]" />
+              <div className="flex items-center gap-2">
+                <Hash className="h-5 w-5 text-[#52525b]" />
+                <div className="relative">
+                  <Info className="h-3.5 w-3.5 text-zinc-600 cursor-help" />
+                  <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                    Jobs completed in selected period
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="text-sm text-[#71717a]">Jobs Completed</div>
           </div>
           {/* Average Job Size */}
-          <div className="flex-1 min-h-[90px] bg-[#18181b] rounded-2xl px-5 py-4 border border-[#27272a] flex flex-col justify-center">
+          <div className="flex-1 min-h-[90px] bg-[#18181b] rounded-2xl px-5 py-4 border border-[#27272a] flex flex-col justify-center relative group">
             <div className="flex items-center justify-between mb-2">
               <div className="text-3xl font-bold text-white">{formatCurrency(averageJobSize)}</div>
-              <TrendingUp className="h-5 w-5 text-[#52525b]" />
+              <div className="flex items-center gap-2">
+                <TrendingUp className="h-5 w-5 text-[#52525b]" />
+                <div className="relative">
+                  <Info className="h-3.5 w-3.5 text-zinc-600 cursor-help" />
+                  <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                    Average revenue per job
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="text-sm text-[#71717a]">Average Job Size</div>
           </div>
           {/* Total Job Value */}
-          <div className="flex-1 min-h-[90px] bg-[#18181b] rounded-2xl px-5 py-4 border border-[#27272a] flex flex-col justify-center">
+          <div className="flex-1 min-h-[90px] bg-[#18181b] rounded-2xl px-5 py-4 border border-[#27272a] flex flex-col justify-center relative group">
             <div className="flex items-center justify-between mb-2">
               <div className="text-3xl font-bold text-white">{formatCurrency(totalJobValue)}</div>
-              <DollarSign className="h-5 w-5 text-[#52525b]" />
+              <div className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5 text-[#52525b]" />
+                <div className="relative">
+                  <Info className="h-3.5 w-3.5 text-zinc-600 cursor-help" />
+                  <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                    Total revenue from all jobs
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="text-sm text-[#71717a]">Total Revenue</div>
           </div>

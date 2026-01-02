@@ -21,6 +21,7 @@ import {
   Zap,
   Star,
   RefreshCw,
+  Info,
 } from 'lucide-react';
 import {
   LineChart,
@@ -227,17 +228,25 @@ export default function ProviderAnalytics() {
           {/* KPI Cards - Mobile: 2x2 grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 md:gap-4">
             {/* Total Revenue */}
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 md:p-6">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 md:p-6 relative group">
               <div className="flex items-center justify-between mb-2 md:mb-4">
                 <div className="p-1.5 md:p-2 bg-emerald-500/10 rounded-lg">
                   <DollarSign className="h-4 w-4 md:h-5 md:w-5 text-emerald-400" />
                 </div>
-                {kpis.revenueChange !== 0 && (
-                  <div className={`flex items-center gap-0.5 md:gap-1 text-xs font-medium ${kpis.revenueChange > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {kpis.revenueChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    <span className="hidden md:inline">{formatPercent(Math.abs(kpis.revenueChange))}</span>
+                <div className="flex items-center gap-2">
+                  {kpis.revenueChange !== 0 && (
+                    <div className={`flex items-center gap-0.5 md:gap-1 text-xs font-medium ${kpis.revenueChange > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {kpis.revenueChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      <span className="hidden md:inline">{formatPercent(Math.abs(kpis.revenueChange))}</span>
+                    </div>
+                  )}
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Total revenue from completed jobs in period
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
               <div className="text-xl md:text-3xl font-bold text-zinc-100 mb-0.5 md:mb-1">
                 {formatCurrency(kpis.totalRevenue)}
@@ -246,17 +255,25 @@ export default function ProviderAnalytics() {
             </div>
 
             {/* Jobs Completed */}
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 md:p-6">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 md:p-6 relative group">
               <div className="flex items-center justify-between mb-2 md:mb-4">
                 <div className="p-1.5 md:p-2 bg-blue-500/10 rounded-lg">
                   <Briefcase className="h-4 w-4 md:h-5 md:w-5 text-blue-400" />
                 </div>
-                {kpis.jobsChange !== 0 && (
-                  <div className={`flex items-center gap-0.5 md:gap-1 text-xs font-medium ${kpis.jobsChange > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {kpis.jobsChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    <span className="hidden md:inline">{formatPercent(Math.abs(kpis.jobsChange))}</span>
+                <div className="flex items-center gap-2">
+                  {kpis.jobsChange !== 0 && (
+                    <div className={`flex items-center gap-0.5 md:gap-1 text-xs font-medium ${kpis.jobsChange > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {kpis.jobsChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      <span className="hidden md:inline">{formatPercent(Math.abs(kpis.jobsChange))}</span>
+                    </div>
+                  )}
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Number of jobs marked complete
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
               <div className="text-xl md:text-3xl font-bold text-zinc-100 mb-0.5 md:mb-1">
                 {kpis.jobsCompleted}
@@ -265,17 +282,25 @@ export default function ProviderAnalytics() {
             </div>
 
             {/* Average Job Value */}
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 md:p-6">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 md:p-6 relative group">
               <div className="flex items-center justify-between mb-2 md:mb-4">
                 <div className="p-1.5 md:p-2 bg-purple-500/10 rounded-lg">
                   <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-purple-400" />
                 </div>
-                {kpis.avgJobValueChange !== 0 && (
-                  <div className={`flex items-center gap-0.5 md:gap-1 text-xs font-medium ${kpis.avgJobValueChange > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {kpis.avgJobValueChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    <span className="hidden md:inline">{formatPercent(Math.abs(kpis.avgJobValueChange))}</span>
+                <div className="flex items-center gap-2">
+                  {kpis.avgJobValueChange !== 0 && (
+                    <div className={`flex items-center gap-0.5 md:gap-1 text-xs font-medium ${kpis.avgJobValueChange > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {kpis.avgJobValueChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      <span className="hidden md:inline">{formatPercent(Math.abs(kpis.avgJobValueChange))}</span>
+                    </div>
+                  )}
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Average revenue per completed job
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
               <div className="text-xl md:text-3xl font-bold text-zinc-100 mb-0.5 md:mb-1">
                 {formatCurrency(kpis.avgJobValue)}
@@ -284,17 +309,25 @@ export default function ProviderAnalytics() {
             </div>
 
             {/* New Customers */}
-            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 md:p-6">
+            <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-3 md:p-6 relative group">
               <div className="flex items-center justify-between mb-2 md:mb-4">
                 <div className="p-1.5 md:p-2 bg-orange-500/10 rounded-lg">
                   <Users className="h-4 w-4 md:h-5 md:w-5 text-orange-400" />
                 </div>
-                {kpis.newCustomersChange !== 0 && (
-                  <div className={`flex items-center gap-0.5 md:gap-1 text-xs font-medium ${kpis.newCustomersChange > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {kpis.newCustomersChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-                    <span className="hidden md:inline">{formatPercent(Math.abs(kpis.newCustomersChange))}</span>
+                <div className="flex items-center gap-2">
+                  {kpis.newCustomersChange !== 0 && (
+                    <div className={`flex items-center gap-0.5 md:gap-1 text-xs font-medium ${kpis.newCustomersChange > 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                      {kpis.newCustomersChange > 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                      <span className="hidden md:inline">{formatPercent(Math.abs(kpis.newCustomersChange))}</span>
+                    </div>
+                  )}
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      New customers acquired in period
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
               <div className="text-xl md:text-3xl font-bold text-zinc-100 mb-0.5 md:mb-1">
                 {kpis.newCustomers}
@@ -480,58 +513,82 @@ export default function ProviderAnalytics() {
               Performance Metrics
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
-              <div className="text-center">
+              <div className="text-center relative group">
                 <div className="text-2xl md:text-4xl font-bold text-emerald-400 mb-1 md:mb-2">
                   {performanceMetrics.conversionRate}%
                 </div>
                 <div className="flex items-center justify-center gap-1.5 md:gap-2 mb-1">
                   <Target className="h-3.5 w-3.5 md:h-4 md:w-4 text-zinc-500" />
                   <p className="text-xs md:text-sm font-medium text-zinc-300">Job Completion Rate</p>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      % of scheduled jobs completed successfully
+                    </div>
+                  </div>
                 </div>
                 <div className="inline-flex items-center px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs">
-                  🟢 Excellent
+                  Excellent
                 </div>
               </div>
 
-              <div className="text-center">
+              <div className="text-center relative group">
                 <div className="text-2xl md:text-4xl font-bold text-blue-400 mb-1 md:mb-2">
                   {performanceMetrics.repeatCustomerRate}%
                 </div>
                 <div className="flex items-center justify-center gap-1.5 md:gap-2 mb-1">
                   <Users className="h-3.5 w-3.5 md:h-4 md:w-4 text-zinc-500" />
                   <p className="text-xs md:text-sm font-medium text-zinc-300">Repeat Customer Rate</p>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      % of customers who booked again
+                    </div>
+                  </div>
                 </div>
                 <div className="inline-flex items-center px-2 py-1 rounded-full bg-blue-500/20 text-blue-400 text-xs">
                   Good
                 </div>
               </div>
 
-              <div className="text-center">
+              <div className="text-center relative group">
                 <div className="text-2xl md:text-4xl font-bold text-purple-400 mb-1 md:mb-2">
                   {performanceMetrics.avgJobDuration}h
                 </div>
                 <div className="flex items-center justify-center gap-1.5 md:gap-2 mb-1">
                   <Clock className="h-3.5 w-3.5 md:h-4 md:w-4 text-zinc-500" />
                   <p className="text-xs md:text-sm font-medium text-zinc-300">Avg Job Duration</p>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Average time to complete a job
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mt-4 md:mt-6 pt-4 md:pt-6 border-t border-zinc-800">
-              <div className="text-center">
+              <div className="text-center relative group">
                 <div className="text-2xl md:text-3xl font-bold text-zinc-100 mb-1 md:mb-2">
                   {performanceMetrics.onTimeRate}%
                 </div>
                 <div className="flex items-center justify-center gap-1.5 md:gap-2">
                   <Calendar className="h-3.5 w-3.5 md:h-4 md:w-4 text-zinc-500" />
                   <p className="text-xs md:text-sm font-medium text-zinc-300">On-Time Completion</p>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      % of jobs finished within scheduled time
+                    </div>
+                  </div>
                 </div>
                 <div className="inline-flex items-center px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-400 text-xs mt-2">
-                  🟢 Great
+                  Great
                 </div>
               </div>
 
-              <div className="text-center">
+              <div className="text-center relative group">
                 <div className="text-2xl md:text-3xl font-bold text-zinc-100 mb-1 md:mb-2 flex items-center justify-center gap-1">
                   {performanceMetrics.customerSatisfaction}
                   <Star className="h-4 w-4 md:h-5 md:w-5 text-yellow-400 fill-yellow-400" />
@@ -539,9 +596,12 @@ export default function ProviderAnalytics() {
                 <div className="flex items-center justify-center gap-1.5 md:gap-2">
                   <Award className="h-3.5 w-3.5 md:h-4 md:w-4 text-zinc-500" />
                   <p className="text-xs md:text-sm font-medium text-zinc-300">Customer Satisfaction</p>
-                </div>
-                <div className="inline-flex items-center px-2 py-1 rounded-full bg-yellow-500/20 text-yellow-400 text-xs mt-2">
-                  ⭐⭐⭐⭐⭐
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Average rating from customer reviews
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
-import { CreditCard, Users, Download, AlertCircle, CheckCircle, Calendar, DollarSign } from 'lucide-react';
+import { CreditCard, Users, Download, AlertCircle, CheckCircle, Calendar, DollarSign, Info } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface SeatUsage {
@@ -162,10 +162,18 @@ export default function BillingPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <DollarSign className="h-4 w-4 text-emerald-400" />
-                  <p className="text-xs text-zinc-400">Price per Seat</p>
+              <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800 relative group">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-emerald-400" />
+                    <p className="text-xs text-zinc-400">Price per Seat</p>
+                  </div>
+                  <div className="relative">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Monthly cost per team member
+                    </div>
+                  </div>
                 </div>
                 <p className="text-2xl font-bold text-zinc-100">
                   {seatUsage ? formatCurrency(seatUsage.pricePerSeat) : '$0.00'}
@@ -173,10 +181,18 @@ export default function BillingPage() {
                 </p>
               </div>
 
-              <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Users className="h-4 w-4 text-blue-400" />
-                  <p className="text-xs text-zinc-400">Active Seats</p>
+              <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800 relative group">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-blue-400" />
+                    <p className="text-xs text-zinc-400">Active Seats</p>
+                  </div>
+                  <div className="relative">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Team members using paid seats
+                    </div>
+                  </div>
                 </div>
                 <p className="text-2xl font-bold text-zinc-100">
                   {seatUsage?.activeSeats}
@@ -184,10 +200,18 @@ export default function BillingPage() {
                 </p>
               </div>
 
-              <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800">
-                <div className="flex items-center gap-2 mb-2">
-                  <Calendar className="h-4 w-4 text-purple-400" />
-                  <p className="text-xs text-zinc-400">Next Billing</p>
+              <div className="bg-zinc-900/50 rounded-lg p-4 border border-zinc-800 relative group">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-purple-400" />
+                    <p className="text-xs text-zinc-400">Next Billing</p>
+                  </div>
+                  <div className="relative">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Date of next subscription charge
+                    </div>
+                  </div>
                 </div>
                 <p className="text-sm font-semibold text-zinc-100">
                   {formatDate(seatUsage?.currentPeriodEnd || null)}

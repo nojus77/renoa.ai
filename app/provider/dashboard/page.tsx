@@ -34,7 +34,8 @@ import {
   ArrowRight,
   Activity,
   Star,
-  Zap
+  Zap,
+  Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Link from 'next/link';
@@ -467,41 +468,63 @@ export default function ProviderDashboard() {
         <div className="max-w-[1600px] mx-auto px-3 md:px-6 py-4 md:py-8">
           {/* COMPACT STATS - PRIORITY #1 - Key metrics */}
           <div className="grid grid-cols-4 gap-1.5 md:gap-3 mb-4">
-            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors">
+            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors group relative">
               <CardHeader className="pb-1 px-2 pt-2 md:pb-2 md:px-4 md:pt-4">
-                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center gap-1">
-                  <Target className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
-                  <span className="truncate">Leads</span>
+                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <Target className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                    <span className="truncate">Leads</span>
+                  </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Active leads awaiting response or follow-up
+                    </div>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pb-2 px-2 pt-0 md:pb-4 md:px-4">
                 <div className="text-xl md:text-3xl font-bold text-blue-400">
                   {leads.filter(l => ['new', 'contacted', 'replied', 'matched'].includes(l.status)).length}
                 </div>
-                <p className="text-[9px] md:text-xs text-zinc-500 mt-0.5 md:mt-1 truncate">New</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors">
+            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors group relative">
               <CardHeader className="pb-1 px-2 pt-2 md:pb-2 md:px-4 md:pt-4">
-                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center gap-1">
-                  <Clock className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
-                  <span className="truncate">Jobs</span>
+                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                    <span className="truncate">Jobs</span>
+                  </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Jobs scheduled for today
+                    </div>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pb-2 px-2 pt-0 md:pb-4 md:px-4">
                 <div className="text-xl md:text-3xl font-bold text-amber-400">
                   {todaysJobs.length}
                 </div>
-                <p className="text-[9px] md:text-xs text-zinc-500 mt-0.5 md:mt-1 truncate">Today</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors">
+            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors group relative">
               <CardHeader className="pb-1 px-2 pt-2 md:pb-2 md:px-4 md:pt-4">
-                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center gap-1">
-                  <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
-                  <span className="truncate">Conv.</span>
+                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                    <span className="truncate">Conv.</span>
+                  </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Leads converted to paying customers
+                    </div>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pb-2 px-2 pt-0 md:pb-4 md:px-4">
@@ -514,11 +537,19 @@ export default function ProviderDashboard() {
               </CardContent>
             </Card>
 
-            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors">
+            <Card className="bg-zinc-900/50 border-zinc-800 hover:bg-zinc-900/70 transition-colors group relative">
               <CardHeader className="pb-1 px-2 pt-2 md:pb-2 md:px-4 md:pt-4">
-                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center gap-1">
-                  <Award className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
-                  <span className="truncate">Rate</span>
+                <CardTitle className="text-[10px] md:text-xs text-zinc-400 flex items-center justify-between">
+                  <div className="flex items-center gap-1">
+                    <Award className="h-3 w-3 md:h-3.5 md:w-3.5 flex-shrink-0" />
+                    <span className="truncate">Rate</span>
+                  </div>
+                  <div className="relative hidden md:block">
+                    <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                    <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                      Percentage of leads converted to jobs
+                    </div>
+                  </div>
                 </CardTitle>
               </CardHeader>
               <CardContent className="pb-2 px-2 pt-0 md:pb-4 md:px-4">
@@ -533,7 +564,7 @@ export default function ProviderDashboard() {
                   )}
                 </div>
                 <p className="text-[9px] md:text-xs text-zinc-500 mt-0.5 md:mt-1 truncate">
-                  {rateTrend === 'up' ? '↑' : '↓'} {Math.abs(conversionRate - lastWeekRate)}%
+                  vs last week
                 </p>
               </CardContent>
             </Card>
@@ -816,48 +847,76 @@ export default function ProviderDashboard() {
             <Card className="bg-zinc-900/50 border-zinc-800 mt-2 border-t-0 rounded-t-none">
               <CardContent className="pt-4">
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="h-4 w-4 text-emerald-400" />
-                      <p className="text-xs font-medium text-zinc-400">This Week</p>
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700 relative group">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-emerald-400" />
+                        <p className="text-xs font-medium text-zinc-400">This Week</p>
+                      </div>
+                      <div className="relative">
+                        <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                        <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                          Revenue from completed jobs this week
+                        </div>
+                      </div>
                     </div>
                     <div className="text-xl font-bold text-emerald-400">
                       {formatCurrency(weeklyEarnings)}
                     </div>
-                    <p className="text-xs text-zinc-500 mt-1">+18% from last week</p>
                   </div>
 
-                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <DollarSign className="h-4 w-4 text-blue-400" />
-                      <p className="text-xs font-medium text-zinc-400">This Month</p>
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700 relative group">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <DollarSign className="h-4 w-4 text-blue-400" />
+                        <p className="text-xs font-medium text-zinc-400">This Month</p>
+                      </div>
+                      <div className="relative">
+                        <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                        <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                          Total revenue for current month
+                        </div>
+                      </div>
                     </div>
                     <div className="text-xl font-bold text-zinc-100">
                       {formatCurrency(monthlyEarnings)}
                     </div>
-                    <p className="text-xs text-zinc-500 mt-1">On track for ${Math.floor(monthlyEarnings * 1.5)}</p>
                   </div>
 
-                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <BarChart3 className="h-4 w-4 text-purple-400" />
-                      <p className="text-xs font-medium text-zinc-400">Avg Job Value</p>
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700 relative group">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <BarChart3 className="h-4 w-4 text-purple-400" />
+                        <p className="text-xs font-medium text-zinc-400">Avg Job</p>
+                      </div>
+                      <div className="relative">
+                        <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                        <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                          Average value per completed job
+                        </div>
+                      </div>
                     </div>
                     <div className="text-xl font-bold text-zinc-100">
                       {formatCurrency(avgJobValue)}
                     </div>
-                    <p className="text-xs text-zinc-500 mt-1">Across {convertedCount} jobs</p>
                   </div>
 
-                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Zap className="h-4 w-4 text-yellow-400" />
-                      <p className="text-xs font-medium text-zinc-400">Response Time</p>
+                  <div className="bg-zinc-800/50 rounded-lg p-3 border border-zinc-700 relative group">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-yellow-400" />
+                        <p className="text-xs font-medium text-zinc-400">Response</p>
+                      </div>
+                      <div className="relative">
+                        <Info className="h-3 w-3 text-zinc-600 cursor-help" />
+                        <div className="absolute bottom-full right-0 mb-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-[10px] text-zinc-300 whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-20">
+                          Average time to respond to leads
+                        </div>
+                      </div>
                     </div>
                     <div className="text-xl font-bold text-zinc-100">
                       {avgResponseTime} min
                     </div>
-                    <p className="text-xs text-emerald-400 mt-1">↓ 2 min faster</p>
                   </div>
                 </div>
               </CardContent>
