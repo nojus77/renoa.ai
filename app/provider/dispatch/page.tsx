@@ -143,6 +143,7 @@ export default function DispatchPage() {
   const [unassignedJobs, setUnassignedJobs] = useState<Job[]>([]);
   const [workerRoutes, setWorkerRoutes] = useState<WorkerRoute[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
   const [selectedDate, setSelectedDate] = useState<Date>(startOfDay(new Date()));
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [selectedWorker, setSelectedWorker] = useState<string | null>(null);
@@ -155,14 +156,6 @@ export default function DispatchPage() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [providerName, setProviderName] = useState<string>('');
   const [officeLocation, setOfficeLocation] = useState<OfficeLocation | null>(null);
-  const [autoAssign, setAutoAssign] = useState(() => {
-    // Load from localStorage on mount (client-side only)
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('dispatchAutoAssign');
-      return saved !== null ? saved === 'true' : true;
-    }
-    return true;
-  });
   const [optimizationResult, setOptimizationResult] = useState<{
     workers: Array<{
       id: string;
@@ -265,11 +258,15 @@ export default function DispatchPage() {
     setProviderName(name || 'Provider Portal');
   }, [router]);
 
-  // Fetch dispatch data
-  const fetchDispatchData = useCallback(async () => {
+  // Fetch dispatch data - supports silent background refresh
+  const fetchDispatchData = useCallback(async (silent = false) => {
     if (!providerId) return;
 
-    setLoading(true);
+    // Only show loading spinner on initial load, not background refreshes
+    if (!silent) {
+      setLoading(true);
+    }
+
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const res = await fetch(`/api/provider/dispatch?providerId=${providerId}&date=${dateStr}`);
@@ -286,36 +283,45 @@ export default function DispatchPage() {
       setNextJobDate(data.nextJobDate || null);
       setPrevJobDate(data.prevJobDate || null);
 
-      // Center on: first job with coordinates, or office location, or default
-      const allJobs = [...(data.jobs || []), ...(data.unassignedJobs || [])];
-      const firstWithCoords = allJobs.find((j: Job) => j.latitude && j.longitude);
-      if (firstWithCoords) {
-        setCenter({ lat: firstWithCoords.latitude!, lng: firstWithCoords.longitude! });
-      } else if (data.office?.latitude && data.office?.longitude) {
-        setCenter({ lat: data.office.latitude, lng: data.office.longitude });
+      // Only center map on initial load, not on background refreshes
+      // This preserves user's zoom/pan position during silent updates
+      if (!initialLoadComplete) {
+        const allJobs = [...(data.jobs || []), ...(data.unassignedJobs || [])];
+        const firstWithCoords = allJobs.find((j: Job) => j.latitude && j.longitude);
+        if (firstWithCoords) {
+          setCenter({ lat: firstWithCoords.latitude!, lng: firstWithCoords.longitude! });
+        } else if (data.office?.latitude && data.office?.longitude) {
+          setCenter({ lat: data.office.latitude, lng: data.office.longitude });
+        }
+        setInitialLoadComplete(true);
       }
     } catch (error) {
       console.error('Failed to fetch dispatch data:', error);
-      setNotification({ message: 'Failed to load dispatch data', type: 'error' });
+      // Only show error notification on non-silent fetches
+      if (!silent) {
+        setNotification({ message: 'Failed to load dispatch data', type: 'error' });
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
-  }, [providerId, selectedDate]);
+  }, [providerId, selectedDate, initialLoadComplete]);
 
   useEffect(() => {
     fetchDispatchData();
   }, [fetchDispatchData]);
 
-  // Auto-refresh every 30 seconds
+  // Auto-refresh every 30 seconds - silent background updates
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!optimizing && !loading) {
-        fetchDispatchData();
+      if (!optimizing) {
+        fetchDispatchData(true); // Silent refresh - no loading state, preserves map position
       }
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [fetchDispatchData, optimizing, loading]);
+  }, [fetchDispatchData, optimizing]);
 
   // Filter toggle helper
   const toggleStatusFilter = (status: string) => {
@@ -436,7 +442,7 @@ export default function DispatchPage() {
           providerId,
           date: dateStr,
           workerIds,
-          autoAssign, // Pass the auto-assign setting
+          autoAssign: true, // Always auto-assign unassigned jobs
         }),
       });
 
@@ -451,7 +457,7 @@ export default function DispatchPage() {
 
       // Build success message
       let message = `Routes optimized! Saved ${data.totalSavedMiles?.toFixed(1) || 0} miles`;
-      if (autoAssign && data.summary?.unassignedCount > 0) {
+      if (data.summary?.unassignedCount > 0) {
         message += ` (${data.summary.unassignedCount} jobs need manual assignment)`;
       }
 
@@ -497,8 +503,9 @@ export default function DispatchPage() {
     }
   };
 
-  // Date navigation
+  // Date navigation - reset initial load to re-center map for new date
   const goToDate = (days: number) => {
+    setInitialLoadComplete(false);
     setSelectedDate(prev => addDays(prev, days));
   };
 
@@ -549,7 +556,10 @@ export default function DispatchPage() {
                   <ChevronDown className="w-4 h-4 rotate-90" />
                 </Button>
                 <button
-                  onClick={() => setSelectedDate(startOfDay(new Date()))}
+                  onClick={() => {
+                    setInitialLoadComplete(false);
+                    setSelectedDate(startOfDay(new Date()));
+                  }}
                   className={`px-3 py-1.5 text-sm font-medium rounded transition-colors ${
                     isToday(selectedDate)
                       ? 'bg-primary text-primary-foreground'
@@ -572,36 +582,12 @@ export default function DispatchPage() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={fetchDispatchData}
+                onClick={() => fetchDispatchData()}
                 disabled={loading}
               >
                 <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-
-              {/* Auto-assign toggle */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => {
-                    const newValue = !autoAssign;
-                    setAutoAssign(newValue);
-                    localStorage.setItem('dispatchAutoAssign', String(newValue));
-                  }}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${
-                    autoAssign ? 'bg-primary' : 'bg-muted'
-                  }`}
-                  title={autoAssign ? 'Auto-assign enabled' : 'Auto-assign disabled'}
-                >
-                  <span
-                    className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform ${
-                      autoAssign ? 'translate-x-5' : 'translate-x-0.5'
-                    }`}
-                  />
-                </button>
-                <span className="text-xs text-muted-foreground">
-                  Auto-assign
-                </span>
-              </div>
 
               {/* Optimize All */}
               <Button
@@ -844,6 +830,7 @@ export default function DispatchPage() {
                 center={center}
                 zoom={12}
                 onLoad={setMapRef}
+                onClick={() => setSelectedJob(null)}
                 options={{
                   styles: isDarkMode ? darkMapStyles : lightMapStyles,
                   disableDefaultUI: false,
@@ -950,8 +937,15 @@ export default function DispatchPage() {
                     position={{ lat: selectedJob.latitude, lng: selectedJob.longitude }}
                     onCloseClick={() => setSelectedJob(null)}
                   >
-                    <div className="p-2 min-w-[220px] max-w-[300px]">
-                      <div className="flex items-center gap-2 mb-2">
+                    <div className="p-2 min-w-[220px] max-w-[300px] relative">
+                      <button
+                        onClick={() => setSelectedJob(null)}
+                        className="absolute -top-1 -right-1 p-1 hover:bg-gray-100 rounded-full transition-colors"
+                        aria-label="Close"
+                      >
+                        <XCircle className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+                      </button>
+                      <div className="flex items-center gap-2 mb-2 pr-6">
                         {getAppointmentTypeIcon(selectedJob.appointmentType)}
                         <p className="font-semibold text-gray-900">{selectedJob.serviceType}</p>
                       </div>
@@ -1025,7 +1019,10 @@ export default function DispatchPage() {
                   <div className="flex flex-wrap gap-2 justify-center border-t border-border pt-3">
                     {nextJobDate && (
                       <button
-                        onClick={() => setSelectedDate(new Date(nextJobDate))}
+                        onClick={() => {
+                          setInitialLoadComplete(false);
+                          setSelectedDate(new Date(nextJobDate));
+                        }}
                         className="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-colors flex items-center gap-1"
                       >
                         Next job: {format(new Date(nextJobDate), 'MMM d')}
@@ -1034,7 +1031,10 @@ export default function DispatchPage() {
                     )}
                     {prevJobDate && (
                       <button
-                        onClick={() => setSelectedDate(new Date(prevJobDate))}
+                        onClick={() => {
+                          setInitialLoadComplete(false);
+                          setSelectedDate(new Date(prevJobDate));
+                        }}
                         className="px-3 py-1.5 text-xs font-medium bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors flex items-center gap-1"
                       >
                         <ChevronLeft className="w-3 h-3" />
