@@ -90,7 +90,11 @@ export default function BlockTimeModal({
         const res = await fetch(`/api/provider/team?providerId=${providerId}`);
         if (res.ok) {
           const data = await res.json();
-          setTeamMembers(data.teamMembers || []);
+          // Filter to only show active workers (field workers)
+          const activeWorkers = (data.users || []).filter(
+            (u: TeamMember & { status?: string }) => u.status === 'active'
+          );
+          setTeamMembers(activeWorkers);
         }
       } catch (error) {
         console.error('Error fetching team members:', error);
