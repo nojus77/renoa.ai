@@ -498,98 +498,93 @@ export default function WeeklyTeamCalendar({
         </div>
       )}
 
-      {/* Navigation Header */}
-      <div className="border-b border-zinc-800 bg-zinc-900/50 px-4 py-2">
-        <div className="flex items-center justify-between gap-3 flex-wrap">
-          {/* Week Navigation */}
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={goToPreviousWeek}
-              className="border-zinc-700 hover:bg-zinc-800"
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+      {/* Compact Navigation Header */}
+      <div className="px-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={goToPreviousWeek}
+            className="h-8 w-8 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
 
-            <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  className="min-w-[280px] justify-start text-left font-medium border-zinc-700 hover:bg-zinc-800"
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  Week of {format(selectedWeekStart, 'MMM d')} - {format(weekEnd, 'MMM d, yyyy')}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-800" align="start">
-                <Calendar
-                  mode="single"
-                  selected={selectedWeekStart}
-                  onSelect={(date) => {
-                    if (date) {
-                      setSelectedWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
-                      setShowDatePicker(false);
-                    }
-                  }}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
-
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={goToNextWeek}
-              className="border-zinc-700 hover:bg-zinc-800"
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-
-            {!isCurrentWeek && (
+          <Popover open={showDatePicker} onOpenChange={setShowDatePicker}>
+            <PopoverTrigger asChild>
               <Button
                 variant="ghost"
-                size="sm"
-                onClick={goToCurrentWeek}
-                className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10"
+                className="text-lg font-semibold text-zinc-100 hover:bg-zinc-800 px-2"
               >
-                This Week
+                {format(selectedWeekStart, 'MMM d')} - {format(weekEnd, 'MMM d, yyyy')}
               </Button>
-            )}
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0 bg-zinc-900 border-zinc-800" align="start">
+              <Calendar
+                mode="single"
+                selected={selectedWeekStart}
+                onSelect={(date) => {
+                  if (date) {
+                    setSelectedWeekStart(startOfWeek(date, { weekStartsOn: 1 }));
+                    setShowDatePicker(false);
+                  }
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
 
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={goToNextWeek}
+            className="h-8 w-8 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800"
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+
+          {!isCurrentWeek && (
             <Button
               variant="ghost"
-              size="icon"
-              onClick={fetchWeeklyData}
-              disabled={loading}
-              className="text-zinc-400 hover:text-zinc-200"
+              size="sm"
+              onClick={goToCurrentWeek}
+              className="text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 h-8"
             >
-              <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+              This Week
             </Button>
-          </div>
+          )}
 
-          {/* Right side actions */}
-          <div className="flex items-center gap-2">
-            {onSwitchToDailyView && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={onSwitchToDailyView}
-                className="border-zinc-700 hover:bg-zinc-800"
-              >
-                Switch to Daily View
-              </Button>
-            )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={fetchWeeklyData}
+            disabled={loading}
+            className="h-8 w-8 text-zinc-400 hover:text-zinc-200"
+          >
+            <RefreshCw className={cn('h-4 w-4', loading && 'animate-spin')} />
+          </Button>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {onSwitchToDailyView && (
             <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowShortcuts(true)}
-              className="text-zinc-400 hover:text-zinc-200"
-              title="Keyboard shortcuts (?)"
+              variant="outline"
+              size="sm"
+              onClick={onSwitchToDailyView}
+              className="border-zinc-700 hover:bg-zinc-800 h-8"
             >
-              <Keyboard className="h-4 w-4" />
+              Switch to Daily View
             </Button>
-          </div>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowShortcuts(true)}
+            className="h-8 w-8 text-zinc-400 hover:text-zinc-200"
+            title="Keyboard shortcuts (?)"
+          >
+            <Keyboard className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 

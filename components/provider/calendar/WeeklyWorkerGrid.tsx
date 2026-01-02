@@ -138,8 +138,8 @@ export default function WeeklyWorkerGrid({
             </div>
           ))}
 
-          {/* Summary bar label - sticky at bottom */}
-          <div className="sticky bottom-0 h-12 bg-zinc-800 border-t border-zinc-700 px-3 flex items-center">
+          {/* Summary bar label - matches height of totals row */}
+          <div className="h-12 bg-zinc-800 border-t border-zinc-700 px-3 flex items-center">
             <span className="text-sm font-medium text-zinc-400">Daily Totals</span>
           </div>
         </div>
@@ -195,8 +195,8 @@ export default function WeeklyWorkerGrid({
               </div>
             )}
 
-            {/* STICKY SUMMARY BAR */}
-            <div className="sticky bottom-0 z-10 bg-zinc-800 border-t border-zinc-700 h-12">
+            {/* SUMMARY BAR - matches label height */}
+            <div className="bg-zinc-800 border-t border-zinc-700 h-12">
               <div className="grid grid-cols-7 h-full">
                 {dailyStats.map((stats, index) => (
                   <div

@@ -9,6 +9,7 @@ import {
   CheckCircle,
   XCircle,
   TrendingDown,
+  Info,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -40,13 +41,13 @@ interface WeekHeaderProps {
 function StatCard({
   label,
   value,
-  subtitle,
+  tooltip,
   variant = 'neutral',
   icon: Icon,
 }: {
   label: string;
   value: string | number;
-  subtitle?: string;
+  tooltip?: string;
   variant?: 'success' | 'warning' | 'danger' | 'neutral';
   icon?: React.ElementType;
 }) {
@@ -62,76 +63,57 @@ function StatCard({
       <div className="flex items-center gap-2 mb-1">
         {Icon && <Icon className="h-4 w-4 opacity-70" />}
         <span className="text-xs font-medium opacity-70">{label}</span>
+        {tooltip && (
+          <div className="relative group">
+            <Info className="h-3 w-3 opacity-50 cursor-help" />
+            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-xs bg-zinc-800 border border-zinc-700 rounded shadow-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+              {tooltip}
+            </div>
+          </div>
+        )}
       </div>
       <div className="text-2xl font-bold">{value}</div>
-      {subtitle && <div className="text-xs opacity-60 mt-0.5">{subtitle}</div>}
     </div>
   );
 }
 
-export default function WeekHeader({ stats, problems = [] }: WeekHeaderProps) {
-  const capacityColor =
-    stats.avgCapacity > 90
-      ? 'text-red-400'
-      : stats.avgCapacity > 70
-        ? 'text-yellow-400'
-        : 'text-emerald-400';
-
-  const weekRange = `${format(stats.weekStart, 'MMM d')} - ${format(stats.weekEnd, 'MMM d, yyyy')}`;
-
+export default function WeekHeader({ stats }: WeekHeaderProps) {
   return (
     <Card className="bg-zinc-900 border-zinc-800">
-      <CardContent className="p-6">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h2 className="text-2xl font-bold text-zinc-100">Week of {weekRange}</h2>
-            <p className="text-zinc-400 mt-1">
-              {stats.totalJobs} jobs scheduled across {stats.activeWorkers} workers
-            </p>
-          </div>
-
-          {/* Average capacity badge */}
-          <div className="text-center">
-            <div className={cn('text-4xl font-bold', capacityColor)}>
-              {stats.avgCapacity}%
-            </div>
-            <div className="text-sm text-zinc-500">Avg Capacity</div>
-          </div>
-        </div>
-
+      <CardContent className="p-4">
         {/* Quick stats bar - 5 cards */}
-        <div className="grid grid-cols-5 gap-4">
+        <div className="grid grid-cols-5 gap-3">
           <StatCard
             label="Total Hours"
             value={`${stats.totalHours}h`}
-            subtitle={`of ${stats.totalCapacity}h capacity`}
+            tooltip={`${stats.totalHours}h scheduled of ${stats.totalCapacity}h total capacity`}
             icon={Clock}
           />
           <StatCard
             label="Unassigned"
             value={stats.unassignedJobs}
-            subtitle="jobs need workers"
+            tooltip="Jobs that haven't been assigned to a worker yet"
             variant={stats.unassignedJobs > 0 ? 'warning' : 'success'}
             icon={stats.unassignedJobs > 0 ? AlertTriangle : CheckCircle}
           />
           <StatCard
             label="Conflicts"
             value={stats.conflicts}
-            subtitle="scheduling conflicts"
+            tooltip="Overlapping jobs scheduled for the same worker"
             variant={stats.conflicts > 0 ? 'danger' : 'success'}
             icon={stats.conflicts > 0 ? XCircle : CheckCircle}
           />
           <StatCard
             label="Overbooked"
             value={stats.overbookedDays}
-            subtitle="worker-days >90%"
+            tooltip="Worker-days with more than 90% capacity filled"
             variant={stats.overbookedDays > 0 ? 'danger' : 'neutral'}
             icon={Users}
           />
           <StatCard
             label="Underutilized"
             value={stats.underutilizedDays}
-            subtitle="worker-days <40%"
+            tooltip="Worker-days with less than 40% capacity filled"
             variant={stats.underutilizedDays > 0 ? 'warning' : 'neutral'}
             icon={TrendingDown}
           />
