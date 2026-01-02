@@ -501,55 +501,6 @@ export default function GanttDailyCalendar({
                   </div>
                 )}
 
-                {/* Empty state - workers exist but no jobs for selected date */}
-                {workers.length > 0 && workers.every(w => w.jobs.length === 0) && (
-                  <div className="flex flex-col items-center justify-center py-12 text-center px-4 border-t border-zinc-800 bg-zinc-900/30">
-                    <CalendarIcon className="h-12 w-12 text-zinc-600 mb-4" />
-                    <p className="text-zinc-400 text-lg font-medium mb-2">
-                      No jobs scheduled for {format(selectedDate, 'MMMM d, yyyy')}
-                    </p>
-                    <p className="text-zinc-500 text-sm mb-4">
-                      {unassignedJobs.length > 0
-                        ? `You have ${unassignedJobs.length} unassigned job${unassignedJobs.length === 1 ? '' : 's'} that need to be scheduled.`
-                        : 'Check other dates or add a new job.'
-                      }
-                    </p>
-                    <div className="flex flex-wrap gap-2 justify-center">
-                      {nextJobDate && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedDate(new Date(nextJobDate))}
-                          className="border-emerald-600 text-emerald-400 hover:bg-emerald-600/20"
-                        >
-                          Next job: {format(new Date(nextJobDate), 'MMM d')}
-                          <ChevronRight className="h-4 w-4 ml-1" />
-                        </Button>
-                      )}
-                      {prevJobDate && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedDate(new Date(prevJobDate))}
-                          className="border-zinc-600 text-zinc-400 hover:bg-zinc-600/20"
-                        >
-                          <ChevronLeft className="h-4 w-4 mr-1" />
-                          Previous job: {format(new Date(prevJobDate), 'MMM d')}
-                        </Button>
-                      )}
-                      {onAddJob && (
-                        <Button
-                          size="sm"
-                          onClick={() => onAddJob()}
-                          className="bg-emerald-600 hover:bg-emerald-500"
-                        >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add Job
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
