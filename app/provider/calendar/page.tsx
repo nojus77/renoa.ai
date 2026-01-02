@@ -627,7 +627,7 @@ export default function ProviderCalendar() {
             </div>
 
             {/* Daily Stats Section (Day view only) - Matches Weekly View */}
-            {(() => {
+            {viewMode === 'day' && (() => {
               const stats = getDailyStats();
               if (!stats) return null;
 
