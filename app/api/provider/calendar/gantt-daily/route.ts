@@ -43,11 +43,15 @@ export async function GET(request: NextRequest) {
     });
 
     // Get all jobs for the day (for timeline display)
+    // Include jobs that START during the day (regardless of when they end)
+    // This ensures we show all jobs that have any overlap with the selected day
     const dayJobs = await prisma.job.findMany({
       where: {
         providerId,
-        startTime: { gte: startOfDay },
-        endTime: { lte: endOfDay },
+        startTime: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
         status: { notIn: ['cancelled'] },
       },
       select: {

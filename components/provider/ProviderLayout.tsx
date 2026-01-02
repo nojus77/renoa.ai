@@ -185,8 +185,16 @@ export default function ProviderLayout({ children, providerName }: ProviderLayou
   }, [providerId, userId]);
 
   const handleLogout = () => {
+    // Clear all provider and user auth data
     localStorage.removeItem('providerId');
     localStorage.removeItem('providerName');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('userEmail');
+    localStorage.removeItem('userRole');
+    localStorage.removeItem('userName');
+    localStorage.removeItem('workerUserId');
+    localStorage.removeItem('workerProviderId');
+    localStorage.removeItem('workerFirstName');
     router.push('/provider/login');
   };
 
