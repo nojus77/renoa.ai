@@ -1111,54 +1111,99 @@ export default function DispatchPage() {
                     {/* Worker jobs */}
                     {selectedWorker === route.workerId && (
                       <div className="px-3 pb-3 space-y-2">
-                        {route.jobs.map((job, index) => (
-                          <div
-                            key={job.id}
-                            className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
-                              selectedJob?.id === job.id
-                                ? 'bg-primary/10 ring-1 ring-primary'
-                                : 'hover:bg-accent/50'
-                            }`}
-                            onClick={() => {
-                              setSelectedJob(job);
-                              if (job.latitude && job.longitude) {
-                                setCenter({ lat: job.latitude, lng: job.longitude });
-                                mapRef?.panTo({ lat: job.latitude, lng: job.longitude });
-                              }
-                            }}
-                          >
-                            {/* Order number */}
-                            <div
-                              className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
-                              style={{ backgroundColor: route.workerColor }}
-                            >
-                              {index + 1}
-                            </div>
+                        {route.jobs.map((job, index) => {
+                          const isCompleted = job.status === 'completed';
+                          const isActive = job.status === 'in_progress' || job.status === 'on_the_way';
+                          const isScheduled = job.status === 'scheduled' || job.status === 'confirmed';
 
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2">
-                                {getAppointmentTypeIcon(job.appointmentType)}
-                                <p className="text-sm font-medium text-foreground truncate">
-                                  {job.serviceType}
+                          return (
+                            <div
+                              key={job.id}
+                              className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer transition-colors ${
+                                selectedJob?.id === job.id
+                                  ? 'bg-primary/10 ring-1 ring-primary'
+                                  : isActive
+                                  ? 'bg-amber-500/15 ring-1 ring-amber-500/50 animate-pulse'
+                                  : isCompleted
+                                  ? 'bg-emerald-500/5 opacity-70'
+                                  : 'hover:bg-accent/50'
+                              }`}
+                              onClick={() => {
+                                setSelectedJob(job);
+                                if (job.latitude && job.longitude) {
+                                  setCenter({ lat: job.latitude, lng: job.longitude });
+                                  mapRef?.panTo({ lat: job.latitude, lng: job.longitude });
+                                }
+                              }}
+                            >
+                              {/* Status indicator */}
+                              <div className="flex-shrink-0">
+                                {isCompleted ? (
+                                  <div className="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center">
+                                    <CheckCircle className="w-4 h-4 text-emerald-500" />
+                                  </div>
+                                ) : isActive ? (
+                                  <div className="w-6 h-6 rounded-full bg-amber-500 flex items-center justify-center animate-pulse">
+                                    <span className="text-xs font-bold text-white">{index + 1}</span>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                                    style={{ backgroundColor: route.workerColor }}
+                                  >
+                                    {index + 1}
+                                  </div>
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  {getAppointmentTypeIcon(job.appointmentType)}
+                                  <p className={`text-sm font-medium truncate ${
+                                    isCompleted
+                                      ? 'text-emerald-500 line-through'
+                                      : isActive
+                                      ? 'text-amber-400'
+                                      : 'text-foreground'
+                                  }`}>
+                                    {job.serviceType}
+                                  </p>
+                                </div>
+                                <p className={`text-xs truncate ${
+                                  isCompleted
+                                    ? 'text-emerald-500/70'
+                                    : isActive
+                                    ? 'text-amber-400/80'
+                                    : 'text-muted-foreground'
+                                }`}>
+                                  {job.customer.name}
                                 </p>
                               </div>
-                              <p className="text-xs text-muted-foreground truncate">
-                                {job.customer.name}
-                              </p>
-                            </div>
 
-                            <div className="text-right flex-shrink-0">
-                              <p className="text-xs font-medium text-foreground">
-                                {format(parseISO(job.startTime), 'h:mm a')}
-                              </p>
-                              {job.estimatedArrival && (
-                                <p className="text-xs text-emerald-500">
-                                  ETA {format(parseISO(job.estimatedArrival), 'h:mm')}
+                              <div className="text-right flex-shrink-0">
+                                <p className={`text-xs font-medium ${
+                                  isCompleted
+                                    ? 'text-emerald-500'
+                                    : isActive
+                                    ? 'text-amber-400'
+                                    : 'text-foreground'
+                                }`}>
+                                  {format(parseISO(job.startTime), 'h:mm a')}
                                 </p>
-                              )}
+                                {job.estimatedArrival && !isCompleted && (
+                                  <p className="text-xs text-emerald-500">
+                                    ETA {format(parseISO(job.estimatedArrival), 'h:mm')}
+                                  </p>
+                                )}
+                                {isActive && (
+                                  <p className="text-[10px] font-semibold text-amber-400 uppercase">
+                                    Active
+                                  </p>
+                                )}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>
