@@ -139,7 +139,7 @@ export default function WeeklyWorkerGrid({
           ))}
 
           {/* Summary bar label - matches height of totals row */}
-          <div className="h-12 bg-zinc-800 border-t border-zinc-700 px-3 flex items-center">
+          <div className="h-12 bg-zinc-800 px-3 flex items-center">
             <span className="text-sm font-medium text-zinc-400">Daily Totals</span>
           </div>
         </div>
@@ -196,7 +196,7 @@ export default function WeeklyWorkerGrid({
             )}
 
             {/* SUMMARY BAR - matches label height */}
-            <div className="bg-zinc-800 border-t border-zinc-700 h-12">
+            <div className="bg-zinc-800 h-12">
               <div className="grid grid-cols-7 h-full">
                 {dailyStats.map((stats, index) => (
                   <div

@@ -491,14 +491,7 @@ export default function WeeklyTeamCalendar({
 
   return (
     <div className="w-full space-y-3">
-      {/* Week Stats Header - Full width at TOP */}
-      {headerStats && (
-        <div className="px-4">
-          <WeekHeader stats={headerStats} problems={insights.problems} />
-        </div>
-      )}
-
-      {/* Compact Navigation Header */}
+      {/* Date Navigation Header - ABOVE stats like daily view */}
       <div className="px-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Button
@@ -587,6 +580,13 @@ export default function WeeklyTeamCalendar({
           </Button>
         </div>
       </div>
+
+      {/* Week Stats Header - Below date navigation */}
+      {headerStats && (
+        <div className="px-4">
+          <WeekHeader stats={headerStats} problems={insights.problems} />
+        </div>
+      )}
 
       {/* Main Content - No internal scrolling, flows with page */}
       <DndContext
