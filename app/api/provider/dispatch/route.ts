@@ -113,6 +113,28 @@ export async function GET(request: NextRequest) {
       customer: j.customer?.name,
     })));
 
+    // Get the next date with jobs (for navigation hint when today has no jobs)
+    const nextJobDate = jobs.length === 0 ? await prisma.job.findFirst({
+      where: {
+        providerId,
+        startTime: { gte: dayStart },
+        status: { notIn: ['cancelled', 'completed'] },
+      },
+      select: { startTime: true },
+      orderBy: { startTime: 'asc' },
+    }) : null;
+
+    // Get the previous date with jobs
+    const prevJobDate = jobs.length === 0 ? await prisma.job.findFirst({
+      where: {
+        providerId,
+        startTime: { lt: dayStart },
+        status: { notIn: ['cancelled', 'completed'] },
+      },
+      select: { startTime: true },
+      orderBy: { startTime: 'desc' },
+    }) : null;
+
     // Process jobs - separate assigned from unassigned
     const assignedJobs: typeof jobs = [];
     const unassignedJobs: typeof jobs = [];
@@ -198,6 +220,9 @@ export async function GET(request: NextRequest) {
       })),
       workers: workersWithColors,
       date: targetDate.toISOString(),
+      // Navigation hints when current date has no jobs
+      nextJobDate: nextJobDate?.startTime?.toISOString().split('T')[0] || null,
+      prevJobDate: prevJobDate?.startTime?.toISOString().split('T')[0] || null,
     });
   } catch (error) {
     console.error('[Dispatch API] Error:', error);

@@ -24,6 +24,14 @@ export async function GET(request: NextRequest) {
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
+    console.log('[Gantt Daily] Query params:', {
+      providerId,
+      dateStr,
+      targetDate: targetDate.toISOString(),
+      startOfDay: startOfDay.toISOString(),
+      endOfDay: endOfDay.toISOString(),
+    });
+
     // Get active team members
     const teamMembers = await prisma.providerUser.findMany({
       where: {
@@ -74,6 +82,38 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { startTime: 'asc' },
     });
+
+    console.log('[Gantt Daily] Jobs found for date:', {
+      count: dayJobs.length,
+      jobs: dayJobs.map(j => ({
+        id: j.id.slice(-6),
+        service: j.serviceType,
+        startTime: j.startTime.toISOString(),
+        status: j.status,
+      })),
+    });
+
+    // Get the next date with jobs (for navigation hint when today has no jobs)
+    const nextJobDate = dayJobs.length === 0 ? await prisma.job.findFirst({
+      where: {
+        providerId,
+        startTime: { gte: startOfDay },
+        status: { notIn: ['cancelled', 'completed'] },
+      },
+      select: { startTime: true },
+      orderBy: { startTime: 'asc' },
+    }) : null;
+
+    // Get the previous date with jobs (for navigation hint)
+    const prevJobDate = dayJobs.length === 0 ? await prisma.job.findFirst({
+      where: {
+        providerId,
+        startTime: { lt: startOfDay },
+        status: { notIn: ['cancelled', 'completed'] },
+      },
+      select: { startTime: true },
+      orderBy: { startTime: 'desc' },
+    }) : null;
 
     // Get ALL unassigned jobs (not just for the selected day)
     // NOTE: Sidebar shows all unassigned jobs for drag-and-drop convenience,
@@ -205,6 +245,9 @@ export async function GET(request: NextRequest) {
         activeWorkers: workers.filter((w) => w.jobs.length > 0).length,
         totalWorkers: workers.length,
       },
+      // Navigation hints when current date has no jobs
+      nextJobDate: nextJobDate?.startTime?.toISOString().split('T')[0] || null,
+      prevJobDate: prevJobDate?.startTime?.toISOString().split('T')[0] || null,
     });
   } catch (error) {
     console.error('Error fetching Gantt daily calendar:', error);

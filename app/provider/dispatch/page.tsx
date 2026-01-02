@@ -6,7 +6,7 @@ import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer, InfoWindow } fro
 import ProviderLayout from '@/components/provider/ProviderLayout';
 import { Button } from '@/components/ui/button';
 import {
-  MapPin, Navigation, Clock, ChevronRight, Route, Loader2, Calendar,
+  MapPin, Navigation, Clock, ChevronRight, ChevronLeft, Route, Loader2, Calendar,
   CheckCircle, XCircle, Users, AlertTriangle, Lock, Unlock, GripVertical,
   ChevronDown, ChevronUp, Filter, RefreshCw, Zap, Building2
 } from 'lucide-react';
@@ -224,6 +224,8 @@ export default function DispatchPage() {
   } | null>(null);
   const [overrideReason, setOverrideReason] = useState('');
   const [statusFilter, setStatusFilter] = useState<string[]>(['all']);
+  const [nextJobDate, setNextJobDate] = useState<string | null>(null);
+  const [prevJobDate, setPrevJobDate] = useState<string | null>(null);
 
   // Check theme
   useEffect(() => {
@@ -281,6 +283,8 @@ export default function DispatchPage() {
       setWorkers(data.workers || []);
       setUnassignedJobs(data.unassignedJobs || []);
       setOfficeLocation(data.office || null);
+      setNextJobDate(data.nextJobDate || null);
+      setPrevJobDate(data.prevJobDate || null);
 
       // Center on: first job with coordinates, or office location, or default
       const allJobs = [...(data.jobs || []), ...(data.unassignedJobs || [])];
@@ -1007,14 +1011,38 @@ export default function DispatchPage() {
 
             {/* No jobs overlay message */}
             {allJobsWithCoords.length === 0 && !loading && (
-              <div className="absolute top-4 left-1/2 -translate-x-1/2 px-6 py-3 bg-card/95 backdrop-blur border border-border rounded-lg shadow-lg flex items-center gap-3">
-                <Calendar className="w-5 h-5 text-muted-foreground" />
-                <div>
-                  <p className="font-medium text-foreground">No jobs scheduled</p>
-                  <p className="text-sm text-muted-foreground">
-                    {format(selectedDate, 'MMMM d, yyyy')}
-                  </p>
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 px-6 py-4 bg-card/95 backdrop-blur border border-border rounded-lg shadow-lg">
+                <div className="flex items-center gap-3 mb-3">
+                  <Calendar className="w-5 h-5 text-muted-foreground" />
+                  <div>
+                    <p className="font-medium text-foreground">No jobs scheduled</p>
+                    <p className="text-sm text-muted-foreground">
+                      {format(selectedDate, 'MMMM d, yyyy')}
+                    </p>
+                  </div>
                 </div>
+                {(nextJobDate || prevJobDate) && (
+                  <div className="flex flex-wrap gap-2 justify-center border-t border-border pt-3">
+                    {nextJobDate && (
+                      <button
+                        onClick={() => setSelectedDate(new Date(nextJobDate))}
+                        className="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-500 transition-colors flex items-center gap-1"
+                      >
+                        Next job: {format(new Date(nextJobDate), 'MMM d')}
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    )}
+                    {prevJobDate && (
+                      <button
+                        onClick={() => setSelectedDate(new Date(prevJobDate))}
+                        className="px-3 py-1.5 text-xs font-medium bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors flex items-center gap-1"
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                        Previous: {format(new Date(prevJobDate), 'MMM d')}
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
