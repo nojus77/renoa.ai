@@ -381,32 +381,99 @@ export default function ProviderCalendar() {
       }
     });
 
-    workerJobsMap.forEach(workerJobs => {
-      const sorted = workerJobs.sort((a, b) =>
+    // Helper to check if two jobs overlap
+    const jobsOverlap = (job1: Job, job2: Job) => {
+      const start1 = new Date(job1.startTime).getTime();
+      const end1 = new Date(job1.endTime).getTime();
+      const start2 = new Date(job2.startTime).getTime();
+      const end2 = new Date(job2.endTime).getTime();
+      return start1 < end2 && end1 > start2;
+    };
+
+    // Count conflicts and track which workers are overbooked
+    const overbookedWorkerIds: string[] = [];
+
+    workerJobsMap.forEach((workerJobs, workerId) => {
+      // Count conflicts for this worker
+      let workerConflicts = 0;
+      for (let i = 0; i < workerJobs.length; i++) {
+        for (let j = i + 1; j < workerJobs.length; j++) {
+          if (jobsOverlap(workerJobs[i], workerJobs[j])) {
+            workerConflicts++;
+          }
+        }
+      }
+      conflicts += workerConflicts;
+
+      // Calculate utilization with merged time ranges (not double-counting overlaps)
+      const sortedJobs = [...workerJobs].sort((a, b) =>
         new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
       );
-      for (let i = 0; i < sorted.length - 1; i++) {
-        const current = sorted[i];
-        const next = sorted[i + 1];
-        if (new Date(current.endTime) > new Date(next.startTime)) {
-          conflicts++;
+
+      // Merge overlapping time ranges
+      const mergedRanges: Array<{ start: number; end: number }> = [];
+      for (const job of sortedJobs) {
+        const start = new Date(job.startTime).getTime();
+        const end = new Date(job.endTime).getTime();
+
+        if (mergedRanges.length === 0) {
+          mergedRanges.push({ start, end });
+        } else {
+          const lastRange = mergedRanges[mergedRanges.length - 1];
+          if (start <= lastRange.end) {
+            // Overlapping - extend the range
+            lastRange.end = Math.max(lastRange.end, end);
+          } else {
+            // No overlap - add new range
+            mergedRanges.push({ start, end });
+          }
         }
+      }
+
+      // Sum merged hours
+      const mergedHours = mergedRanges.reduce((total, range) => {
+        return total + (range.end - range.start) / (1000 * 60 * 60);
+      }, 0);
+
+      const utilization = (mergedHours / 8) * 100;
+
+      // Worker is overbooked if >100% utilization OR has any conflicts
+      if (utilization > 100 || workerConflicts > 0) {
+        overbookedWorkerIds.push(workerId);
       }
     });
 
-    // Calculate worker utilization
-    const workerUtilization = new Map<string, number>();
-    workerJobsMap.forEach((workerJobs, workerId) => {
-      const hours = workerJobs.reduce((sum, j) => {
-        const start = new Date(j.startTime);
-        const end = new Date(j.endTime);
-        return sum + (end.getTime() - start.getTime()) / (1000 * 60 * 60);
-      }, 0);
-      workerUtilization.set(workerId, (hours / 8) * 100);
-    });
+    // Count overbooked and underutilized workers
+    const overbookedWorkers = overbookedWorkerIds.length;
 
-    const overbookedWorkers = Array.from(workerUtilization.values()).filter(util => util > 90).length;
-    const underutilizedWorkers = Array.from(workerUtilization.values()).filter(util => util < 40).length;
+    // Calculate underutilized from merged hours
+    let underutilizedWorkers = 0;
+    workerJobsMap.forEach((workerJobs) => {
+      const sortedJobs = [...workerJobs].sort((a, b) =>
+        new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+      );
+      const mergedRanges: Array<{ start: number; end: number }> = [];
+      for (const job of sortedJobs) {
+        const start = new Date(job.startTime).getTime();
+        const end = new Date(job.endTime).getTime();
+        if (mergedRanges.length === 0) {
+          mergedRanges.push({ start, end });
+        } else {
+          const lastRange = mergedRanges[mergedRanges.length - 1];
+          if (start <= lastRange.end) {
+            lastRange.end = Math.max(lastRange.end, end);
+          } else {
+            mergedRanges.push({ start, end });
+          }
+        }
+      }
+      const mergedHours = mergedRanges.reduce((total, range) => {
+        return total + (range.end - range.start) / (1000 * 60 * 60);
+      }, 0);
+      if ((mergedHours / 8) * 100 < 40) {
+        underutilizedWorkers++;
+      }
+    });
 
     return {
       totalJobs: selectedDateJobs.length,

@@ -195,17 +195,85 @@ export async function GET(request: NextRequest) {
       orderBy: { startTime: 'asc' },
     });
 
+    // Helper function to check if two time ranges overlap
+    const jobsOverlap = (job1: { startTime: Date; endTime: Date }, job2: { startTime: Date; endTime: Date }) => {
+      return job1.startTime < job2.endTime && job1.endTime > job2.startTime;
+    };
+
+    // Track conflicts and overbooked workers globally
+    const allConflicts: Array<{
+      workerId: string;
+      workerName: string;
+      job1Id: string;
+      job1Service: string;
+      job2Id: string;
+      job2Service: string;
+    }> = [];
+    const overbookedWorkerIds: string[] = [];
+
     // Process workers with their jobs
     const workers = teamMembers.map((member) => {
       // Get jobs assigned to this worker (only for the selected day)
       const memberJobs = dayJobs.filter((job) => job.assignedUserIds.includes(member.id));
 
-      // Calculate scheduled hours
-      const scheduledMinutes = memberJobs.reduce((total, job) => {
-        const duration = (job.endTime.getTime() - job.startTime.getTime()) / (1000 * 60);
-        return total + duration;
-      }, 0);
-      const totalHours = scheduledMinutes / 60;
+      // Detect conflicts: jobs that overlap in time
+      const workerConflicts: Array<{ job1Id: string; job2Id: string }> = [];
+      const conflictingJobIds = new Set<string>();
+      for (let i = 0; i < memberJobs.length; i++) {
+        for (let j = i + 1; j < memberJobs.length; j++) {
+          if (jobsOverlap(memberJobs[i], memberJobs[j])) {
+            workerConflicts.push({
+              job1Id: memberJobs[i].id,
+              job2Id: memberJobs[j].id,
+            });
+            conflictingJobIds.add(memberJobs[i].id);
+            conflictingJobIds.add(memberJobs[j].id);
+            // Add to global conflicts
+            allConflicts.push({
+              workerId: member.id,
+              workerName: `${member.firstName} ${member.lastName}`,
+              job1Id: memberJobs[i].id,
+              job1Service: memberJobs[i].serviceType,
+              job2Id: memberJobs[j].id,
+              job2Service: memberJobs[j].serviceType,
+            });
+          }
+        }
+      }
+
+      // Calculate scheduled hours - merge overlapping time ranges for accurate count
+      let mergedMinutes = 0;
+      if (memberJobs.length > 0) {
+        // Sort jobs by start time
+        const sortedJobs = [...memberJobs].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+
+        // Merge overlapping time ranges
+        const mergedRanges: Array<{ start: number; end: number }> = [];
+        for (const job of sortedJobs) {
+          const start = job.startTime.getTime();
+          const end = job.endTime.getTime();
+
+          if (mergedRanges.length === 0) {
+            mergedRanges.push({ start, end });
+          } else {
+            const lastRange = mergedRanges[mergedRanges.length - 1];
+            if (start <= lastRange.end) {
+              // Overlapping - extend the range
+              lastRange.end = Math.max(lastRange.end, end);
+            } else {
+              // No overlap - add new range
+              mergedRanges.push({ start, end });
+            }
+          }
+        }
+
+        // Sum up merged minutes
+        mergedMinutes = mergedRanges.reduce((total, range) => {
+          return total + (range.end - range.start) / (1000 * 60);
+        }, 0);
+      }
+
+      const totalHours = mergedMinutes / 60;
 
       // Get working hours (default 8 hours)
       const workingHours = (member.workingHours as { start?: string; end?: string } | null) || {
@@ -216,7 +284,15 @@ export async function GET(request: NextRequest) {
       const [endHour, endMin] = (workingHours.end || '17:00').split(':').map(Number);
       const capacityHours = endHour + endMin / 60 - (startHour + startMin / 60);
 
+      // Calculate utilization based on merged hours (not double-counting overlaps)
       const utilization = capacityHours > 0 ? Math.round((totalHours / capacityHours) * 100) : 0;
+
+      // Worker is overbooked if utilization > 100% OR has any conflicts
+      const isOverbooked = utilization > 100 || workerConflicts.length > 0;
+
+      if (isOverbooked) {
+        overbookedWorkerIds.push(member.id);
+      }
 
       return {
         id: member.id,
@@ -235,9 +311,13 @@ export async function GET(request: NextRequest) {
           duration: (job.endTime.getTime() - job.startTime.getTime()) / (1000 * 60 * 60),
           status: job.status,
           estimatedValue: job.estimatedValue ? Number(job.estimatedValue) : null,
+          // Mark if this job is part of a conflict
+          hasConflict: conflictingJobIds.has(job.id),
         })),
         totalHours: Math.round(totalHours * 10) / 10,
         utilization,
+        isOverbooked,
+        conflictCount: workerConflicts.length,
       };
     });
 
@@ -281,6 +361,9 @@ export async function GET(request: NextRequest) {
         ? Math.round(workers.reduce((sum, w) => sum + w.utilization, 0) / workers.length)
         : 0;
 
+    // Count unique conflicts (each pair of overlapping jobs counts as 1 conflict)
+    const conflictCount = allConflicts.length;
+
     return NextResponse.json({
       date: targetDate.toISOString().split('T')[0],
       workers,
@@ -295,6 +378,8 @@ export async function GET(request: NextRequest) {
         scope: block.scope,
         blockedWorkerIds: block.blockedWorkerIds,
       })),
+      // Include conflicts data for UI
+      conflicts: allConflicts,
       stats: {
         totalJobs,
         assignedJobs: assignedJobCount,
@@ -303,6 +388,10 @@ export async function GET(request: NextRequest) {
         avgUtilization,
         activeWorkers: workers.filter((w) => w.jobs.length > 0).length,
         totalWorkers: workers.length,
+        // NEW: Conflict and overbooking stats
+        conflictCount,
+        overbookedWorkers: overbookedWorkerIds,
+        overbookedCount: overbookedWorkerIds.length,
       },
       // Navigation hints when current date has no jobs
       nextJobDate: nextJobDate?.startTime?.toISOString().split('T')[0] || null,
