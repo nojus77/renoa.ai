@@ -1323,7 +1323,7 @@ export default function DispatchPage() {
                             {mismatch.workerSkills.length > 3 && ` +${mismatch.workerSkills.length - 3} more`}
                           </p>
                           <p className="text-amber-600 mt-0.5">
-                            Missing: {(mismatch.missingSkillNames || mismatch.requiredSkills).slice(0, 3).join(', ')}
+                            Missing: {(mismatch.missingSkillNames?.length > 0 ? mismatch.missingSkillNames : mismatch.requiredSkills).slice(0, 3).join(', ') || 'Required skills not configured'}
                           </p>
                         </div>
                         <div className="flex gap-2 mt-3">
@@ -1486,7 +1486,7 @@ export default function DispatchPage() {
                     Worker: <span className="text-amber-600 font-medium">{overrideModalJob.assignedWorkerName}</span>
                   </p>
                   <p className="text-xs text-amber-600 mt-1">
-                    Missing: {overrideModalJob.missingSkillNames.join(', ')}
+                    Missing: {overrideModalJob.missingSkillNames.length > 0 ? overrideModalJob.missingSkillNames.join(', ') : 'Required skills not configured'}
                   </p>
                 </div>
 
@@ -1526,6 +1526,7 @@ export default function DispatchPage() {
                       const res = await fetch(`/api/provider/jobs/${overrideModalJob.jobId}/override`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify({
                           reason: overrideReason,
                           assignedWorkerId: overrideModalJob.assignedWorkerId,
