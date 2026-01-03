@@ -85,7 +85,34 @@ export async function GET(request: NextRequest) {
         };
       }
 
-      // Get jobs for this worker
+      // Get shifts for this worker this week (actual clocked hours)
+      const shifts = await prisma.workerShift.findMany({
+        where: {
+          userId: user.id,
+          providerId,
+          clockIn: { gte: weekStart },
+        },
+        select: {
+          clockIn: true,
+          clockOut: true,
+          hoursWorked: true,
+        },
+      });
+
+      // Calculate actual clocked hours this week
+      let hoursThisWeek = 0;
+      for (const shift of shifts) {
+        if (shift.clockOut && shift.hoursWorked) {
+          // Completed shift - use stored hours
+          hoursThisWeek += shift.hoursWorked;
+        } else if (!shift.clockOut) {
+          // Active shift - calculate elapsed time
+          const elapsed = (new Date().getTime() - new Date(shift.clockIn).getTime()) / (1000 * 60 * 60);
+          hoursThisWeek += elapsed;
+        }
+      }
+
+      // Get jobs for this worker (for availability calculation)
       const jobs = await prisma.job.findMany({
         where: {
           assignedUserIds: { has: user.id },
@@ -97,12 +124,6 @@ export async function GET(request: NextRequest) {
           status: true,
         },
       });
-
-      // Calculate hours this week
-      const hoursThisWeek = jobs.reduce((sum, job) => {
-        const hours = (new Date(job.endTime).getTime() - new Date(job.startTime).getTime()) / (1000 * 60 * 60);
-        return sum + hours;
-      }, 0);
 
       // Count completed jobs (all time)
       const jobsCompleted = await prisma.job.count({
@@ -135,11 +156,15 @@ export async function GET(request: NextRequest) {
         },
       });
 
+      // Check if worker is currently clocked in
+      const isClockedIn = shifts.some(s => !s.clockOut);
+
       return {
         ...user,
         hoursThisWeek: Math.round(hoursThisWeek * 10) / 10,
         jobsCompleted,
         availableToday,
+        isClockedIn,
         nextJob,
       };
     }));

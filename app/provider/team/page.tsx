@@ -74,6 +74,7 @@ interface TeamMember {
   hoursThisWeek?: number;
   jobsCompleted?: number;
   availableToday?: boolean;
+  isClockedIn?: boolean;
   nextJob?: {
     id: string;
     startTime: string;
@@ -2026,9 +2027,17 @@ export default function TeamManagementPage() {
 
                             {/* Hours This Week - Right Aligned */}
                             <td className="px-4 py-3 text-right">
-                              <span className="text-sm font-medium text-zinc-100 tabular-nums">
-                                {member.hoursThisWeek || 0}h
-                              </span>
+                              <div className="flex items-center justify-end gap-2">
+                                {member.isClockedIn && (
+                                  <span className="flex items-center gap-1 text-xs text-emerald-400">
+                                    <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                                    On Shift
+                                  </span>
+                                )}
+                                <span className="text-sm font-medium text-zinc-100 tabular-nums">
+                                  {member.hoursThisWeek || 0}h
+                                </span>
+                              </div>
                             </td>
 
                           </tr>
@@ -2380,6 +2389,7 @@ export default function TeamManagementPage() {
                       const crewSkills = crew.skills || Array.from(new Set(crew.users.flatMap(m => m.workerSkills?.map(ws => ws.skill.name) || [])));
                       const leader = crew.users.find(m => m.id === crew.leaderId);
                       const totalHours = crew.users.reduce((sum, m) => sum + (m.hoursThisWeek || 0), 0);
+                      const clockedInCount = crew.users.filter(m => m.isClockedIn).length;
                       const showAllSkills = expandedSkillsCrew === crew.id;
 
                       return (
@@ -2444,7 +2454,13 @@ export default function TeamManagementPage() {
                               </div>
                               <div className="text-center">
                                 <div className="text-lg font-semibold text-zinc-100">{totalHours}</div>
-                                <div className="text-xs text-zinc-500">Hours</div>
+                                <div className="text-xs text-zinc-500">
+                                  {clockedInCount > 0 ? (
+                                    <span className="text-emerald-400">{clockedInCount} on shift</span>
+                                  ) : (
+                                    'Hours'
+                                  )}
+                                </div>
                               </div>
                               <div className="text-center">
                                 {crew.unassignedToday && crew.unassignedToday > 0 ? (

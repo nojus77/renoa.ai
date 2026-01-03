@@ -100,13 +100,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const now = new Date();
+
+    // Auto clock-in to shift if not already clocked in
+    const activeShift = await prisma.workerShift.findFirst({
+      where: {
+        userId,
+        providerId,
+        clockOut: null,
+      },
+    });
+
+    let shiftStarted = false;
+    if (!activeShift) {
+      // Automatically start a shift when starting a job
+      await prisma.workerShift.create({
+        data: {
+          userId,
+          providerId,
+          clockIn: now,
+        },
+      });
+      shiftStarted = true;
+      console.log(`[Auto Clock-In] Started shift for user ${userId} when starting job ${jobId}`);
+    }
+
     // Create work log with clock in time
     const workLog = await prisma.workLog.create({
       data: {
         jobId,
         userId,
         providerId,
-        clockIn: new Date(),
+        clockIn: now,
       },
     });
 
@@ -116,7 +141,11 @@ export async function POST(request: NextRequest) {
       data: { status: 'in_progress' },
     });
 
-    return NextResponse.json({ success: true, workLog });
+    return NextResponse.json({
+      success: true,
+      workLog,
+      shiftStarted, // Let frontend know a shift was auto-started
+    });
   } catch (error) {
     console.error('Error clocking in:', error);
     return NextResponse.json(
