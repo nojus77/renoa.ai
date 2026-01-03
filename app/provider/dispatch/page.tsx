@@ -869,7 +869,9 @@ export default function DispatchPage() {
                   return filteredJobs.map((job, index) => {
                     // Determine stroke color based on job status
                     const isCompleted = job.status === 'completed';
-                    const isActive = job.status === 'in_progress' || job.status === 'on_the_way';
+                    const isOnTheWay = job.status === 'on_the_way';
+                    const isInProgress = job.status === 'in_progress';
+                    const isActive = isOnTheWay || isInProgress;
 
                     let strokeColor = '#fff'; // Default: white for upcoming
                     let strokeWeight = 2;
@@ -877,9 +879,12 @@ export default function DispatchPage() {
                     if (isCompleted) {
                       strokeColor = '#10b981'; // Green for completed
                       strokeWeight = 3;
-                    } else if (isActive) {
-                      strokeColor = '#f59e0b'; // Orange for active
-                      strokeWeight = 4; // Thicker stroke for active jobs
+                    } else if (isOnTheWay) {
+                      strokeColor = '#3b82f6'; // Blue for on the way
+                      strokeWeight = 4;
+                    } else if (isInProgress) {
+                      strokeColor = '#f59e0b'; // Orange for in progress
+                      strokeWeight = 4;
                     }
 
                     // Fixed appointments still get red outline (takes priority)
