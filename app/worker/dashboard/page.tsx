@@ -718,15 +718,43 @@ export default function WorkerDashboard() {
           </div>
         )}
 
-        {/* Call Dispatch Button */}
-        <button
-          onClick={handleCallDispatch}
-          className="w-full py-4 rounded-[20px] font-semibold text-black flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
-          style={{ backgroundColor: LIME_GREEN }}
-        >
-          <PhoneCall className="w-5 h-5" />
-          Call Dispatch
-        </button>
+        {/* Action Buttons Row */}
+        <div className="flex gap-3">
+          {/* Clock In/Out Button */}
+          {activeJob ? (
+            <button
+              onClick={() => router.push(`/worker/job/${activeJob.id}`)}
+              className="flex-1 py-4 rounded-[20px] font-semibold text-white flex items-center justify-center gap-2 transition-colors active:scale-[0.98] bg-orange-500 hover:bg-orange-600"
+            >
+              <LogOut className="w-5 h-5" />
+              Clock Out
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (nextJobToClockIn) {
+                  router.push(`/worker/job/${nextJobToClockIn.id}`);
+                } else {
+                  toast.error('No jobs scheduled to clock into');
+                }
+              }}
+              className="flex-1 py-4 rounded-[20px] font-semibold text-white flex items-center justify-center gap-2 transition-colors active:scale-[0.98] bg-blue-500 hover:bg-blue-600"
+            >
+              <LogIn className="w-5 h-5" />
+              Clock In
+            </button>
+          )}
+
+          {/* Call Dispatch Button */}
+          <button
+            onClick={handleCallDispatch}
+            className="flex-1 py-4 rounded-[20px] font-semibold text-black flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
+            style={{ backgroundColor: LIME_GREEN }}
+          >
+            <PhoneCall className="w-5 h-5" />
+            Call Dispatch
+          </button>
+        </div>
 
         {/* Today's Jobs Section */}
         <div className="space-y-4">
