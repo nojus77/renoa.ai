@@ -51,7 +51,7 @@ interface SkillInfo {
 interface ServiceConfig {
   id: string;
   serviceType: string;
-  durationMinutes: number; // in hours
+  estimatedDuration: number | null; // in hours (from API)
   crewSizeMin: number;
   crewSizeMax: number;
   requiredSkillIds: string[];
@@ -236,6 +236,21 @@ export default function AddJobModal({
     };
   };
 
+  // Count qualified workers for a service config
+  const getQualifiedWorkersCount = (config: ServiceConfig): number => {
+    const requiredSkillIds = config.requiredSkillIds || [];
+    // If no skills required, all field workers qualify
+    if (requiredSkillIds.length === 0) {
+      return teamMembers.filter(m => m.role === 'field').length;
+    }
+    // Count workers who have ALL required skills
+    return teamMembers.filter(member => {
+      if (member.role !== 'field') return false;
+      const workerSkillIds = member.workerSkills?.map(ws => ws.skillId) || [];
+      return requiredSkillIds.every(skillId => workerSkillIds.includes(skillId));
+    }).length;
+  };
+
   // Handle service selection
   const handleSelectService = async (config: ServiceConfig) => {
     setSelectedServiceConfig(config);
@@ -245,13 +260,18 @@ export default function AddJobModal({
     setCustomDurationValue('');
     setAverageDuration(null);
 
-    // Auto-fill from config
+    // Auto-fill from config - estimatedDuration is in hours, convert to minutes
+    // Default to 60 minutes if estimatedDuration is null/undefined
+    const durationInMinutes = config.estimatedDuration
+      ? Math.round(config.estimatedDuration * 60)
+      : 60;
+
     setJobDetails(prev => ({
       ...prev,
-      durationMinutes: Math.round(config.durationMinutes * 60),
-      requiredWorkerCount: config.crewSizeMin,
-      requiredSkillIds: config.requiredSkillIds,
-      preferredSkillIds: config.preferredSkillIds,
+      durationMinutes: durationInMinutes,
+      requiredWorkerCount: config.crewSizeMin || 1,
+      requiredSkillIds: config.requiredSkillIds || [],
+      preferredSkillIds: config.preferredSkillIds || [],
     }));
 
     // Fetch average duration for this service type
@@ -297,10 +317,11 @@ export default function AddJobModal({
       }
 
       // Add to configs and select it
+      // API returns estimatedDuration in hours
       const newConfig: ServiceConfig = {
         id: data.config.id,
         serviceType: data.config.serviceType,
-        durationMinutes: data.config.durationMinutes,
+        estimatedDuration: data.config.estimatedDuration || (newServiceDuration / 60),
         crewSizeMin: data.config.crewSizeMin || newServiceWorkers,
         crewSizeMax: data.config.crewSizeMax || 4,
         requiredSkillIds: data.config.requiredSkillIds || newServiceSkills,
@@ -968,40 +989,46 @@ export default function AddJobModal({
                         </div>
 
                         <div className="max-h-60 overflow-y-auto">
+                          {/* Create Custom Service - at top for visibility */}
+                          <button
+                            type="button"
+                            onClick={() => { setShowServiceDropdown(false); setShowCreateService(true); }}
+                            className="w-full px-4 py-3 text-left hover:bg-emerald-500/10 border-b border-zinc-700 transition-colors flex items-center gap-2 bg-emerald-500/5"
+                          >
+                            <Plus className="h-4 w-4 text-emerald-400" />
+                            <span className="text-sm font-medium text-emerald-400">Create Custom Service</span>
+                          </button>
+
                           {loadingConfigs ? (
                             <div className="p-4 text-center text-sm text-zinc-400">Loading services...</div>
                           ) : filteredServices.length > 0 ? (
-                            filteredServices.map((config) => (
-                              <button
-                                key={config.id}
-                                type="button"
-                                onClick={() => handleSelectService(config)}
-                                className="w-full text-left px-4 py-3 hover:bg-zinc-700 border-b border-zinc-700/50 last:border-b-0 transition-colors"
-                              >
-                                <p className="text-sm font-medium text-zinc-100">{config.serviceType}</p>
-                                <p className="text-xs text-zinc-400 mt-0.5">
-                                  {formatDuration(Math.round(config.durationMinutes * 60))} • {config.crewSizeMin} worker{config.crewSizeMin !== 1 ? 's' : ''}
-                                  {config.requiredSkills.length > 0 && ` • ${config.requiredSkills.length} skill${config.requiredSkills.length !== 1 ? 's' : ''} required`}
-                                </p>
-                              </button>
-                            ))
+                            filteredServices.map((config) => {
+                              // Calculate duration in minutes from hours, default to 60 if null
+                              const durationMins = config.estimatedDuration
+                                ? Math.round(config.estimatedDuration * 60)
+                                : 60;
+                              const qualifiedCount = getQualifiedWorkersCount(config);
+
+                              return (
+                                <button
+                                  key={config.id}
+                                  type="button"
+                                  onClick={() => handleSelectService(config)}
+                                  className="w-full text-left px-4 py-3 hover:bg-zinc-700 border-b border-zinc-700/50 last:border-b-0 transition-colors"
+                                >
+                                  <p className="text-sm font-medium text-zinc-100">{config.serviceType}</p>
+                                  <p className="text-xs text-zinc-400 mt-0.5">
+                                    {formatDuration(durationMins)} • {qualifiedCount} qualified worker{qualifiedCount !== 1 ? 's' : ''}
+                                    {config.requiredSkills && config.requiredSkills.length > 0 && ` • ${config.requiredSkills.length} skill${config.requiredSkills.length !== 1 ? 's' : ''} required`}
+                                  </p>
+                                </button>
+                              );
+                            })
                           ) : (
                             <div className="p-4 text-center text-sm text-zinc-400">
                               No services found
                             </div>
                           )}
-                        </div>
-
-                        {/* Create Custom Service */}
-                        <div className="border-t border-zinc-700">
-                          <button
-                            type="button"
-                            onClick={() => { setShowServiceDropdown(false); setShowCreateService(true); }}
-                            className="w-full px-4 py-3 text-left hover:bg-zinc-700/50 transition-colors flex items-center gap-2 text-emerald-400"
-                          >
-                            <Plus className="h-4 w-4" />
-                            <span className="text-sm font-medium">Create Custom Service</span>
-                          </button>
                         </div>
                       </div>
                     )}
@@ -1018,7 +1045,11 @@ export default function AddJobModal({
                         <div className="flex flex-wrap gap-2">
                           {DURATION_OPTIONS.map(opt => {
                             const isSelected = jobDetails.durationMinutes === opt.minutes && !showCustomDuration;
-                            const isDefault = selectedServiceConfig && Math.round(selectedServiceConfig.durationMinutes * 60) === opt.minutes;
+                            // Check if this is the default duration from service config (convert hours to minutes)
+                            const configDurationMins = selectedServiceConfig?.estimatedDuration
+                              ? Math.round(selectedServiceConfig.estimatedDuration * 60)
+                              : null;
+                            const isDefault = configDurationMins === opt.minutes;
                             return (
                               <button
                                 key={opt.minutes}
@@ -1327,11 +1358,30 @@ export default function AddJobModal({
                 {/* Time selection based on appointment type */}
                 <div className="p-4 bg-zinc-800/30 border border-zinc-700 rounded-lg">
                   {jobDetails.appointmentType === 'anytime' && (
-                    <div className="text-center py-2">
-                      <p className="text-sm text-zinc-400">
-                        Duration: <span className="text-emerald-400 font-medium">{formatDuration(jobDetails.durationMinutes)}</span>
-                      </p>
-                      <p className="text-xs text-zinc-500 mt-1">Scheduled by optimizer within business hours</p>
+                    <div className="space-y-3">
+                      <p className="text-sm text-zinc-400">Scheduled by optimizer within business hours</p>
+                      <div>
+                        <label className="block text-xs font-medium text-zinc-400 mb-2">Duration</label>
+                        <div className="flex flex-wrap gap-2">
+                          {DURATION_OPTIONS.map(opt => {
+                            const isSelected = jobDetails.durationMinutes === opt.minutes;
+                            return (
+                              <button
+                                key={opt.minutes}
+                                type="button"
+                                onClick={() => setJobDetails(prev => ({ ...prev, durationMinutes: opt.minutes }))}
+                                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                                  isSelected
+                                    ? 'bg-emerald-500 text-white'
+                                    : 'bg-zinc-700/50 border border-zinc-600 text-zinc-300 hover:bg-zinc-700'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
                   )}
 
