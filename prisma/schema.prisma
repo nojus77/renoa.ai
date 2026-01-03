@@ -101,6 +101,7 @@ model Provider {
   statusLogs                 UserStatusLog[]              @relation("ProviderStatusLogs")
   teamMessages               team_messages[]
   serviceChecklists          ServiceChecklist[]           @relation("ProviderChecklists")
+  workerShifts               WorkerShift[]                @relation("ProviderShifts")
 }
 
 model Notification {
@@ -163,6 +164,7 @@ model ProviderUser {
   workLogs          WorkLog[]           @relation("UserWorkLogs")
   statusLogs        UserStatusLog[]     @relation("UserStatusLogs")
   sentTeamMessages  team_messages[]     @relation("SentTeamMessages")
+  shifts            WorkerShift[]       @relation("UserShifts")
 
   @@index([providerId])
   @@index([email])
@@ -1183,4 +1185,25 @@ model WorkLog {
   @@index([isPaid])
   @@index([clockIn])
   @@map("work_logs")
+}
+
+// Worker shift tracking (independent of jobs)
+model WorkerShift {
+  id          String       @id @default(cuid())
+  userId      String       @map("user_id")
+  providerId  String       @map("provider_id")
+  clockIn     DateTime     @map("clock_in")
+  clockOut    DateTime?    @map("clock_out")
+  hoursWorked Float?       @map("hours_worked")
+  notes       String?
+  createdAt   DateTime     @default(now()) @map("created_at")
+  updatedAt   DateTime     @updatedAt @map("updated_at")
+
+  user     ProviderUser @relation("UserShifts", fields: [userId], references: [id], onDelete: Cascade)
+  provider Provider     @relation("ProviderShifts", fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([providerId])
+  @@index([clockIn])
+  @@map("worker_shifts")
 }

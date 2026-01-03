@@ -98,6 +98,12 @@ export default function WorkerDashboard() {
   const [dispatchPhone, setDispatchPhone] = useState<string | null>(null);
   const [clockingIn, setClockingIn] = useState(false);
   const [clockingOut, setClockingOut] = useState(false);
+  // Shift tracking state
+  const [isClockedIn, setIsClockedIn] = useState(false);
+  const [activeShiftId, setActiveShiftId] = useState<string | null>(null);
+  const [shiftClockIn, setShiftClockIn] = useState<Date | null>(null);
+  const [shiftElapsedTime, setShiftElapsedTime] = useState<string>('0h 0m');
+  const [totalHoursToday, setTotalHoursToday] = useState(0);
 
   // Job creation modal state
   const [showCreateJob, setShowCreateJob] = useState(false);
@@ -233,6 +239,7 @@ export default function WorkerDashboard() {
     fetchJobs(uid);
     fetchUpcomingJobs(uid);
     fetchWorkerPermissions(uid);
+    fetchShiftStatus(uid, pid);
   }, [router, fetchJobs, fetchUpcomingJobs, fetchWorkerPermissions]);
 
   // Update date once per minute (for midnight rollover)
@@ -334,6 +341,117 @@ export default function WorkerDashboard() {
   const handleQuickClockOut = (jobId: string) => {
     // Navigate to job detail page for full completion flow (signature, photos, etc.)
     router.push(`/worker/job/${jobId}`);
+  };
+
+  // Fetch shift status
+  const fetchShiftStatus = async (uid: string, pid: string) => {
+    try {
+      const res = await fetch(`/api/worker/shift?userId=${uid}&providerId=${pid}`);
+      const data = await res.json();
+
+      if (data.success) {
+        setIsClockedIn(data.isClockedIn);
+        setTotalHoursToday(data.totalHoursToday || 0);
+        if (data.activeShift) {
+          setActiveShiftId(data.activeShift.id);
+          setShiftClockIn(new Date(data.activeShift.clockIn));
+        } else {
+          setActiveShiftId(null);
+          setShiftClockIn(null);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching shift status:', error);
+    }
+  };
+
+  // Update shift elapsed time every second when clocked in
+  useEffect(() => {
+    if (!isClockedIn || !shiftClockIn) {
+      setShiftElapsedTime('0h 0m');
+      return;
+    }
+
+    const updateElapsed = () => {
+      const now = new Date();
+      const elapsed = now.getTime() - shiftClockIn.getTime();
+      const hours = Math.floor(elapsed / (1000 * 60 * 60));
+      const minutes = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+      setShiftElapsedTime(`${hours}h ${minutes}m`);
+      // Also update totalHoursToday with elapsed time
+      const elapsedHours = elapsed / (1000 * 60 * 60);
+      setTotalHoursToday(prev => {
+        // Only update if we're increasing (don't reset on component re-render)
+        const baseHours = stats.hoursWorked || 0;
+        return Math.max(prev, baseHours + elapsedHours);
+      });
+    };
+
+    updateElapsed();
+    const timer = setInterval(updateElapsed, 1000);
+    return () => clearInterval(timer);
+  }, [isClockedIn, shiftClockIn, stats.hoursWorked]);
+
+  // Handle shift clock in
+  const handleShiftClockIn = async () => {
+    if (!userId || !providerId) return;
+
+    setClockingIn(true);
+    try {
+      const res = await fetch('/api/worker/shift', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, providerId }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setIsClockedIn(true);
+        setActiveShiftId(data.shift.id);
+        setShiftClockIn(new Date(data.shift.clockIn));
+        toast.success('Clocked in! Your shift has started.');
+      } else {
+        toast.error(data.error || 'Failed to clock in');
+      }
+    } catch (error) {
+      console.error('Clock in error:', error);
+      toast.error('Failed to clock in');
+    } finally {
+      setClockingIn(false);
+    }
+  };
+
+  // Handle shift clock out
+  const handleShiftClockOut = async () => {
+    if (!userId || !providerId) return;
+
+    setClockingOut(true);
+    try {
+      const res = await fetch('/api/worker/shift', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, providerId, shiftId: activeShiftId }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setIsClockedIn(false);
+        setActiveShiftId(null);
+        setShiftClockIn(null);
+        toast.success(data.message || 'Clocked out successfully!');
+        // Refresh to get updated total hours
+        fetchShiftStatus(userId, providerId);
+      } else {
+        toast.error(data.error || 'Failed to clock out');
+      }
+    } catch (error) {
+      console.error('Clock out error:', error);
+      toast.error('Failed to clock out');
+    } finally {
+      setClockingOut(false);
+    }
   };
 
   // Customer search with debounce
@@ -620,10 +738,12 @@ export default function WorkerDashboard() {
             <p className="text-2xl font-bold text-white">{stats.jobsCount}</p>
             <p className="text-xs text-gray-500">Jobs Today</p>
           </div>
-          <div className="bg-[#1F1F1F] rounded-[20px] p-4 text-center border border-[#2A2A2A]">
-            <Clock className="w-6 h-6 mx-auto mb-2" style={{ color: LIME_GREEN }} />
-            <p className="text-2xl font-bold text-white">{stats.hoursWorked}h</p>
-            <p className="text-xs text-gray-500">Hours</p>
+          <div className={`bg-[#1F1F1F] rounded-[20px] p-4 text-center border ${isClockedIn ? 'border-green-500' : 'border-[#2A2A2A]'}`}>
+            <Clock className="w-6 h-6 mx-auto mb-2" style={{ color: isClockedIn ? '#22c55e' : LIME_GREEN }} />
+            <p className="text-2xl font-bold text-white">
+              {isClockedIn ? shiftElapsedTime : `${Math.round(totalHoursToday * 10) / 10}h`}
+            </p>
+            <p className="text-xs text-gray-500">{isClockedIn ? 'On Shift' : 'Hours'}</p>
           </div>
           <div className="bg-[#1F1F1F] rounded-[20px] p-4 text-center border border-[#2A2A2A]">
             <DollarSign className="w-6 h-6 mx-auto mb-2" style={{ color: LIME_GREEN }} />
@@ -720,28 +840,32 @@ export default function WorkerDashboard() {
 
         {/* Action Buttons Row */}
         <div className="flex gap-3">
-          {/* Clock In/Out Button */}
-          {activeJob ? (
+          {/* Clock In/Out Button - Shift based */}
+          {isClockedIn ? (
             <button
-              onClick={() => router.push(`/worker/job/${activeJob.id}`)}
-              className="flex-1 py-4 rounded-[20px] font-semibold text-white flex items-center justify-center gap-2 transition-colors active:scale-[0.98] bg-orange-500 hover:bg-orange-600"
+              onClick={handleShiftClockOut}
+              disabled={clockingOut}
+              className="flex-1 py-4 rounded-[20px] font-semibold text-white flex items-center justify-center gap-2 transition-colors active:scale-[0.98] bg-orange-500 hover:bg-orange-600 disabled:opacity-50"
             >
-              <LogOut className="w-5 h-5" />
-              Clock Out
+              {clockingOut ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <LogOut className="w-5 h-5" />
+              )}
+              {clockingOut ? 'Clocking Out...' : 'Clock Out'}
             </button>
           ) : (
             <button
-              onClick={() => {
-                if (nextJobToClockIn) {
-                  router.push(`/worker/job/${nextJobToClockIn.id}`);
-                } else {
-                  toast.error('No jobs scheduled to clock into');
-                }
-              }}
-              className="flex-1 py-4 rounded-[20px] font-semibold text-white flex items-center justify-center gap-2 transition-colors active:scale-[0.98] bg-blue-500 hover:bg-blue-600"
+              onClick={handleShiftClockIn}
+              disabled={clockingIn}
+              className="flex-1 py-4 rounded-[20px] font-semibold text-white flex items-center justify-center gap-2 transition-colors active:scale-[0.98] bg-blue-500 hover:bg-blue-600 disabled:opacity-50"
             >
-              <LogIn className="w-5 h-5" />
-              Clock In
+              {clockingIn ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <LogIn className="w-5 h-5" />
+              )}
+              {clockingIn ? 'Clocking In...' : 'Clock In'}
             </button>
           )}
 
