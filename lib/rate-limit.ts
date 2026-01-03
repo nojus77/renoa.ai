@@ -9,6 +9,9 @@ const redis = new Redis({
   token: process.env.UPSTASH_REDIS_REST_TOKEN || '',
 });
 
+// Export redis for use in other modules
+export { redis };
+
 // Rate limiters for different contexts
 // Auth routes: strict limit to prevent brute force
 export const authRateLimiter = new Ratelimit({

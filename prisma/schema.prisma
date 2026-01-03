@@ -313,6 +313,8 @@ model Job {
   // Skill requirements (copied from ServiceTypeConfig at creation)
   requiredSkillIds      String[]               @default([]) @map("required_skill_ids")
   preferredSkillIds     String[]               @default([]) @map("preferred_skill_ids")
+  // Snapshot of skill names at job creation (prevents showing IDs if skills are deleted)
+  requiredSkillsSnapshot Json?                 @map("required_skills_snapshot") // [{id: "...", name: "..."}]
   // Multi-worker support
   requiredWorkerCount   Int                    @default(1) @map("required_worker_count")
   // Buffer time between jobs (minutes)

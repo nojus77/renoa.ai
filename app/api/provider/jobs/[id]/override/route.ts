@@ -85,10 +85,9 @@ export async function POST(
         );
       }
 
-      // Add worker to assignments if not already assigned
-      if (!job.assignedUserIds.includes(assignedWorkerId)) {
-        updateData.assignedUserIds = [...job.assignedUserIds, assignedWorkerId];
-      }
+      // Override REPLACES the current assignment with the new worker
+      // (not appending, since the override is specifically for this worker)
+      updateData.assignedUserIds = [assignedWorkerId];
     }
 
     // Update the job

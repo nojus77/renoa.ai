@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { GoogleMap, useJsApiLoader, Marker, DirectionsRenderer, InfoWindow } from '@react-google-maps/api';
 import ProviderLayout from '@/components/provider/ProviderLayout';
+import SkillMismatchModal from '@/components/provider/SkillMismatchModal';
 import { Button } from '@/components/ui/button';
 import {
   MapPin, Navigation, Clock, ChevronRight, ChevronLeft, Route, Loader2, Calendar,
@@ -57,6 +58,9 @@ interface Worker {
   color: string;
   homeLatitude?: number | null;
   homeLongitude?: number | null;
+  role?: string;
+  skillIds?: string[];
+  skills?: string[];
 }
 
 interface OfficeLocation {
@@ -221,6 +225,8 @@ export default function DispatchPage() {
   const [prevJobDate, setPrevJobDate] = useState<string | null>(null);
   const [reassigningJobId, setReassigningJobId] = useState<string | null>(null);
   const [reassignmentWorker, setReassignmentWorker] = useState<Record<string, string>>({});
+  const [isUserInteracting, setIsUserInteracting] = useState(false);
+  const interactionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check theme
   useEffect(() => {
@@ -314,16 +320,37 @@ export default function DispatchPage() {
     fetchDispatchData();
   }, [fetchDispatchData]);
 
+  // Helper to mark user interaction (prevents auto-refresh for 10 seconds)
+  const markUserInteraction = useCallback(() => {
+    setIsUserInteracting(true);
+    if (interactionTimeoutRef.current) {
+      clearTimeout(interactionTimeoutRef.current);
+    }
+    interactionTimeoutRef.current = setTimeout(() => {
+      setIsUserInteracting(false);
+    }, 10000);
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (interactionTimeoutRef.current) {
+        clearTimeout(interactionTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Auto-refresh every 30 seconds - silent background updates
+  // Skip refresh when user is interacting with modals or dropdowns
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!optimizing) {
+      if (!optimizing && !isUserInteracting && !showSkillMismatchModal && !showNeedsReviewModal && !overrideModalJob) {
         fetchDispatchData(true); // Silent refresh - no loading state, preserves map position
       }
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [fetchDispatchData, optimizing]);
+  }, [fetchDispatchData, optimizing, isUserInteracting, showSkillMismatchModal, showNeedsReviewModal, overrideModalJob]);
 
   // Filter toggle helper
   const toggleStatusFilter = (status: string) => {
@@ -484,24 +511,38 @@ export default function DispatchPage() {
     }
   };
 
-  // Assign job to worker
+  // Assign job to worker using proper assignment API
   const assignJobToWorker = async (jobId: string, workerId: string) => {
+    markUserInteraction();
     try {
-      const res = await fetch(`/api/provider/jobs/${jobId}`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/provider/jobs/${jobId}/assign`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assignedUserIds: [workerId] }),
+        body: JSON.stringify({
+          providerId,
+          userIds: [workerId],
+        }),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        throw new Error('Failed to assign job');
+        // Handle skill mismatch error
+        if (data.skillMismatch) {
+          setNotification({
+            message: `Skill mismatch: Worker missing ${data.missingSkillNames?.join(', ') || 'required skills'}`,
+            type: 'error'
+          });
+          return;
+        }
+        throw new Error(data.error || 'Failed to assign job');
       }
 
       setNotification({ message: 'Job assigned successfully', type: 'success' });
       await fetchDispatchData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Assign error:', error);
-      setNotification({ message: 'Failed to assign job', type: 'error' });
+      setNotification({ message: error.message || 'Failed to assign job', type: 'error' });
     }
   };
 
@@ -1282,178 +1323,27 @@ export default function DispatchPage() {
           </div>
         </div>
 
-        {/* Skill Mismatch Modal */}
-        {showSkillMismatchModal && optimizationResult?.skillMismatches && optimizationResult.skillMismatches.length > 0 && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-card border border-border rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] flex flex-col">
-              <div className="p-4 border-b border-border flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-5 h-5 text-amber-500" />
-                  <h3 className="font-semibold text-foreground">
-                    Skill Mismatches Found
-                  </h3>
-                </div>
-                <button
-                  onClick={() => setShowSkillMismatchModal(false)}
-                  className="p-1 hover:bg-accent rounded"
-                >
-                  <XCircle className="w-5 h-5 text-muted-foreground" />
-                </button>
-              </div>
-
-              <div className="p-4 overflow-y-auto flex-1">
-                <p className="text-sm text-muted-foreground mb-4">
-                  {optimizationResult.skillMismatches.length} job(s) are assigned to workers without the required skills:
-                </p>
-
-                <div className="space-y-3">
-                  {optimizationResult.skillMismatches.map((mismatch) => {
-                    // Find other workers for this job (workers not currently assigned)
-                    const otherWorkers = workers.filter(w =>
-                      w.id !== mismatch.assignedWorkerId
-                    );
-
-                    return (
-                      <div
-                        key={mismatch.jobId}
-                        className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-foreground text-sm truncate">
-                            {mismatch.jobTitle}
-                          </p>
-                          <p className="text-xs text-muted-foreground mt-1">
-                            Currently: <span className="text-amber-600 font-medium">{mismatch.assignedWorkerName}</span>
-                          </p>
-                          <div className="mt-2 text-xs">
-                            <p className="text-muted-foreground">
-                              Their skills: {mismatch.workerSkills.length > 0 ? mismatch.workerSkills.slice(0, 3).join(', ') : 'None'}
-                              {mismatch.workerSkills.length > 3 && ` +${mismatch.workerSkills.length - 3} more`}
-                            </p>
-                            <p className="text-amber-600 mt-0.5">
-                              Missing: {(mismatch.missingSkillNames?.length > 0 ? mismatch.missingSkillNames : mismatch.requiredSkills).slice(0, 3).join(', ') || 'Required skills not configured'}
-                            </p>
-                          </div>
-
-                          {/* Inline Reassignment */}
-                          <div className="mt-3 flex flex-col gap-2">
-                            <div className="flex items-center gap-2">
-                              <select
-                                value={reassignmentWorker[mismatch.jobId] || ''}
-                                onChange={(e) => setReassignmentWorker(prev => ({
-                                  ...prev,
-                                  [mismatch.jobId]: e.target.value
-                                }))}
-                                className="flex-1 px-2 py-1.5 text-xs bg-background border border-border rounded text-foreground"
-                              >
-                                <option value="">Reassign to...</option>
-                                {otherWorkers.map(w => (
-                                  <option key={w.id} value={w.id}>
-                                    {w.firstName} {w.lastName}
-                                  </option>
-                                ))}
-                              </select>
-                              <button
-                                disabled={!reassignmentWorker[mismatch.jobId] || reassigningJobId === mismatch.jobId}
-                                onClick={async () => {
-                                  const newWorkerId = reassignmentWorker[mismatch.jobId];
-                                  if (!newWorkerId) return;
-
-                                  setReassigningJobId(mismatch.jobId);
-                                  try {
-                                    const res = await fetch(`/api/provider/jobs/${mismatch.jobId}/assign`, {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({
-                                        providerId,
-                                        userIds: [newWorkerId],
-                                      }),
-                                    });
-
-                                    if (res.ok) {
-                                      setNotification({ message: 'Worker reassigned successfully', type: 'success' });
-                                      // Remove from mismatches
-                                      if (optimizationResult) {
-                                        setOptimizationResult({
-                                          ...optimizationResult,
-                                          skillMismatches: optimizationResult.skillMismatches.filter(
-                                            m => m.jobId !== mismatch.jobId
-                                          ),
-                                        });
-                                      }
-                                      // Clear selection
-                                      setReassignmentWorker(prev => {
-                                        const updated = { ...prev };
-                                        delete updated[mismatch.jobId];
-                                        return updated;
-                                      });
-                                      // Refresh data
-                                      await fetchDispatchData();
-                                    } else {
-                                      const data = await res.json();
-                                      setNotification({ message: data.error || 'Failed to reassign', type: 'error' });
-                                    }
-                                  } catch {
-                                    setNotification({ message: 'Failed to reassign worker', type: 'error' });
-                                  } finally {
-                                    setReassigningJobId(null);
-                                  }
-                                }}
-                                className="px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
-                              >
-                                {reassigningJobId === mismatch.jobId ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
-                                ) : (
-                                  'Reassign'
-                                )}
-                              </button>
-                            </div>
-
-                            <div className="flex gap-2">
-                              <button
-                                onClick={() => {
-                                  setOverrideModalJob({
-                                    jobId: mismatch.jobId,
-                                    jobTitle: mismatch.jobTitle,
-                                    assignedWorkerId: mismatch.assignedWorkerId,
-                                    assignedWorkerName: mismatch.assignedWorkerName,
-                                    missingSkillNames: mismatch.missingSkillNames || mismatch.requiredSkills,
-                                  });
-                                  setShowSkillMismatchModal(false);
-                                }}
-                                className="px-2 py-1 text-xs bg-amber-500/20 text-amber-600 border border-amber-500/30 rounded hover:bg-amber-500/30"
-                              >
-                                Keep & Override
-                              </button>
-                              <button
-                                onClick={() => {
-                                  router.push(`/provider/jobs/${mismatch.jobId}`);
-                                  setShowSkillMismatchModal(false);
-                                }}
-                                className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-                              >
-                                View Job →
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="p-4 border-t border-border flex justify-end gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setShowSkillMismatchModal(false)}
-                >
-                  Close
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Skill Mismatch Modal - Using the new component */}
+        <SkillMismatchModal
+          isOpen={showSkillMismatchModal && (optimizationResult?.skillMismatches?.length || 0) > 0}
+          onClose={() => setShowSkillMismatchModal(false)}
+          mismatches={optimizationResult?.skillMismatches || []}
+          workers={workers}
+          providerId={providerId}
+          onUpdate={() => fetchDispatchData()}
+          onMismatchesChange={(newMismatches) => {
+            if (optimizationResult) {
+              setOptimizationResult({
+                ...optimizationResult,
+                skillMismatches: newMismatches,
+              });
+            }
+            // Close modal if no more mismatches
+            if (newMismatches.length === 0) {
+              setShowSkillMismatchModal(false);
+            }
+          }}
+        />
 
         {/* Needs Review Modal */}
         {showNeedsReviewModal && optimizationResult?.needsReview && optimizationResult.needsReview.length > 0 && (

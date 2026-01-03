@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Fetch all field workers
+    // Fetch all field workers with their skills
     const workers = await prisma.providerUser.findMany({
       where: {
         providerId,
@@ -94,6 +94,17 @@ export async function GET(request: NextRequest) {
         color: true,
         homeLatitude: true,
         homeLongitude: true,
+        workerSkills: {
+          select: {
+            skillId: true,
+            skill: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
       },
       orderBy: { firstName: 'asc' },
     });
@@ -164,10 +175,27 @@ export async function GET(request: NextRequest) {
       '#ec4899', '#06b6d4', '#f97316', '#84cc16',
     ];
 
-    const workersWithColors = workers.map((worker, index) => ({
-      ...worker,
-      color: worker.color || WORKER_COLORS[index % WORKER_COLORS.length],
-    }));
+    // Office coordinates for fallback
+    const officeLocation = provider?.officeLatitude && provider?.officeLongitude
+      ? { latitude: provider.officeLatitude, longitude: provider.officeLongitude }
+      : null;
+
+    const workersWithColors = workers.map((worker, index) => {
+      const hasHomeLocation = worker.homeLatitude && worker.homeLongitude;
+      return {
+        id: worker.id,
+        firstName: worker.firstName,
+        lastName: worker.lastName,
+        color: worker.color || WORKER_COLORS[index % WORKER_COLORS.length],
+        // Use home location or fall back to office
+        homeLatitude: worker.homeLatitude ?? officeLocation?.latitude ?? null,
+        homeLongitude: worker.homeLongitude ?? officeLocation?.longitude ?? null,
+        usingFallbackLocation: !hasHomeLocation && !!officeLocation,
+        // Include skill IDs for skill matching
+        skillIds: worker.workerSkills.map(ws => ws.skillId),
+        skills: worker.workerSkills.map(ws => ws.skill.name),
+      };
+    });
 
     return NextResponse.json({
       office: provider ? {
@@ -196,6 +224,11 @@ export async function GET(request: NextRequest) {
         },
         assignedUserIds: job.assignedUserIds,
         assignedCrew: job.assignedCrew,
+        // Skill requirements for mismatch detection
+        requiredSkillIds: (job as any).requiredSkillIds || [],
+        requiredSkillsSnapshot: (job as any).requiredSkillsSnapshot || null,
+        allowUnqualified: (job as any).allowUnqualified || false,
+        requiredWorkerCount: (job as any).requiredWorkerCount || 1,
       })),
       unassignedJobs: unassignedJobs.map(job => ({
         id: job.id,
@@ -217,6 +250,11 @@ export async function GET(request: NextRequest) {
         },
         assignedUserIds: job.assignedUserIds,
         assignedCrew: job.assignedCrew,
+        // Skill requirements for mismatch detection
+        requiredSkillIds: (job as any).requiredSkillIds || [],
+        requiredSkillsSnapshot: (job as any).requiredSkillsSnapshot || null,
+        allowUnqualified: (job as any).allowUnqualified || false,
+        requiredWorkerCount: (job as any).requiredWorkerCount || 1,
       })),
       workers: workersWithColors,
       date: targetDate.toISOString(),

@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { redis } from '@/lib/rate-limit';
 import { startOfDay, endOfDay, parseISO, addMinutes, format } from 'date-fns';
 import {
   calculateHaversineDistance,
   type Coordinates,
 } from '@/lib/services/distance-service';
+
+// Lock expiry time in seconds (5 minutes)
+const OPTIMIZATION_LOCK_TTL = 300;
 
 const WORKER_COLORS = [
   '#10b981', '#3b82f6', '#f59e0b', '#ef4444',
@@ -15,6 +19,11 @@ const DEFAULT_START_HOUR = 8;
 const AVG_SPEED_MPH = 30;
 const MAX_JOBS_PER_WORKER = 12; // Hard limit
 const WORKLOAD_PENALTY_FACTOR = 5; // Miles penalty per extra job above average
+
+interface SkillSnapshot {
+  id: string;
+  name: string;
+}
 
 interface JobWithCoords {
   id: string;
@@ -31,6 +40,7 @@ interface JobWithCoords {
   // Skill requirements from job
   requiredSkillIds: string[];
   preferredSkillIds: string[];
+  requiredSkillsSnapshot: SkillSnapshot[] | null;
   requiredWorkerCount: number;
   bufferMinutes: number;
   allowUnqualified: boolean;
@@ -55,52 +65,10 @@ interface ScheduledJob extends JobWithCoords {
 }
 
 /**
- * Skill mapping for job types - worker needs ANY of these skills
+ * NOTE: Fuzzy skill matching has been removed.
+ * All skill matching is now done via explicit skill IDs configured on jobs.
+ * If a job has no requiredSkillIds, any worker can do it.
  */
-function getRequiredSkillsForJob(serviceType: string): string[] {
-  const skillMap: Record<string, string[]> = {
-    'Lawn Mowing': ['Lawn Mowing', 'Lawn Care', 'Mowing', 'Lawn Edging', 'Lawn', 'Zero-Turn Mower', 'Walk-Behind Mower', 'Edging & Trimming'],
-    'Lawn Edging': ['Lawn Edging', 'Edging & Trimming', 'Lawn Mowing', 'Lawn Care', 'Lawn', 'Mowing', 'String Trimmer', 'Edger'],
-    'Tree Trimming': ['Tree Trimming', 'Pruning', 'Tree Work', 'Trimming & Pruning', 'Chainsaw Operation'],
-    'Tree Removal': ['Tree Removal', 'Tree Work', 'Tree Trimming', 'Chainsaw Operation', 'ISA Certified Arborist'],
-    'Trimming & Pruning': ['Trimming & Pruning', 'Pruning', 'Tree Trimming', 'Bush/Shrub Pruning', 'Hedge Trimming', 'Landscaping', 'Lawn Care'],
-    'Landscaping': ['Landscaping', 'Planting', 'Garden Bed Maintenance', 'Landscape Design', 'Mulching', 'Lawn Care'],
-    'Planting': ['Planting (Shrubs)', 'Planting (Flowers)', 'Planting (Trees)', 'Planting', 'Landscaping', 'Garden Bed Maintenance', 'Lawn Care', 'Mulching', 'Edging & Trimming'],
-    'Mulching': ['Mulching', 'Landscaping', 'Garden Bed Maintenance', 'Planting', 'Planting (Shrubs)', 'Planting (Flowers)', 'Lawn Care', 'Edging & Trimming'],
-    'Hardscaping': ['Hardscaping', 'Paver Installation', 'Retaining Wall', 'Concrete Work', 'Stone Work'],
-    'Irrigation': ['Irrigation', 'Sprinkler Repair', 'Sprinkler Installation', 'Irrigation Repair', 'Irrigation Installation'],
-    'Fertilization': ['Fertilization', 'Lawn Treatment', 'Pesticide Applicator License', 'Weed Control', 'Lawn Care'],
-    'Hedge Trimming': ['Hedge Trimming', 'Bush/Shrub Pruning', 'Pruning', 'Trimming & Pruning'],
-    'Spring Cleanup': ['Spring Cleanup', 'Fall Cleanup', 'Cleanup', 'Leaf Removal', 'Lawn Care', 'Debris Removal', 'Lawn Mowing', 'Leaf Blower'],
-    'Fall Cleanup': ['Fall Cleanup', 'Spring Cleanup', 'Cleanup', 'Leaf Removal', 'Lawn Care', 'Debris Removal', 'Leaf Blower'],
-    'Leaf Removal': ['Leaf Removal', 'Fall Cleanup', 'Spring Cleanup', 'Cleanup', 'Leaf Blower', 'Debris Removal', 'Lawn Care', 'Lawn Mowing'],
-    'Aeration': ['Aeration', 'Lawn Care', 'Lawn Mowing', 'Lawn Treatment'],
-    'Seeding': ['Seeding', 'Seeding & Overseeding', 'Lawn Care', 'Sod Installation', 'Aeration'],
-  };
-  return skillMap[serviceType] || [];
-}
-
-/**
- * Check if worker has skills for a job (with fuzzy matching)
- * DEPRECATED: Use workerHasRequiredSkillIds for explicit skill matching
- */
-function workerCanDoJob(workerSkills: string[], serviceType: string): boolean {
-  const requiredSkills = getRequiredSkillsForJob(serviceType);
-
-  // If no specific skills required, any worker can do it
-  if (requiredSkills.length === 0) return true;
-
-  // Check if worker has ANY of the required skills (fuzzy match)
-  return requiredSkills.some(required =>
-    workerSkills.some(workerSkill => {
-      const reqLower = required.toLowerCase();
-      const skillLower = workerSkill.toLowerCase();
-      return skillLower === reqLower ||
-        skillLower.includes(reqLower) ||
-        reqLower.includes(skillLower);
-    })
-  );
-}
 
 /**
  * Check if worker has ALL required skills (explicit ID matching)
@@ -123,20 +91,39 @@ function getMissingSkillIds(workerSkillIds: string[], requiredSkillIds: string[]
 }
 
 /**
+ * Get skill name from snapshot (preferred) or fallback to map
+ * Prevents showing IDs when skills are deleted
+ */
+function getSkillName(
+  skillId: string,
+  snapshot: SkillSnapshot[] | null,
+  skillNameMap: Map<string, string>
+): string {
+  // First try snapshot (skill name at job creation)
+  const fromSnapshot = snapshot?.find(s => s.id === skillId)?.name;
+  if (fromSnapshot) return fromSnapshot;
+
+  // Then try current skill map
+  const fromMap = skillNameMap.get(skillId);
+  if (fromMap) return fromMap;
+
+  // Last resort: show truncated ID
+  return `Unknown Skill (${skillId.slice(0, 8)}...)`;
+}
+
+/**
  * Determine if worker is qualified for a job
- * Uses explicit skill IDs if available, falls back to fuzzy matching
+ * Uses ONLY explicit skill ID matching - no fuzzy matching
  */
 function workerIsQualifiedForJob(worker: WorkerData, job: JobWithCoords): boolean {
   // If job has allowUnqualified flag, anyone can do it
   if (job.allowUnqualified) return true;
 
-  // Prefer explicit skill ID matching if job has requiredSkillIds
-  if (job.requiredSkillIds && job.requiredSkillIds.length > 0) {
-    return workerHasRequiredSkillIds(worker.skillIds, job.requiredSkillIds);
-  }
+  // If job has no required skills, any worker can do it
+  if (!job.requiredSkillIds || job.requiredSkillIds.length === 0) return true;
 
-  // Fall back to fuzzy matching for legacy jobs without skill IDs
-  return workerCanDoJob(worker.skills, job.serviceType);
+  // Worker must have ALL required skills (exact ID matching)
+  return workerHasRequiredSkillIds(worker.skillIds, job.requiredSkillIds);
 }
 
 /**
@@ -432,11 +419,44 @@ function calculateETAs(jobs: JobWithCoords[], startPoint: Coordinates | null, da
  * 3. Re-optimize routes after assignments
  */
 export async function POST(req: Request) {
+  let lockKey: string | null = null;
+
   try {
     const { date, workerIds, providerId, autoAssign = true } = await req.json();
 
     if (!providerId) {
       return NextResponse.json({ error: 'Provider ID required' }, { status: 400 });
+    }
+
+    // Acquire lock to prevent concurrent optimizations for the same provider
+    lockKey = `optimization_lock:${providerId}`;
+
+    // Check if Redis is configured before trying to use it
+    const redisConfigured = process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN;
+
+    if (redisConfigured) {
+      try {
+        const existingLock = await redis.get(lockKey);
+        if (existingLock) {
+          return NextResponse.json(
+            {
+              error: 'Route optimization already in progress',
+              inProgress: true,
+              message: 'Please wait for the current optimization to complete',
+            },
+            { status: 409 }
+          );
+        }
+
+        // Set lock with TTL (5 minutes max)
+        await redis.set(lockKey, Date.now().toString(), { ex: OPTIMIZATION_LOCK_TTL });
+      } catch (redisError) {
+        // If Redis fails, continue without lock (fallback to unlocked operation)
+        console.warn('[Optimize-All API] Redis lock failed, proceeding without lock:', redisError);
+        lockKey = null;
+      }
+    } else {
+      lockKey = null; // No locking if Redis not configured
     }
 
     const dateObj = parseISO(date);
@@ -511,6 +531,7 @@ export async function POST(req: Request) {
         const job = j as typeof j & {
           requiredSkillIds?: string[];
           preferredSkillIds?: string[];
+          requiredSkillsSnapshot?: Array<{ id: string; name: string }> | null;
           requiredWorkerCount?: number;
           bufferMinutes?: number;
           allowUnqualified?: boolean;
@@ -530,6 +551,7 @@ export async function POST(req: Request) {
           // Include skill fields from job
           requiredSkillIds: job.requiredSkillIds || [],
           preferredSkillIds: job.preferredSkillIds || [],
+          requiredSkillsSnapshot: job.requiredSkillsSnapshot || null,
           requiredWorkerCount: job.requiredWorkerCount || 1,
           bufferMinutes: job.bufferMinutes || 15,
           allowUnqualified: job.allowUnqualified || false,
@@ -598,19 +620,26 @@ export async function POST(req: Request) {
     }> = [];
 
     for (const job of jobsWithCoords) {
-      // Check for multi-worker jobs - these should never be auto-assigned
+      // Check for multi-worker jobs - these need special handling
       if (job.requiredWorkerCount > 1) {
-        needsReview.push({
-          jobId: job.id,
-          jobTitle: `${job.serviceType} - ${job.customer?.name || 'Unknown'}`,
-          serviceType: job.serviceType,
-          reason: 'MULTI_WORKER_REQUIRED',
-          message: `Requires ${job.requiredWorkerCount} workers`,
-          requiredWorkerCount: job.requiredWorkerCount,
-        });
-        // Still add to assigned jobs if it has assignments
-        if (job.assignedUserIds.length > 0) {
-          assignedJobs.push(job);
+        const assignedCount = job.assignedUserIds.length;
+        const isFullyAssigned = assignedCount >= job.requiredWorkerCount;
+
+        // Only add to needsReview if not fully assigned
+        if (!isFullyAssigned) {
+          needsReview.push({
+            jobId: job.id,
+            jobTitle: `${job.serviceType} - ${job.customer?.name || 'Unknown'}`,
+            serviceType: job.serviceType,
+            reason: 'MULTI_WORKER_REQUIRED',
+            message: `Requires ${job.requiredWorkerCount} workers (${assignedCount} assigned)`,
+            requiredWorkerCount: job.requiredWorkerCount,
+          });
+        }
+
+        // Add to worker routes if assigned (but only count once in assignedJobs)
+        if (assignedCount > 0) {
+          assignedJobs.push(job); // Count once, not per worker
           for (const workerId of job.assignedUserIds) {
             const worker = workerMap.get(workerId);
             if (worker) worker.assignedJobs.push(job);
@@ -630,20 +659,18 @@ export async function POST(req: Request) {
             const hasSkills = workerIsQualifiedForJob(worker, job);
 
             if (!hasSkills && !job.allowUnqualified) {
-              // Get missing skill details
+              // Get missing skill details (only if job has explicit required skills)
               const missingIds = getMissingSkillIds(worker.skillIds, job.requiredSkillIds);
 
-              // Get required skill names for display
-              const requiredNames = job.requiredSkillIds.length > 0
-                ? job.requiredSkillIds.map(id => skillNameMap.get(id) || id)
-                : getRequiredSkillsForJob(job.serviceType);
+              // Get required skill names for display (use snapshot first, then map)
+              const requiredNames = job.requiredSkillIds.map(id =>
+                getSkillName(id, job.requiredSkillsSnapshot, skillNameMap)
+              );
 
-              // For missing names: use explicit IDs if available, otherwise use fuzzy-matched required skills
-              // When using fuzzy matching (no explicit skill IDs), ALL required skills are "missing"
-              // since the worker doesn't have any matching skills
-              const missingNames = missingIds.length > 0
-                ? missingIds.map(id => skillNameMap.get(id) || id)
-                : requiredNames;
+              // Get missing skill names (use snapshot first, then map)
+              const missingNames = missingIds.map(id =>
+                getSkillName(id, job.requiredSkillsSnapshot, skillNameMap)
+              );
 
               skillMismatches.push({
                 jobId: job.id,
@@ -717,17 +744,19 @@ export async function POST(req: Request) {
         }
 
         if (eligibleWorkers.length === 0) {
-          // Get required skill names for the error message
-          const requiredSkillNames = job.requiredSkillIds.length > 0
-            ? job.requiredSkillIds.map(id => skillNameMap.get(id) || id)
-            : getRequiredSkillsForJob(job.serviceType);
+          // Get required skill names for the error message (use snapshot first, then map)
+          const requiredSkillNames = job.requiredSkillIds.map(id =>
+            getSkillName(id, job.requiredSkillsSnapshot, skillNameMap)
+          );
 
           needsReview.push({
             jobId: job.id,
             jobTitle: `${job.serviceType} - ${job.customer?.name || 'Unknown'}`,
             serviceType: job.serviceType,
             reason: 'NO_QUALIFIED_WORKERS',
-            message: 'No workers have all required skills',
+            message: requiredSkillNames.length > 0
+              ? 'No workers have all required skills'
+              : 'No available workers for this job',
             requiredSkillIds: job.requiredSkillIds,
             requiredSkillNames: requiredSkillNames,
           });
@@ -736,7 +765,9 @@ export async function POST(req: Request) {
             id: job.id,
             service: job.serviceType,
             customer: job.customer?.name || null,
-            reason: `No workers have required skills: ${requiredSkillNames.join(', ')}`,
+            reason: requiredSkillNames.length > 0
+              ? `No workers have required skills: ${requiredSkillNames.join(', ')}`
+              : 'No available workers',
           });
           continue;
         }
@@ -757,6 +788,15 @@ export async function POST(req: Request) {
           // Assign job to this worker
           bestWorker.assignedJobs.push(job);
         } else {
+          // Add to needsReview with capacity warning
+          needsReview.push({
+            jobId: job.id,
+            jobTitle: `${job.serviceType} - ${job.customer?.name || 'Unknown'}`,
+            serviceType: job.serviceType,
+            reason: 'WORKER_CAPACITY_FULL',
+            message: 'All eligible workers at maximum capacity',
+          });
+
           unassignableJobs.push({
             id: job.id,
             service: job.serviceType,
@@ -877,5 +917,14 @@ export async function POST(req: Request) {
   } catch (error) {
     console.error('[Optimize-All API] Error:', error);
     return NextResponse.json({ error: 'Failed to optimize routes' }, { status: 500 });
+  } finally {
+    // Always release the lock when done (success or error)
+    if (lockKey && process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
+      try {
+        await redis.del(lockKey);
+      } catch (redisError) {
+        console.warn('[Optimize-All API] Failed to release lock:', redisError);
+      }
+    }
   }
 }

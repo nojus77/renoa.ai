@@ -236,6 +236,19 @@ export async function POST(request: NextRequest) {
       estimatedDuration: serviceConfig.estimatedDuration, // ServiceTypeConfig stores in hours
     } : 'Not configured');
 
+    // Determine final required skill IDs
+    const finalRequiredSkillIds = requiredSkillIds ?? serviceConfig?.requiredSkills ?? [];
+
+    // Create skill snapshot for display (prevents showing IDs if skills are deleted)
+    let requiredSkillsSnapshot: Array<{ id: string; name: string }> | null = null;
+    if (finalRequiredSkillIds.length > 0) {
+      const skills = await prisma.skill.findMany({
+        where: { id: { in: finalRequiredSkillIds } },
+        select: { id: true, name: true },
+      });
+      requiredSkillsSnapshot = skills.map(s => ({ id: s.id, name: s.name }));
+    }
+
     // Create the job with skill requirements
     // Use explicit values from request if provided, otherwise fall back to ServiceTypeConfig
     const job = await prisma.job.create({
@@ -258,8 +271,12 @@ export async function POST(request: NextRequest) {
         recurringEndDate: isRecurring && recurringEndDate ? new Date(recurringEndDate) : null,
         assignedUserIds,
         // Skill requirements: prefer explicit values, fall back to ServiceTypeConfig
-        requiredSkillIds: requiredSkillIds ?? serviceConfig?.requiredSkills ?? [],
+        requiredSkillIds: finalRequiredSkillIds,
         preferredSkillIds: preferredSkillIds ?? serviceConfig?.preferredSkills ?? [],
+        // Snapshot of skill names at creation (only store if we have skills)
+        ...(requiredSkillsSnapshot && requiredSkillsSnapshot.length > 0
+          ? { requiredSkillsSnapshot: requiredSkillsSnapshot }
+          : {}),
         requiredWorkerCount: requiredWorkerCount ?? serviceConfig?.crewSizeMin ?? 1,
         bufferMinutes: bufferMinutes ?? 15,
         durationMinutes: durationMinutes ?? (serviceConfig?.estimatedDuration ? Math.round(serviceConfig.estimatedDuration * 60) : Math.round(durationHours * 60)),
