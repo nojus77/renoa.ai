@@ -1,14 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { cookies } from 'next/headers';
 
 /**
  * POST /api/provider/jobs/[id]/override
  * Override skill requirements for a job assignment
  *
  * Body:
+ * - providerId: string (required) - Provider ID
  * - reason: string (required) - Reason for the override
  * - assignedWorkerId: string (optional) - Worker being assigned despite skill mismatch
+ * - overrideByUserId: string (optional) - User ID who is overriding (for audit)
  */
 export async function POST(
   request: NextRequest,
@@ -17,37 +18,19 @@ export async function POST(
   try {
     const { id: jobId } = await params;
     const body = await request.json();
-    const { reason, assignedWorkerId } = body;
+    const { reason, assignedWorkerId, providerId, overrideByUserId } = body;
+
+    if (!providerId) {
+      return NextResponse.json(
+        { error: 'Provider ID is required' },
+        { status: 400 }
+      );
+    }
 
     if (!reason || reason.trim().length === 0) {
       return NextResponse.json(
         { error: 'Override reason is required' },
         { status: 400 }
-      );
-    }
-
-    // Get the current user from session
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('provider_session');
-
-    if (!sessionCookie?.value) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    let session;
-    try {
-      session = JSON.parse(sessionCookie.value);
-    } catch {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
-    }
-
-    const { providerId, userId, role } = session;
-
-    // Only owners and office staff can override skill requirements
-    if (!['owner', 'office'].includes(role)) {
-      return NextResponse.json(
-        { error: 'Only owners and office staff can override skill requirements' },
-        { status: 403 }
       );
     }
 
@@ -75,7 +58,7 @@ export async function POST(
     // Build the update data
     const updateData: any = {
       allowUnqualified: true,
-      unqualifiedOverrideBy: userId,
+      unqualifiedOverrideBy: overrideByUserId || null,
       unqualifiedOverrideAt: new Date(),
       unqualifiedOverrideReason: reason.trim(),
     };
@@ -123,14 +106,17 @@ export async function POST(
       },
     });
 
-    // Get the user who made the override for the response
-    const overrideUser = await prisma.providerUser.findUnique({
-      where: { id: userId },
-      select: {
-        firstName: true,
-        lastName: true,
-      },
-    });
+    // Get the user who made the override for the response (if provided)
+    let overrideUser = null;
+    if (overrideByUserId) {
+      overrideUser = await prisma.providerUser.findUnique({
+        where: { id: overrideByUserId },
+        select: {
+          firstName: true,
+          lastName: true,
+        },
+      });
+    }
 
     return NextResponse.json({
       success: true,
@@ -154,6 +140,9 @@ export async function POST(
 /**
  * DELETE /api/provider/jobs/[id]/override
  * Remove skill override from a job
+ *
+ * Query params:
+ * - providerId: string (required)
  */
 export async function DELETE(
   request: NextRequest,
@@ -161,29 +150,13 @@ export async function DELETE(
 ) {
   try {
     const { id: jobId } = await params;
+    const searchParams = request.nextUrl.searchParams;
+    const providerId = searchParams.get('providerId');
 
-    // Get the current user from session
-    const cookieStore = await cookies();
-    const sessionCookie = cookieStore.get('provider_session');
-
-    if (!sessionCookie?.value) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    let session;
-    try {
-      session = JSON.parse(sessionCookie.value);
-    } catch {
-      return NextResponse.json({ error: 'Invalid session' }, { status: 401 });
-    }
-
-    const { providerId, role } = session;
-
-    // Only owners and office staff can remove overrides
-    if (!['owner', 'office'].includes(role)) {
+    if (!providerId) {
       return NextResponse.json(
-        { error: 'Only owners and office staff can remove skill overrides' },
-        { status: 403 }
+        { error: 'Provider ID is required' },
+        { status: 400 }
       );
     }
 
