@@ -632,12 +632,18 @@ export async function POST(req: Request) {
             if (!hasSkills && !job.allowUnqualified) {
               // Get missing skill details
               const missingIds = getMissingSkillIds(worker.skillIds, job.requiredSkillIds);
-              const missingNames = missingIds.map(id => skillNameMap.get(id) || id);
 
               // Get required skill names for display
               const requiredNames = job.requiredSkillIds.length > 0
                 ? job.requiredSkillIds.map(id => skillNameMap.get(id) || id)
                 : getRequiredSkillsForJob(job.serviceType);
+
+              // For missing names: use explicit IDs if available, otherwise use fuzzy-matched required skills
+              // When using fuzzy matching (no explicit skill IDs), ALL required skills are "missing"
+              // since the worker doesn't have any matching skills
+              const missingNames = missingIds.length > 0
+                ? missingIds.map(id => skillNameMap.get(id) || id)
+                : requiredNames;
 
               skillMismatches.push({
                 jobId: job.id,
