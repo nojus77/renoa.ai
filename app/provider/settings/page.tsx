@@ -870,10 +870,10 @@ export default function ProviderSettings() {
   };
 
   const tabs = [
-    { id: 'profile' as TabType, name: 'Profile', icon: User },
+    { id: 'profile' as TabType, name: 'Business Profile', icon: User },
     { id: 'availability' as TabType, name: 'Availability', icon: Clock },
     { id: 'services' as TabType, name: 'Services & Pricing', icon: DollarSign },
-    { id: 'team' as TabType, name: 'Team', icon: Users },
+    { id: 'team' as TabType, name: 'Team & Permissions', icon: Users },
     { id: 'notifications' as TabType, name: 'Notifications', icon: Bell },
     { id: 'payments' as TabType, name: 'Payments', icon: CreditCard },
     { id: 'integrations' as TabType, name: 'Integrations', icon: Link2 },
