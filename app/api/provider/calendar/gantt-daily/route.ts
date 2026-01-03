@@ -282,10 +282,18 @@ export async function GET(request: NextRequest) {
       };
       const [startHour, startMin] = (workingHours.start || '08:00').split(':').map(Number);
       const [endHour, endMin] = (workingHours.end || '17:00').split(':').map(Number);
-      const capacityHours = endHour + endMin / 60 - (startHour + startMin / 60);
+      let capacityHours = endHour + endMin / 60 - (startHour + startMin / 60);
+
+      // Ensure minimum capacity of 1 hour to avoid unrealistic percentages
+      // If working hours are invalid or too short, default to 8 hours
+      if (capacityHours <= 0 || isNaN(capacityHours)) {
+        capacityHours = 8;
+      }
 
       // Calculate utilization based on merged hours (not double-counting overlaps)
-      const utilization = capacityHours > 0 ? Math.round((totalHours / capacityHours) * 100) : 0;
+      // Cap at 200% to avoid absurd numbers while still showing overbooking
+      const rawUtilization = Math.round((totalHours / capacityHours) * 100);
+      const utilization = Math.min(rawUtilization, 200);
 
       // Worker is overbooked if utilization > 100% OR has any conflicts
       const isOverbooked = utilization > 100 || workerConflicts.length > 0;

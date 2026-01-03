@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { createNotification } from '@/lib/notifications';
 import { getTimezoneFromAddress } from '@/lib/google-timezone';
+import { geocodeAddress } from '@/lib/geocode';
 
 export async function POST(request: NextRequest) {
   try {
@@ -314,6 +315,28 @@ export async function POST(request: NextRequest) {
       requiredSkillsSnapshot = skills.map(s => ({ id: s.id, name: s.name }));
     }
 
+    // Geocode the job address to get lat/lng for map display
+    // Try job address first, then fall back to customer address
+    const addressToGeocode = customerAddress || '';
+    let latitude: number | null = null;
+    let longitude: number | null = null;
+
+    if (addressToGeocode) {
+      try {
+        const coords = await geocodeAddress(addressToGeocode);
+        if (coords) {
+          latitude = coords.lat;
+          longitude = coords.lng;
+          console.log('📍 Geocoded job address:', { address: addressToGeocode, lat: latitude, lng: longitude });
+        } else {
+          console.warn('⚠️ Could not geocode address:', addressToGeocode);
+        }
+      } catch (error) {
+        console.error('❌ Geocoding error:', error);
+        // Continue without coordinates - job will still be created
+      }
+    }
+
     // Create the job with skill requirements
     // Use explicit values from request if provided, otherwise fall back to ServiceTypeConfig
     const job = await prisma.job.create({
@@ -322,6 +345,8 @@ export async function POST(request: NextRequest) {
         customerId: finalCustomerId,
         serviceType,
         address: customerAddress || '',
+        latitude,
+        longitude,
         timezone: finalTimezone, // IANA timezone from job location
         startTime: startDate,
         endTime: endDate,

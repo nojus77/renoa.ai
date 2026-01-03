@@ -777,9 +777,24 @@ export default function ProviderCalendar() {
             {viewMode === 'week' && (
               <WeeklyTeamCalendar
                 providerId={providerId}
-                onJobClick={(jobId) => {
-                  const job = jobs.find(j => j.id === jobId);
-                  if (job) setSelectedJob(job);
+                onJobClick={async (jobId) => {
+                  // First try to find the job in local state
+                  const localJob = jobs.find(j => j.id === jobId);
+                  if (localJob) {
+                    setSelectedJob(localJob);
+                    return;
+                  }
+                  // If not found locally, fetch it from the API
+                  try {
+                    const res = await fetch(`/api/provider/jobs/${jobId}?providerId=${providerId}`);
+                    const data = await res.json();
+                    if (data.job) {
+                      setSelectedJob(data.job);
+                    }
+                  } catch (error) {
+                    console.error('Failed to fetch job details:', error);
+                    toast.error('Failed to load job details');
+                  }
                 }}
                 onDayClick={(workerId, date) => {
                   // Switch to daily view for the selected day
@@ -813,9 +828,24 @@ export default function ProviderCalendar() {
               <GanttDailyCalendar
                 providerId={providerId}
                 initialDate={currentDate}
-                onJobClick={(jobId) => {
-                  const job = jobs.find(j => j.id === jobId);
-                  if (job) setSelectedJob(job);
+                onJobClick={async (jobId) => {
+                  // First try to find the job in local state
+                  const localJob = jobs.find(j => j.id === jobId);
+                  if (localJob) {
+                    setSelectedJob(localJob);
+                    return;
+                  }
+                  // If not found locally, fetch it from the API
+                  try {
+                    const res = await fetch(`/api/provider/jobs/${jobId}?providerId=${providerId}`);
+                    const data = await res.json();
+                    if (data.job) {
+                      setSelectedJob(data.job);
+                    }
+                  } catch (error) {
+                    console.error('Failed to fetch job details:', error);
+                    toast.error('Failed to load job details');
+                  }
                 }}
                 onWorkerClick={(workerId) => setProfileWorkerId(workerId)}
                 onAddJob={(workerId, hour) => {

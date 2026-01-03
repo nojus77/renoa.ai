@@ -23,6 +23,9 @@ import {
   PhoneCall,
   Play,
   CheckCircle,
+  LogIn,
+  LogOut,
+  Navigation,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -93,6 +96,8 @@ export default function WorkerDashboard() {
   const [activeJobDismissed, setActiveJobDismissed] = useState(false);
   const [elapsedTime, setElapsedTime] = useState<string>('00:00:00');
   const [dispatchPhone, setDispatchPhone] = useState<string | null>(null);
+  const [clockingIn, setClockingIn] = useState(false);
+  const [clockingOut, setClockingOut] = useState(false);
 
   // Job creation modal state
   const [showCreateJob, setShowCreateJob] = useState(false);
@@ -297,6 +302,40 @@ export default function WorkerDashboard() {
     }
   };
 
+  // Handle clock in from dashboard
+  const handleQuickClockIn = async (jobId: string) => {
+    if (!userId || !providerId) return;
+
+    setClockingIn(true);
+    try {
+      const res = await fetch('/api/worker/clock-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jobId, userId, providerId }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        toast.success('Clocked in successfully!');
+        fetchJobs(userId);
+      } else {
+        toast.error(data.error || 'Failed to clock in');
+      }
+    } catch (error) {
+      console.error('Clock in error:', error);
+      toast.error('Failed to clock in');
+    } finally {
+      setClockingIn(false);
+    }
+  };
+
+  // Handle clock out from dashboard - navigates to job page for completion flow
+  const handleQuickClockOut = (jobId: string) => {
+    // Navigate to job detail page for full completion flow (signature, photos, etc.)
+    router.push(`/worker/job/${jobId}`);
+  };
+
   // Customer search with debounce
   useEffect(() => {
     if (showCreateJob && providerId && !isNewCustomer) {
@@ -460,6 +499,12 @@ export default function WorkerDashboard() {
     return 'scheduled';
   };
 
+  // Find next job to clock into (scheduled job that hasn't started yet)
+  const nextJobToClockIn = jobs.find((job) => {
+    const status = getJobStatus(job);
+    return status === 'scheduled' || status === 'on_the_way' || status === 'arrived';
+  });
+
   // Navigate to job details
   const handleJobClick = (jobId: string) => {
     console.log('handleJobClick called with jobId:', jobId);
@@ -586,6 +631,92 @@ export default function WorkerDashboard() {
             <p className="text-xs text-gray-500">Earned</p>
           </div>
         </div>
+
+        {/* Quick Clock In/Out Section */}
+        {(activeJob || nextJobToClockIn) && (
+          <div className="bg-[#1F1F1F] rounded-[20px] border border-[#2A2A2A] overflow-hidden">
+            {activeJob ? (
+              // Currently clocked in - show active job with clock out option
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-[#C4F542] animate-pulse" />
+                    <span className="text-sm font-medium text-[#C4F542]">Currently Working</span>
+                  </div>
+                  <span className="text-2xl font-bold font-mono" style={{ color: LIME_GREEN }}>
+                    {elapsedTime}
+                  </span>
+                </div>
+
+                <div className="bg-[#2A2A2A] rounded-xl p-3 space-y-1">
+                  <p className="text-white font-medium">{activeJob.serviceType}</p>
+                  <p className="text-sm text-zinc-400">{activeJob.customer.name}</p>
+                  <p className="text-sm text-zinc-500 truncate">{activeJob.address}</p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => router.push(`/worker/job/${activeJob.id}`)}
+                    className="flex-1 py-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] rounded-xl font-medium text-white flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    View Job
+                  </button>
+                  <button
+                    onClick={() => handleQuickClockOut(activeJob.id)}
+                    className="flex-1 py-3 rounded-xl font-semibold text-black flex items-center justify-center gap-2 transition-colors active:scale-[0.98]"
+                    style={{ backgroundColor: LIME_GREEN }}
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Complete Job
+                  </button>
+                </div>
+              </div>
+            ) : nextJobToClockIn ? (
+              // Not clocked in - show next job with clock in option
+              <div className="p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-zinc-400" />
+                  <span className="text-sm font-medium text-zinc-400">Next Job</span>
+                </div>
+
+                <div className="bg-[#2A2A2A] rounded-xl p-3 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-white font-medium">{nextJobToClockIn.serviceType}</p>
+                    <span className="text-sm font-medium" style={{ color: LIME_GREEN }}>
+                      {formatTime(nextJobToClockIn.startTime)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-zinc-400">{nextJobToClockIn.customer.name}</p>
+                  <p className="text-sm text-zinc-500 truncate">{nextJobToClockIn.address}</p>
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => router.push(`/worker/job/${nextJobToClockIn.id}`)}
+                    className="flex-1 py-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] rounded-xl font-medium text-white flex items-center justify-center gap-2 transition-colors"
+                  >
+                    <Navigation className="w-4 h-4" />
+                    View Job
+                  </button>
+                  <button
+                    onClick={() => handleQuickClockIn(nextJobToClockIn.id)}
+                    disabled={clockingIn}
+                    className="flex-1 py-3 rounded-xl font-semibold text-black flex items-center justify-center gap-2 transition-colors active:scale-[0.98] disabled:opacity-50"
+                    style={{ backgroundColor: LIME_GREEN }}
+                  >
+                    {clockingIn ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <LogIn className="w-4 h-4" />
+                    )}
+                    {clockingIn ? 'Starting...' : 'Start Job'}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        )}
 
         {/* Call Dispatch Button */}
         <button

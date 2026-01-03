@@ -154,10 +154,20 @@ export async function GET(request: NextRequest) {
       // Calculate total available hours
       const [startHour, startMin] = defaultStart.split(':').map(Number);
       const [endHour, endMin] = defaultEnd.split(':').map(Number);
-      const totalHours = (endHour + endMin / 60) - (startHour + startMin / 60);
+      let totalHours = (endHour + endMin / 60) - (startHour + startMin / 60);
+
+      // Ensure minimum capacity of 1 hour to avoid unrealistic percentages
+      // If working hours are invalid or too short, default to 8 hours
+      if (totalHours <= 0 || isNaN(totalHours)) {
+        totalHours = 8;
+      }
 
       // Find conflicts for this worker
       const conflicts = findConflicts(memberJobs);
+
+      // Calculate percentage and cap at 200% to avoid absurd numbers
+      const rawPercentage = Math.round((scheduledHours / totalHours) * 100);
+      const percentage = Math.min(rawPercentage, 200);
 
       return {
         id: member.id,
@@ -184,7 +194,7 @@ export async function GET(request: NextRequest) {
         capacity: {
           scheduled: Math.round(scheduledHours * 10) / 10,
           total: totalHours,
-          percentage: Math.round((scheduledHours / totalHours) * 100),
+          percentage,
         },
         conflicts,
       };
