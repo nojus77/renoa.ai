@@ -6,7 +6,15 @@ import { NextRequest } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { hasPermission, type Permission, type AdminRole } from './permissions';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('FATAL: JWT_SECRET environment variable is not set. Server cannot start without a secure JWT secret.');
+  }
+  return secret;
+}
+
+const JWT_SECRET = getJwtSecret();
 
 export interface DecodedToken {
   id: string;
@@ -25,7 +33,7 @@ export function verifyAdminToken(request: NextRequest): DecodedToken | null {
 
   const token = authHeader.substring(7);
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as DecodedToken;
+    const decoded = jwt.verify(token, JWT_SECRET) as unknown as DecodedToken;
     return decoded;
   } catch {
     return null;

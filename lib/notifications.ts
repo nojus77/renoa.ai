@@ -9,7 +9,8 @@ export type NotificationType =
   | 'worker_clocked_in'
   | 'job_created_by_worker'
   | 'new_team_member'
-  | 'job_assigned';
+  | 'job_assigned'
+  | 'schedule_conflict';
 
 interface CreateNotificationParams {
   providerId: string;

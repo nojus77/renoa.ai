@@ -419,6 +419,23 @@ export async function GET(request: NextRequest) {
       }
     });
 
+    // Track which workers are overbooked (have conflicts)
+    const overbookedWorkerIds = new Set<string>();
+    conflictingJobs.forEach(conflict => {
+      overbookedWorkerIds.add(conflict.workerId);
+    });
+
+    // Get overbooked worker details
+    const overbookedWorkers = Array.from(overbookedWorkerIds).map(id => {
+      const worker = providerWorkers.find(w => w.id === id);
+      const conflictCount = conflictingJobs.filter(c => c.workerId === id).length;
+      return {
+        id,
+        name: worker ? `${worker.firstName} ${worker.lastName}` : 'Unknown',
+        conflictCount
+      };
+    });
+
     console.log('🔔 DEBUG - Alerts for provider:', {
       providerId,
       pendingInvoices,
@@ -693,6 +710,7 @@ export async function GET(request: NextRequest) {
             } : null;
           }).filter(Boolean),
           overloadedWorkers,
+          overbookedWorkers,
           underutilizedWorkers,
           unassignedJobs,
           unassignedJobsLatest,

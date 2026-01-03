@@ -23,7 +23,20 @@ export async function GET(request: NextRequest) {
     }
 
     // Parse date or use today - use shared date utility for consistency
-    const targetDate = dateStr ? parseISO(dateStr) : new Date();
+    // Validate dateStr is a valid ISO date format before parsing
+    let targetDate: Date;
+    if (dateStr) {
+      const parsed = parseISO(dateStr);
+      if (isNaN(parsed.getTime())) {
+        return NextResponse.json(
+          { error: 'Invalid date format. Use YYYY-MM-DD.' },
+          { status: 400 }
+        );
+      }
+      targetDate = parsed;
+    } else {
+      targetDate = new Date();
+    }
     const { start: dayStart, end: dayEnd } = getDateRange(targetDate);
 
     console.log('[Dispatch API] Fetching jobs for:', {

@@ -93,16 +93,6 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     console.log('Payment Intent Amount:', paymentIntent.amount);
     console.log('Payment Intent Metadata:', JSON.stringify(paymentIntent.metadata));
 
-    // Idempotency check - prevent duplicate payment records from webhook retries
-    const existingPayment = await prisma.payment.findFirst({
-      where: { transactionId: paymentIntent.id },
-    });
-
-    if (existingPayment) {
-      console.log('⏭️ Duplicate webhook - payment already processed:', paymentIntent.id);
-      return;
-    }
-
     const invoiceId = paymentIntent.metadata.invoiceId;
 
     if (!invoiceId) {
@@ -140,20 +130,37 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     const paymentAmount = paymentIntent.amount / 100;
     console.log('Payment amount (converted from cents):', paymentAmount);
 
-    // Create payment record
-    console.log('Creating payment record...');
-    const payment = await prisma.payment.create({
-      data: {
-        invoiceId: invoice.id,
-        amount: paymentAmount,
-        paymentMethod: 'credit_card', // Stripe card payment (using enum value)
-        transactionId: paymentIntent.id,
-        paymentDate: new Date(),
-        notes: `Stripe payment: ${paymentIntent.id}`,
-      },
-    });
-
-    console.log('✓ Payment record created:', payment.id);
+    // ATOMIC IDEMPOTENCY: Use try-catch with unique constraint on transactionId
+    // This prevents race conditions where concurrent webhooks could create duplicate payments
+    // The database unique constraint guarantees exactly-once payment processing
+    let payment;
+    try {
+      console.log('Creating payment record (atomic with unique constraint)...');
+      payment = await prisma.payment.create({
+        data: {
+          invoiceId: invoice.id,
+          amount: paymentAmount,
+          paymentMethod: 'credit_card', // Stripe card payment (using enum value)
+          transactionId: paymentIntent.id,
+          paymentDate: new Date(),
+          notes: `Stripe payment: ${paymentIntent.id}`,
+        },
+      });
+      console.log('✓ Payment record created:', payment.id);
+    } catch (createError: unknown) {
+      // Check if this is a unique constraint violation (duplicate payment intent)
+      if (
+        createError &&
+        typeof createError === 'object' &&
+        'code' in createError &&
+        createError.code === 'P2002'
+      ) {
+        console.log('⏭️ Duplicate webhook (unique constraint) - payment already processed:', paymentIntent.id);
+        return; // Idempotent success - payment was already recorded
+      }
+      // Re-throw other errors
+      throw createError;
+    }
 
     // Calculate new amount paid and remaining balance
     const newAmountPaid = Number(invoice.amountPaid) + paymentAmount;
@@ -171,15 +178,18 @@ async function handlePaymentSucceeded(paymentIntent: Stripe.PaymentIntent) {
     let newStatus: 'sent' | 'partial' | 'paid' = invoice.status === 'draft' ? 'sent' : (invoice.status as 'sent' | 'partial' | 'paid');
     let paidDate: Date | null = invoice.paidDate;
 
-    if (remainingBalance <= 0.01) {
-      // Fully paid (accounting for floating point rounding)
+    // Use cents-based comparison to avoid floating point precision issues
+    // Round to cents (2 decimal places) before comparing
+    const remainingBalanceCents = Math.round(remainingBalance * 100);
+    if (remainingBalanceCents <= 0) {
+      // Fully paid (using cents-based comparison)
       newStatus = 'paid';
       paidDate = new Date();
-      console.log('Invoice will be marked as PAID (remainingBalance <= 0.01)');
+      console.log('Invoice will be marked as PAID (remainingBalanceCents <= 0)');
     } else if (newAmountPaid > 0) {
       // Partially paid
       newStatus = 'partial';
-      console.log('Invoice will be marked as PARTIAL (remainingBalance > 0.01)');
+      console.log('Invoice will be marked as PARTIAL (remainingBalanceCents > 0)');
     }
 
     // Update invoice

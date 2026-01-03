@@ -19,6 +19,15 @@ export async function POST(
       );
     }
 
+    // Validate payment amount is a positive number
+    const paymentAmount = Number(amount);
+    if (isNaN(paymentAmount) || paymentAmount <= 0) {
+      return NextResponse.json(
+        { error: 'Payment amount must be a positive number' },
+        { status: 400 }
+      );
+    }
+
     const invoice = await prisma.invoice.findUnique({
       where: { id: params.id },
     });
@@ -30,11 +39,20 @@ export async function POST(
       );
     }
 
-    // Create payment record
+    // Validate payment doesn't exceed remaining balance
+    const remainingBalance = Number(invoice.total) - Number(invoice.amountPaid);
+    if (paymentAmount > remainingBalance + 0.01) { // Allow small tolerance for rounding
+      return NextResponse.json(
+        { error: 'Payment amount cannot exceed invoice remaining balance' },
+        { status: 400 }
+      );
+    }
+
+    // Create payment record (use validated amount)
     const payment = await prisma.payment.create({
       data: {
         invoiceId: params.id,
-        amount,
+        amount: paymentAmount,
         paymentDate: new Date(paymentDate),
         paymentMethod,
         transactionId,
@@ -43,8 +61,8 @@ export async function POST(
       },
     });
 
-    // Calculate new amount paid
-    const newAmountPaid = Number(invoice.amountPaid) + Number(amount);
+    // Calculate new amount paid (use validated paymentAmount)
+    const newAmountPaid = Number(invoice.amountPaid) + paymentAmount;
     const total = Number(invoice.total);
 
     // Determine new status

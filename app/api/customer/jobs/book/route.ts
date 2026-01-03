@@ -16,7 +16,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { customerId, providerId } = JSON.parse(session.value);
+    // Safely parse session cookie
+    let customerId: string;
+    let providerId: string;
+    try {
+      const parsed = JSON.parse(session.value);
+      customerId = parsed.customerId;
+      providerId = parsed.providerId;
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid session' },
+        { status: 401 }
+      );
+    }
+
+    if (!customerId || !providerId) {
+      return NextResponse.json(
+        { error: 'Invalid session data' },
+        { status: 401 }
+      );
+    }
     const body = await request.json();
     const {
       serviceType,

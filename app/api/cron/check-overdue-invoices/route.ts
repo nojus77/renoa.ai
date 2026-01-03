@@ -5,9 +5,19 @@ const prisma = new PrismaClient();
 
 export async function GET(request: NextRequest) {
   try {
+    // Verify CRON_SECRET is configured - reject ALL requests if missing
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      console.error('❌ CRON_SECRET environment variable is not configured');
+      return NextResponse.json(
+        { error: 'Cron secret not configured' },
+        { status: 401 }
+      );
+    }
+
     // Verify authorization from Vercel Cron
     const authHeader = request.headers.get('authorization');
-    const expectedAuth = `Bearer ${process.env.CRON_SECRET}`;
+    const expectedAuth = `Bearer ${cronSecret}`;
 
     if (authHeader !== expectedAuth) {
       console.error('❌ Unauthorized cron request');

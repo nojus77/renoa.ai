@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('FATAL: JWT_SECRET environment variable is not set.');
+  }
+  return secret;
+}
+
+const JWT_SECRET = getJwtSecret();
 
 export async function POST(request: NextRequest) {
   try {

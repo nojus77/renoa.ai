@@ -73,81 +73,86 @@ export async function POST(
       }
     }
 
-    // Create or update job completion data
-    const completionData = await prisma.jobCompletionData.upsert({
-      where: { jobId },
-      update: {
-        checklistCompleted,
-        completionPhotos,
-        signatureUrl,
-        signedByName: skipSignature ? null : signedByName,
-        signedAt: skipSignature ? null : new Date(),
-        completionNotes,
-      },
-      create: {
-        jobId,
-        checklistCompleted,
-        completionPhotos,
-        signatureUrl,
-        signedByName: skipSignature ? null : signedByName,
-        signedAt: skipSignature ? null : new Date(),
-        completionNotes,
-      },
-    });
-
-    // Update job status
-    await prisma.job.update({
-      where: { id: jobId },
-      data: {
-        status: 'completed',
-        completedAt: new Date(),
-        completedByUserId,
-        actualDurationMinutes,
-      },
-    });
-
-    // Create invoice if requested
-    let invoice = null;
-    if (createInvoice && job.estimatedValue) {
-      // Generate invoice number
-      const invoiceCount = await prisma.invoice.count({
-        where: { providerId: job.providerId },
-      });
-      const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(4, '0')}`;
-
-      const subtotal = job.actualValue || job.estimatedValue;
-      const taxRate = 0; // Could be configurable per provider
-      const taxAmount = subtotal * (taxRate / 100);
-      const total = subtotal + taxAmount;
-
-      invoice = await prisma.invoice.create({
-        data: {
-          invoiceNumber,
-          providerId: job.providerId,
-          customerId: job.customerId,
-          jobId: job.id,
-          status: 'sent',
-          invoiceDate: new Date(),
-          dueDate: addDays(new Date(), 30),
-          subtotal,
-          taxRate,
-          taxAmount,
-          total,
-          notes: `Service: ${job.serviceType}\nAddress: ${job.address}`,
-          lineItems: {
-            create: [
-              {
-                description: job.serviceType,
-                quantity: 1,
-                unitPrice: subtotal,
-                total: subtotal,
-                order: 0,
-              },
-            ],
-          },
+    // Use transaction to ensure all database writes succeed or fail together
+    const { completionData, invoice } = await prisma.$transaction(async (tx) => {
+      // Create or update job completion data
+      const completionData = await tx.jobCompletionData.upsert({
+        where: { jobId },
+        update: {
+          checklistCompleted,
+          completionPhotos,
+          signatureUrl,
+          signedByName: skipSignature ? null : signedByName,
+          signedAt: skipSignature ? null : new Date(),
+          completionNotes,
+        },
+        create: {
+          jobId,
+          checklistCompleted,
+          completionPhotos,
+          signatureUrl,
+          signedByName: skipSignature ? null : signedByName,
+          signedAt: skipSignature ? null : new Date(),
+          completionNotes,
         },
       });
-    }
+
+      // Update job status
+      await tx.job.update({
+        where: { id: jobId },
+        data: {
+          status: 'completed',
+          completedAt: new Date(),
+          completedByUserId,
+          actualDurationMinutes,
+        },
+      });
+
+      // Create invoice if requested
+      let invoice = null;
+      if (createInvoice && job.estimatedValue) {
+        // Generate invoice number
+        const invoiceCount = await tx.invoice.count({
+          where: { providerId: job.providerId },
+        });
+        const invoiceNumber = `INV-${new Date().getFullYear()}-${String(invoiceCount + 1).padStart(4, '0')}`;
+
+        const subtotal = job.actualValue || job.estimatedValue;
+        const taxRate = 0; // Could be configurable per provider
+        const taxAmount = subtotal * (taxRate / 100);
+        const total = subtotal + taxAmount;
+
+        invoice = await tx.invoice.create({
+          data: {
+            invoiceNumber,
+            providerId: job.providerId,
+            customerId: job.customerId,
+            jobId: job.id,
+            status: 'sent',
+            invoiceDate: new Date(),
+            dueDate: addDays(new Date(), 30),
+            subtotal,
+            taxRate,
+            taxAmount,
+            total,
+            notes: `Service: ${job.serviceType}\nAddress: ${job.address}`,
+            lineItems: {
+              create: [
+                {
+                  description: job.serviceType,
+                  quantity: 1,
+                  unitPrice: subtotal,
+                  total: subtotal,
+                  order: 0,
+                },
+              ],
+            },
+          },
+        });
+      }
+
+      return { completionData, invoice };
+    });
 
     // TODO: Send completion email to customer
     // await sendCompletionEmail(job, invoice);

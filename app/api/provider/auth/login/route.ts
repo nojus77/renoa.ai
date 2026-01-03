@@ -57,31 +57,6 @@ export async function POST(request: NextRequest) {
         data: { lastLoginAt: new Date() },
       });
 
-      // 🔓 DEV BYPASS - Master password for local testing only
-      const DEV_BYPASS_PASSWORD = 'devpass123';
-      if (process.env.NODE_ENV === 'development' && password === DEV_BYPASS_PASSWORD) {
-        console.log('🔓 DEV BYPASS: Logged in as', user.email, '(Role:', user.role + ')');
-
-        return NextResponse.json({
-          success: true,
-          user: {
-            id: user.id,
-            email: user.email,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            role: user.role,
-            providerId: user.providerId,
-          },
-          provider: {
-            id: user.provider.id,
-            businessName: user.provider.businessName,
-            ownerName: user.provider.ownerName,
-            email: user.provider.email,
-            phone: user.provider.phone,
-          },
-        });
-      }
-
       // Verify password
       const passwordValid = await bcrypt.compare(password, user.passwordHash);
       if (!passwordValid) {
@@ -141,8 +116,9 @@ export async function POST(request: NextRequest) {
       const firstName = nameParts[0] || 'Owner';
       const lastName = nameParts.slice(1).join(' ') || provider.businessName || 'Admin';
 
-      // Create simple temporary password
-      const tempPassword = '123456';
+      // Generate secure random password (16 chars with letters, numbers, symbols)
+      const crypto = await import('crypto');
+      const tempPassword = crypto.randomBytes(12).toString('base64').slice(0, 16);
       const passwordHash = await bcrypt.hash(tempPassword, 10);
 
       ownerUser = await prisma.providerUser.create({
@@ -159,11 +135,15 @@ export async function POST(request: NextRequest) {
       });
 
       console.log('✅ Auto-created owner user:', firstName, lastName);
+      console.log('📧 Temporary password generated for', provider.email, '- user must reset password');
+
+      // TODO: Send email with temporary password to provider.email
+      // For now, return flag indicating password setup is required
     }
 
     console.log('✅ Legacy provider login successful (auto-migrated):', provider.businessName);
 
-    // Return user + provider data just like multi-user login
+    // Return user + provider data - require password setup for migrated accounts
     return NextResponse.json({
       success: true,
       user: {
@@ -181,7 +161,7 @@ export async function POST(request: NextRequest) {
         email: provider.email,
         phone: provider.phone,
       },
-      needsPasswordSetup: true, // Flag to prompt password change
+      needsPasswordSetup: true, // Flag to prompt password change - user MUST set new password
     });
 
   } catch (error) {

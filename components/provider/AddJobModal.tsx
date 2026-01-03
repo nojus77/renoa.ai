@@ -670,7 +670,15 @@ export default function AddJobModal({
       }
 
       setShowSuccessAnimation(true);
-      toast.success('Job created successfully!');
+
+      // Show conflict warning if applicable
+      if (data.hasConflicts) {
+        toast.warning('Job created but has scheduling conflicts! Check calendar for overlapping jobs.', {
+          duration: 5000,
+        });
+      } else {
+        toast.success('Job created successfully!');
+      }
 
       setTimeout(() => {
         setShowSuccessAnimation(false);

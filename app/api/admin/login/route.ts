@@ -6,7 +6,15 @@ import { authRateLimiter, withRateLimit } from '@/lib/rate-limit';
 
 const prisma = new PrismaClient();
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('FATAL: JWT_SECRET environment variable is not set.');
+  }
+  return secret;
+}
+
+const JWT_SECRET = getJwtSecret();
 
 export async function POST(request: NextRequest) {
   // Rate limit: 5 requests per minute for login attempts

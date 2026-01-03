@@ -4,7 +4,16 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this-in-production';
+
+function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('FATAL: JWT_SECRET environment variable is not set.');
+  }
+  return secret;
+}
+
+const JWT_SECRET = getJwtSecret();
 
 // Verify admin token and extract user info
 function verifyAdminToken(request: NextRequest) {

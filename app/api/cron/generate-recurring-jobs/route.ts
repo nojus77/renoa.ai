@@ -29,9 +29,19 @@ function calculateNextOccurrence(lastDate: Date, frequency: string): Date {
 
 export async function GET(request: NextRequest) {
   try {
+    // Verify CRON_SECRET is configured - reject ALL requests if missing
+    const cronSecret = process.env.CRON_SECRET;
+    if (!cronSecret) {
+      console.error('❌ CRON_SECRET environment variable is not configured');
+      return NextResponse.json(
+        { error: 'Cron secret not configured' },
+        { status: 401 }
+      );
+    }
+
     // Verify authorization from Vercel Cron
     const authHeader = request.headers.get('authorization');
-    const expectedAuth = `Bearer ${process.env.CRON_SECRET}`;
+    const expectedAuth = `Bearer ${cronSecret}`;
 
     if (authHeader !== expectedAuth) {
       console.error('❌ Unauthorized cron request');
@@ -47,6 +57,7 @@ export async function GET(request: NextRequest) {
     const providerSummary: Record<string, number> = {};
 
     // Find all recurring jobs across ALL providers
+    // Limit to 1000 to prevent memory issues with large datasets
     const recurringJobs = await prisma.job.findMany({
       where: {
         isRecurring: true,
@@ -59,6 +70,8 @@ export async function GET(request: NextRequest) {
         customer: true,
         provider: true,
       },
+      take: 1000, // Prevent unbounded queries
+      orderBy: { startTime: 'asc' }, // Process oldest first
     });
 
     console.log(`📅 Found ${recurringJobs.length} recurring jobs across all providers`);

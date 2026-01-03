@@ -56,6 +56,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields: providerId, serviceType, startTime' }, { status: 400 });
     }
 
+    // Validate startTime is a valid date
+    const startDate = new Date(startTime);
+    if (isNaN(startDate.getTime())) {
+      return NextResponse.json({ error: 'Invalid startTime: must be a valid date string' }, { status: 400 });
+    }
+
     // Duration validation
     const durationHours = durationMinutes ? durationMinutes / 60 : duration;
     if (!durationHours || durationHours <= 0) {
@@ -84,8 +90,7 @@ export async function POST(request: NextRequest) {
       finalCustomerId = newCustomer.id;
     }
 
-    // Calculate endTime from startTime + duration
-    const startDate = new Date(startTime);
+    // Calculate endTime from startTime + duration (startDate already validated above)
     const endDate = new Date(startDate.getTime() + durationHours * 60 * 60 * 1000);
 
     // Verify assigned user IDs belong to this provider (if any)
@@ -115,35 +120,77 @@ export async function POST(request: NextRequest) {
       console.log('ℹ️ No users assigned to this job');
     }
 
-    // Check for blocked time conflicts (if workers are assigned)
+    // Check for blocked time conflicts
+    // Get the job's date (for recurring block check)
+    const jobDayOfWeek = startDate.getDay();
+
+    // Find blocked times that overlap with this job's time
+    const blockedTimes = await prisma.blockedTime.findMany({
+      where: {
+        providerId,
+        fromDate: { lte: endDate },
+        toDate: { gte: startDate },
+        OR: [
+          { isRecurring: false },
+          {
+            AND: [
+              { isRecurring: true },
+              {
+                OR: [
+                  { recurringEndsType: 'never' },
+                  { recurringEndsOnDate: { gte: startDate } },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    // Check for company-wide blocks first (affects all jobs regardless of assignment)
+    for (const block of blockedTimes) {
+      // For recurring blocks, check if the day of week matches
+      if (block.isRecurring && block.recurringType === 'weekly' && block.recurringDaysOfWeek) {
+        const blockDays = block.recurringDaysOfWeek as number[];
+        if (!blockDays.includes(jobDayOfWeek)) continue;
+      }
+
+      // Check time overlap (if time-specific block)
+      if (block.startTime && block.endTime) {
+        const [blockStartH, blockStartM] = block.startTime.split(':').map(Number);
+        const [blockEndH, blockEndM] = block.endTime.split(':').map(Number);
+        const jobStartHour = startDate.getHours() + startDate.getMinutes() / 60;
+        const jobEndHour = endDate.getHours() + endDate.getMinutes() / 60;
+        const blockStartHour = blockStartH + blockStartM / 60;
+        const blockEndHour = blockEndH + blockEndM / 60;
+
+        // Check if there's no overlap
+        if (jobEndHour <= blockStartHour || jobStartHour >= blockEndHour) {
+          continue; // No time overlap, skip this block
+        }
+      }
+
+      // If this is a company-wide block, reject the job creation entirely
+      if (block.scope === 'company') {
+        console.log('⚠️ Company-wide blocked time conflict detected:', {
+          blockId: block.id,
+          reason: block.reason,
+          fromDate: block.fromDate,
+          toDate: block.toDate,
+        });
+
+        return NextResponse.json(
+          {
+            error: `Cannot schedule job: The company is blocked during this time${block.reason ? ` (${block.reason})` : ''}`,
+            blockedType: 'company',
+          },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Check if any assigned workers are blocked
     if (assignedUserIds && assignedUserIds.length > 0) {
-      // Get the job's date (for recurring block check)
-      const jobDayOfWeek = startDate.getDay();
-
-      // Find blocked times that overlap with this job's time
-      const blockedTimes = await prisma.blockedTime.findMany({
-        where: {
-          providerId,
-          fromDate: { lte: endDate },
-          toDate: { gte: startDate },
-          OR: [
-            { isRecurring: false },
-            {
-              AND: [
-                { isRecurring: true },
-                {
-                  OR: [
-                    { recurringEndsType: 'never' },
-                    { recurringEndsOnDate: { gte: startDate } },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      });
-
-      // Check if any blocked time affects the assigned workers
       const blockedWorkers: string[] = [];
       for (const block of blockedTimes) {
         // For recurring blocks, check if the day of week matches
@@ -167,12 +214,8 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Determine which workers are affected
-        if (block.scope === 'company') {
-          // Company-wide block affects all assigned workers
-          blockedWorkers.push(...assignedUserIds);
-        } else if (block.scope === 'workers' && block.blockedWorkerIds) {
-          // Check if any assigned workers are in the blocked list
+        // Check if any assigned workers are in the blocked list
+        if (block.scope === 'workers' && block.blockedWorkerIds) {
           const affected = assignedUserIds.filter((id: string) =>
             block.blockedWorkerIds.includes(id)
           );
@@ -194,7 +237,7 @@ export async function POST(request: NextRequest) {
           .map(w => `${w.firstName} ${w.lastName}`)
           .join(', ');
 
-        console.log('⚠️ Blocked time conflict detected:', {
+        console.log('⚠️ Worker blocked time conflict detected:', {
           blockedWorkers: uniqueBlockedWorkers,
           workerNames,
         });
@@ -238,6 +281,28 @@ export async function POST(request: NextRequest) {
 
     // Determine final required skill IDs
     const finalRequiredSkillIds = requiredSkillIds ?? serviceConfig?.requiredSkills ?? [];
+    const finalPreferredSkillIds = preferredSkillIds ?? serviceConfig?.preferredSkills ?? [];
+
+    // Validate skill IDs exist in the database (if any provided)
+    const allSkillIds = Array.from(new Set([...finalRequiredSkillIds, ...finalPreferredSkillIds]));
+    if (allSkillIds.length > 0) {
+      const existingSkills = await prisma.skill.findMany({
+        where: {
+          id: { in: allSkillIds },
+          providerId, // Skills must belong to this provider
+        },
+        select: { id: true },
+      });
+      const existingSkillIds = new Set(existingSkills.map(s => s.id));
+      const invalidSkillIds = allSkillIds.filter(id => !existingSkillIds.has(id));
+
+      if (invalidSkillIds.length > 0) {
+        return NextResponse.json(
+          { error: `Invalid skill IDs: ${invalidSkillIds.join(', ')}` },
+          { status: 400 }
+        );
+      }
+    }
 
     // Create skill snapshot for display (prevents showing IDs if skills are deleted)
     let requiredSkillsSnapshot: Array<{ id: string; name: string }> | null = null;
@@ -270,9 +335,9 @@ export async function POST(request: NextRequest) {
         recurringFrequency: isRecurring ? recurringFrequency : null,
         recurringEndDate: isRecurring && recurringEndDate ? new Date(recurringEndDate) : null,
         assignedUserIds,
-        // Skill requirements: prefer explicit values, fall back to ServiceTypeConfig
+        // Skill requirements: prefer explicit values, fall back to ServiceTypeConfig (already validated)
         requiredSkillIds: finalRequiredSkillIds,
-        preferredSkillIds: preferredSkillIds ?? serviceConfig?.preferredSkills ?? [],
+        preferredSkillIds: finalPreferredSkillIds,
         // Snapshot of skill names at creation (only store if we have skills)
         ...(requiredSkillsSnapshot && requiredSkillsSnapshot.length > 0
           ? { requiredSkillsSnapshot: requiredSkillsSnapshot }
@@ -296,6 +361,44 @@ export async function POST(request: NextRequest) {
       assignedUserIds: job.assignedUserIds,
       hasCustomer: !!job.customer,
     });
+
+    // Check for scheduling conflicts with the newly created job
+    let hasConflicts = false;
+    const conflictingWorkers: string[] = [];
+
+    if (assignedUserIds && assignedUserIds.length > 0) {
+      // Find other jobs for these workers that overlap with this job's time
+      const overlappingJobs = await prisma.job.findMany({
+        where: {
+          providerId,
+          id: { not: job.id }, // Exclude the job we just created
+          assignedUserIds: { hasSome: assignedUserIds },
+          status: { notIn: ['cancelled', 'completed', 'no_show'] },
+          // Check for time overlap: job starts before this ends AND ends after this starts
+          startTime: { lt: endDate },
+          endTime: { gt: startDate },
+        },
+        select: {
+          id: true,
+          serviceType: true,
+          startTime: true,
+          endTime: true,
+          assignedUserIds: true,
+        },
+      });
+
+      if (overlappingJobs.length > 0) {
+        hasConflicts = true;
+        // Find which workers have conflicts
+        for (const overlappingJob of overlappingJobs) {
+          for (const userId of assignedUserIds) {
+            if (overlappingJob.assignedUserIds.includes(userId) && !conflictingWorkers.includes(userId)) {
+              conflictingWorkers.push(userId);
+            }
+          }
+        }
+      }
+    }
 
     // Send notifications to assigned workers
     if (assignedUserIds && assignedUserIds.length > 0) {
@@ -330,13 +433,60 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('✅ Job assignment notifications sent');
+
+      // If there are conflicts, send a warning notification to office users
+      if (hasConflicts && conflictingWorkers.length > 0) {
+        console.log('⚠️ Scheduling conflict detected, sending notifications');
+
+        // Get conflicting worker names
+        const conflictingWorkerDetails = await prisma.providerUser.findMany({
+          where: { id: { in: conflictingWorkers } },
+          select: { id: true, firstName: true, lastName: true },
+        });
+        const workerNames = conflictingWorkerDetails.map(w => `${w.firstName} ${w.lastName}`).join(', ');
+
+        // Get office users to notify
+        const officeUsers = await prisma.providerUser.findMany({
+          where: {
+            providerId,
+            role: { in: ['admin', 'owner', 'office'] },
+            status: 'active',
+          },
+          select: { id: true },
+        });
+
+        for (const officeUser of officeUsers) {
+          await createNotification({
+            providerId,
+            userId: officeUser.id,
+            type: 'schedule_conflict',
+            title: '⚠️ Scheduling Conflict',
+            message: `${workerNames} ${conflictingWorkers.length > 1 ? 'have' : 'has'} overlapping jobs on ${jobDate} at ${jobTime}`,
+            link: `/provider/calendar?date=${startDate.toISOString().split('T')[0]}`,
+            data: {
+              jobId: job.id,
+              conflictingWorkerIds: conflictingWorkers,
+              conflictType: 'time_overlap',
+            },
+          });
+        }
+
+        console.log('✅ Conflict notifications sent to office users');
+      }
     }
 
-    const response = { success: true, job };
+    const response = {
+      success: true,
+      job,
+      // Include conflict info for frontend to show warning
+      hasConflicts,
+      conflictingWorkers: hasConflicts ? conflictingWorkers : undefined,
+    };
     console.log('📤 Returning response with job data:', {
       success: response.success,
       jobId: response.job.id,
       customerName: response.job.customer?.name,
+      hasConflicts,
     });
 
     return NextResponse.json(response);

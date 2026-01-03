@@ -19,12 +19,60 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { providerId, userIds = [], skipSkillCheck = false } = body;
+    const { providerId, userIds = [], skipSkillCheck = false, requesterId } = body;
 
     if (!providerId) {
       return NextResponse.json(
         { error: 'Provider ID required' },
         { status: 400 }
+      );
+    }
+
+    // AUTH CHECK: Verify requester exists and has admin role (owner, admin, or office)
+    if (!requesterId) {
+      return NextResponse.json(
+        { error: 'Requester ID required' },
+        { status: 400 }
+      );
+    }
+
+    const requester = await prisma.providerUser.findUnique({
+      where: { id: requesterId },
+      select: {
+        id: true,
+        providerId: true,
+        role: true,
+        status: true,
+      },
+    });
+
+    if (!requester) {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      );
+    }
+
+    if (requester.status !== 'active') {
+      return NextResponse.json(
+        { error: 'Your account has been deactivated' },
+        { status: 403 }
+      );
+    }
+
+    if (requester.providerId !== providerId) {
+      return NextResponse.json(
+        { error: 'Forbidden - provider mismatch' },
+        { status: 403 }
+      );
+    }
+
+    // Only admin roles can assign jobs (field workers cannot)
+    const adminRoles = ['owner', 'admin', 'office'];
+    if (!adminRoles.includes(requester.role)) {
+      return NextResponse.json(
+        { error: 'Forbidden - only admin users can assign jobs' },
+        { status: 403 }
       );
     }
 
