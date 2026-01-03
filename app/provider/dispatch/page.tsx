@@ -623,8 +623,8 @@ export default function DispatchPage() {
                 onClick={() => toggleStatusFilter('scheduled')}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   statusFilter.includes('scheduled')
-                    ? 'bg-emerald-500 text-white'
-                    : 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20'
+                    ? 'bg-zinc-100 text-zinc-900'
+                    : 'bg-zinc-500/10 text-zinc-400 hover:bg-zinc-500/20'
                 }`}
               >
                 Scheduled
@@ -653,8 +653,8 @@ export default function DispatchPage() {
                 onClick={() => toggleStatusFilter('completed')}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
                   statusFilter.includes('completed')
-                    ? 'bg-zinc-500 text-white'
-                    : 'bg-zinc-500/10 text-zinc-600 hover:bg-zinc-500/20'
+                    ? 'bg-emerald-500 text-white'
+                    : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'
                 }`}
               >
                 Completed
@@ -884,12 +884,6 @@ export default function DispatchPage() {
                       strokeWeight = 4;
                     } else if (isInProgress) {
                       strokeColor = '#f59e0b'; // Orange for in progress
-                      strokeWeight = 4;
-                    }
-
-                    // Fixed appointments still get red outline (takes priority)
-                    if (job.appointmentType === 'fixed') {
-                      strokeColor = '#ef4444';
                       strokeWeight = 4;
                     }
 
